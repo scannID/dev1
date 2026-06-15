@@ -1,10 +1,12 @@
 import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, MoreHorizontal, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import './App.css'
 
 const ORDERS_KEY = 'scanit-orders-v1'
 const BUSINESSES_KEY = 'scanit-businesses-v1'
 const SCAN_BASE_URL = 'https://scanit.app'
+const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
 type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
 
@@ -311,7 +313,6 @@ function App() {
           {[
             ['account', 'Overview'],
             ['catalog', 'Catalog'],
-            ['customer', 'Customer view'],
             ['dashboard', `Orders${pendingCount ? ` (${pendingCount})` : ''}`],
           ].map(([id, label]) => (
             <button
@@ -335,7 +336,11 @@ function App() {
             <h2>Welcome, {business.ownerName}</h2>
             <p>Everything here belongs to {business.name}: QR, prices, orders, and payments.</p>
           </div>
-          <div className="company-pill">{business.merchantId}</div>
+          {view === 'account' && (
+            <button className="primary-action topbar-add-item-button" type="button" onClick={() => setView('add-item')}>
+              Add item
+            </button>
+          )}
         </header>
 
         <section className="metric-grid" aria-label="Company summary">
@@ -361,17 +366,14 @@ function App() {
           <OverviewPage business={business} />
         )}
 
-        {view === 'customer' && (
-          <CustomerMenu
+        {view === 'add-item' && (
+          <AddItemPage
             business={business}
-            categories={categories}
-            cartLines={cartLines}
-            customer={customer}
-            total={total}
-            onAdd={addToCart}
-            onCustomerChange={setCustomer}
-            onQuantityChange={updateQuantity}
-            onSubmit={submitOrder}
+            onBack={() => setView('account')}
+            onItemsChange={(items) => {
+              updateBusinessItems(items)
+              setView('catalog')
+            }}
           />
         )}
 
@@ -736,6 +738,20 @@ function CustomerMenu({
   onQuantityChange: (itemId: string, quantity: number) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const [submitted, setSubmitted] = useState(false)
+  const isCustomerNameMissing = submitted && !customer.name.trim()
+
+  function submitOrderForm(event) {
+    setSubmitted(true)
+
+    if (!customer.name.trim()) {
+      event.preventDefault()
+      return
+    }
+
+    onSubmit(event)
+  }
+
   return (
     <div className="customer-layout">
       <section className="menu-panel">
@@ -801,15 +817,18 @@ function CustomerMenu({
           <p className="empty">Add menu items or tickets to start an order.</p>
         )}
 
-        <form className="order-form" onSubmit={onSubmit}>
+        <form className="order-form" noValidate onSubmit={submitOrderForm}>
           <label>
             Name
             <input
               required
+              aria-invalid={isCustomerNameMissing}
+              className={isCustomerNameMissing ? 'field-error' : undefined}
               value={customer.name}
               onChange={(event) => onCustomerChange({ ...customer, name: event.target.value })}
               placeholder="Customer name"
             />
+            {isCustomerNameMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
           </label>
           <label>
             Phone
@@ -853,7 +872,7 @@ function CustomerMenu({
   )
 }
 
-function CatalogPage({
+function AddItemForm({
   business,
   onItemsChange,
 }: {
@@ -868,6 +887,7 @@ function CatalogPage({
     available: true,
   }
   const [item, setItem] = useState(emptyItem)
+  const [submitted, setSubmitted] = useState(false)
   const categories = [...new Set<string>(business.items.map((entry) => entry.category))]
 
   function submitItem(event) {
@@ -876,6 +896,8 @@ function CatalogPage({
     const name = item.name.trim()
     const category = item.category.trim()
     const price = Number(item.price)
+
+    setSubmitted(true)
 
     if (!name || !category || !Number.isFinite(price) || price <= 0) return
 
@@ -890,8 +912,127 @@ function CatalogPage({
 
     onItemsChange([...business.items, newItem])
     setItem(emptyItem)
+    setSubmitted(false)
   }
 
+  const isItemNameMissing = submitted && !item.name.trim()
+  const isCategoryMissing = submitted && !item.category.trim()
+  const price = Number(item.price)
+  const isPriceMissing = submitted && (!Number.isFinite(price) || price <= 0)
+
+  return (
+    <form className="catalog-form universal-item-form" noValidate onSubmit={submitItem}>
+      <div>
+        <p className="eyebrow">Add item</p>
+        <h3>New item, service, or ticket</h3>
+      </div>
+
+      <label>
+        Item or ticket name
+        <input
+          required
+          aria-invalid={isItemNameMissing}
+          className={isItemNameMissing ? 'field-error' : undefined}
+          value={item.name}
+          onChange={(event) => setItem({ ...item, name: event.target.value })}
+          placeholder="Burger, cocktail, VIP ticket, uniform, school lunch..."
+        />
+        {isItemNameMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
+      </label>
+
+      <label>
+        Category
+        <input
+          required
+          aria-invalid={isCategoryMissing}
+          className={isCategoryMissing ? 'field-error' : undefined}
+          list="catalog-categories"
+          value={item.category}
+          onChange={(event) => setItem({ ...item, category: event.target.value })}
+          placeholder="Meals, Drinks, Tickets, Services, Goods..."
+        />
+        {isCategoryMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
+      </label>
+
+      <datalist id="catalog-categories">
+        {categories.map((category) => (
+          <option value={category} key={category} />
+        ))}
+      </datalist>
+
+      <label>
+        Price
+        <input
+          required
+          aria-invalid={isPriceMissing}
+          className={isPriceMissing ? 'field-error' : undefined}
+          min="1"
+          type="number"
+          value={item.price}
+          onChange={(event) => setItem({ ...item, price: event.target.value })}
+          placeholder="18000"
+        />
+        {isPriceMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
+      </label>
+
+      <label>
+        Description
+        <textarea
+          value={item.description}
+          onChange={(event) => setItem({ ...item, description: event.target.value })}
+          placeholder="Size, flavor, seat type, pickup details, event date, or customer note"
+        />
+      </label>
+
+      <label className="inline-check">
+        <input
+          checked={item.available}
+          type="checkbox"
+          onChange={(event) => setItem({ ...item, available: event.target.checked })}
+        />
+        Available to customers
+      </label>
+
+      <button className="primary-action" type="submit">
+        Add item
+      </button>
+    </form>
+  )
+}
+function AddItemPage({
+  business,
+  onBack,
+  onItemsChange,
+}: {
+  business: Business
+  onBack: () => void
+  onItemsChange: (items: CatalogItem[]) => void
+}) {
+  return (
+    <section className="add-item-page">
+      <button className="icon-button add-item-back-button" type="button" onClick={onBack} aria-label="Back to overview" title="Back to overview">
+        <ArrowLeft size={20} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+
+      <div className="dashboard-head add-item-head">
+        <div>
+          <p className="eyebrow">Add item</p>
+          <h3>Add item</h3>
+        </div>
+      </div>
+
+      <AddItemForm business={business} onItemsChange={onItemsChange} />
+    </section>
+  )
+}
+
+function CatalogPage({
+  business,
+  onItemsChange,
+}: {
+  business: Business
+  onItemsChange: (items: CatalogItem[]) => void
+}) {
   function updateItem(itemId, field, value) {
     onItemsChange(
       business.items.map((entry) =>
@@ -920,73 +1061,7 @@ function CatalogPage({
       </div>
 
       <div className="catalog-layout">
-        <form className="catalog-form" onSubmit={submitItem}>
-          <div>
-            <p className="eyebrow">Add item</p>
-            <h3>New good, meal, service, or ticket</h3>
-          </div>
-
-          <label>
-            Item name
-            <input
-              required
-              value={item.name}
-              onChange={(event) => setItem({ ...item, name: event.target.value })}
-              placeholder="Chicken wrap, VIP ticket, School lunch..."
-            />
-          </label>
-
-          <label>
-            Category
-            <input
-              required
-              list="catalog-categories"
-              value={item.category}
-              onChange={(event) => setItem({ ...item, category: event.target.value })}
-              placeholder="Meals, Drinks, Tickets, Goods..."
-            />
-          </label>
-
-          <datalist id="catalog-categories">
-            {categories.map((category) => (
-              <option value={category} key={category} />
-            ))}
-          </datalist>
-
-          <label>
-            Price
-            <input
-              required
-              min="1"
-              type="number"
-              value={item.price}
-              onChange={(event) => setItem({ ...item, price: event.target.value })}
-              placeholder="18000"
-            />
-          </label>
-
-          <label>
-            Description
-            <textarea
-              value={item.description}
-              onChange={(event) => setItem({ ...item, description: event.target.value })}
-              placeholder="Short detail customers will see"
-            />
-          </label>
-
-          <label className="inline-check">
-            <input
-              checked={item.available}
-              type="checkbox"
-              onChange={(event) => setItem({ ...item, available: event.target.checked })}
-            />
-            Available to customers
-          </label>
-
-          <button className="primary-action" type="submit">
-            Add item
-          </button>
-        </form>
+        <AddItemForm business={business} onItemsChange={onItemsChange} />
 
         <div className="catalog-table">
           <div className="catalog-table-head">
@@ -1052,6 +1127,64 @@ function CatalogPage({
 function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStatusChange }) {
   const statusOptions = ['Pending', 'Preparing', 'Ready', 'Completed', 'Cancelled']
   const paymentOptions = ['Unpaid', 'Paid', 'Refunded']
+  const pageSize = 5
+  const [page, setPage] = useState(1)
+  const [detailOrderId, setDetailOrderId] = useState('')
+
+  const sampleOrders = useMemo(() => {
+    const items = business.items.length ? business.items : defaultBusinesses[0].items
+    const pick = (index) => items[index % items.length]
+    const makeItems = (start, count) =>
+      Array.from({ length: count }, (_, index) => {
+        const item = pick(start + index)
+        const quantity = (index % 2) + 1
+        return {
+          id: `${item.id}-sample-${start}-${index}`,
+          name: item.name,
+          price: item.price,
+          quantity,
+          lineTotal: item.price * quantity,
+        }
+      })
+
+    return Array.from({ length: 12 }, (_, index) => {
+      const sampleItems = makeItems(index, (index % 3) + 1)
+      const createdAt = new Date(Date.now() - index * 48 * 60 * 1000).toISOString()
+      const paymentStatus = paymentOptions[index % paymentOptions.length]
+      const status = statusOptions[index % statusOptions.length]
+
+      return {
+        id: `ORD-SAMPLE-${String(index + 1).padStart(3, '0')}`,
+        businessId: business.id,
+        merchantId: business.merchantId,
+        qrToken: business.qrToken,
+        paymentReference: business.paymentReference,
+        businessName: business.name,
+        customer: {
+          name: ['Amina N.', 'Brian K.', 'Clara M.', 'David R.'][index % 4],
+          phone: `07${String(70000000 + index * 1379).slice(0, 8)}`,
+          location: ['Table 4', 'Counter', 'Gate A', 'Pickup'][index % 4],
+          note: index % 3 === 0 ? 'Customer asked for quick pickup.' : '',
+        },
+        items: sampleItems,
+        total: sampleItems.reduce((sum, item) => sum + item.lineTotal, 0),
+        paymentStatus,
+        status,
+        createdAt,
+      }
+    })
+  }, [business])
+
+  const displayOrders = orders.length ? orders : sampleOrders
+  const totalPages = Math.max(1, Math.ceil(displayOrders.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageOrders = displayOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const detailOrder = displayOrders.find((order) => order.id === detailOrderId)
+
+  useEffect(() => {
+    setPage(1)
+    setDetailOrderId('')
+  }, [orders.length, business.id])
 
   return (
     <section className="dashboard">
@@ -1065,71 +1198,132 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
         </button>
       </div>
 
-      {orders.length ? (
-        <div className="order-board">
-          {orders.map((order) => (
-            <article className="order-card" key={order.id}>
-              <div className="order-top">
-                <div>
-                  <strong>{order.id}</strong>
-                  <span>
-                    {new Date(order.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-                <select value={order.status} onChange={(event) => onStatusChange(order.id, event.target.value)}>
-                  {statusOptions.map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
-                </select>
+      <div className="orders-page">
+        <div className="orders-table" role="table" aria-label="Orders">
+          <div className="orders-table-head" role="row">
+            <span>Order</span>
+            <span>Customer</span>
+            <span>Line items</span>
+            <span>Total</span>
+            <span>Status</span>
+            <span>Payment</span>
+            <span>Action</span>
+          </div>
+
+          {pageOrders.map((order) => (
+            <article className="order-row" key={order.id} role="row">
+              <div className="order-id-cell">
+                <strong>{order.id}</strong>
+                <span>
+                  {new Date(order.createdAt).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
               </div>
 
               <div className="customer-note">
                 <strong>{order.customer.name}</strong>
-                <span>{[order.customer.phone, order.customer.location].filter(Boolean).join(' • ')}</span>
-                {order.customer.note && <p>{order.customer.note}</p>}
+                <span>{[order.customer.phone, order.customer.location].filter(Boolean).join(' | ')}</span>
               </div>
 
+              <ul className="order-line-items">
+                {order.items.slice(0, 2).map((item) => (
+                  <li key={item.id}>{item.quantity} x {item.name}</li>
+                ))}
+                {order.items.length > 2 && <li>+{order.items.length - 2} more</li>}
+              </ul>
+
+              <strong className="order-total-cell">{currency(order.total)}</strong>
+
+              <select value={order.status} onChange={(event) => onStatusChange(order.id, event.target.value)}>
+                {statusOptions.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+
+              <select
+                value={order.paymentStatus}
+                onChange={(event) => onPaymentChange(order.id, event.target.value)}
+              >
+                {paymentOptions.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="icon-button order-details-button"
+                onClick={() => setDetailOrderId(order.id)}
+                aria-label={`View details for ${order.id}`}
+                title="View details"
+              >
+                <MoreHorizontal size={20} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            </article>
+          ))}
+        </div>
+
+        {detailOrder && (
+          <div className="order-drawer-layer" role="presentation">
+            <button className="order-drawer-backdrop" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" />
+            <aside className="order-detail-drawer" aria-label="Order details">
+              <div className="order-drawer-head">
+                <div>
+                  <p className="eyebrow">Order details</p>
+                  <h3>{detailOrder.id}</h3>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" title="Close">
+                  <X size={20} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="customer-note">
+                <strong>{detailOrder.customer.name}</strong>
+                <span>{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' | ')}</span>
+                {detailOrder.customer.note && <p>{detailOrder.customer.note}</p>}
+              </div>
               <ul className="order-items">
-                {order.items.map((item) => (
+                {detailOrder.items.map((item) => (
                   <li key={item.id}>
-                    <span>
-                      {item.quantity} x {item.name}
-                    </span>
+                    <span>{item.quantity} x {item.name}</span>
                     <strong>{currency(item.lineTotal)}</strong>
                   </li>
                 ))}
               </ul>
-
               <div className="payment-status">
-                <span>{order.paymentReference}</span>
-                <select
-                  value={order.paymentStatus}
-                  onChange={(event) => onPaymentChange(order.id, event.target.value)}
-                >
-                  {paymentOptions.map((status) => (
-                    <option key={status}>{status}</option>
-                  ))}
-                </select>
+                <span>{detailOrder.paymentReference}</span>
+                <strong>{detailOrder.paymentStatus}</strong>
               </div>
-
               <div className="total-row">
                 <span>Total</span>
-                <strong>{currency(order.total)}</strong>
+                <strong>{currency(detailOrder.total)}</strong>
               </div>
-            </article>
+            </aside>
+          </div>
+        )}
+
+        <div className="pagination-controls" aria-label="Orders pagination">
+          <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+            <button
+              type="button"
+              className={pageNumber === currentPage ? 'active' : ''}
+              key={pageNumber}
+              onClick={() => setPage(pageNumber)}
+            >
+              {pageNumber}
+            </button>
           ))}
+          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
+            Next
+          </button>
         </div>
-      ) : (
-        <div className="empty-state">
-          <h4>No orders yet</h4>
-          <p>Orders placed from the customer menu will appear here immediately.</p>
-        </div>
-      )}
+      </div>
     </section>
   )
 }
-
 export default App
