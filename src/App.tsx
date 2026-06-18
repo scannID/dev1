@@ -1,10 +1,10 @@
-import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, MoreHorizontal, X } from 'lucide-react'
+import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, CheckCircle2, Clock, DollarSign, MoreHorizontal, ShoppingCart, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import './App.css'
 
 const ORDERS_KEY = 'scanit-orders-v1'
-const BUSINESSES_KEY = 'scanit-businesses-v1'
+const BUSINESSES_KEY = 'scanit-businesses-v2'
 const SCAN_BASE_URL = 'https://scanit.app'
 const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
@@ -69,13 +69,13 @@ const defaultBusinesses: Business[] = [
     id: 'kampala-grill',
     merchantId: 'MER-KGL-1001',
     qrToken: 'SIT-KGL-1001',
-    name: 'Kampala Grill',
-    ownerName: 'Demo Owner',
-    phone: '+256700000001',
-    type: 'Restaurant',
-    tableLabel: 'Table number',
-    paymentReference: 'PAY-KGL-1001',
-    accent: '#0f766e',
+    name: 'ScanIT Business',
+    ownerName: '',
+    phone: '',
+    type: 'Bar',
+    tableLabel: 'Location',
+    paymentReference: '',
+    accent: '#2563eb',
     items: [
       {
         id: 'beef-plate',
@@ -116,8 +116,8 @@ const defaultBusinesses: Business[] = [
     merchantId: 'MER-CLG-1002',
     qrToken: 'SIT-CLG-1002',
     name: 'City Lounge',
-    ownerName: 'Demo Owner',
-    phone: '+256700000002',
+    ownerName: '',
+    phone: '',
     type: 'Bar',
     tableLabel: 'Seat or area',
     paymentReference: 'PAY-CLG-1002',
@@ -333,8 +333,8 @@ function App() {
         <header className="company-topbar">
           <div>
             <p className="eyebrow">Company dashboard</p>
-            <h2>Welcome, {business.ownerName}</h2>
-            <p>Everything here belongs to {business.name}: QR, prices, orders, and payments.</p>
+            <h2>Overview</h2>
+            <p>Manage QR access, catalog items, orders, and payments from one workspace.</p>
           </div>
           {view === 'account' && (
             <button className="primary-action topbar-add-item-button" type="button" onClick={() => setView('add-item')}>
@@ -343,33 +343,30 @@ function App() {
           )}
         </header>
 
-        <section className="metric-grid" aria-label="Company summary">
-          <div>
-            <span>Open orders</span>
-            <strong>{pendingCount}</strong>
-          </div>
-          <div>
-            <span>Published items</span>
-            <strong>{availableItems}</strong>
-          </div>
-          <div>
-            <span>Paid sales</span>
-            <strong>{currency(paidTotal)}</strong>
-          </div>
-          <div>
-            <span>Payment ref</span>
-            <strong>{business.paymentReference}</strong>
-          </div>
-        </section>
-
         {view === 'account' && (
-          <OverviewPage business={business} />
+          <>
+            <section className="metric-grid overview-metric-grid" aria-label="Overview summary">
+              <div>
+                <span>Open orders</span>
+                <strong>{pendingCount}</strong>
+              </div>
+              <div>
+                <span>Published items</span>
+                <strong>{availableItems}</strong>
+              </div>
+              <div>
+                <span>Paid sales</span>
+                <strong>{currency(paidTotal)}</strong>
+              </div>
+            </section>
+            <OverviewPage business={business} />
+          </>
         )}
 
         {view === 'add-item' && (
           <AddItemPage
             business={business}
-            onBack={() => setView('account')}
+            onBack={() => setView('catalog')}
             onItemsChange={(items) => {
               updateBusinessItems(items)
               setView('catalog')
@@ -378,7 +375,7 @@ function App() {
         )}
 
         {view === 'catalog' && (
-          <CatalogPage business={business} onItemsChange={updateBusinessItems} />
+          <CatalogPage business={business} onItemsChange={updateBusinessItems} onAddItem={() => setView('add-item')} />
         )}
 
         {view === 'dashboard' && (
@@ -414,52 +411,9 @@ function OverviewPage({ business }: { business: Business }) {
             <strong>{business.merchantId}</strong>
           </div>
           <div>
-            <span>Payments</span>
-            <strong>{business.paymentReference}</strong>
-          </div>
-          <div>
             <span>Goods and prices</span>
             <strong>{business.items.length} linked items</strong>
           </div>
-        </div>
-      </section>
-
-      <section className="account-form-card">
-        <div>
-          <p className="eyebrow">Overview</p>
-          <h3>Company details linked to this QR</h3>
-          <p className="muted-copy">
-            These details were created during account registration and are attached to the printed QR.
-          </p>
-        </div>
-
-        <div className="owner-grid">
-          <div>
-            <span>Owner</span>
-            <strong>{business.ownerName}</strong>
-          </div>
-          <div>
-            <span>Phone</span>
-            <strong>{business.phone}</strong>
-          </div>
-          <div>
-            <span>Business type</span>
-            <strong>{business.type}</strong>
-          </div>
-          <div>
-            <span>Customer instruction</span>
-            <strong>Print the QR and provide it to customers</strong>
-          </div>
-        </div>
-
-        <div className="catalog-snapshot">
-          <h3>Current customer prices</h3>
-          {business.items.map((item) => (
-            <div key={item.id}>
-              <span>{item.name}</span>
-              <strong>{currency(item.price)}</strong>
-            </div>
-          ))}
         </div>
       </section>
     </div>
@@ -831,14 +785,6 @@ function CustomerMenu({
             {isCustomerNameMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
           </label>
           <label>
-            Phone
-            <input
-              value={customer.phone}
-              onChange={(event) => onCustomerChange({ ...customer, phone: event.target.value })}
-              placeholder="Optional phone"
-            />
-          </label>
-          <label>
             {business.tableLabel}
             <input
               value={customer.location}
@@ -855,10 +801,6 @@ function CustomerMenu({
             />
           </label>
 
-          <div className="payment-box">
-            <span>Payment reference</span>
-            <strong>{business.paymentReference}</strong>
-          </div>
           <div className="total-row">
             <span>Total</span>
             <strong>{currency(total)}</strong>
@@ -1029,99 +971,345 @@ function AddItemPage({
 function CatalogPage({
   business,
   onItemsChange,
+  onAddItem,
 }: {
   business: Business
   onItemsChange: (items: CatalogItem[]) => void
+  onAddItem: () => void
 }) {
-  function updateItem(itemId, field, value) {
+  const PAGE_SIZE = 20
+  const categories = useMemo(() => [...new Set(business.items.map((i) => i.category))], [business.items])
+
+  const [search, setSearch] = useState('')
+  const [filterCategory, setFilterCategory] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [page, setPage] = useState(1)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<Partial<CatalogItem>>({})
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return business.items.filter((item) => {
+      const matchSearch = !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
+      const matchCategory = filterCategory === 'all' || item.category === filterCategory
+      const matchStatus = filterStatus === 'all' || (filterStatus === 'available' ? item.available : !item.available)
+      return matchSearch && matchCategory && matchStatus
+    })
+  }, [business.items, search, filterCategory, filterStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function startEdit(item: CatalogItem) {
+    setEditingId(item.id)
+    setEditDraft({ ...item })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditDraft({})
+  }
+
+  function saveEdit() {
+    if (!editDraft.name?.trim() || !editDraft.category?.trim()) return
     onItemsChange(
       business.items.map((entry) =>
-        entry.id === itemId
-          ? {
-              ...entry,
-              [field]: field === 'price' ? Number(value) || 0 : value,
-            }
+        entry.id === editingId
+          ? { ...entry, ...editDraft, price: Number(editDraft.price) || 0 }
           : entry,
       ),
     )
+    cancelEdit()
   }
 
-  function removeItem(itemId) {
+  function removeItem(itemId: string) {
     onItemsChange(business.items.filter((entry) => entry.id !== itemId))
+    if (editingId === itemId) cancelEdit()
   }
+
+  function resetFilters() {
+    setSearch('')
+    setFilterCategory('all')
+    setFilterStatus('all')
+    setPage(1)
+  }
+
+  const isFiltered = search || filterCategory !== 'all' || filterStatus !== 'all'
 
   return (
     <section className="catalog-page">
+      <section className="metric-grid" aria-label="Catalog summary">
+        <div>
+          <span>Total items</span>
+          <strong>{business.items.length}</strong>
+        </div>
+        <div>
+          <span>Available</span>
+          <strong>{business.items.filter(i => i.available).length}</strong>
+        </div>
+        <div>
+          <span>Hidden</span>
+          <strong>{business.items.filter(i => !i.available).length}</strong>
+        </div>
+        <div>
+          <span>Categories</span>
+          <strong>{categories.length}</strong>
+        </div>
+      </section>
       <div className="dashboard-head">
         <div>
           <p className="eyebrow">Catalog</p>
           <h3>Items customers see after scanning</h3>
         </div>
-        <span className="catalog-count">{business.items.length} items</span>
-      </div>
-
-      <div className="catalog-layout">
-        <AddItemForm business={business} onItemsChange={onItemsChange} />
-
-        <div className="catalog-table">
-          <div className="catalog-table-head">
-            <span>Item details</span>
-            <span>Price</span>
-            <span>Status</span>
-            <span></span>
-          </div>
-
-          {business.items.map((entry) => (
-            <article className="catalog-row" key={entry.id}>
-              <div className="catalog-main-fields">
-                <label>
-                  <span>Item</span>
-                  <input
-                    value={entry.name}
-                    onChange={(event) => updateItem(entry.id, 'name', event.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Category</span>
-                  <input
-                    value={entry.category}
-                    onChange={(event) => updateItem(entry.id, 'category', event.target.value)}
-                  />
-                </label>
-                <label className="description-field">
-                  <span>Description</span>
-                  <textarea
-                    value={entry.description}
-                    onChange={(event) => updateItem(entry.id, 'description', event.target.value)}
-                  />
-                </label>
-              </div>
-              <label>
-                <span>Price</span>
-                <input
-                  min="0"
-                  type="number"
-                  value={entry.price}
-                  onChange={(event) => updateItem(entry.id, 'price', event.target.value)}
-                />
-              </label>
-              <label className="availability-toggle">
-                <input
-                  checked={entry.available}
-                  type="checkbox"
-                  onChange={(event) => updateItem(entry.id, 'available', event.target.checked)}
-                />
-                {entry.available ? 'Available' : 'Hidden'}
-              </label>
-              <button type="button" className="danger-button" onClick={() => removeItem(entry.id)}>
-                Remove
-              </button>
-            </article>
-          ))}
+        <div className="catalog-head-actions">
+          <span className="catalog-count">{business.items.length} items</span>
+          <button className="primary-action catalog-add-btn" type="button" onClick={onAddItem}>
+            Add item
+          </button>
         </div>
       </div>
+
+      <div className="catalog-filters">
+        <input
+          className="catalog-search"
+          type="search"
+          placeholder="Search items…"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          aria-label="Search catalog items"
+        />
+        <select
+          className="catalog-filter-select"
+          value={filterCategory}
+          onChange={(e) => { setFilterCategory(e.target.value); setPage(1) }}
+          aria-label="Filter by category"
+        >
+          <option value="all">All categories</option>
+          {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+        </select>
+        <select
+          className="catalog-filter-select"
+          value={filterStatus}
+          onChange={(e) => { setFilterStatus(e.target.value); setPage(1) }}
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          <option value="available">Available</option>
+          <option value="hidden">Hidden</option>
+        </select>
+        <span className="catalog-results-count">
+          {filtered.length} of {business.items.length} items
+        </span>
+        {isFiltered && (
+          <button className="catalog-clear-filters" type="button" onClick={resetFilters}>
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      <div className="catalog-items-table">
+        <div className="catalog-items-head">
+          <span>Name</span>
+          <span>Category</span>
+          <span>Price</span>
+          <span>Status</span>
+          <span></span>
+        </div>
+
+        {pageItems.length === 0 && (
+          <div className="catalog-empty">
+            <p>No items match your search.</p>
+            <button type="button" className="ghost-button" onClick={resetFilters}>Clear filters</button>
+          </div>
+        )}
+
+        {pageItems.map((entry) =>
+          editingId === entry.id ? (
+            <div className="catalog-item-row catalog-row-editing" key={entry.id}>
+              <div className="catalog-edit-fields">
+                <label>
+                  Name
+                  <input
+                    autoFocus
+                    value={editDraft.name ?? ''}
+                    onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Category
+                  <input
+                    list="catalog-edit-categories"
+                    value={editDraft.category ?? ''}
+                    onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}
+                  />
+                  <datalist id="catalog-edit-categories">
+                    {categories.map((cat) => <option key={cat} value={cat} />)}
+                  </datalist>
+                </label>
+                <label>
+                  Price
+                  <input
+                    type="number"
+                    min="0"
+                    value={editDraft.price ?? ''}
+                    onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })}
+                  />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    value={editDraft.description ?? ''}
+                    onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })}
+                  />
+                </label>
+                <label className="inline-check">
+                  <input
+                    type="checkbox"
+                    checked={editDraft.available ?? true}
+                    onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })}
+                  />
+                  Available to customers
+                </label>
+              </div>
+              <div className="catalog-edit-actions">
+                <button className="primary-action catalog-save-btn" type="button" onClick={saveEdit}>Save</button>
+                <button className="ghost-button" type="button" onClick={cancelEdit}>Cancel</button>
+                <button className="danger-button" type="button" onClick={() => removeItem(entry.id)}>Delete</button>
+              </div>
+            </div>
+          ) : (
+            <article className="catalog-item-row catalog-row-display" key={entry.id}>
+              <div className="catalog-row-name">
+                <strong>{entry.name}</strong>
+                <span>{entry.description}</span>
+              </div>
+              <span className="catalog-row-category">{entry.category}</span>
+              <span className="catalog-row-price">{currency(entry.price)}</span>
+              <span className={entry.available ? 'catalog-badge available' : 'catalog-badge hidden'}>
+                {entry.available ? 'Available' : 'Hidden'}
+              </span>
+              <button className="ghost-button catalog-edit-btn" type="button" onClick={() => startEdit(entry)}>
+                Edit
+              </button>
+            </article>
+          )
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="pagination-controls" aria-label="Catalog pagination">
+          <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+            .reduce<(number | '…')[]>((acc, p, i, arr) => {
+              if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
+              acc.push(p)
+              return acc
+            }, [])
+            .map((p, i) =>
+              p === '…' ? (
+                <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  className={p === currentPage ? 'active' : ''}
+                  onClick={() => setPage(p as number)}
+                >
+                  {p}
+                </button>
+              )
+            )}
+          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
+            Next
+          </button>
+        </div>
+      )}
     </section>
   )
+}
+
+function OrderActionMenu({ order, statusOptions, paymentOptions, onStatusChange, onPaymentChange, onViewDetails }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  return (
+    <div className="order-action-menu" ref={ref}>
+      <button
+        type="button"
+        className="icon-button order-dots-btn"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Order actions"
+      >
+        <MoreHorizontal size={18} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="order-action-dropdown" role="menu">
+          <button type="button" className="order-action-item" role="menuitem" onClick={() => { onViewDetails(); setOpen(false) }}>
+            View details
+          </button>
+          <div className="order-action-divider" />
+          <p className="order-action-label">Set status</p>
+          {statusOptions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`order-action-item${order.status === s ? ' active' : ''}`}
+              role="menuitem"
+              onClick={() => { onStatusChange(order.id, s); setOpen(false) }}
+            >
+              {s}
+            </button>
+          ))}
+          <div className="order-action-divider" />
+          <p className="order-action-label">Set payment</p>
+          {paymentOptions.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`order-action-item${order.paymentStatus === p ? ' active' : ''}`}
+              role="menuitem"
+              onClick={() => { onPaymentChange(order.id, p); setOpen(false) }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = {
+    Pending: 'badge-pending',
+    Preparing: 'badge-preparing',
+    Ready: 'badge-ready',
+    Completed: 'badge-completed',
+    Cancelled: 'badge-cancelled',
+  }[status] ?? 'badge-pending'
+  return <span className={`order-badge ${cls}`}>{status}</span>
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  const cls = {
+    Unpaid: 'badge-unpaid',
+    Paid: 'badge-paid',
+    Refunded: 'badge-refunded',
+  }[status] ?? 'badge-unpaid'
+  return <span className={`order-badge ${cls}`}>{status}</span>
 }
 
 function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStatusChange }) {
@@ -1181,6 +1369,14 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
   const pageOrders = displayOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const detailOrder = displayOrders.find((order) => order.id === detailOrderId)
 
+  const openCount = orders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled').length
+  const paidSales = orders.filter(o => o.paymentStatus === 'Paid').reduce((sum, o) => sum + o.total, 0)
+  const unpaidCount = orders.filter(o => o.paymentStatus === 'Unpaid' && o.status !== 'Cancelled').length
+  const completedCount = orders.filter(o => o.status === 'Completed').length
+
+  const firstItem = (currentPage - 1) * pageSize + 1
+  const lastItem = Math.min(currentPage * pageSize, displayOrders.length)
+
   useEffect(() => {
     setPage(1)
     setDetailOrderId('')
@@ -1188,26 +1384,66 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
 
   return (
     <section className="dashboard">
-      <div className="dashboard-head">
-        <div>
-          <p className="eyebrow">Management</p>
-          <h3>Orders for {business.name}</h3>
+      {/* Metric cards */}
+      <section className="orders-metric-grid" aria-label="Orders summary">
+        <div className="orders-metric-card">
+          <div className="omc-icon omc-icon-orange"><ShoppingCart size={20} aria-hidden="true" /></div>
+          <div className="omc-body">
+            <p className="omc-label">OPEN ORDERS</p>
+            <strong className="omc-value">{openCount}</strong>
+            <p className="omc-sub">Active right now</p>
+          </div>
         </div>
-        <button type="button" className="ghost-button" onClick={onClearCompleted}>
-          Clear finished
-        </button>
-      </div>
+        <div className="orders-metric-card">
+          <div className="omc-icon omc-icon-green"><DollarSign size={20} aria-hidden="true" /></div>
+          <div className="omc-body">
+            <p className="omc-label">PAID SALES</p>
+            <strong className="omc-value omc-value-green">{currency(paidSales)}</strong>
+            <p className="omc-sub omc-sub-green">Revenue collected</p>
+          </div>
+        </div>
+        <div className="orders-metric-card">
+          <div className="omc-icon omc-icon-red"><Clock size={20} aria-hidden="true" /></div>
+          <div className="omc-body">
+            <p className="omc-label">AWAITING PAYMENT</p>
+            <strong className="omc-value">{unpaidCount}</strong>
+            <p className="omc-sub">Unpaid open orders</p>
+          </div>
+        </div>
+        <div className="orders-metric-card">
+          <div className="omc-icon omc-icon-teal"><CheckCircle2 size={20} aria-hidden="true" /></div>
+          <div className="omc-body">
+            <p className="omc-label">COMPLETED</p>
+            <strong className="omc-value">{completedCount}</strong>
+            <p className="omc-sub omc-sub-green">Orders fulfilled</p>
+          </div>
+        </div>
+      </section>
 
-      <div className="orders-page">
+      {/* Table section */}
+      <div className="orders-panel">
+        <div className="orders-panel-head">
+          <div>
+            <p className="eyebrow">Management</p>
+            <h3>Orders for {business.name}</h3>
+          </div>
+          <div className="orders-panel-actions">
+            <span className="orders-count-pill">{displayOrders.length} orders</span>
+            <button type="button" className="ghost-button orders-clear-btn" onClick={onClearCompleted}>
+              🗑 Clear finished
+            </button>
+          </div>
+        </div>
+
         <div className="orders-table" role="table" aria-label="Orders">
           <div className="orders-table-head" role="row">
-            <span>Order</span>
-            <span>Customer</span>
-            <span>Line items</span>
-            <span>Total</span>
-            <span>Status</span>
-            <span>Payment</span>
-            <span>Action</span>
+            <span>ORDER</span>
+            <span>CUSTOMER</span>
+            <span>LINE ITEMS</span>
+            <span>TOTAL</span>
+            <span>STATUS</span>
+            <span>PAYMENT</span>
+            <span></span>
           </div>
 
           {pageOrders.map((order) => (
@@ -1216,113 +1452,120 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
                 <strong>{order.id}</strong>
                 <span>
                   {new Date(order.createdAt).toLocaleString([], {
-                    month: 'short',
                     day: 'numeric',
+                    month: 'short',
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
                 </span>
               </div>
 
-              <div className="customer-note">
+              <div className="order-customer-cell">
                 <strong>{order.customer.name}</strong>
-                <span>{[order.customer.phone, order.customer.location].filter(Boolean).join(' | ')}</span>
+                <span>
+                  {[order.customer.phone, order.customer.location].filter(Boolean).join(' · ')}
+                </span>
               </div>
 
-              <ul className="order-line-items">
+              <div className="order-chips-cell">
                 {order.items.slice(0, 2).map((item) => (
-                  <li key={item.id}>{item.quantity} x {item.name}</li>
+                  <span key={item.id} className="order-item-chip">{item.quantity}x {item.name}</span>
                 ))}
-                {order.items.length > 2 && <li>+{order.items.length - 2} more</li>}
-              </ul>
+                {order.items.length > 2 && (
+                  <span className="order-item-chip order-item-chip-more">+{order.items.length - 2} more</span>
+                )}
+              </div>
 
               <strong className="order-total-cell">{currency(order.total)}</strong>
 
-              <select value={order.status} onChange={(event) => onStatusChange(order.id, event.target.value)}>
-                {statusOptions.map((status) => (
-                  <option key={status}>{status}</option>
-                ))}
-              </select>
+              <StatusBadge status={order.status} />
 
-              <select
-                value={order.paymentStatus}
-                onChange={(event) => onPaymentChange(order.id, event.target.value)}
-              >
-                {paymentOptions.map((status) => (
-                  <option key={status}>{status}</option>
-                ))}
-              </select>
+              <PaymentBadge status={order.paymentStatus} />
 
-              <button
-                type="button"
-                className="icon-button order-details-button"
-                onClick={() => setDetailOrderId(order.id)}
-                aria-label={`View details for ${order.id}`}
-                title="View details"
-              >
-                <MoreHorizontal size={20} strokeWidth={2.4} aria-hidden="true" />
-              </button>
+              <OrderActionMenu
+                order={order}
+                statusOptions={statusOptions}
+                paymentOptions={paymentOptions}
+                onStatusChange={onStatusChange}
+                onPaymentChange={onPaymentChange}
+                onViewDetails={() => setDetailOrderId(order.id)}
+              />
             </article>
           ))}
         </div>
 
-        {detailOrder && (
-          <div className="order-drawer-layer" role="presentation">
-            <button className="order-drawer-backdrop" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" />
-            <aside className="order-detail-drawer" aria-label="Order details">
-              <div className="order-drawer-head">
-                <div>
-                  <p className="eyebrow">Order details</p>
-                  <h3>{detailOrder.id}</h3>
-                </div>
-                <button className="icon-button" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" title="Close">
-                  <X size={20} strokeWidth={2.4} aria-hidden="true" />
-                </button>
-              </div>
-              <div className="customer-note">
-                <strong>{detailOrder.customer.name}</strong>
-                <span>{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' | ')}</span>
-                {detailOrder.customer.note && <p>{detailOrder.customer.note}</p>}
-              </div>
-              <ul className="order-items">
-                {detailOrder.items.map((item) => (
-                  <li key={item.id}>
-                    <span>{item.quantity} x {item.name}</span>
-                    <strong>{currency(item.lineTotal)}</strong>
-                  </li>
-                ))}
-              </ul>
-              <div className="payment-status">
-                <span>{detailOrder.paymentReference}</span>
-                <strong>{detailOrder.paymentStatus}</strong>
-              </div>
-              <div className="total-row">
-                <span>Total</span>
-                <strong>{currency(detailOrder.total)}</strong>
-              </div>
-            </aside>
-          </div>
-        )}
-
-        <div className="pagination-controls" aria-label="Orders pagination">
-          <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
-            <button
-              type="button"
-              className={pageNumber === currentPage ? 'active' : ''}
-              key={pageNumber}
-              onClick={() => setPage(pageNumber)}
-            >
-              {pageNumber}
+        <div className="orders-table-footer">
+          <span className="orders-showing">Showing {firstItem}–{lastItem} of {displayOrders.length}</span>
+          <div className="pagination-controls" aria-label="Orders pagination">
+            <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
+              Previous
             </button>
-          ))}
-          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
-            Next
-          </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .reduce<(number | '…')[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) =>
+                p === '…' ? (
+                  <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    className={p === currentPage ? 'active' : ''}
+                    onClick={() => setPage(p as number)}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
+              Next
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Detail drawer */}
+      {detailOrder && (
+        <div className="order-drawer-layer" role="presentation">
+          <button className="order-drawer-backdrop" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" />
+          <aside className="order-detail-drawer" aria-label="Order details">
+            <div className="order-drawer-head">
+              <div>
+                <p className="eyebrow">Order details</p>
+                <h3>{detailOrder.id}</h3>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" title="Close">
+                <X size={20} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="customer-note">
+              <strong>{detailOrder.customer.name}</strong>
+              <span>{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' · ')}</span>
+              {detailOrder.customer.note && <p>{detailOrder.customer.note}</p>}
+            </div>
+            <ul className="order-items">
+              {detailOrder.items.map((item) => (
+                <li key={item.id}>
+                  <span>{item.quantity} x {item.name}</span>
+                  <strong>{currency(item.lineTotal)}</strong>
+                </li>
+              ))}
+            </ul>
+            <div className="payment-status">
+              <span>{detailOrder.paymentReference}</span>
+              <strong>{detailOrder.paymentStatus}</strong>
+            </div>
+            <div className="total-row">
+              <span>Total</span>
+              <strong>{currency(detailOrder.total)}</strong>
+            </div>
+          </aside>
+        </div>
+      )}
     </section>
   )
 }
