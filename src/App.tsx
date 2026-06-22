@@ -1,5 +1,5 @@
 import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Clock, DollarSign, MoreHorizontal, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, DollarSign, MoreHorizontal, ShoppingCart, Trash2, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import './App.css'
 
@@ -333,8 +333,18 @@ function App() {
         <header className="company-topbar">
           <div>
             <p className="eyebrow">Company dashboard</p>
-            <h2>Overview</h2>
-            <p>Manage QR access, catalog items, orders, and payments from one workspace.</p>
+            <h2>
+              {view === 'account' && 'Overview'}
+              {view === 'catalog' && 'Catalog'}
+              {view === 'add-item' && 'Add Item'}
+              {view === 'dashboard' && 'Orders'}
+            </h2>
+            <p>
+              {view === 'account' && 'Manage QR access, catalog items, orders, and payments from one workspace.'}
+              {view === 'catalog' && 'Manage your catalog items, prices, and availability.'}
+              {view === 'add-item' && 'Add a new item, service, or ticket to your catalog.'}
+              {view === 'dashboard' && 'Track and manage all orders in real-time.'}
+            </p>
           </div>
           {view === 'account' && (
             <button className="primary-action topbar-add-item-button" type="button" onClick={() => setView('add-item')}>
@@ -1385,38 +1395,26 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
   return (
     <section className="dashboard">
       {/* Metric cards */}
-      <section className="orders-metric-grid" aria-label="Orders summary">
-        <div className="orders-metric-card">
-          <div className="omc-icon omc-icon-orange"><ShoppingCart size={20} aria-hidden="true" /></div>
-          <div className="omc-body">
-            <p className="omc-label">OPEN ORDERS</p>
-            <strong className="omc-value">{openCount}</strong>
-            <p className="omc-sub">Active right now</p>
-          </div>
+      <section className="metric-grid" aria-label="Orders summary">
+        <div>
+          <span>OPEN ORDERS</span>
+          <strong>{openCount}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>Active right now</span>
         </div>
-        <div className="orders-metric-card">
-          <div className="omc-icon omc-icon-green"><DollarSign size={20} aria-hidden="true" /></div>
-          <div className="omc-body">
-            <p className="omc-label">PAID SALES</p>
-            <strong className="omc-value omc-value-green">{currency(paidSales)}</strong>
-            <p className="omc-sub omc-sub-green">Revenue collected</p>
-          </div>
+        <div>
+          <span>PAID SALES</span>
+          <strong style={{ color: '#10b981' }}>{currency(paidSales)}</strong>
+          <span style={{ color: '#10b981', fontWeight: 400 }}>Revenue collected</span>
         </div>
-        <div className="orders-metric-card">
-          <div className="omc-icon omc-icon-red"><Clock size={20} aria-hidden="true" /></div>
-          <div className="omc-body">
-            <p className="omc-label">AWAITING PAYMENT</p>
-            <strong className="omc-value">{unpaidCount}</strong>
-            <p className="omc-sub">Unpaid open orders</p>
-          </div>
+        <div>
+          <span>AWAITING PAYMENT</span>
+          <strong>{unpaidCount}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>Unpaid open orders</span>
         </div>
-        <div className="orders-metric-card">
-          <div className="omc-icon omc-icon-teal"><CheckCircle2 size={20} aria-hidden="true" /></div>
-          <div className="omc-body">
-            <p className="omc-label">COMPLETED</p>
-            <strong className="omc-value">{completedCount}</strong>
-            <p className="omc-sub omc-sub-green">Orders fulfilled</p>
-          </div>
+        <div>
+          <span>COMPLETED</span>
+          <strong>{completedCount}</strong>
+          <span style={{ color: '#10b981', fontWeight: 400 }}>Orders fulfilled</span>
         </div>
       </section>
 
@@ -1430,7 +1428,8 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
           <div className="orders-panel-actions">
             <span className="orders-count-pill">{displayOrders.length} orders</span>
             <button type="button" className="ghost-button orders-clear-btn" onClick={onClearCompleted}>
-              🗑 Clear finished
+              <Trash2 size={16} />
+              Clear finished
             </button>
           </div>
         </div>
