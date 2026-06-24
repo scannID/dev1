@@ -23,9 +23,9 @@ function AlertDialogPortal({
 }
 
 function AlertDialogOverlay({
-  className,
+  className = "",
   ...props
-}) {
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>) {
   return (
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
@@ -38,10 +38,10 @@ function AlertDialogOverlay({
 }
 
 function AlertDialogContent({
-  className,
+  className = "",
   size = "default",
   ...props
-}) {
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & { size?: "default" | "sm" }) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
@@ -58,9 +58,9 @@ function AlertDialogContent({
 }
 
 function AlertDialogHeader({
-  className,
+  className = "",
   ...props
-}) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="alert-dialog-header"
@@ -73,9 +73,9 @@ function AlertDialogHeader({
 }
 
 function AlertDialogFooter({
-  className,
+  className = "",
   ...props
-}) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="alert-dialog-footer"
@@ -88,9 +88,9 @@ function AlertDialogFooter({
 }
 
 function AlertDialogMedia({
-  className,
+  className = "",
   ...props
-}) {
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="alert-dialog-media"
@@ -103,9 +103,9 @@ function AlertDialogMedia({
 }
 
 function AlertDialogTitle({
-  className,
+  className = "",
   ...props
-}) {
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>) {
   return (
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
@@ -118,9 +118,9 @@ function AlertDialogTitle({
 }
 
 function AlertDialogDescription({
-  className,
+  className = "",
   ...props
-}) {
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>) {
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
@@ -133,10 +133,13 @@ function AlertDialogDescription({
 }
 
 function AlertDialogAction({
-  className,
+  className = "",
   variant = "default",
   size = "default",
   ...props
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> & {
+  variant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link"
+  size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg"
 }) {
   return (
     <Button variant={variant} size={size} asChild>
@@ -146,10 +149,13 @@ function AlertDialogAction({
 }
 
 function AlertDialogCancel({
-  className,
+  className = "",
   variant = "outline",
   size = "default",
   ...props
+}: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel> & {
+  variant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link"
+  size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg"
 }) {
   return (
     <Button variant={variant} size={size} asChild>

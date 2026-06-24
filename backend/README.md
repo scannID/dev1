@@ -1,4 +1,4 @@
-# ScanIT Backend
+# Scanny Backend
 
 Small Node backend for QR-linked businesses, goods, prices, payments, and orders.
 

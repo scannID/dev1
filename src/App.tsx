@@ -1,11 +1,21 @@
 import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Clock, DollarSign, MoreHorizontal, ShoppingCart, Trash2, X } from 'lucide-react'
+import { ArrowLeft, BarChart3, CheckCircle2, Clock, DollarSign, Home, LogOut, MoreHorizontal, Package, Settings, ShoppingCart, Trash2, X } from 'lucide-react'
 import QRCode from 'qrcode'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import './App.css'
 
-const ORDERS_KEY = 'scanit-orders-v1'
-const BUSINESSES_KEY = 'scanit-businesses-v2'
-const SCAN_BASE_URL = 'https://scanit.app'
+const ORDERS_KEY = 'scanny-orders-v1'
+const BUSINESSES_KEY = 'scanny-businesses-v2'
+const SCAN_BASE_URL = 'https://scanny.app'
 const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
 type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
@@ -69,7 +79,7 @@ const defaultBusinesses: Business[] = [
     id: 'kampala-grill',
     merchantId: 'MER-KGL-1001',
     qrToken: 'SIT-KGL-1001',
-    name: 'ScanIT Business',
+    name: '',
     ownerName: '',
     phone: '',
     type: 'Bar',
@@ -183,6 +193,40 @@ function App() {
     location: '',
     note: '',
   })
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('scanny-dark-mode')
+    return saved ? JSON.parse(saved) : false
+  })
+
+  // Toggle dark mode with 'D' key
+  useEffect(() => {
+    function handleKeyPress(e: KeyboardEvent) {
+      if (e.key === 'd' || e.key === 'D') {
+        // Don't toggle if user is typing in an input field
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return
+        }
+        setDarkMode((prev: boolean) => {
+          const newMode = !prev
+          localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
+          return newMode
+        })
+      }
+    }
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [])
+
+  // Apply dark mode class to body
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark-mode')
+    } else {
+      document.documentElement.classList.remove('dark-mode')
+    }
+  }, [darkMode])
 
   const business = businesses.find((entry) => entry.id === activeBusinessId) ?? businesses[0]
   const categories = [...new Set(business.items.map((item) => item.category))]
@@ -205,6 +249,50 @@ function App() {
     .filter((order) => order.paymentStatus === 'Paid')
     .reduce((sum, order) => sum + order.total, 0)
   const availableItems = business.items.filter((item) => item.available).length
+
+  // Sparkline component with area fill
+  function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
+    if (data.length === 0) return null
+    
+    const max = Math.max(...data)
+    const min = Math.min(...data)
+    const range = max - min || 1
+    
+    const points = data.map((value, index) => {
+      const x = (index / (data.length - 1)) * 100
+      const y = 100 - ((value - min) / range) * 80 - 10
+      return { x, y }
+    })
+    
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
+    const areaPath = `${linePath} L 100,100 L 0,100 Z`
+    
+    // Generate gradient ID based on color
+    const gradientId = `gradient-${color.replace('#', '')}`
+    
+    return (
+      <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+          </linearGradient>
+        </defs>
+        <path
+          d={areaPath}
+          fill={`url(#${gradientId})`}
+        />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
 
   useEffect(() => {
     localStorage.setItem(BUSINESSES_KEY, JSON.stringify(businesses))
@@ -295,13 +383,21 @@ function App() {
     )
   }
 
+  function handleLogout() {
+    // Clear localStorage data
+    localStorage.removeItem(ORDERS_KEY)
+    localStorage.removeItem(BUSINESSES_KEY)
+    
+    // Reload the page to reset the app
+    window.location.reload()
+  }
+
   return (
     <main className="company-shell">
       <aside className="company-sidebar" aria-label="Company workspace navigation">
         <div>
-          <p className="eyebrow">ScanIT</p>
-          <h1>{business.name}</h1>
-          <p className="sidebar-copy">Your company workspace is ready. Print your QR and start receiving orders.</p>
+          <p className="eyebrow">Scanny</p>
+          <h1>{business.name || 'Business Name'}</h1>
         </div>
 
         <div className="company-status">
@@ -311,22 +407,66 @@ function App() {
 
         <nav className="side-nav" aria-label="Workspace sections">
           {[
-            ['account', 'Overview'],
-            ['catalog', 'Catalog'],
-            ['dashboard', `Orders${pendingCount ? ` (${pendingCount})` : ''}`],
-          ].map(([id, label]) => (
+            { id: 'account', label: 'Overview', icon: Home },
+            { id: 'catalog', label: 'Catalog', icon: Package },
+            { id: 'dashboard', label: `Orders${pendingCount ? ` (${pendingCount})` : ''}`, icon: ShoppingCart },
+            { id: 'reports', label: 'Reports', icon: BarChart3 },
+          ].map(({ id, label, icon: Icon }) => (
             <button
               type="button"
               className={view === id ? 'active' : ''}
               key={id}
               onClick={() => setView(id)}
             >
+              <Icon size={20} />
               {label}
             </button>
           ))}
         </nav>
 
-        <QrPanel business={business} compact />
+        <div className="sidebar-settings">
+          <button 
+            type="button" 
+            className="settings-button"
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          >
+            <Settings size={20} />
+            <span>Settings</span>
+          </button>
+          
+          {showSettingsMenu && (
+            <div className="settings-dropdown">
+              <button 
+                type="button" 
+                className="logout-button"
+                onClick={() => {
+                  setShowLogoutDialog(true)
+                  setShowSettingsMenu(false)
+                }}
+              >
+                <LogOut size={18} />
+                <span>Log out</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Log out of Scanny?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You will be logged out and all unsaved data will be cleared. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={handleLogout}>
+                Log out
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </aside>
 
       <section className="company-workspace">
@@ -338,12 +478,14 @@ function App() {
               {view === 'catalog' && 'Catalog'}
               {view === 'add-item' && 'Add Item'}
               {view === 'dashboard' && 'Orders'}
+              {view === 'reports' && 'Reports'}
             </h2>
             <p>
               {view === 'account' && 'Manage QR access, catalog items, orders, and payments from one workspace.'}
               {view === 'catalog' && 'Manage your catalog items, prices, and availability.'}
               {view === 'add-item' && 'Add a new item, service, or ticket to your catalog.'}
               {view === 'dashboard' && 'Track and manage all orders in real-time.'}
+              {view === 'reports' && 'View sales analytics and business insights.'}
             </p>
           </div>
           {view === 'account' && (
@@ -359,17 +501,20 @@ function App() {
               <div>
                 <span>Open orders</span>
                 <strong>{pendingCount}</strong>
+                <Sparkline data={[3, 5, 4, 6, 5, 7, pendingCount]} color="#3b82f6" />
               </div>
               <div>
                 <span>Published items</span>
                 <strong>{availableItems}</strong>
+                <Sparkline data={[12, 15, 14, 16, 18, 19, availableItems]} color="#8b5cf6" />
               </div>
               <div>
                 <span>Paid sales</span>
                 <strong>{currency(paidTotal)}</strong>
+                <Sparkline data={[paidTotal * 0.6, paidTotal * 0.7, paidTotal * 0.75, paidTotal * 0.8, paidTotal * 0.85, paidTotal * 0.92, paidTotal]} color="#10b981" />
               </div>
             </section>
-            <OverviewPage business={business} />
+            <OverviewPage business={business} darkMode={darkMode} />
           </>
         )}
 
@@ -385,7 +530,7 @@ function App() {
         )}
 
         {view === 'catalog' && (
-          <CatalogPage business={business} onItemsChange={updateBusinessItems} onAddItem={() => setView('add-item')} />
+          <CatalogPage business={business} onItemsChange={updateBusinessItems} onAddItem={() => setView('add-item')} Sparkline={Sparkline} />
         )}
 
         {view === 'dashboard' && (
@@ -395,17 +540,22 @@ function App() {
             onClearCompleted={clearCompleted}
             onPaymentChange={updatePayment}
             onStatusChange={updateStatus}
+            Sparkline={Sparkline}
           />
+        )}
+
+        {view === 'reports' && (
+          <ReportsPage business={business} orders={businessOrders} />
         )}
       </section>
     </main>
   )
 }
 
-function OverviewPage({ business }: { business: Business }) {
+function OverviewPage({ business, darkMode }: { business: Business; darkMode: boolean }) {
   return (
     <div className="account-layout">
-      <MetricsCard business={business} />
+      <MetricsCard business={business} darkMode={darkMode} />
 
       <section className="account-summary">
         <QrPanel business={business} />
@@ -430,7 +580,7 @@ function OverviewPage({ business }: { business: Business }) {
   )
 }
 
-function MetricsCard({ business }: { business: Business }) {
+function MetricsCard({ business, darkMode }: { business: Business; darkMode: boolean }) {
   const metricData = {
     day: {
       label: '1D',
@@ -577,17 +727,17 @@ function MetricsCard({ business }: { business: Business }) {
         >
           <defs>
             <linearGradient id="scan-fill" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#98c99a" stopOpacity="0.38" />
-              <stop offset="55%" stopColor="#d5b181" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#1f2937" stopOpacity="0" />
+              <stop offset="0%" stopColor={darkMode ? "#98c99a" : "#14b8a6"} stopOpacity={darkMode ? "0.38" : "0.25"} />
+              <stop offset="55%" stopColor={darkMode ? "#d5b181" : "#fb923c"} stopOpacity={darkMode ? "0.28" : "0.18"} />
+              <stop offset="100%" stopColor={darkMode ? "#1f2937" : "#f8fafc"} stopOpacity="0" />
             </linearGradient>
             <linearGradient id="scan-line" x1="0" x2="1">
-              <stop offset="0%" stopColor="#d7e8c5" />
-              <stop offset="100%" stopColor="#84b486" />
+              <stop offset="0%" stopColor={darkMode ? "#d7e8c5" : "#0d9488"} />
+              <stop offset="100%" stopColor={darkMode ? "#84b486" : "#14b8a6"} />
             </linearGradient>
             <linearGradient id="order-line" x1="0" x2="1">
-              <stop offset="0%" stopColor="#d5b181" />
-              <stop offset="100%" stopColor="#e7c899" />
+              <stop offset="0%" stopColor={darkMode ? "#d5b181" : "#f97316"} />
+              <stop offset="100%" stopColor={darkMode ? "#e7c899" : "#fb923c"} />
             </linearGradient>
           </defs>
           <path
@@ -647,7 +797,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
   return (
     <div className={compact ? 'qr-panel compact' : 'qr-panel large'} style={{ '--accent': business.accent } as QrStyle}>
       <div className="print-card">
-        <div className="print-brand">ScanIT</div>
+        <div className="print-brand">Scanny</div>
         <h3>{business.name}</h3>
         <p>Scan to view prices, goods, tickets, and place orders.</p>
         {qrImage ? <img src={qrImage} alt={`${business.name} QR code`} /> : <div className="qr-loading" />}
@@ -982,10 +1132,12 @@ function CatalogPage({
   business,
   onItemsChange,
   onAddItem,
+  Sparkline,
 }: {
   business: Business
   onItemsChange: (items: CatalogItem[]) => void
   onAddItem: () => void
+  Sparkline: (props: { data: number[]; color?: string }) => React.ReactElement | null
 }) {
   const PAGE_SIZE = 20
   const categories = useMemo(() => [...new Set(business.items.map((i) => i.category))], [business.items])
@@ -1053,18 +1205,22 @@ function CatalogPage({
         <div>
           <span>Total items</span>
           <strong>{business.items.length}</strong>
+          <Sparkline data={[business.items.length - 6, business.items.length - 4, business.items.length - 3, business.items.length - 2, business.items.length - 1, business.items.length - 1, business.items.length]} color="#3b82f6" />
         </div>
         <div>
           <span>Available</span>
           <strong>{business.items.filter(i => i.available).length}</strong>
+          <Sparkline data={[business.items.filter(i => i.available).length - 3, business.items.filter(i => i.available).length - 2, business.items.filter(i => i.available).length - 2, business.items.filter(i => i.available).length - 1, business.items.filter(i => i.available).length, business.items.filter(i => i.available).length, business.items.filter(i => i.available).length]} color="#10b981" />
         </div>
         <div>
           <span>Hidden</span>
           <strong>{business.items.filter(i => !i.available).length}</strong>
+          <Sparkline data={[business.items.filter(i => !i.available).length + 2, business.items.filter(i => !i.available).length + 2, business.items.filter(i => !i.available).length + 1, business.items.filter(i => !i.available).length + 1, business.items.filter(i => !i.available).length, business.items.filter(i => !i.available).length, business.items.filter(i => !i.available).length]} color="#f59e0b" />
         </div>
         <div>
           <span>Categories</span>
           <strong>{categories.length}</strong>
+          <Sparkline data={[categories.length - 1, categories.length - 1, categories.length - 1, categories.length, categories.length, categories.length, categories.length]} color="#8b5cf6" />
         </div>
       </section>
       <div className="dashboard-head">
@@ -1322,7 +1478,7 @@ function PaymentBadge({ status }: { status: string }) {
   return <span className={`order-badge ${cls}`}>{status}</span>
 }
 
-function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStatusChange }) {
+function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStatusChange, Sparkline }) {
   const statusOptions = ['Pending', 'Preparing', 'Ready', 'Completed', 'Cancelled']
   const paymentOptions = ['Unpaid', 'Paid', 'Refunded']
   const pageSize = 5
@@ -1400,21 +1556,25 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
           <span>OPEN ORDERS</span>
           <strong>{openCount}</strong>
           <span style={{ color: '#667085', fontWeight: 400 }}>Active right now</span>
+          <Sparkline data={[openCount + 3, openCount + 5, openCount + 2, openCount + 4, openCount + 1, openCount + 2, openCount]} color="#3b82f6" />
         </div>
         <div>
           <span>PAID SALES</span>
           <strong style={{ color: '#10b981' }}>{currency(paidSales)}</strong>
           <span style={{ color: '#10b981', fontWeight: 400 }}>Revenue collected</span>
+          <Sparkline data={[paidSales * 0.55, paidSales * 0.65, paidSales * 0.72, paidSales * 0.78, paidSales * 0.85, paidSales * 0.93, paidSales]} color="#10b981" />
         </div>
         <div>
           <span>AWAITING PAYMENT</span>
           <strong>{unpaidCount}</strong>
           <span style={{ color: '#667085', fontWeight: 400 }}>Unpaid open orders</span>
+          <Sparkline data={[unpaidCount + 4, unpaidCount + 3, unpaidCount + 5, unpaidCount + 2, unpaidCount + 3, unpaidCount + 1, unpaidCount]} color="#f59e0b" />
         </div>
         <div>
           <span>COMPLETED</span>
           <strong>{completedCount}</strong>
           <span style={{ color: '#10b981', fontWeight: 400 }}>Orders fulfilled</span>
+          <Sparkline data={[completedCount - 45, completedCount - 38, completedCount - 30, completedCount - 22, completedCount - 15, completedCount - 8, completedCount]} color="#8b5cf6" />
         </div>
       </section>
 
@@ -1568,4 +1728,433 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
     </section>
   )
 }
+
+function ReportsPage({ business, orders }: { business: Business; orders: Order[] }) {
+  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'all'>('week')
+  const [selectedStatus, setSelectedStatus] = useState<'Pending' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled'>('Pending')
+
+  // Dummy data based on time range
+  const dummyData = useMemo(() => {
+    const data = {
+      today: {
+        totalRevenue: 145000,
+        totalOrders: 8,
+        completedOrders: 5,
+        revenueTrend: [18000, 15000, 22000, 19000, 25000, 21000, 25000],
+        ordersTrend: [1, 1, 2, 1, 2, 1, 0],
+        avgOrderTrend: [18000, 15000, 11000, 19000, 12500, 21000, 0],
+        completionTrend: [100, 100, 100, 100, 50, 83, 100],
+        itemSales: [
+          { name: 'Beef Plate', quantity: 12, revenue: 216000 },
+          { name: 'Chicken Wrap', quantity: 8, revenue: 116000 },
+          { name: 'Passion Juice', quantity: 15, revenue: 90000 },
+          { name: 'Family Platter', quantity: 2, revenue: 84000 },
+          { name: 'House Mocktail', quantity: 6, revenue: 72000 },
+        ],
+        paymentBreakdown: { Paid: 145000, Unpaid: 58000, Refunded: 0 },
+        statusBreakdown: { Pending: 2, Preparing: 1, Ready: 0, Completed: 5, Cancelled: 0 },
+        ordersByStatus: {
+          Pending: [
+            { id: 'ORD-001', customer: 'John M.', items: ['2x Beef Plate', '1x Passion Juice'], total: 42000 },
+            { id: 'ORD-002', customer: 'Sarah K.', items: ['1x Chicken Wrap'], total: 14500 },
+          ],
+          Preparing: [
+            { id: 'ORD-003', customer: 'David R.', items: ['1x Family Platter', '2x House Mocktail'], total: 66000 },
+          ],
+          Ready: [],
+          Completed: [
+            { id: 'ORD-004', customer: 'Amina N.', items: ['3x Beef Plate'], total: 54000 },
+            { id: 'ORD-005', customer: 'Brian T.', items: ['2x Chicken Wrap', '1x Passion Juice'], total: 35000 },
+            { id: 'ORD-006', customer: 'Clara M.', items: ['1x Family Platter'], total: 42000 },
+            { id: 'ORD-007', customer: 'Michael S.', items: ['4x Passion Juice'], total: 24000 },
+            { id: 'ORD-008', customer: 'Emma L.', items: ['1x Beef Plate', '2x House Mocktail'], total: 42000 },
+          ],
+          Cancelled: [],
+        },
+      },
+      week: {
+        totalRevenue: 1240000,
+        totalOrders: 67,
+        completedOrders: 52,
+        revenueTrend: [145000, 168000, 192000, 175000, 210000, 185000, 165000],
+        ordersTrend: [8, 10, 12, 9, 13, 10, 5],
+        avgOrderTrend: [18125, 16800, 16000, 19444, 16154, 18500, 33000],
+        completionTrend: [62.5, 70, 75, 77, 76.9, 80, 77.6],
+        itemSales: [
+          { name: 'Beef Plate', quantity: 89, revenue: 1602000 },
+          { name: 'Chicken Wrap', quantity: 67, revenue: 971500 },
+          { name: 'Family Platter', quantity: 28, revenue: 1176000 },
+          { name: 'Passion Juice', quantity: 124, revenue: 744000 },
+          { name: 'House Mocktail', quantity: 45, revenue: 540000 },
+        ],
+        paymentBreakdown: { Paid: 1240000, Unpaid: 320000, Refunded: 28000 },
+        statusBreakdown: { Pending: 8, Preparing: 4, Ready: 3, Completed: 52, Cancelled: 0 },
+        ordersByStatus: {
+          Pending: [
+            { id: 'ORD-060', customer: 'John M.', items: ['2x Beef Plate', '1x Passion Juice'], total: 42000 },
+            { id: 'ORD-061', customer: 'Sarah K.', items: ['1x Chicken Wrap'], total: 14500 },
+            { id: 'ORD-062', customer: 'Peter W.', items: ['1x Family Platter'], total: 42000 },
+            { id: 'ORD-063', customer: 'Lisa M.', items: ['3x Passion Juice'], total: 18000 },
+            { id: 'ORD-064', customer: 'Tom H.', items: ['2x Spicy Wings'], total: 44000 },
+            { id: 'ORD-065', customer: 'Anna B.', items: ['1x Beef Plate', '1x House Mocktail'], total: 30000 },
+            { id: 'ORD-066', customer: 'James P.', items: ['1x Chicken Wrap', '2x Passion Juice'], total: 26500 },
+            { id: 'ORD-067', customer: 'Maria G.', items: ['1x Family Platter', '1x House Mocktail'], total: 54000 },
+          ],
+          Preparing: [
+            { id: 'ORD-056', customer: 'David R.', items: ['1x Family Platter', '2x House Mocktail'], total: 66000 },
+            { id: 'ORD-057', customer: 'Grace N.', items: ['2x Beef Plate'], total: 36000 },
+            { id: 'ORD-058', customer: 'Paul K.', items: ['3x Chicken Wrap'], total: 43500 },
+            { id: 'ORD-059', customer: 'Rachel S.', items: ['1x Spicy Wings', '2x Passion Juice'], total: 34000 },
+          ],
+          Ready: [
+            { id: 'ORD-053', customer: 'Mark J.', items: ['1x Family Platter', '1x Passion Juice'], total: 48000 },
+            { id: 'ORD-054', customer: 'Sophie L.', items: ['2x Chicken Wrap', '1x House Mocktail'], total: 41000 },
+            { id: 'ORD-055', customer: 'Kevin M.', items: ['1x Beef Plate', '1x Passion Juice'], total: 24000 },
+          ],
+          Completed: [
+            { id: 'ORD-001', customer: 'Amina N.', items: ['3x Beef Plate'], total: 54000 },
+            { id: 'ORD-002', customer: 'Brian T.', items: ['2x Chicken Wrap', '1x Passion Juice'], total: 35000 },
+            { id: 'ORD-003', customer: 'Clara M.', items: ['1x Family Platter'], total: 42000 },
+          ],
+          Cancelled: [],
+        },
+      },
+      month: {
+        totalRevenue: 4850000,
+        totalOrders: 268,
+        completedOrders: 234,
+        revenueTrend: [620000, 680000, 750000, 720000, 810000, 740000, 730000],
+        ordersTrend: [32, 38, 42, 39, 45, 40, 32],
+        avgOrderTrend: [19375, 17895, 17857, 18462, 18000, 18500, 22812],
+        completionTrend: [78, 82, 84, 85, 87, 88, 87.3],
+        itemSales: [
+          { name: 'Beef Plate', quantity: 356, revenue: 6408000 },
+          { name: 'Family Platter', quantity: 124, revenue: 5208000 },
+          { name: 'Chicken Wrap', quantity: 289, revenue: 4190500 },
+          { name: 'Passion Juice', quantity: 478, revenue: 2868000 },
+          { name: 'Spicy Wings', quantity: 167, revenue: 3674000 },
+        ],
+        paymentBreakdown: { Paid: 4850000, Unpaid: 890000, Refunded: 126000 },
+        statusBreakdown: { Pending: 18, Preparing: 8, Ready: 8, Completed: 234, Cancelled: 0 },
+        ordersByStatus: {
+          Pending: [
+            { id: 'ORD-260', customer: 'John M.', items: ['2x Beef Plate', '1x Passion Juice'], total: 42000 },
+            { id: 'ORD-261', customer: 'Sarah K.', items: ['1x Chicken Wrap'], total: 14500 },
+            { id: 'ORD-262', customer: 'Peter W.', items: ['1x Family Platter'], total: 42000 },
+            { id: 'ORD-263', customer: 'Lisa M.', items: ['3x Passion Juice'], total: 18000 },
+            { id: 'ORD-264', customer: 'Tom H.', items: ['2x Spicy Wings'], total: 44000 },
+          ],
+          Preparing: [
+            { id: 'ORD-252', customer: 'David R.', items: ['1x Family Platter', '2x House Mocktail'], total: 66000 },
+            { id: 'ORD-253', customer: 'Grace N.', items: ['2x Beef Plate'], total: 36000 },
+            { id: 'ORD-254', customer: 'Paul K.', items: ['3x Chicken Wrap'], total: 43500 },
+            { id: 'ORD-255', customer: 'Rachel S.', items: ['1x Spicy Wings', '2x Passion Juice'], total: 34000 },
+          ],
+          Ready: [
+            { id: 'ORD-244', customer: 'Mark J.', items: ['1x Family Platter', '1x Passion Juice'], total: 48000 },
+            { id: 'ORD-245', customer: 'Sophie L.', items: ['2x Chicken Wrap', '1x House Mocktail'], total: 41000 },
+            { id: 'ORD-246', customer: 'Kevin M.', items: ['1x Beef Plate', '1x Passion Juice'], total: 24000 },
+          ],
+          Completed: [
+            { id: 'ORD-001', customer: 'Amina N.', items: ['3x Beef Plate'], total: 54000 },
+            { id: 'ORD-002', customer: 'Brian T.', items: ['2x Chicken Wrap', '1x Passion Juice'], total: 35000 },
+            { id: 'ORD-003', customer: 'Clara M.', items: ['1x Family Platter'], total: 42000 },
+          ],
+          Cancelled: [],
+        },
+      },
+      all: {
+        totalRevenue: 18650000,
+        totalOrders: 1024,
+        completedOrders: 956,
+        revenueTrend: [2100000, 2350000, 2580000, 2720000, 2950000, 3100000, 2850000],
+        ordersTrend: [112, 128, 145, 152, 168, 176, 143],
+        avgOrderTrend: [18750, 18359, 17793, 17895, 17560, 17614, 19930],
+        completionTrend: [89, 90, 91, 92, 93, 93.4, 93.4],
+        itemSales: [
+          { name: 'Beef Plate', quantity: 1456, revenue: 26208000 },
+          { name: 'Family Platter', quantity: 534, revenue: 22428000 },
+          { name: 'Chicken Wrap', quantity: 1178, revenue: 17081000 },
+          { name: 'Passion Juice', quantity: 2089, revenue: 12534000 },
+          { name: 'Spicy Wings', quantity: 678, revenue: 14916000 },
+        ],
+        paymentBreakdown: { Paid: 18650000, Unpaid: 2340000, Refunded: 456000 },
+        statusBreakdown: { Pending: 34, Preparing: 18, Ready: 16, Completed: 956, Cancelled: 0 },
+        ordersByStatus: {
+          Pending: [
+            { id: 'ORD-1018', customer: 'John M.', items: ['2x Beef Plate', '1x Passion Juice'], total: 42000 },
+            { id: 'ORD-1019', customer: 'Sarah K.', items: ['1x Chicken Wrap'], total: 14500 },
+            { id: 'ORD-1020', customer: 'Peter W.', items: ['1x Family Platter'], total: 42000 },
+            { id: 'ORD-1021', customer: 'Lisa M.', items: ['3x Passion Juice'], total: 18000 },
+            { id: 'ORD-1022', customer: 'Tom H.', items: ['2x Spicy Wings'], total: 44000 },
+          ],
+          Preparing: [
+            { id: 'ORD-1010', customer: 'David R.', items: ['1x Family Platter', '2x House Mocktail'], total: 66000 },
+            { id: 'ORD-1011', customer: 'Grace N.', items: ['2x Beef Plate'], total: 36000 },
+            { id: 'ORD-1012', customer: 'Paul K.', items: ['3x Chicken Wrap'], total: 43500 },
+            { id: 'ORD-1013', customer: 'Rachel S.', items: ['1x Spicy Wings', '2x Passion Juice'], total: 34000 },
+          ],
+          Ready: [
+            { id: 'ORD-1002', customer: 'Mark J.', items: ['1x Family Platter', '1x Passion Juice'], total: 48000 },
+            { id: 'ORD-1003', customer: 'Sophie L.', items: ['2x Chicken Wrap', '1x House Mocktail'], total: 41000 },
+            { id: 'ORD-1004', customer: 'Kevin M.', items: ['1x Beef Plate', '1x Passion Juice'], total: 24000 },
+          ],
+          Completed: [
+            { id: 'ORD-001', customer: 'Amina N.', items: ['3x Beef Plate'], total: 54000 },
+            { id: 'ORD-002', customer: 'Brian T.', items: ['2x Chicken Wrap', '1x Passion Juice'], total: 35000 },
+            { id: 'ORD-003', customer: 'Clara M.', items: ['1x Family Platter'], total: 42000 },
+          ],
+          Cancelled: [],
+        },
+      },
+    }
+    return data[timeRange]
+  }, [timeRange])
+
+  // Calculate metrics from dummy data
+  const totalOrders = dummyData.totalOrders
+  const totalRevenue = dummyData.totalRevenue
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+  const completedOrders = dummyData.completedOrders
+  const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0
+
+  // Use dummy data
+  const itemSales = dummyData.itemSales
+  const paymentBreakdown = dummyData.paymentBreakdown
+  const statusBreakdown = dummyData.statusBreakdown
+  const ordersByStatus = dummyData.ordersByStatus
+
+  // Sparkline component with area fill
+  function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
+    if (data.length === 0) return null
+    
+    const max = Math.max(...data)
+    const min = Math.min(...data)
+    const range = max - min || 1
+    
+    const points = data.map((value, index) => {
+      const x = (index / (data.length - 1)) * 100
+      const y = 100 - ((value - min) / range) * 80 - 10
+      return { x, y }
+    })
+    
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
+    const areaPath = `${linePath} L 100,100 L 0,100 Z`
+    
+    // Generate gradient ID based on color
+    const gradientId = `gradient-${color.replace('#', '')}`
+    
+    return (
+      <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+          </linearGradient>
+        </defs>
+        <path
+          d={areaPath}
+          fill={`url(#${gradientId})`}
+        />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+
+  return (
+    <section className="reports-page">
+      {/* Time range selector */}
+      <div className="reports-filters">
+        <div className="range-tabs" aria-label="Time range">
+          <button
+            className={timeRange === 'today' ? 'active' : ''}
+            type="button"
+            onClick={() => setTimeRange('today')}
+          >
+            Today
+          </button>
+          <button
+            className={timeRange === 'week' ? 'active' : ''}
+            type="button"
+            onClick={() => setTimeRange('week')}
+          >
+            Last 7 days
+          </button>
+          <button
+            className={timeRange === 'month' ? 'active' : ''}
+            type="button"
+            onClick={() => setTimeRange('month')}
+          >
+            This month
+          </button>
+          <button
+            className={timeRange === 'all' ? 'active' : ''}
+            type="button"
+            onClick={() => setTimeRange('all')}
+          >
+            All time
+          </button>
+        </div>
+      </div>
+
+      {/* Key metrics */}
+      <section className="metric-grid" aria-label="Sales metrics">
+        <div>
+          <span>TOTAL REVENUE</span>
+          <strong style={{ color: '#10b981' }}>{currency(totalRevenue)}</strong>
+          <span style={{ color: '#10b981', fontWeight: 400 }}>Paid orders</span>
+          <Sparkline data={dummyData.revenueTrend} color="#10b981" />
+        </div>
+        <div>
+          <span>TOTAL ORDERS</span>
+          <strong>{totalOrders}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>All statuses</span>
+          <Sparkline data={dummyData.ordersTrend} color="#3b82f6" />
+        </div>
+        <div>
+          <span>AVG ORDER VALUE</span>
+          <strong>{currency(averageOrderValue)}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>Per order</span>
+          <Sparkline data={dummyData.avgOrderTrend} color="#f59e0b" />
+        </div>
+        <div>
+          <span>COMPLETION RATE</span>
+          <strong>{completionRate.toFixed(1)}%</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>{completedOrders} completed</span>
+          <Sparkline data={dummyData.completionTrend} color="#8b5cf6" />
+        </div>
+      </section>
+
+      {/* Reports grid */}
+      <div className="reports-grid">
+        {/* Top selling items */}
+        <div className="report-card">
+          <div className="report-card-head">
+            <h3>Top Selling Items</h3>
+            <span>{itemSales.length} items</span>
+          </div>
+          <div className="report-card-body">
+            {itemSales.length > 0 ? (
+              <div className="report-list">
+                {itemSales.map((item, index) => (
+                  <div key={item.name} className="report-list-item">
+                    <div className="report-list-rank">{index + 1}</div>
+                    <div className="report-list-details">
+                      <strong>{item.name}</strong>
+                      <span>{item.quantity} sold</span>
+                    </div>
+                    <strong className="report-list-value">{currency(item.revenue)}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="report-empty">No sales data available for this period.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Payment breakdown */}
+        <div className="report-card">
+          <div className="report-card-head">
+            <h3>Payment Status</h3>
+            <span>{currency(Object.values(paymentBreakdown).reduce((a, b) => a + b, 0))}</span>
+          </div>
+          <div className="report-card-body">
+            <div className="report-breakdown">
+              <div className="report-breakdown-item">
+                <div className="report-breakdown-bar">
+                  <div 
+                    className="report-breakdown-fill paid" 
+                    style={{ width: `${totalRevenue > 0 ? (paymentBreakdown.Paid / (paymentBreakdown.Paid + paymentBreakdown.Unpaid + paymentBreakdown.Refunded)) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="report-breakdown-details">
+                  <span>Paid</span>
+                  <strong>{currency(paymentBreakdown.Paid)}</strong>
+                </div>
+              </div>
+              <div className="report-breakdown-item">
+                <div className="report-breakdown-bar">
+                  <div 
+                    className="report-breakdown-fill unpaid" 
+                    style={{ width: `${totalRevenue > 0 ? (paymentBreakdown.Unpaid / (paymentBreakdown.Paid + paymentBreakdown.Unpaid + paymentBreakdown.Refunded)) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="report-breakdown-details">
+                  <span>Unpaid</span>
+                  <strong>{currency(paymentBreakdown.Unpaid)}</strong>
+                </div>
+              </div>
+              {paymentBreakdown.Refunded > 0 && (
+                <div className="report-breakdown-item">
+                  <div className="report-breakdown-bar">
+                    <div 
+                      className="report-breakdown-fill refunded" 
+                      style={{ width: `${totalRevenue > 0 ? (paymentBreakdown.Refunded / (paymentBreakdown.Paid + paymentBreakdown.Unpaid + paymentBreakdown.Refunded)) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <div className="report-breakdown-details">
+                    <span>Refunded</span>
+                    <strong>{currency(paymentBreakdown.Refunded)}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Order status breakdown */}
+        <div className="report-card">
+          <div className="report-card-head">
+            <h3>Orders by Status</h3>
+            <span>{totalOrders} orders</span>
+          </div>
+          <div className="report-card-body">
+            <div className="report-status-tabs">
+              {(Object.keys(statusBreakdown) as Array<keyof typeof statusBreakdown>).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className={selectedStatus === status ? 'active' : ''}
+                  onClick={() => setSelectedStatus(status as typeof selectedStatus)}
+                >
+                  <StatusBadge status={status} />
+                  <strong>{statusBreakdown[status]}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="report-orders-list">
+              {ordersByStatus[selectedStatus].length > 0 ? (
+                ordersByStatus[selectedStatus].map((order) => (
+                  <div key={order.id} className="report-order-item">
+                    <div className="report-order-inline">
+                      <strong>{order.id}</strong>
+                      <span className="report-order-customer">{order.customer}</span>
+                      <div className="report-order-items">
+                        {order.items.map((item, idx) => (
+                          <span key={idx} className="report-order-chip">{item}</span>
+                        ))}
+                      </div>
+                      <span className="report-order-total">{currency(order.total)}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="report-empty">No {selectedStatus.toLowerCase()} orders for this period.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default App

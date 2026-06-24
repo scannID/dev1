@@ -433,7 +433,7 @@ type FormState = {
   tables: TableOption[]
 }
 
-function TicketForm({ onGenerate }: { onGenerate: (d: TicketData) => void }) {
+function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => void; onBack: () => void }) {
   const [form, setForm] = useState<FormState>({
     eventName: '',
     date: '',
@@ -484,10 +484,10 @@ function TicketForm({ onGenerate }: { onGenerate: (d: TicketData) => void }) {
   })
 
   return (
-    <div style={{ minHeight: '100vh', background: C.dark, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 32px 60px', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: C.dark, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px 60px', fontFamily: "'Inter', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'); * { box-sizing: border-box; }`}</style>
 
-      <div style={{ textAlign: 'center', marginBottom: 36, maxWidth: 960 }}>
+      <div style={{ textAlign: 'center', marginBottom: 36, width: '100%' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.tealLt, display: 'inline-block' }} />
           No sign-in required
@@ -496,7 +496,16 @@ function TicketForm({ onGenerate }: { onGenerate: (d: TicketData) => void }) {
         <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.6, margin: 0 }}>Set your event details, ticket classes, and payment info — then generate a printable QR ticket.</p>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: 960, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 18, padding: '32px 32px', display: 'grid', gap: 24 }}>
+      <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: '1400px', background: C.darker, border: `1px solid ${C.border}`, borderRadius: 18, padding: '32px', display: 'grid', gap: 24, position: 'relative' }}>
+        {/* Back button inside form */}
+        <div style={{ position: 'absolute', top: '32px', left: '32px' }}>
+          <button type="button" onClick={onBack} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.muted, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            ← Back to Scanny
+          </button>
+        </div>
+
+        {/* Add padding to account for back button */}
+        <div style={{ height: '24px' }} />
 
         {/* ── Row 1: Event name + Date side by side ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -580,12 +589,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
 
   return (
     <div>
-      <div style={{ position: 'fixed', top: 14, left: 16, zIndex: 99 }}>
-        <button onClick={onBack} style={{ background: C.darker, border: `1px solid ${C.border}`, color: C.muted, padding: '7px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
-          ← ScanIT Home
-        </button>
-      </div>
-      <TicketForm onGenerate={handleGenerate} />
+      <TicketForm onGenerate={handleGenerate} onBack={onBack} />
     </div>
   )
 }
