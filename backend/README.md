@@ -1,17 +1,38 @@
-# Scanny Backend
+# ScanIT Backend (Java + Spring Boot + PostgreSQL)
 
-Small Node backend for QR-linked businesses, goods, prices, payments, and orders.
+REST API for QR-linked businesses, catalog items, orders, and payments.
 
-## Run
+## Prerequisites
+
+- Java 21+
+- Maven 3.9+
+- Docker (for PostgreSQL)
+
+## Quick start
 
 ```bash
+# 1. Start PostgreSQL
 cd backend
-npm run dev
+docker compose up -d
+
+# 2. Run the API (port 4000)
+./mvnw spring-boot:run
 ```
 
-The API runs on `http://localhost:4000` by default.
+Health check: `http://localhost:4000/health`
 
-## Main endpoints
+## Configuration
+
+Edit `src/main/resources/application.yml`:
+
+| Setting | Default |
+|---------|---------|
+| Server port | `4000` |
+| Database | `jdbc:postgresql://localhost:5432/scanit` |
+| DB user/password | `scanit` / `scanit` |
+| Customer URL base | `https://scanit.app` |
+
+## API endpoints
 
 ```text
 GET    /health
@@ -28,6 +49,7 @@ PATCH  /api/orders/:orderId
 ## Create business
 
 ```json
+POST /api/businesses
 {
   "ownerName": "Sarah",
   "businessName": "Sarah Fashion House",
@@ -36,11 +58,10 @@ PATCH  /api/orders/:orderId
 }
 ```
 
-The backend generates the business ID, merchant ID, QR token, payment reference, customer URL, and starter items.
-
 ## Create order
 
 ```json
+POST /api/businesses/kampala-grill/orders
 {
   "customer": {
     "name": "Allan",
@@ -49,10 +70,11 @@ The backend generates the business ID, merchant ID, QR token, payment reference,
     "note": "No onions"
   },
   "items": [
-    {
-      "itemId": "beef-plate",
-      "quantity": 2
-    }
+    { "itemId": "beef-plate", "quantity": 2 }
   ]
 }
 ```
+
+## Database
+
+Flyway migrations live in `src/main/resources/db/migration/`. Seed data includes sample businesses from the frontend demo.

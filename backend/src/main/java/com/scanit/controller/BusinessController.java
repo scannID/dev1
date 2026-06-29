@@ -1,0 +1,91 @@
+package com.scanit.controller;
+
+import com.scanit.dto.ApiDtos.BusinessResponse;
+import com.scanit.dto.ApiDtos.OrderResponse;
+import com.scanit.dto.RequestDtos.CreateBusinessRequest;
+import com.scanit.dto.RequestDtos.CreateOrderRequest;
+import com.scanit.entity.CatalogItem;
+import com.scanit.service.BusinessService;
+import com.scanit.service.OrderService;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+public class BusinessController {
+
+    private final BusinessService businessService;
+    private final OrderService orderService;
+
+    public BusinessController(BusinessService businessService, OrderService orderService) {
+        this.businessService = businessService;
+        this.orderService = orderService;
+    }
+
+    @GetMapping("/businesses")
+    public Map<String, List<BusinessResponse>> listBusinesses() {
+        return Map.of("businesses", businessService.listBusinesses());
+    }
+
+    @PostMapping("/businesses")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, BusinessResponse> createBusiness(@Valid @RequestBody CreateBusinessRequest request) {
+        return Map.of("business", businessService.createBusiness(request));
+    }
+
+    @GetMapping("/qr/{qrToken}")
+    public Map<String, BusinessResponse> getByQr(@PathVariable String qrToken) {
+        return Map.of("business", businessService.getBusinessByQrToken(qrToken));
+    }
+
+    @GetMapping("/businesses/{businessId}")
+    public Map<String, BusinessResponse> getBusiness(@PathVariable String businessId) {
+        return Map.of("business", businessService.getBusiness(businessId));
+    }
+
+    @GetMapping("/businesses/{businessId}/menu")
+    public Map<String, Object> getMenu(
+            @PathVariable String businessId,
+            @RequestParam(required = false) String qr
+    ) {
+        BusinessResponse business = businessService.getBusiness(businessId);
+        List<CatalogItem> availableItems = businessService.getAvailableMenu(businessId, qr);
+        return Map.of(
+                "business", business,
+                "items", availableItems.stream()
+                        .map(item -> Map.of(
+                                "id", item.getId(),
+                                "name", item.getName(),
+                                "category", item.getCategory(),
+                                "price", item.getPrice(),
+                                "description", item.getDescription(),
+                                "available", item.isAvailable()
+                        ))
+                        .toList()
+        );
+    }
+
+    @GetMapping("/businesses/{businessId}/orders")
+    public Map<String, List<OrderResponse>> listOrders(@PathVariable String businessId) {
+        return Map.of("orders", orderService.listOrders(businessId));
+    }
+
+    @PostMapping("/businesses/{businessId}/orders")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, OrderResponse> createOrder(
+            @PathVariable String businessId,
+            @Valid @RequestBody CreateOrderRequest request
+    ) {
+        return Map.of("order", orderService.createOrder(businessId, request));
+    }
+}

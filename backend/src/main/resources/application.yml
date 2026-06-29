@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: scanit-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/scanit
+    username: scanit
+    password: scanit
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+server:
+  port: 4000
+
+scanit:
+  scan-base-url: https://scanit.app
