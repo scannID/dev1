@@ -1,5 +1,5 @@
 import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, BarChart3, CheckCircle2, Clock, DollarSign, Home, LogOut, MoreHorizontal, Package, Settings, ShoppingCart, Trash2, X } from 'lucide-react'
+import { ArrowLeft, BarChart3, CheckCircle2, Clock, DollarSign, Eye, Home, LogOut, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import {
   AlertDialog,
@@ -11,6 +11,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import './App.css'
 
 const ORDERS_KEY = 'scanny-orders-v1'
@@ -181,7 +214,7 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function App() {
+function App({ onLogout }: { onLogout?: () => void }) {
   const [businesses, setBusinesses] = useState(() => readJson(BUSINESSES_KEY, defaultBusinesses))
   const [activeBusinessId] = useState(() => businesses[0]?.id ?? '')
   const [view, setView] = useState('account')
@@ -193,8 +226,8 @@ function App() {
     location: '',
     note: '',
   })
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [showAddItem, setShowAddItem] = useState(false)
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
@@ -384,34 +417,34 @@ function App() {
   }
 
   function handleLogout() {
-    // Clear localStorage data
-    localStorage.removeItem(ORDERS_KEY)
-    localStorage.removeItem(BUSINESSES_KEY)
-    
-    // Reload the page to reset the app
-    window.location.reload()
+    // Delegate to parent — parent clears storage and ends Keycloak session
+    if (onLogout) {
+      onLogout()
+    } else {
+      localStorage.removeItem(ORDERS_KEY)
+      localStorage.removeItem(BUSINESSES_KEY)
+      window.location.reload()
+    }
   }
 
   return (
     <main className="company-shell">
       <aside className="company-sidebar" aria-label="Company workspace navigation">
-        <div>
-          <p className="eyebrow">Scanny</p>
-          <h1>{business.name || 'Business Name'}</h1>
-        </div>
-
-        <div className="company-status">
-          <span>Registered company</span>
-          <strong>{business.type}</strong>
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-logo">SC</div>
+          <div className="sidebar-brand-text">
+            <strong>Scanny</strong>
+            <span>Merchant Portal</span>
+          </div>
         </div>
 
         <nav className="side-nav" aria-label="Workspace sections">
           {[
             { id: 'account', label: 'Overview', icon: Home },
             { id: 'catalog', label: 'Catalog', icon: Package },
-            { id: 'dashboard', label: `Orders${pendingCount ? ` (${pendingCount})` : ''}`, icon: ShoppingCart },
+            { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount },
             { id: 'reports', label: 'Reports', icon: BarChart3 },
-          ].map(({ id, label, icon: Icon }) => (
+          ].map(({ id, label, icon: Icon, count }) => (
             <button
               type="button"
               className={view === id ? 'active' : ''}
@@ -419,44 +452,27 @@ function App() {
               onClick={() => setView(id)}
             >
               <Icon size={20} />
-              {label}
+              <span style={{ flex: 1 }}>{label}</span>
+              {count ? (
+                <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
+                  {count}
+                </Badge>
+              ) : null}
             </button>
           ))}
         </nav>
 
-        <div className="sidebar-settings">
-          <button 
-            type="button" 
-            className="settings-button"
-            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-          >
-            <Settings size={20} />
-            <span>Settings</span>
-          </button>
-          
-          {showSettingsMenu && (
-            <div className="settings-dropdown">
-              <button 
-                type="button" 
-                className="logout-button"
-                onClick={() => {
-                  setShowLogoutDialog(true)
-                  setShowSettingsMenu(false)
-                }}
-              >
-                <LogOut size={18} />
-                <span>Log out</span>
-              </button>
-            </div>
-          )}
-        </div>
+        <SidebarProfile
+          business={business}
+          onLogoutRequest={() => setShowLogoutDialog(true)}
+        />
 
         <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Log out of Scanny?</AlertDialogTitle>
               <AlertDialogDescription>
-                You will be logged out and all unsaved data will be cleared. This action cannot be undone.
+                You will be logged out and returned to the landing page.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -470,33 +486,30 @@ function App() {
       </aside>
 
       <section className="company-workspace">
-        <header className="company-topbar">
-          <div>
-            <p className="eyebrow">Company dashboard</p>
+        <header className="company-topbar">          <div>
+            <p className="eyebrow">
+              {view === 'account' && 'Merchant · Overview'}
+              {view === 'catalog' && 'Merchant · Catalog'}
+              {view === 'dashboard' && 'Merchant · Orders'}
+              {view === 'reports' && 'Merchant · Reports'}
+            </p>
             <h2>
-              {view === 'account' && 'Overview'}
+              {view === 'account' && `Welcome back, ${business.ownerName || 'Merchant'}`}
               {view === 'catalog' && 'Catalog'}
-              {view === 'add-item' && 'Add Item'}
               {view === 'dashboard' && 'Orders'}
               {view === 'reports' && 'Reports'}
             </h2>
-            <p>
-              {view === 'account' && 'Manage QR access, catalog items, orders, and payments from one workspace.'}
-              {view === 'catalog' && 'Manage your catalog items, prices, and availability.'}
-              {view === 'add-item' && 'Add a new item, service, or ticket to your catalog.'}
-              {view === 'dashboard' && 'Track and manage all orders in real-time.'}
-              {view === 'reports' && 'View sales analytics and business insights.'}
-            </p>
           </div>
           {view === 'account' && (
-            <button className="primary-action topbar-add-item-button" type="button" onClick={() => setView('add-item')}>
+            <Button size="sm" onClick={() => setShowAddItem(true)}>
+              <Plus className="size-3.5" />
               Add item
-            </button>
+            </Button>
           )}
         </header>
 
         {view === 'account' && (
-          <>
+          <div className="page-content">
             <section className="metric-grid overview-metric-grid" aria-label="Overview summary">
               <div>
                 <span>Open orders</span>
@@ -515,40 +528,92 @@ function App() {
               </div>
             </section>
             <OverviewPage business={business} darkMode={darkMode} />
-          </>
-        )}
-
-        {view === 'add-item' && (
-          <AddItemPage
-            business={business}
-            onBack={() => setView('catalog')}
-            onItemsChange={(items) => {
-              updateBusinessItems(items)
-              setView('catalog')
-            }}
-          />
+          </div>
         )}
 
         {view === 'catalog' && (
-          <CatalogPage business={business} onItemsChange={updateBusinessItems} onAddItem={() => setView('add-item')} Sparkline={Sparkline} />
+          <div className="page-content">
+            <CatalogPage
+              business={business}
+              onItemsChange={updateBusinessItems}
+              onAddItem={() => setShowAddItem(true)}
+              Sparkline={Sparkline}
+            />
+          </div>
         )}
 
         {view === 'dashboard' && (
-          <Dashboard
-            business={business}
-            orders={businessOrders}
-            onClearCompleted={clearCompleted}
-            onPaymentChange={updatePayment}
-            onStatusChange={updateStatus}
-            Sparkline={Sparkline}
-          />
+          <div className="page-content">
+            <Dashboard
+              business={business}
+              orders={businessOrders}
+              onClearCompleted={clearCompleted}
+              onPaymentChange={updatePayment}
+              onStatusChange={updateStatus}
+              Sparkline={Sparkline}
+            />
+          </div>
         )}
 
         {view === 'reports' && (
-          <ReportsPage business={business} orders={businessOrders} />
+          <div className="page-content">
+            <ReportsPage business={business} orders={businessOrders} />
+          </div>
         )}
+
+        {/* Add item — Sheet drawer (accessible from overview & catalog) */}
+        <Sheet open={showAddItem} onOpenChange={setShowAddItem}>
+          <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
+            <SheetHeader className="border-b border-border px-6 py-4">
+              <SheetTitle>Add item</SheetTitle>
+              <SheetDescription>Add a new item to {business.name || 'your catalog'}.</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto">
+              <AddItemForm
+                business={business}
+                onItemsChange={(items) => {
+                  updateBusinessItems(items)
+                  setShowAddItem(false)
+                }}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </section>
     </main>
+  )
+}
+function SidebarProfile({
+  business,
+  onLogoutRequest,
+}: {
+  business: Business
+  onLogoutRequest: () => void
+}) {
+  const initials = business.name
+    ? business.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+    : business.ownerName
+      ? business.ownerName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+      : '?'
+
+  return (
+    <div className="sidebar-profile">
+      <div className="sidebar-profile-avatar" style={{ background: business.accent }}>
+        {initials}
+      </div>
+      <div className="sidebar-profile-info">
+        <strong>{business.ownerName || business.name || 'Merchant'}</strong>
+        <span>{business.name || 'Business'}</span>
+      </div>
+      <button
+        type="button"
+        className="sidebar-profile-logout"
+        title="Log out"
+        onClick={onLogoutRequest}
+      >
+        <LogOut size={16} />
+      </button>
+    </div>
   )
 }
 
@@ -1223,259 +1288,201 @@ function CatalogPage({
           <Sparkline data={[categories.length - 1, categories.length - 1, categories.length - 1, categories.length, categories.length, categories.length, categories.length]} color="#8b5cf6" />
         </div>
       </section>
-      <div className="dashboard-head">
-        <div>
-          <p className="eyebrow">Catalog</p>
-          <h3>Items customers see after scanning</h3>
-        </div>
-        <div className="catalog-head-actions">
-          <span className="catalog-count">{business.items.length} items</span>
-          <button className="primary-action catalog-add-btn" type="button" onClick={onAddItem}>
+
+      {/* Table card */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search items…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              className="h-8 pl-8 text-sm"
+              aria-label="Search catalog items"
+            />
+          </div>
+          <Select value={filterCategory} onValueChange={(v) => { setFilterCategory(v); setPage(1) }}>
+            <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by category">
+              <SelectValue placeholder="All categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setPage(1) }}>
+            <SelectTrigger className="h-8 w-[130px] text-sm" aria-label="Filter by status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="hidden">Hidden</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {business.items.length} items</span>
+          {isFiltered && (
+            <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs">
+              Clear filters
+            </Button>
+          )}
+          <Button size="sm" className="h-8" onClick={onAddItem}>
+            <Plus className="size-3.5" />
             Add item
-          </button>
-        </div>
-      </div>
-
-      <div className="catalog-filters">
-        <input
-          className="catalog-search"
-          type="search"
-          placeholder="Search items…"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          aria-label="Search catalog items"
-        />
-        <select
-          className="catalog-filter-select"
-          value={filterCategory}
-          onChange={(e) => { setFilterCategory(e.target.value); setPage(1) }}
-          aria-label="Filter by category"
-        >
-          <option value="all">All categories</option>
-          {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-        </select>
-        <select
-          className="catalog-filter-select"
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1) }}
-          aria-label="Filter by status"
-        >
-          <option value="all">All statuses</option>
-          <option value="available">Available</option>
-          <option value="hidden">Hidden</option>
-        </select>
-        <span className="catalog-results-count">
-          {filtered.length} of {business.items.length} items
-        </span>
-        {isFiltered && (
-          <button className="catalog-clear-filters" type="button" onClick={resetFilters}>
-            Clear filters
-          </button>
-        )}
-      </div>
-
-      <div className="catalog-items-table">
-        <div className="catalog-items-head">
-          <span>Name</span>
-          <span>Category</span>
-          <span>Price</span>
-          <span>Status</span>
-          <span></span>
+          </Button>
         </div>
 
-        {pageItems.length === 0 && (
-          <div className="catalog-empty">
-            <p>No items match your search.</p>
-            <button type="button" className="ghost-button" onClick={resetFilters}>Clear filters</button>
+        {/* Table */}
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b border-border">
+              <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase w-[40%]">Name</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Category</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Price</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
+              <TableHead className="pr-5 text-right text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pageItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                  No items match your search.{' '}
+                  <button type="button" className="text-primary underline" onClick={resetFilters}>Clear filters</button>
+                </TableCell>
+              </TableRow>
+            ) : (
+              pageItems.map((entry) => (
+                <TableRow key={entry.id} className="border-b border-border hover:bg-muted/40 cursor-default">
+                  <TableCell className="pl-5 py-3">
+                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.description}</p>
+                  </TableCell>
+                  <TableCell className="text-sm text-foreground">{entry.category}</TableCell>
+                  <TableCell className="text-sm font-medium text-foreground font-mono">{currency(entry.price)}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className={entry.available
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-muted text-muted-foreground'
+                    }>
+                      {entry.available ? 'Available' : 'Hidden'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="pr-5 text-right">
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => startEdit(entry)}>
+                      <Pencil className="size-3" />
+                      Edit
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border px-5 py-3">
+            <span className="text-xs text-muted-foreground">{filtered.length} items</span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | '…')[]>((acc, p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((p, i) =>
+                  p === '…' ? (
+                    <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
+                  ) : (
+                    <Button key={p} variant={p === currentPage ? 'default' : 'outline'} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setPage(p as number)}>{p}</Button>
+                  )
+                )}
+              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
+            </div>
           </div>
         )}
-
-        {pageItems.map((entry) =>
-          editingId === entry.id ? (
-            <div className="catalog-item-row catalog-row-editing" key={entry.id}>
-              <div className="catalog-edit-fields">
-                <label>
-                  Name
-                  <input
-                    autoFocus
-                    value={editDraft.name ?? ''}
-                    onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Category
-                  <input
-                    list="catalog-edit-categories"
-                    value={editDraft.category ?? ''}
-                    onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}
-                  />
-                  <datalist id="catalog-edit-categories">
-                    {categories.map((cat) => <option key={cat} value={cat} />)}
-                  </datalist>
-                </label>
-                <label>
-                  Price
-                  <input
-                    type="number"
-                    min="0"
-                    value={editDraft.price ?? ''}
-                    onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })}
-                  />
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={editDraft.description ?? ''}
-                    onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })}
-                  />
-                </label>
-                <label className="inline-check">
-                  <input
-                    type="checkbox"
-                    checked={editDraft.available ?? true}
-                    onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })}
-                  />
-                  Available to customers
-                </label>
-              </div>
-              <div className="catalog-edit-actions">
-                <button className="primary-action catalog-save-btn" type="button" onClick={saveEdit}>Save</button>
-                <button className="ghost-button" type="button" onClick={cancelEdit}>Cancel</button>
-                <button className="danger-button" type="button" onClick={() => removeItem(entry.id)}>Delete</button>
-              </div>
-            </div>
-          ) : (
-            <article className="catalog-item-row catalog-row-display" key={entry.id}>
-              <div className="catalog-row-name">
-                <strong>{entry.name}</strong>
-                <span>{entry.description}</span>
-              </div>
-              <span className="catalog-row-category">{entry.category}</span>
-              <span className="catalog-row-price">{currency(entry.price)}</span>
-              <span className={entry.available ? 'catalog-badge available' : 'catalog-badge hidden'}>
-                {entry.available ? 'Available' : 'Hidden'}
-              </span>
-              <button className="ghost-button catalog-edit-btn" type="button" onClick={() => startEdit(entry)}>
-                Edit
-              </button>
-            </article>
-          )
-        )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="pagination-controls" aria-label="Catalog pagination">
-          <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
-            .reduce<(number | '…')[]>((acc, p, i, arr) => {
-              if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
-              acc.push(p)
-              return acc
-            }, [])
-            .map((p, i) =>
-              p === '…' ? (
-                <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  className={p === currentPage ? 'active' : ''}
-                  onClick={() => setPage(p as number)}
-                >
-                  {p}
-                </button>
-              )
-            )}
-          <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
-            Next
-          </button>
-        </div>
-      )}
+      {/* Edit item — Sheet drawer */}
+      <Sheet open={!!editingId} onOpenChange={(open) => { if (!open) cancelEdit() }}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+          <SheetHeader className="border-b border-border px-6 py-4">
+            <SheetTitle>Edit item</SheetTitle>
+            <SheetDescription>{editDraft.name || 'Catalog item'}</SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-category">Category</Label>
+              <Input id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} />
+              <datalist id="edit-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-price">Price (UGX)</Label>
+              <Input id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
+              <Label htmlFor="edit-available" className="cursor-pointer">Available to customers</Label>
+            </div>
+          </div>
+          <div className="border-t border-border px-6 py-4 flex items-center gap-2">
+            <Button className="flex-1" onClick={saveEdit}>Save changes</Button>
+            <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
+            <Button variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item">
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </section>
   )
 }
 
-function OrderActionMenu({ order, statusOptions, paymentOptions, onStatusChange, onPaymentChange, onViewDetails }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
+function OrderActionMenu({ order, onViewDetails }) {
   return (
-    <div className="order-action-menu" ref={ref}>
-      <button
-        type="button"
-        className="icon-button order-dots-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Order actions"
-      >
-        <MoreHorizontal size={18} strokeWidth={2.2} aria-hidden="true" />
-      </button>
-      {open && (
-        <div className="order-action-dropdown" role="menu">
-          <button type="button" className="order-action-item" role="menuitem" onClick={() => { onViewDetails(); setOpen(false) }}>
-            View details
-          </button>
-          <div className="order-action-divider" />
-          <p className="order-action-label">Set status</p>
-          {statusOptions.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`order-action-item${order.status === s ? ' active' : ''}`}
-              role="menuitem"
-              onClick={() => { onStatusChange(order.id, s); setOpen(false) }}
-            >
-              {s}
-            </button>
-          ))}
-          <div className="order-action-divider" />
-          <p className="order-action-label">Set payment</p>
-          {paymentOptions.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`order-action-item${order.paymentStatus === p ? ' active' : ''}`}
-              role="menuitem"
-              onClick={() => { onPaymentChange(order.id, p); setOpen(false) }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label="View order details"
+      onClick={onViewDetails}
+    >
+      <Eye className="size-4" />
+    </Button>
   )
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cls = {
-    Pending: 'badge-pending',
-    Preparing: 'badge-preparing',
-    Ready: 'badge-ready',
-    Completed: 'badge-completed',
-    Cancelled: 'badge-cancelled',
-  }[status] ?? 'badge-pending'
-  return <span className={`order-badge ${cls}`}>{status}</span>
+  const cls: Record<string, string> = {
+    Pending: 'bg-amber-50 text-amber-700 border-amber-200',
+    Preparing: 'bg-blue-50 text-blue-700 border-blue-200',
+    Ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    Completed: 'bg-muted text-muted-foreground',
+    Cancelled: 'bg-red-50 text-red-600 border-red-200',
+  }
+  return <Badge variant="secondary" className={cls[status] ?? cls.Pending}>{status}</Badge>
 }
 
 function PaymentBadge({ status }: { status: string }) {
-  const cls = {
-    Unpaid: 'badge-unpaid',
-    Paid: 'badge-paid',
-    Refunded: 'badge-refunded',
-  }[status] ?? 'badge-unpaid'
-  return <span className={`order-badge ${cls}`}>{status}</span>
+  const cls: Record<string, string> = {
+    Unpaid: 'bg-red-50 text-red-600 border-red-200',
+    Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    Refunded: 'bg-muted text-muted-foreground',
+  }
+  return <Badge variant="secondary" className={cls[status] ?? cls.Unpaid}>{status}</Badge>
 }
 
 function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStatusChange, Sparkline }) {
@@ -1553,112 +1560,97 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
       {/* Metric cards */}
       <section className="metric-grid" aria-label="Orders summary">
         <div>
-          <span>OPEN ORDERS</span>
+          <span>Open orders</span>
           <strong>{openCount}</strong>
-          <span style={{ color: '#667085', fontWeight: 400 }}>Active right now</span>
           <Sparkline data={[openCount + 3, openCount + 5, openCount + 2, openCount + 4, openCount + 1, openCount + 2, openCount]} color="#3b82f6" />
         </div>
         <div>
-          <span>PAID SALES</span>
-          <strong style={{ color: '#10b981' }}>{currency(paidSales)}</strong>
-          <span style={{ color: '#10b981', fontWeight: 400 }}>Revenue collected</span>
+          <span>Paid sales</span>
+          <strong>{currency(paidSales)}</strong>
           <Sparkline data={[paidSales * 0.55, paidSales * 0.65, paidSales * 0.72, paidSales * 0.78, paidSales * 0.85, paidSales * 0.93, paidSales]} color="#10b981" />
         </div>
         <div>
-          <span>AWAITING PAYMENT</span>
+          <span>Awaiting payment</span>
           <strong>{unpaidCount}</strong>
-          <span style={{ color: '#667085', fontWeight: 400 }}>Unpaid open orders</span>
           <Sparkline data={[unpaidCount + 4, unpaidCount + 3, unpaidCount + 5, unpaidCount + 2, unpaidCount + 3, unpaidCount + 1, unpaidCount]} color="#f59e0b" />
         </div>
         <div>
-          <span>COMPLETED</span>
+          <span>Completed</span>
           <strong>{completedCount}</strong>
-          <span style={{ color: '#10b981', fontWeight: 400 }}>Orders fulfilled</span>
           <Sparkline data={[completedCount - 45, completedCount - 38, completedCount - 30, completedCount - 22, completedCount - 15, completedCount - 8, completedCount]} color="#8b5cf6" />
         </div>
       </section>
 
-      {/* Table section */}
-      <div className="orders-panel">
-        <div className="orders-panel-head">
+      {/* Orders table */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
           <div>
-            <p className="eyebrow">Management</p>
-            <h3>Orders for {business.name}</h3>
+            <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Management</p>
+            <h3 className="mt-0.5 text-base font-semibold text-foreground">Orders</h3>
           </div>
-          <div className="orders-panel-actions">
-            <span className="orders-count-pill">{displayOrders.length} orders</span>
-            <button type="button" className="ghost-button orders-clear-btn" onClick={onClearCompleted}>
-              <Trash2 size={16} />
-              Clear finished
-            </button>
-          </div>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={onClearCompleted}>
+            <Trash2 className="size-3.5" />
+            Clear finished
+          </Button>
         </div>
 
-        <div className="orders-table" role="table" aria-label="Orders">
-          <div className="orders-table-head" role="row">
-            <span>ORDER</span>
-            <span>CUSTOMER</span>
-            <span>LINE ITEMS</span>
-            <span>TOTAL</span>
-            <span>STATUS</span>
-            <span>PAYMENT</span>
-            <span></span>
-          </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b border-border">
+              <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Order</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Customer</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Items</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Total</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Payment</TableHead>
+              <TableHead className="pr-5 text-right text-[10px] font-medium tracking-widest text-muted-foreground uppercase"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pageOrders.map((order) => (
+              <TableRow
+                key={order.id}
+                className="border-b border-border hover:bg-muted/40 cursor-pointer"
+                onClick={() => setDetailOrderId(order.id)}
+              >
+                <TableCell className="pl-5 py-3">
+                  <p className="text-sm font-mono font-medium text-foreground">{order.id}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(order.createdAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-sm font-medium text-foreground">{order.customer.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{[order.customer.phone, order.customer.location].filter(Boolean).join(' · ')}</p>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {order.items.slice(0, 2).map((item) => (
+                      <Badge key={item.id} variant="secondary" className="text-[11px] font-normal">{item.quantity}× {item.name}</Badge>
+                    ))}
+                    {order.items.length > 2 && <Badge variant="secondary" className="text-[11px] font-normal">+{order.items.length - 2} more</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm font-medium font-mono text-foreground">{currency(order.total)}</TableCell>
+                <TableCell><StatusBadge status={order.status} /></TableCell>
+                <TableCell><PaymentBadge status={order.paymentStatus} /></TableCell>
+                <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
+                  <OrderActionMenu
+                    order={order}
+                    onViewDetails={() => setDetailOrderId(order.id)}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
 
-          {pageOrders.map((order) => (
-            <article className="order-row" key={order.id} role="row">
-              <div className="order-id-cell">
-                <strong>{order.id}</strong>
-                <span>
-                  {new Date(order.createdAt).toLocaleString([], {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-
-              <div className="order-customer-cell">
-                <strong>{order.customer.name}</strong>
-                <span>
-                  {[order.customer.phone, order.customer.location].filter(Boolean).join(' · ')}
-                </span>
-              </div>
-
-              <div className="order-chips-cell">
-                {order.items.slice(0, 2).map((item) => (
-                  <span key={item.id} className="order-item-chip">{item.quantity}x {item.name}</span>
-                ))}
-                {order.items.length > 2 && (
-                  <span className="order-item-chip order-item-chip-more">+{order.items.length - 2} more</span>
-                )}
-              </div>
-
-              <strong className="order-total-cell">{currency(order.total)}</strong>
-
-              <StatusBadge status={order.status} />
-
-              <PaymentBadge status={order.paymentStatus} />
-
-              <OrderActionMenu
-                order={order}
-                statusOptions={statusOptions}
-                paymentOptions={paymentOptions}
-                onStatusChange={onStatusChange}
-                onPaymentChange={onPaymentChange}
-                onViewDetails={() => setDetailOrderId(order.id)}
-              />
-            </article>
-          ))}
-        </div>
-
-        <div className="orders-table-footer">
-          <span className="orders-showing">Showing {firstItem}–{lastItem} of {displayOrders.length}</span>
-          <div className="pagination-controls" aria-label="Orders pagination">
-            <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>
-              Previous
-            </button>
+        {/* Pagination */}
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
+          <span className="text-xs text-muted-foreground">Showing {firstItem}–{lastItem} of {displayOrders.length}</span>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
               .reduce<(number | '…')[]>((acc, p, i, arr) => {
@@ -1668,63 +1660,78 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
               }, [])
               .map((p, i) =>
                 p === '…' ? (
-                  <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                  <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
                 ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    className={p === currentPage ? 'active' : ''}
-                    onClick={() => setPage(p as number)}
-                  >
-                    {p}
-                  </button>
+                  <Button key={p} variant={p === currentPage ? 'default' : 'outline'} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setPage(p as number)}>{p}</Button>
                 )
               )}
-            <button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>
-              Next
-            </button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
           </div>
         </div>
       </div>
 
-      {/* Detail drawer */}
-      {detailOrder && (
-        <div className="order-drawer-layer" role="presentation">
-          <button className="order-drawer-backdrop" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" />
-          <aside className="order-detail-drawer" aria-label="Order details">
-            <div className="order-drawer-head">
-              <div>
-                <p className="eyebrow">Order details</p>
-                <h3>{detailOrder.id}</h3>
+      {/* Order detail — shadcn Sheet */}
+      <Sheet open={!!detailOrderId} onOpenChange={(open) => { if (!open) setDetailOrderId('') }}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
+          {detailOrder && (
+            <>
+              <SheetHeader className="border-b border-border px-6 py-4">
+                <SheetTitle className="font-mono tracking-wide">{detailOrder.id}</SheetTitle>
+                <SheetDescription>
+                  {new Date(detailOrder.createdAt).toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                {/* Customer */}
+                <div>
+                  <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">Customer</p>
+                  <p className="text-sm font-medium text-foreground">{detailOrder.customer.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' · ')}</p>
+                  {detailOrder.customer.note && <p className="text-xs text-muted-foreground mt-1 italic">{detailOrder.customer.note}</p>}
+                </div>
+
+                <Separator />
+
+                {/* Items */}
+                <div>
+                  <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">Items</p>
+                  <ul className="space-y-2">
+                    {detailOrder.items.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-foreground">{item.quantity} × {item.name}</span>
+                        <span className="text-sm font-medium font-mono text-foreground">{currency(item.lineTotal)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <Separator />
+
+                {/* Total + payment */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Payment ref</span>
+                    <span className="text-sm font-mono text-foreground">{detailOrder.paymentReference || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Status</span>
+                    <StatusBadge status={detailOrder.status} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Payment</span>
+                    <PaymentBadge status={detailOrder.paymentStatus} />
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <span className="text-sm font-semibold text-foreground">Total</span>
+                    <span className="text-sm font-bold font-mono text-foreground">{currency(detailOrder.total)}</span>
+                  </div>
+                </div>
               </div>
-              <button className="icon-button" type="button" onClick={() => setDetailOrderId('')} aria-label="Close order details" title="Close">
-                <X size={20} strokeWidth={2.4} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="customer-note">
-              <strong>{detailOrder.customer.name}</strong>
-              <span>{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' · ')}</span>
-              {detailOrder.customer.note && <p>{detailOrder.customer.note}</p>}
-            </div>
-            <ul className="order-items">
-              {detailOrder.items.map((item) => (
-                <li key={item.id}>
-                  <span>{item.quantity} x {item.name}</span>
-                  <strong>{currency(item.lineTotal)}</strong>
-                </li>
-              ))}
-            </ul>
-            <div className="payment-status">
-              <span>{detailOrder.paymentReference}</span>
-              <strong>{detailOrder.paymentStatus}</strong>
-            </div>
-            <div className="total-row">
-              <span>Total</span>
-              <strong>{currency(detailOrder.total)}</strong>
-            </div>
-          </aside>
-        </div>
-      )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </section>
   )
 }
