@@ -6,10 +6,9 @@ import LandingPage from './LandingPage'
 import EventTicketPage from './EventTicket'
 import keycloak from './keycloak'
 
-type View = 'landing' | 'app' | 'ticket'
+// Isolated session key — only the merchant app sets/reads this
+const SESSION_KEY = 'scanny-merchant-authenticated'
 
-// Module-level flag — survives StrictMode double-invoke because it lives
-// outside React's component lifecycle entirely.
 let kcInitPromise: Promise<boolean> | null = null
 
 function initKeycloak() {
@@ -19,6 +18,8 @@ function initKeycloak() {
   return kcInitPromise
 }
 
+type View = 'landing' | 'app' | 'ticket'
+
 function Root() {
   const [view, setView] = useState<View>('landing')
   const [darkMode, setDarkMode] = useState(() => {
@@ -26,10 +27,9 @@ function Root() {
     return saved ? JSON.parse(saved) : false
   })
 
-  // On mount: silently check for an existing Keycloak session.
-  // Only moves to 'app' if the user already authenticated in a previous visit.
+  // Restore session only if THIS app's flag is set
   useEffect(() => {
-    const hadSession = sessionStorage.getItem('scanny-kc-authenticated') === '1'
+    const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
     if (!hadSession) return
 
     initKeycloak()
@@ -37,13 +37,12 @@ function Root() {
         if (authenticated) {
           setView('app')
         } else {
-          sessionStorage.removeItem('scanny-kc-authenticated')
+          sessionStorage.removeItem(SESSION_KEY)
         }
       })
-      .catch(() => sessionStorage.removeItem('scanny-kc-authenticated'))
+      .catch(() => sessionStorage.removeItem(SESSION_KEY))
   }, [])
 
-  // Toggle dark mode with 'D' key
   useEffect(() => {
     function handleKeyPress(e: KeyboardEvent) {
       if (e.key === 'd' || e.key === 'D') {
@@ -63,24 +62,26 @@ function Root() {
     document.body.classList.toggle('dark-mode', darkMode)
   }, [darkMode])
 
-  // "Get Started" — initialize Keycloak then immediately redirect to login
   function handleGetStarted() {
-    initKeycloak()
-      .then(() => {
-        // Whether or not there's already a session, send them to the login page
-        keycloak.login({ redirectUri: window.location.origin })
-      })
-      .catch(console.error)
+    keycloak.login({ redirectUri: window.location.origin }).catch(console.error)
   }
 
   function handleLogout() {
-    sessionStorage.removeItem('scanny-kc-authenticated')
+    sessionStorage.removeItem(SESSION_KEY)
     localStorage.removeItem('scanny-orders-v1')
     localStorage.removeItem('scanny-businesses-v2')
-    keycloak.logout({ redirectUri: window.location.origin })
+    if (keycloak.authenticated) {
+      keycloak.logout({ redirectUri: window.location.origin })
+    } else {
+      setView('landing')
+    }
   }
 
-  if (view === 'app')    return <App onLogout={handleLogout} />
+  const kcUsername = keycloak.authenticated && keycloak.tokenParsed
+    ? (keycloak.tokenParsed.name || keycloak.tokenParsed.preferred_username || keycloak.tokenParsed.email || '')
+    : ''
+
+  if (view === 'app')    return <App onLogout={handleLogout} kcUsername={kcUsername} />
   if (view === 'ticket') return <EventTicketPage onBack={() => setView('landing')} />
   return (
     <LandingPage
@@ -90,23 +91,21 @@ function Root() {
   )
 }
 
-// After Keycloak redirects back post-login, pick up the auth code from the URL
-// and exchange it for a token before React even renders.
+// Module-level init — handles post-login redirect (auth code in URL)
 keycloak
   .init({ onLoad: 'check-sso', checkLoginIframe: false })
   .then((authenticated) => {
     kcInitPromise = Promise.resolve(authenticated)
     if (authenticated) {
-      sessionStorage.setItem('scanny-kc-authenticated', '1')
+      // Only store session flag if token belongs to the merchant client
+      if (keycloak.tokenParsed?.azp === 'scanny-client') {
+        sessionStorage.setItem(SESSION_KEY, '1')
+      }
     }
   })
-  .catch(() => {
-    kcInitPromise = Promise.resolve(false)
-  })
+  .catch(() => { kcInitPromise = Promise.resolve(false) })
   .finally(() => {
     createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <Root />
-      </StrictMode>,
+      <StrictMode><Root /></StrictMode>
     )
   })

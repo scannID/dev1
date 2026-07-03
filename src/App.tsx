@@ -1,5 +1,5 @@
 import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, BarChart3, CheckCircle2, Clock, DollarSign, Eye, Home, LogOut, Package, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react'
+import { ArrowLeft, BarChart3, Bell, CheckCircle2, Clock, DollarSign, Eye, Home, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import {
   AlertDialog,
@@ -214,7 +214,7 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function App({ onLogout }: { onLogout?: () => void }) {
+function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: string }) {
   const [businesses, setBusinesses] = useState(() => readJson(BUSINESSES_KEY, defaultBusinesses))
   const [activeBusinessId] = useState(() => businesses[0]?.id ?? '')
   const [view, setView] = useState('account')
@@ -228,6 +228,7 @@ function App({ onLogout }: { onLogout?: () => void }) {
   })
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
@@ -431,7 +432,11 @@ function App({ onLogout }: { onLogout?: () => void }) {
     <main className="company-shell">
       <aside className="company-sidebar" aria-label="Company workspace navigation">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-logo">SC</div>
+          <img
+            src="/qrcode1.png"
+            alt="Scanny"
+            className="sidebar-brand-logo"
+          />
           <div className="sidebar-brand-text">
             <strong>Scanny</strong>
             <span>Merchant Portal</span>
@@ -464,6 +469,7 @@ function App({ onLogout }: { onLogout?: () => void }) {
 
         <SidebarProfile
           business={business}
+          kcUsername={kcUsername || ''}
           onLogoutRequest={() => setShowLogoutDialog(true)}
         />
 
@@ -486,7 +492,8 @@ function App({ onLogout }: { onLogout?: () => void }) {
       </aside>
 
       <section className="company-workspace">
-        <header className="company-topbar">          <div>
+        <header className="company-topbar">
+          <div>
             <p className="eyebrow">
               {view === 'account' && 'Merchant · Overview'}
               {view === 'catalog' && 'Merchant · Catalog'}
@@ -500,12 +507,34 @@ function App({ onLogout }: { onLogout?: () => void }) {
               {view === 'reports' && 'Reports'}
             </h2>
           </div>
-          {view === 'account' && (
-            <Button size="sm" onClick={() => setShowAddItem(true)}>
-              <Plus className="size-3.5" />
-              Add item
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {view === 'account' && (
+              <Button size="sm" onClick={() => setShowAddItem(true)}>
+                <Plus className="size-3.5" />
+                Add item
+              </Button>
+            )}
+            {/* Dark mode toggle */}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              title={darkMode ? 'Light mode' : 'Dark mode'}
+              onClick={() => setDarkMode((v: boolean) => !v)}
+            >
+              {darkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
             </Button>
-          )}
+            {/* Notifications */}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Notifications"
+              className="relative"
+              onClick={() => setShowNotifications(true)}
+            >
+              <Bell className="size-3.5" />
+              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+            </Button>
+          </div>
         </header>
 
         {view === 'account' && (
@@ -579,22 +608,112 @@ function App({ onLogout }: { onLogout?: () => void }) {
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* Notifications drawer */}
+        <Sheet open={showNotifications} onOpenChange={setShowNotifications}>
+          <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
+            <SheetHeader className="border-b border-border px-6 py-4">
+              <SheetTitle>Notifications</SheetTitle>
+              <SheetDescription>Recent activity for {business.name || 'your business'}</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto">
+              <NotificationsPanel businessName={business.name} orders={businessOrders} />
+            </div>
+          </SheetContent>
+        </Sheet>
       </section>
     </main>
   )
 }
+function NotificationsPanel({ businessName, orders }: { businessName: string; orders: Order[] }) {
+  const recentOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
+  const unpaid = orders.filter(o => o.paymentStatus === 'Unpaid' && o.status !== 'Cancelled').length
+  const pending = orders.filter(o => o.status === 'Pending').length
+
+  const systemNotifs = [
+    unpaid > 0 && {
+      icon: '💳',
+      bg: 'oklch(0.96 0.02 30)',
+      title: `${unpaid} unpaid order${unpaid > 1 ? 's' : ''}`,
+      sub: 'Awaiting payment collection',
+      time: 'Now',
+      dot: true,
+    },
+    pending > 0 && {
+      icon: '🔔',
+      bg: 'oklch(0.96 0.04 75)',
+      title: `${pending} order${pending > 1 ? 's' : ''} pending`,
+      sub: 'Needs your attention',
+      time: 'Now',
+      dot: true,
+    },
+  ].filter(Boolean) as { icon: string; bg: string; title: string; sub: string; time: string; dot: boolean }[]
+
+  return (
+    <div>
+      {/* System alerts */}
+      {systemNotifs.length > 0 && (
+        <div style={{ borderBottom: '1px solid var(--border)' }}>
+          <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Alerts</p>
+          {systemNotifs.map((n, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: n.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{n.icon}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{n.title}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>{n.sub}</p>
+              </div>
+              {n.dot && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--destructive)', flexShrink: 0, marginTop: 5 }} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recent orders */}
+      <div>
+        <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Recent Orders</p>
+        {recentOrders.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>No orders yet for {businessName || 'your business'}.</p>
+          </div>
+        ) : (
+          recentOrders.map((order) => (
+            <div key={order.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: order.status === 'Pending' ? 'oklch(0.96 0.04 75)' : order.status === 'Completed' ? 'oklch(0.94 0.04 145)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                {order.status === 'Pending' ? '🕐' : order.status === 'Completed' ? '✅' : order.status === 'Preparing' ? '👨‍🍳' : order.status === 'Ready' ? '🛎' : '❌'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{order.id} · {order.customer.name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  {order.status} · {order.paymentStatus} · {currency(order.total)}
+                </p>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flexShrink: 0 }}>
+                {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SidebarProfile({
   business,
+  kcUsername,
   onLogoutRequest,
 }: {
   business: Business
+  kcUsername: string
   onLogoutRequest: () => void
 }) {
-  const initials = business.name
-    ? business.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-    : business.ownerName
-      ? business.ownerName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-      : '?'
+  const displayName = kcUsername || business.ownerName || business.name || 'Merchant'
+  const initials = displayName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   return (
     <div className="sidebar-profile">
@@ -602,7 +721,7 @@ function SidebarProfile({
         {initials}
       </div>
       <div className="sidebar-profile-info">
-        <strong>{business.ownerName || business.name || 'Merchant'}</strong>
+        <strong>{displayName}</strong>
         <span>{business.name || 'Business'}</span>
       </div>
       <button
@@ -1095,7 +1214,7 @@ function AddItemForm({
       </div>
 
       <label>
-        Item or ticket name
+        Item name
         <input
           required
           aria-invalid={isItemNameMissing}

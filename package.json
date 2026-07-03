@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:admin": "vite --config admin-console/vite.config.ts",
     "build": "vite build",
+    "build:admin": "vite build --config admin-console/vite.config.ts",
     "lint": "eslint .",
     "typecheck": "tsc -b",
     "preview": "vite preview"
