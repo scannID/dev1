@@ -6,10 +6,24 @@
 // ============================================================================
 
 export interface DashboardMetrics {
-  totalMerchants: number
-  totalOrders: number
-  totalRevenue: number
-  activeQRScans: number
+  merchants: {
+    total: number
+    change: string
+    thisWeek: number
+  }
+  ordersToday: {
+    total: number
+    change: string
+  }
+  qrScans: {
+    last24Hours: number
+    change: string
+  }
+  revenue: {
+    thisMonth: number
+    currency: string
+    change: string
+  }
 }
 
 export interface PendingOrder {
@@ -34,17 +48,15 @@ export interface RecentActivity {
 
 export interface Merchant {
   id: string
-  merchantId: string
-  qrToken: string
   name: string
-  ownerName: string
-  phone: string
+  owner: string
   type: string
-  paymentReference: string
+  plan: string
+  orders: number
+  revenue: number
+  currency: string
   status: 'active' | 'warning' | 'suspended' | 'pending'
-  totalOrders: number
-  totalRevenue: number
-  joinedDate: string
+  joinedAt: string
 }
 
 export interface MerchantStats {

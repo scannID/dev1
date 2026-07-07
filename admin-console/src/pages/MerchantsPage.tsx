@@ -54,15 +54,15 @@ export default function MerchantsPage() {
 
   // Use API data if available, fallback to static data
   const displayMerchants = merchants.length > 0 ? merchants.map(m => ({
-    id: m.merchantId,
+    id: m.id,
     name: m.name,
-    owner: m.ownerName,
+    owner: m.owner,
     type: m.type,
-    plan: 'Pro', // Could be added to backend later
-    orders: m.totalOrders,
-    revenue: currency(m.totalRevenue),
+    plan: m.plan,
+    orders: m.orders,
+    revenue: currency(m.revenue),
     status: m.status,
-    joined: new Date(m.joinedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    joined: new Date(m.joinedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   })) : MERCHANTS
 
   const filtered = displayMerchants.filter((m) =>

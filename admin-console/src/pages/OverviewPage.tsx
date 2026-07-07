@@ -86,39 +86,39 @@ export default function OverviewPage() {
   const displayMetrics = metrics ? [
     { 
       label: 'Total Merchants', 
-      value: metrics.totalMerchants.toString(), 
-      sub: '+3 this week', 
-      delta: '+2.2%', 
+      value: metrics.merchants.total.toString(), 
+      sub: `+${metrics.merchants.thisWeek} this week`, 
+      delta: metrics.merchants.change, 
       up: true, 
       color: '#3b82f6', 
-      data: Array.from({length: 7}, (_, i) => metrics.totalMerchants - (6-i) * 2) 
+      data: Array.from({length: 7}, (_, i) => metrics.merchants.total - (6-i) * 2) 
     },
     { 
       label: 'Orders Today', 
-      value: metrics.totalOrders.toLocaleString(), 
+      value: metrics.ordersToday.total.toLocaleString(), 
       sub: 'across all merchants', 
-      delta: '+14.3%', 
+      delta: metrics.ordersToday.change, 
       up: true, 
       color: '#10b981', 
-      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.totalOrders * (0.6 + i * 0.08))) 
+      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.ordersToday.total * (0.6 + i * 0.08))) 
     },
     { 
       label: 'Active QR Scans', 
-      value: metrics.activeQRScans.toLocaleString(), 
+      value: metrics.qrScans.last24Hours.toLocaleString(), 
       sub: 'last 24 hours', 
-      delta: '+8.1%', 
+      delta: metrics.qrScans.change, 
       up: true, 
       color: '#8b5cf6', 
-      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.activeQRScans * (0.7 + i * 0.05))) 
+      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.qrScans.last24Hours * (0.7 + i * 0.05))) 
     },
     { 
       label: 'Platform Revenue', 
-      value: currency(metrics.totalRevenue), 
+      value: currency(metrics.revenue.thisMonth), 
       sub: 'this month', 
-      delta: '+19.4%', 
+      delta: metrics.revenue.change, 
       up: true, 
       color: '#f59e0b', 
-      data: Array.from({length: 7}, (_, i) => metrics.totalRevenue * (0.5 + i * 0.08)) 
+      data: Array.from({length: 7}, (_, i) => metrics.revenue.thisMonth * (0.5 + i * 0.08)) 
     },
   ] : METRICS
 
