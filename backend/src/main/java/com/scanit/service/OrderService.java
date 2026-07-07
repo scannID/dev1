@@ -126,6 +126,44 @@ public class OrderService {
         return OrderResponse.from(orderRepository.save(order));
     }
 
+    @Transactional
+    public OrderResponse updateOrderStatus(String orderId, OrderStatus status) {
+        Order order = orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+
+        order.setStatus(status);
+        order.setUpdatedAt(Instant.now());
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional
+    public OrderResponse updatePaymentStatus(String orderId, PaymentStatus paymentStatus) {
+        Order order = orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+
+        order.setPaymentStatus(paymentStatus);
+        order.setUpdatedAt(Instant.now());
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional
+    public int clearCompletedOrders(String businessId) {
+        businessService.requireBusiness(businessId);
+        
+        List<Order> orders = orderRepository.findByBusinessIdOrderByCreatedAtDesc(businessId);
+        List<Order> toDelete = orders.stream()
+            .filter(order -> order.getStatus() == OrderStatus.Completed || order.getStatus() == OrderStatus.Cancelled)
+            .toList();
+
+        if (!toDelete.isEmpty()) {
+            orderRepository.deleteAll(toDelete);
+        }
+
+        return toDelete.size();
+    }
+
     private String trimToEmpty(String value) {
         return value != null ? value.trim() : "";
     }

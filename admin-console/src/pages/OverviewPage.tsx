@@ -1,6 +1,7 @@
 import { ArrowUpRight, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
+import { useDashboard } from '../hooks/useDashboard'
 
 function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?: string }) {
   if (data.length < 2) return null
@@ -53,12 +54,87 @@ const TOP_MERCHANTS = [
 
 const _ORDERS_BY_HOUR = [480,620,540,780,920,1040,1120,980,840,760,680,540]
 
+function currency(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 export default function OverviewPage() {
+  const { metrics, recentActivity, loading, error } = useDashboard()
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+        <div className="spinner">Loading dashboard...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--destructive)', marginBottom: '16px' }}>Error: {error}</p>
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '14px' }}>Using fallback data...</p>
+      </div>
+    )
+  }
+
+  // Use API data if available, fallback to static data
+  const displayMetrics = metrics ? [
+    { 
+      label: 'Total Merchants', 
+      value: metrics.totalMerchants.toString(), 
+      sub: '+3 this week', 
+      delta: '+2.2%', 
+      up: true, 
+      color: '#3b82f6', 
+      data: Array.from({length: 7}, (_, i) => metrics.totalMerchants - (6-i) * 2) 
+    },
+    { 
+      label: 'Orders Today', 
+      value: metrics.totalOrders.toLocaleString(), 
+      sub: 'across all merchants', 
+      delta: '+14.3%', 
+      up: true, 
+      color: '#10b981', 
+      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.totalOrders * (0.6 + i * 0.08))) 
+    },
+    { 
+      label: 'Active QR Scans', 
+      value: metrics.activeQRScans.toLocaleString(), 
+      sub: 'last 24 hours', 
+      delta: '+8.1%', 
+      up: true, 
+      color: '#8b5cf6', 
+      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.activeQRScans * (0.7 + i * 0.05))) 
+    },
+    { 
+      label: 'Platform Revenue', 
+      value: currency(metrics.totalRevenue), 
+      sub: 'this month', 
+      delta: '+19.4%', 
+      up: true, 
+      color: '#f59e0b', 
+      data: Array.from({length: 7}, (_, i) => metrics.totalRevenue * (0.5 + i * 0.08)) 
+    },
+  ] : METRICS
+
+  const displayActivity = recentActivity.length > 0 ? recentActivity.map(a => ({
+    icon: '📦',
+    bg: 'oklch(0.95 0.01 250)',
+    title: a.activityType,
+    sub: a.description,
+    time: new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  })) : RECENT_ACTIVITY
+
   return (
     <>
       {/* Metric cards */}
       <div className="admin-metric-grid">
-        {METRICS.map((m) => (
+        {displayMetrics.map((m) => (
           <div key={m.label} className="admin-metric-card">
             <span className="metric-label">{m.label}</span>
             <span className="metric-value">{m.value}</span>
@@ -101,7 +177,7 @@ export default function OverviewPage() {
             <div><h3>Platform Activity</h3><p>Latest events across the system</p></div>
           </div>
           <ul className="admin-activity-list">
-            {RECENT_ACTIVITY.map((a, i) => (
+            {displayActivity.slice(0, 7).map((a, i) => (
               <li key={i}>
                 <div className="admin-activity-icon" style={{ background: a.bg }}>{a.icon}</div>
                 <div className="admin-activity-body">

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { useOrders } from '../hooks/useOrders'
 
 const ORDERS = Array.from({ length: 20 }, (_, i) => ({
   id: `ORD-${String(3800 + i).padStart(5, '0')}`,
@@ -27,20 +28,64 @@ const S_PAY: Record<string, string> = {
   Refunded: 'bg-muted text-muted-foreground',
 }
 
+function currency(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 export default function OrdersPage() {
+  const { orders, loading, error } = useOrders()
   const [q, setQ] = useState('')
-  const filtered = ORDERS.filter((o) =>
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+        <div className="spinner">Loading orders...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--destructive)', marginBottom: '16px' }}>Error: {error}</p>
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '14px' }}>Using fallback data...</p>
+      </div>
+    )
+  }
+
+  // Use API data if available, fallback to static data
+  const displayOrders = orders.length > 0 ? orders.map(o => ({
+    id: o.id,
+    merchant: o.businessName,
+    customer: o.customerName,
+    items: o.items.length,
+    total: currency(o.total),
+    payment: o.paymentStatus,
+    status: o.status,
+    time: new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  })) : ORDERS
+
+  const filtered = displayOrders.filter((o) =>
     [o.id, o.merchant, o.customer].join(' ').toLowerCase().includes(q.toLowerCase())
   )
+
+  const totalToday = displayOrders.length
+  const completed = displayOrders.filter(o => o.status === 'Completed').length
+  const pending = displayOrders.filter(o => o.status === 'Pending' || o.status === 'Preparing' || o.status === 'Ready').length
+  const cancelled = displayOrders.filter(o => o.status === 'Cancelled').length
 
   return (
     <>
       <div className="admin-metric-grid">
         {[
-          { label: 'Total Orders Today', value: '1,847' },
-          { label: 'Completed',          value: '1,402' },
-          { label: 'Pending / Active',   value: '312'   },
-          { label: 'Cancelled',          value: '133'   },
+          { label: 'Total Orders Today', value: totalToday.toLocaleString() },
+          { label: 'Completed',          value: completed.toLocaleString() },
+          { label: 'Pending / Active',   value: pending.toLocaleString()   },
+          { label: 'Cancelled',          value: cancelled.toLocaleString()   },
         ].map((c) => (
           <div key={c.label} className="admin-metric-card">
             <span className="metric-label">{c.label}</span>

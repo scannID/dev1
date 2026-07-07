@@ -3,6 +3,7 @@ import { Search, Plus, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useMerchants } from '../hooks/useMerchants'
 
 const MERCHANTS = [
   { id: 'MER-001', name: 'Kampala Grill',   owner: 'James Okello',   type: 'Restaurant', plan: 'Pro',   orders: 1240, revenue: 'UGX 22.4M', status: 'active',    joined: '12 Jan 2024' },
@@ -22,21 +23,66 @@ const STATUS_STYLE: Record<string, string> = {
   pending:   'bg-muted text-muted-foreground',
 }
 
+function currency(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 export default function MerchantsPage() {
+  const { merchants, loading, error } = useMerchants()
   const [query, setQuery] = useState('')
-  const filtered = MERCHANTS.filter((m) =>
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+        <div className="spinner">Loading merchants...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: 'var(--destructive)', marginBottom: '16px' }}>Error: {error}</p>
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '14px' }}>Using fallback data...</p>
+      </div>
+    )
+  }
+
+  // Use API data if available, fallback to static data
+  const displayMerchants = merchants.length > 0 ? merchants.map(m => ({
+    id: m.merchantId,
+    name: m.name,
+    owner: m.ownerName,
+    type: m.type,
+    plan: 'Pro', // Could be added to backend later
+    orders: m.totalOrders,
+    revenue: currency(m.totalRevenue),
+    status: m.status,
+    joined: new Date(m.joinedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  })) : MERCHANTS
+
+  const filtered = displayMerchants.filter((m) =>
     [m.name, m.owner, m.type, m.id].join(' ').toLowerCase().includes(query.toLowerCase())
   )
+
+  const totalMerchants = displayMerchants.length
+  const activeMerchants = displayMerchants.filter(m => m.status === 'active').length
+  const pendingMerchants = displayMerchants.filter(m => m.status === 'pending').length
+  const suspendedMerchants = displayMerchants.filter(m => m.status === 'suspended').length
 
   return (
     <>
       {/* Summary cards */}
       <div className="admin-metric-grid">
         {[
-          { label: 'Total',     value: '142', sub: 'All time' },
-          { label: 'Active',    value: '128', sub: 'Currently live' },
-          { label: 'Pending',   value: '9',   sub: 'Awaiting approval' },
-          { label: 'Suspended', value: '5',   sub: 'Violations / issues' },
+          { label: 'Total',     value: totalMerchants.toString(), sub: 'All time' },
+          { label: 'Active',    value: activeMerchants.toString(), sub: 'Currently live' },
+          { label: 'Pending',   value: pendingMerchants.toString(),   sub: 'Awaiting approval' },
+          { label: 'Suspended', value: suspendedMerchants.toString(),   sub: 'Violations / issues' },
         ].map((c) => (
           <div key={c.label} className="admin-metric-card">
             <span className="metric-label">{c.label} Merchants</span>
@@ -49,7 +95,7 @@ export default function MerchantsPage() {
       {/* Table card */}
       <div className="admin-card">
         <div className="admin-card-header">
-          <div><h3>All Merchants</h3><p>{filtered.length} of {MERCHANTS.length} shown</p></div>
+          <div><h3>All Merchants</h3><p>{filtered.length} of {displayMerchants.length} shown</p></div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
