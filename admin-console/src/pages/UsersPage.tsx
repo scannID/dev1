@@ -1,4 +1,4 @@
-import { Badge } from '../../../src/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 
 const USERS = [
   { name: 'Amina Nakato',    email: 'amina@mail.com',   role: 'Customer',  orders: 14, joined: '2 Jan 2024',  status: 'active'   },

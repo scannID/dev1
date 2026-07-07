@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Search, Plus, MoreHorizontal } from 'lucide-react'
-import { Badge } from '../../../src/components/ui/badge'
-import { Button } from '../../../src/components/ui/button'
-import { Input } from '../../../src/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 const MERCHANTS = [
   { id: 'MER-001', name: 'Kampala Grill',   owner: 'James Okello',   type: 'Restaurant', plan: 'Pro',   orders: 1240, revenue: 'UGX 22.4M', status: 'active',    joined: '12 Jan 2024' },

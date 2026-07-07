@@ -1,5 +1,5 @@
 import { TrendingUp } from 'lucide-react'
-import { Badge } from '../../../src/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 
 const MONTHLY = [
   { month: 'Jan', revenue: 42, txns: 1820 },

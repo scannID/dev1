@@ -1,5 +1,5 @@
-import { ArrowUpRight, Building2, QrCode, ShoppingCart, TrendingUp, Users, DollarSign, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
-import { Badge } from '../../../src/components/ui/badge'
+import { ArrowUpRight, TrendingUp } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
 
 function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?: string }) {
@@ -51,7 +51,7 @@ const TOP_MERCHANTS = [
   { name: 'Garden Bistro',    type: 'Restaurant', orders: 167, revenue: 'UGX 2.9M', status: 'warning'},
 ]
 
-const ORDERS_BY_HOUR = [480,620,540,780,920,1040,1120,980,840,760,680,540]
+const _ORDERS_BY_HOUR = [480,620,540,780,920,1040,1120,980,840,760,680,540]
 
 export default function OverviewPage() {
   return (

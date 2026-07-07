@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bella Pizza QR Code</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    #qrcode {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      display: inline-block;
+      margin: 20px 0;
+    }
+    .url {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      word-break: break-all;
+      margin: 20px 0;
+      color: #374151;
+    }
+    .instructions {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: left;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1e40af;
+    }
+    .badge {
+      display: inline-block;
+      background: #10b981;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 15px;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #764ba2;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">🍕 Table QR Code</span>
+    <h1>Bella Pizza Restaurant</h1>
+    <p class="subtitle">Scan to view menu & place order</p>
+    
+    <div id="qrcode"></div>
+    
+    <div class="url">
+      <strong>URL:</strong><br>
+      <span id="url-text">http://localhost:5173/?bid=bella-pizza-001</span>
+    </div>
+    
+    <button onclick="copyUrl()">📋 Copy URL</button>
+    <button onclick="openUrl()">🔗 Open Menu</button>
+    
+    <div class="instructions">
+      <strong>📱 How to Test:</strong><br>
+      • <strong>On Same Device:</strong> Click "Open Menu" above<br>
+      • <strong>On Phone (Same WiFi):</strong> Scan QR code or replace "localhost" with your computer's IP<br>
+      • <strong>Print & Use:</strong> Print this page and place on restaurant table
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const url = 'http://localhost:5173/?bid=bella-pizza-001';
+    
+    // Generate QR code
+    new QRCode(document.getElementById('qrcode'), {
+      text: url,
+      width: 256,
+      height: 256,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    function copyUrl() {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('✅ URL copied to clipboard!');
+      });
+    }
+    
+    function openUrl() {
+      window.open(url, '_blank');
+    }
+    
+    // Display computer's local IP hint
+    window.addEventListener('load', () => {
+      console.log('💡 To test on phone:');
+      console.log('1. Find your computer\'s IP address');
+      console.log('2. Replace "localhost" with that IP');
+      console.log('3. Example: http://192.168.1.100:5173/?bid=bella-pizza-001');
+    });
+  </script>
+</body>
+</html>

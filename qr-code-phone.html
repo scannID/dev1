@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bella Pizza QR Code - Scannable</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    #qrcode {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      display: inline-block;
+      margin: 20px 0;
+      border: 3px solid #667eea;
+    }
+    .url {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      word-break: break-all;
+      margin: 20px 0;
+      color: #374151;
+      line-height: 1.6;
+    }
+    .instructions {
+      background: #dcfce7;
+      border-left: 4px solid #10b981;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: left;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #065f46;
+    }
+    .instructions strong {
+      color: #047857;
+      display: block;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .badge {
+      display: inline-block;
+      background: #10b981;
+      color: white;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 8px;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .status {
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #92400e;
+      font-weight: 500;
+    }
+    .big-qr {
+      font-size: 80px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">📱 Ready to Scan</span>
+    <h1>🍕 Bella Pizza Restaurant</h1>
+    <p class="subtitle">Scan with your phone camera to order</p>
+    
+    <div class="big-qr">📲</div>
+    <div id="qrcode"></div>
+    
+    <div class="url">
+      <strong>📍 Your Mac's URL:</strong><br>
+      http://192.168.100.244:5173/?bid=bella-pizza-001
+    </div>
+    
+    <button onclick="copyUrl()">📋 Copy URL</button>
+    <button onclick="openUrl()">🔗 Test Now</button>
+    
+    <div class="instructions">
+      <strong>📱 How to Scan:</strong>
+      1️⃣ Make sure your phone is on the <u>same WiFi network</u> as this Mac<br>
+      2️⃣ Open your phone's <u>Camera app</u><br>
+      3️⃣ Point camera at the QR code above<br>
+      4️⃣ Tap the notification that appears<br>
+      5️⃣ Start ordering! 🍕
+    </div>
+    
+    <div class="status">
+      ⚠️ <strong>Important:</strong> Your phone must be on the same WiFi network as this computer
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    const url = 'http://192.168.100.244:5173/?bid=bella-pizza-001';
+    
+    // Generate QR code
+    new QRCode(document.getElementById('qrcode'), {
+      text: url,
+      width: 280,
+      height: 280,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    function copyUrl() {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('✅ URL copied! You can paste it in your phone\'s browser.');
+      });
+    }
+    
+    function openUrl() {
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>

@@ -29,7 +29,7 @@ export function ScannyPhoneDemo() {
   useEffect(() => {
     const interval = setInterval(() => {
       setScanLinePos(pos => {
-        let newPos = pos + scanDirRef.current * 4
+        const newPos = pos + scanDirRef.current * 4
         if (newPos > 158) scanDirRef.current = -1
         if (newPos < 5) scanDirRef.current = 1
         return newPos

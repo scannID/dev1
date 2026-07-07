@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
-import { Badge } from '../../../src/components/ui/badge'
-import { Input } from '../../../src/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 
 const ORDERS = Array.from({ length: 20 }, (_, i) => ({
   id: `ORD-${String(3800 + i).padStart(5, '0')}`,

@@ -1,5 +1,5 @@
 import { Shield, BarChart3, Building2, QrCode, Users, Activity } from 'lucide-react'
-import { Button } from '../../src/components/ui/button'
+import { Button } from '@/components/ui/button'
 
 export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
   return (
@@ -21,7 +21,7 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={S.navBadge}>Restricted Access</span>
-          <Button size="sm" onClick={onLogin} style={S.navBtn}>
+          <Button className="" size="sm" onClick={onLogin} style={S.navBtn}>
             <Shield size={13} />
             Sign in
           </Button>
@@ -49,7 +49,7 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
             Monitor merchants, orders, revenue, QR activity, and system health — all from one place. Restricted to authorised administrators.
           </p>
 
-          <Button onClick={onLogin} style={S.heroBtn}>
+          <Button className="" onClick={onLogin} style={S.heroBtn}>
             <Shield size={16} />
             Sign in with SSO
           </Button>
@@ -92,7 +92,7 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
       <section style={S.cta}>
         <h2 style={S.ctaH2}>Ready to manage the platform?</h2>
         <p style={S.ctaSub}>Sign in with your admin credentials to access the console.</p>
-        <Button onClick={onLogin} style={S.ctaBtn}>
+        <Button className="" onClick={onLogin} style={S.ctaBtn}>
           <Shield size={16} />
           Sign in with SSO
         </Button>

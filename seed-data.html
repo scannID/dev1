@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seed Restaurant Data</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { margin-bottom: 16px; color: #111; }
+    p { color: #666; margin-bottom: 24px; line-height: 1.6; }
+    button {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background: #059669;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+    }
+    .success {
+      background: #dcfce7;
+      border: 2px solid #10b981;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 24px;
+      display: none;
+    }
+    .success.show { display: block; }
+    .success-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .link {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-family: monospace;
+      font-size: 13px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🍕 Seed Restaurant Data</h1>
+    <p>Click the button below to create Bella Pizza Restaurant with a full menu (pizzas, pasta, drinks, appetizers, and desserts).</p>
+    
+    <button onclick="seedData()">Create Restaurant</button>
+    
+    <div class="success" id="success">
+      <div class="success-icon">✅</div>
+      <h2>Restaurant Created!</h2>
+      <p>Bella Pizza Restaurant has been added with 15 menu items.</p>
+      <div class="link">
+        <strong>Customer Menu URL:</strong><br>
+        http://localhost:5173/?bid=bella-pizza-001
+      </div>
+      <button onclick="window.location.href='http://localhost:5173/?bid=bella-pizza-001'" style="margin-top: 16px; background: #3b82f6;">
+        View Menu Now →
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function seedData() {
+      const restaurantData = {
+        id: 'bella-pizza-001',
+        name: 'Bella Pizza Restaurant',
+        type: 'restaurant',
+        description: 'Authentic Italian pizza and pasta',
+        items: [
+          {id: 'bella-pizza-001-pizza-1', name: 'Margherita Pizza', category: 'Pizzas', price: 25000, description: 'Fresh mozzarella, tomato sauce, basil', available: true},
+          {id: 'bella-pizza-001-pizza-2', name: 'Pepperoni Pizza', category: 'Pizzas', price: 30000, description: 'Pepperoni, mozzarella, tomato sauce', available: true},
+          {id: 'bella-pizza-001-pizza-3', name: 'Quattro Formaggi', category: 'Pizzas', price: 35000, description: 'Four cheese blend: mozzarella, gorgonzola, parmesan, ricotta', available: true},
+          {id: 'bella-pizza-001-pizza-4', name: 'Hawaiian Pizza', category: 'Pizzas', price: 28000, description: 'Ham, pineapple, mozzarella', available: true},
+          {id: 'bella-pizza-001-pasta-1', name: 'Spaghetti Carbonara', category: 'Pasta', price: 22000, description: 'Creamy sauce with bacon and parmesan', available: true},
+          {id: 'bella-pizza-001-pasta-2', name: 'Fettuccine Alfredo', category: 'Pasta', price: 24000, description: 'Rich cream sauce with parmesan', available: true},
+          {id: 'bella-pizza-001-pasta-3', name: 'Penne Arrabbiata', category: 'Pasta', price: 20000, description: 'Spicy tomato sauce with garlic', available: true},
+          {id: 'bella-pizza-001-drink-1', name: 'Coca Cola', category: 'Drinks', price: 3000, description: 'Chilled soft drink', available: true},
+          {id: 'bella-pizza-001-drink-2', name: 'Fresh Orange Juice', category: 'Drinks', price: 5000, description: 'Freshly squeezed', available: true},
+          {id: 'bella-pizza-001-drink-3', name: 'Italian Lemonade', category: 'Drinks', price: 4000, description: 'Homemade with fresh lemons', available: true},
+          {id: 'bella-pizza-001-app-1', name: 'Bruschetta', category: 'Appetizers', price: 8000, description: 'Toasted bread with tomatoes, garlic, and olive oil', available: true},
+          {id: 'bella-pizza-001-app-2', name: 'Mozzarella Sticks', category: 'Appetizers', price: 12000, description: 'Fried mozzarella with marinara sauce', available: true},
+          {id: 'bella-pizza-001-app-3', name: 'Caesar Salad', category: 'Appetizers', price: 15000, description: 'Romaine lettuce, croutons, parmesan, caesar dressing', available: true},
+          {id: 'bella-pizza-001-dessert-1', name: 'Tiramisu', category: 'Desserts', price: 10000, description: 'Classic Italian coffee-flavored dessert', available: true},
+          {id: 'bella-pizza-001-dessert-2', name: 'Gelato', category: 'Desserts', price: 7000, description: 'Italian ice cream - vanilla, chocolate, or strawberry', available: true}
+        ]
+      };
+
+      try {
+        const existing = localStorage.getItem('scanny-businesses-v2');
+        let businesses = existing ? JSON.parse(existing) : [];
+        
+        const idx = businesses.findIndex(b => b.id === restaurantData.id);
+        if (idx >= 0) {
+          businesses[idx] = restaurantData;
+        } else {
+          businesses.push(restaurantData);
+        }
+        
+        localStorage.setItem('scanny-businesses-v2', JSON.stringify(businesses));
+        
+        document.getElementById('success').classList.add('show');
+        console.log('✅ Restaurant created successfully!');
+      } catch (error) {
+        alert('Error creating restaurant: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>

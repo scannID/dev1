@@ -50,7 +50,7 @@ const getStyles = (C: typeof CLight): Record<string, React.CSSProperties> => ({
 })
 
 /* ─── QR Mockup ─────────────────────────────────────────────────────── */
-function QRMockup({ C }: { C: typeof CLight }) {
+function _QRMockup({ C }: { C: typeof CLight }) {
   const [scanLine, setScanLine] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setScanLine(v => (v + 1) % 100), 18)

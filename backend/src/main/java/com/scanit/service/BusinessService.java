@@ -1,6 +1,6 @@
 package com.scanit.service;
 
-import com.scanit.dto.ApiDtos.BusinessResponse;
+import com.scanit.dto.BusinessResponse;
 import com.scanit.dto.RequestDtos.CreateBusinessRequest;
 import com.scanit.entity.Business;
 import com.scanit.entity.CatalogItem;

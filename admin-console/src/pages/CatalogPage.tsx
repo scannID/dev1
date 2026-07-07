@@ -1,4 +1,4 @@
-import { Badge } from '../../../src/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 
 const ITEMS = [
   { merchant: 'Kampala Grill', name: 'Beef Plate',     category: 'Meals',   price: 'UGX 18,000', available: true,  orders: 892 },

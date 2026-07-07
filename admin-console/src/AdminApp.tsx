@@ -16,16 +16,16 @@ import {
   Sun,
   Users,
 } from 'lucide-react'
-import { Badge } from '../../src/components/ui/badge'
-import { Button } from '../../src/components/ui/button'
-import { Separator } from '../../src/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from '../../src/components/ui/sheet'
+} from '@/components/ui/sheet'
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
 import OrdersPage from './pages/OrdersPage'

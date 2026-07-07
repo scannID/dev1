@@ -1,7 +1,7 @@
 package com.scanit.controller;
 
-import com.scanit.dto.ApiDtos.BusinessResponse;
-import com.scanit.dto.ApiDtos.OrderResponse;
+import com.scanit.dto.BusinessResponse;
+import com.scanit.dto.OrderResponse;
 import com.scanit.dto.RequestDtos.CreateBusinessRequest;
 import com.scanit.dto.RequestDtos.CreateOrderRequest;
 import com.scanit.entity.CatalogItem;

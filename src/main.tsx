@@ -4,23 +4,35 @@ import './index.css'
 import App from './App'
 import LandingPage from './LandingPage'
 import EventTicketPage from './EventTicket'
+import CustomerMenu from './CustomerMenu'
 import keycloak from './keycloak'
 
-// Isolated session key — only the merchant app sets/reads this
-const SESSION_KEY = 'scanny-merchant-authenticated'
+// Check if this is a customer menu view (has ?bid= parameter)
+const urlParams = new URLSearchParams(window.location.search)
+const businessId = urlParams.get('bid')
 
-let kcInitPromise: Promise<boolean> | null = null
+// If businessId exists, show customer menu directly without authentication
+if (businessId) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <CustomerMenu businessId={businessId} />
+    </StrictMode>
+  )
+} else {
+  const SESSION_KEY = 'scanny-merchant-authenticated'
 
-function initKeycloak() {
+  let kcInitPromise: Promise<boolean> | null = null
+
+  function initKeycloak() {
   if (!kcInitPromise) {
     kcInitPromise = keycloak.init({ onLoad: 'check-sso', checkLoginIframe: false })
   }
   return kcInitPromise
 }
 
-type View = 'landing' | 'app' | 'ticket'
+  type View = 'landing' | 'app' | 'ticket'
 
-function Root() {
+  function Root() {
   const [view, setView] = useState<View>('landing')
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('scanny-dark-mode')
@@ -109,3 +121,4 @@ keycloak
       <StrictMode><Root /></StrictMode>
     )
   })
+}

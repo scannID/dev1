@@ -10,4 +10,8 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  server: {
+    host: true, // Listen on all network interfaces
+    port: 5173,
+  },
 })

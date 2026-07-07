@@ -1,5 +1,5 @@
-import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, BarChart3, Bell, CheckCircle2, Clock, DollarSign, Eye, Home, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2, X } from 'lucide-react'
+import { type CSSProperties, type FormEvent, type PointerEvent, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, BarChart3, Bell, Eye, Home, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import {
   AlertDialog,
@@ -13,11 +13,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -48,6 +43,50 @@ import './App.css'
 
 const ORDERS_KEY = 'scanny-orders-v1'
 const BUSINESSES_KEY = 'scanny-businesses-v2'
+
+// Sparkline component with area fill - moved outside render to fix React hooks error
+function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
+  if (data.length === 0) return null
+  
+  const max = Math.max(...data)
+  const min = Math.min(...data)
+  const range = max - min || 1
+  
+  const points = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * 100
+    const y = 100 - ((value - min) / range) * 80 - 10
+    return { x, y }
+  })
+  
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
+  const areaPath = `${linePath} L 100,100 L 0,100 Z`
+  
+  // Generate gradient ID based on color
+  const gradientId = `gradient-${color.replace('#', '')}`
+  
+  return (
+    <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <path
+        d={areaPath}
+        fill={`url(#${gradientId})`}
+      />
+      <path
+        d={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 const SCAN_BASE_URL = 'https://scanny.app'
 const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
@@ -263,6 +302,7 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
   }, [darkMode])
 
   const business = businesses.find((entry) => entry.id === activeBusinessId) ?? businesses[0]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const categories = [...new Set(business.items.map((item) => item.category))]
 
   const cartLines = useMemo<CartLine[]>(() => {
@@ -281,52 +321,8 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
   ).length
   const paidTotal = businessOrders
     .filter((order) => order.paymentStatus === 'Paid')
-    .reduce((sum, order) => sum + order.total, 0)
+    .reduce((sum, _order) => sum + _order.total, 0)
   const availableItems = business.items.filter((item) => item.available).length
-
-  // Sparkline component with area fill
-  function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
-    if (data.length === 0) return null
-    
-    const max = Math.max(...data)
-    const min = Math.min(...data)
-    const range = max - min || 1
-    
-    const points = data.map((value, index) => {
-      const x = (index / (data.length - 1)) * 100
-      const y = 100 - ((value - min) / range) * 80 - 10
-      return { x, y }
-    })
-    
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
-    const areaPath = `${linePath} L 100,100 L 0,100 Z`
-    
-    // Generate gradient ID based on color
-    const gradientId = `gradient-${color.replace('#', '')}`
-    
-    return (
-      <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-        <path
-          d={areaPath}
-          fill={`url(#${gradientId})`}
-        />
-        <path
-          d={linePath}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
 
   useEffect(() => {
     localStorage.setItem(BUSINESSES_KEY, JSON.stringify(businesses))
@@ -509,7 +505,7 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {view === 'account' && (
-              <Button size="sm" onClick={() => setShowAddItem(true)}>
+              <Button className="" size="sm" onClick={() => setShowAddItem(true)}>
                 <Plus className="size-3.5" />
                 Add item
               </Button>
@@ -594,8 +590,8 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
         <Sheet open={showAddItem} onOpenChange={setShowAddItem}>
           <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
             <SheetHeader className="border-b border-border px-6 py-4">
-              <SheetTitle>Add item</SheetTitle>
-              <SheetDescription>Add a new item to {business.name || 'your catalog'}.</SheetDescription>
+              <SheetTitle className="">Add item</SheetTitle>
+              <SheetDescription className="">Add a new item to {business.name || 'your catalog'}.</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto">
               <AddItemForm
@@ -613,8 +609,8 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
         <Sheet open={showNotifications} onOpenChange={setShowNotifications}>
           <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
             <SheetHeader className="border-b border-border px-6 py-4">
-              <SheetTitle>Notifications</SheetTitle>
-              <SheetDescription>Recent activity for {business.name || 'your business'}</SheetDescription>
+              <SheetTitle className="">Notifications</SheetTitle>
+              <SheetDescription className="">Recent activity for {business.name || 'your business'}</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto">
               <NotificationsPanel businessName={business.name} orders={businessOrders} />
@@ -1427,19 +1423,19 @@ function CatalogPage({
             <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by category">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+            <SelectContent className="">
+              <SelectItem className="" value="all">All categories</SelectItem>
+              {categories.map((cat) => <SelectItem className="" key={cat} value={cat}>{cat}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setPage(1) }}>
             <SelectTrigger className="h-8 w-[130px] text-sm" aria-label="Filter by status">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="hidden">Hidden</SelectItem>
+            <SelectContent className="">
+              <SelectItem className="" value="all">All statuses</SelectItem>
+              <SelectItem className="" value="available">Available</SelectItem>
+              <SelectItem className="" value="hidden">Hidden</SelectItem>
             </SelectContent>
           </Select>
           <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {business.items.length} items</span>
@@ -1465,9 +1461,9 @@ function CatalogPage({
               <TableHead className="pr-5 text-right text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Action</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="">
             {pageItems.length === 0 ? (
-              <TableRow>
+              <TableRow className="">
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                   No items match your search.{' '}
                   <button type="button" className="text-primary underline" onClick={resetFilters}>Clear filters</button>
@@ -1537,21 +1533,21 @@ function CatalogPage({
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-name">Name</Label>
-              <Input id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+              <Label className="" htmlFor="edit-name">Name</Label>
+              <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-category">Category</Label>
-              <Input id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} />
+              <Label className="" htmlFor="edit-category">Category</Label>
+              <Input className="" id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} />
               <datalist id="edit-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-price">Price (UGX)</Label>
-              <Input id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
+              <Label className="" htmlFor="edit-price">Price (UGX)</Label>
+              <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
+              <Label className="" htmlFor="edit-description">Description</Label>
+              <Textarea className="" id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
             </div>
             <div className="flex items-center gap-2 pt-1">
               <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
@@ -1560,8 +1556,8 @@ function CatalogPage({
           </div>
           <div className="border-t border-border px-6 py-4 flex items-center gap-2">
             <Button className="flex-1" onClick={saveEdit}>Save changes</Button>
-            <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item">
+            <Button className="" variant="outline" onClick={cancelEdit}>Cancel</Button>
+            <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item">
               <Trash2 className="size-4" />
             </Button>
           </div>
@@ -1715,7 +1711,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
         </div>
 
         <Table>
-          <TableHeader>
+          <TableHeader className="">
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Order</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Customer</TableHead>
@@ -1810,7 +1806,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
                   {detailOrder.customer.note && <p className="text-xs text-muted-foreground mt-1 italic">{detailOrder.customer.note}</p>}
                 </div>
 
-                <Separator />
+                <Separator className="" />
 
                 {/* Items */}
                 <div>
@@ -1825,7 +1821,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
                   </ul>
                 </div>
 
-                <Separator />
+                <Separator className="" />
 
                 {/* Total + payment */}
                 <div className="space-y-2">
@@ -2049,50 +2045,6 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
   const paymentBreakdown = dummyData.paymentBreakdown
   const statusBreakdown = dummyData.statusBreakdown
   const ordersByStatus = dummyData.ordersByStatus
-
-  // Sparkline component with area fill
-  function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
-    if (data.length === 0) return null
-    
-    const max = Math.max(...data)
-    const min = Math.min(...data)
-    const range = max - min || 1
-    
-    const points = data.map((value, index) => {
-      const x = (index / (data.length - 1)) * 100
-      const y = 100 - ((value - min) / range) * 80 - 10
-      return { x, y }
-    })
-    
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
-    const areaPath = `${linePath} L 100,100 L 0,100 Z`
-    
-    // Generate gradient ID based on color
-    const gradientId = `gradient-${color.replace('#', '')}`
-    
-    return (
-      <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
-        <path
-          d={areaPath}
-          fill={`url(#${gradientId})`}
-        />
-        <path
-          d={linePath}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
 
   return (
     <section className="reports-page">

@@ -1,4 +1,4 @@
-import { Badge } from '../../../src/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 
 const LOGS = [
   { actor: 'admin@scanny.app', action: 'SUSPEND_MERCHANT',   target: 'MER-006 · Sky Bar',         ip: '196.0.2.1',  time: '14:32:01' },

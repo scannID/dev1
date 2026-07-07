@@ -1,6 +1,6 @@
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import '../../src/index.css'
+import './admin-index.css'
 import './admin.css'
 import AdminLogin from './AdminLogin'
 import AdminApp from './AdminApp'
@@ -27,33 +27,48 @@ function Root() {
   // Restore session only if THIS app's flag is set
   useEffect(() => {
     const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
+    console.log('[ADMIN] Checking session on mount, hadSession:', hadSession)
     if (!hadSession) return
 
+    console.log('[ADMIN] Restoring session...')
     initKc()
       .then((authenticated) => {
+        console.log('[ADMIN] Session restore - authenticated:', authenticated)
         if (authenticated) {
           const name = adminKeycloak.tokenParsed?.name
             || adminKeycloak.tokenParsed?.preferred_username
             || adminKeycloak.tokenParsed?.email
             || 'Admin'
+          console.log('[ADMIN] User authenticated as:', name)
           setKcUsername(name)
           setView('app')
         } else {
+          console.log('[ADMIN] Not authenticated, clearing session')
           sessionStorage.removeItem(SESSION_KEY)
         }
       })
-      .catch(() => sessionStorage.removeItem(SESSION_KEY))
+      .catch((err) => {
+        console.error('[ADMIN] Session restore error:', err)
+        sessionStorage.removeItem(SESSION_KEY)
+      })
   }, [])
 
   function handleLogin() {
-    adminKeycloak.login({ redirectUri: 'http://localhost:5174' }).catch(console.error)
+    console.log('[ADMIN] Login button clicked, redirecting to Keycloak...')
+    console.log('[ADMIN] Redirect URI:', 'http://localhost:5174')
+    adminKeycloak.login({ redirectUri: 'http://localhost:5174' }).catch((err) => {
+      console.error('[ADMIN] Login error:', err)
+    })
   }
 
   function handleLogout() {
+    console.log('[ADMIN] Logout initiated')
     sessionStorage.removeItem(SESSION_KEY)
     if (adminKeycloak.authenticated) {
+      console.log('[ADMIN] Logging out from Keycloak')
       adminKeycloak.logout({ redirectUri: 'http://localhost:5174' })
     } else {
+      console.log('[ADMIN] No active Keycloak session, returning to landing')
       setView('landing')
     }
   }
@@ -66,19 +81,38 @@ function Root() {
 }
 
 // Module-level init — handles the post-login redirect (code in URL)
+console.log('[ADMIN] Initializing Keycloak...')
+console.log('[ADMIN] Keycloak config:', {
+  url: 'http://localhost:8080',
+  realm: 'scanny',
+  clientId: 'scanny-admin'
+})
+
 adminKeycloak
   .init({ onLoad: 'check-sso', checkLoginIframe: false })
   .then((authenticated) => {
+    console.log('[ADMIN] Keycloak init complete - authenticated:', authenticated)
     kcInitPromise = Promise.resolve(authenticated)
     if (authenticated) {
+      console.log('[ADMIN] Token parsed:', adminKeycloak.tokenParsed)
+      console.log('[ADMIN] Client (azp):', adminKeycloak.tokenParsed?.azp)
       // Only store the flag if Keycloak authenticated via THIS client
-      if (adminKeycloak.tokenParsed?.azp === 'superadmin') {
+      if (adminKeycloak.tokenParsed?.azp === 'scanny-admin') {
+        console.log('[ADMIN] Correct client, storing session')
         sessionStorage.setItem(SESSION_KEY, '1')
+      } else {
+        console.warn('[ADMIN] Wrong client, expected scanny-admin but got:', adminKeycloak.tokenParsed?.azp)
       }
+    } else {
+      console.log('[ADMIN] Not authenticated')
     }
   })
-  .catch(() => { kcInitPromise = Promise.resolve(false) })
+  .catch((err) => { 
+    console.error('[ADMIN] Keycloak init error:', err)
+    kcInitPromise = Promise.resolve(false) 
+  })
   .finally(() => {
+    console.log('[ADMIN] Rendering app')
     createRoot(document.getElementById('admin-root')!).render(
       <StrictMode><Root /></StrictMode>
     )

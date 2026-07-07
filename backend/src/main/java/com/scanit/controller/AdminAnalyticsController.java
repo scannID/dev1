@@ -1,0 +1,38 @@
+package com.scanit.controller;
+
+import com.scanit.dto.admin.AdminAnalyticsDtos;
+import com.scanit.service.AdminAnalyticsService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/admin")
+public class AdminAnalyticsController {
+
+    private final AdminAnalyticsService adminAnalyticsService;
+
+    public AdminAnalyticsController(AdminAnalyticsService adminAnalyticsService) {
+        this.adminAnalyticsService = adminAnalyticsService;
+    }
+
+    @GetMapping("/analytics/tickets")
+    public AdminAnalyticsDtos.TicketAnalytics getTicketAnalytics() {
+        return adminAnalyticsService.getTicketAnalytics();
+    }
+
+    @GetMapping("/analytics/quick-payments")
+    public AdminAnalyticsDtos.QuickPaymentAnalytics getQuickPaymentAnalytics() {
+        return adminAnalyticsService.getQuickPaymentAnalytics();
+    }
+
+    @GetMapping("/analytics/devices")
+    public AdminAnalyticsDtos.DeviceAnalytics getDeviceAnalytics() {
+        return adminAnalyticsService.getDeviceAnalytics();
+    }
+
+    @GetMapping("/revenue/overview")
+    public AdminAnalyticsDtos.RevenueOverview getRevenueOverview() {
+        return adminAnalyticsService.getRevenueOverview();
+    }
+}

@@ -1,6 +1,6 @@
 package com.scanit.service;
 
-import com.scanit.dto.ApiDtos.OrderResponse;
+import com.scanit.dto.OrderResponse;
 import com.scanit.dto.RequestDtos.CreateOrderRequest;
 import com.scanit.dto.RequestDtos.OrderItemRequest;
 import com.scanit.dto.RequestDtos.UpdateOrderRequest;

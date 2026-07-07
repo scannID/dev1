@@ -1,4 +1,4 @@
-import { Badge } from '../../../src/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 const SERVICES = [

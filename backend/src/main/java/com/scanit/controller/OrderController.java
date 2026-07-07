@@ -1,6 +1,6 @@
 package com.scanit.controller;
 
-import com.scanit.dto.ApiDtos.OrderResponse;
+import com.scanit.dto.OrderResponse;
 import com.scanit.dto.RequestDtos.UpdateOrderRequest;
 import com.scanit.service.OrderService;
 import java.util.Map;
