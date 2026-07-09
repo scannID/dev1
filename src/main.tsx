@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import LandingPage from './LandingPage'
+import AuthPage from './AuthPage'
 import EventTicketPage from './EventTicket'
 import CustomerMenu from './CustomerMenu'
 import keycloak from './keycloak'
@@ -30,7 +31,7 @@ if (businessId) {
   return kcInitPromise
 }
 
-  type View = 'landing' | 'app' | 'ticket'
+  type View = 'landing' | 'app' | 'ticket' | 'auth'
 
   function Root() {
   const [view, setView] = useState<View>('landing')
@@ -75,6 +76,7 @@ if (businessId) {
   }, [darkMode])
 
   function handleGetStarted() {
+    // Redirect to Keycloak login page
     keycloak.login({ redirectUri: window.location.origin }).catch(console.error)
   }
 
@@ -95,6 +97,15 @@ if (businessId) {
 
   if (view === 'app')    return <App onLogout={handleLogout} kcUsername={kcUsername} />
   if (view === 'ticket') return <EventTicketPage onBack={() => setView('landing')} />
+  if (view === 'auth')   return (
+    <AuthPage 
+      onBack={() => setView('landing')} 
+      onSuccess={() => {
+        sessionStorage.setItem(SESSION_KEY, '1')
+        setView('app')
+      }}
+    />
+  )
   return (
     <LandingPage
       onGetStarted={handleGetStarted}

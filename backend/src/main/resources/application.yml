@@ -15,9 +15,40 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  mail:
+    # Email configuration for receipt sending
+    # For development, you can use a fake SMTP server like MailHog or Mailtrap
+    # For production, configure with your email provider (Gmail, SendGrid, etc.)
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+    default-encoding: UTF-8
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/scanny}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/scanny/protocol/openid-connect/certs}
 
 server:
   port: 4000
 
 scanit:
   scan-base-url: https://scanit.app
+
+keycloak:
+  server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+  realm: ${KEYCLOAK_REALM:scanny}
+  admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+  admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+  client-id: ${KEYCLOAK_CLIENT_ID:scanny-backend}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:}

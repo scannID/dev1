@@ -515,7 +515,13 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
               variant="outline"
               size="icon-sm"
               title={darkMode ? 'Light mode' : 'Dark mode'}
-              onClick={() => setDarkMode((v: boolean) => !v)}
+              onClick={() => {
+                setDarkMode((prev: boolean) => {
+                  const newMode = !prev
+                  localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
+                  return newMode
+                })
+              }}
             >
               {darkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
             </Button>
@@ -1451,8 +1457,8 @@ function CatalogPage({
         </div>
 
         {/* Table */}
-        <Table>
-          <TableHeader>
+        <Table className={undefined}>
+          <TableHeader className={undefined}>
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase w-[40%]">Name</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Category</TableHead>
@@ -1478,7 +1484,7 @@ function CatalogPage({
                   </TableCell>
                   <TableCell className="text-sm text-foreground">{entry.category}</TableCell>
                   <TableCell className="text-sm font-medium text-foreground font-mono">{currency(entry.price)}</TableCell>
-                  <TableCell>
+                  <TableCell className={undefined}>
                     <Badge variant="secondary" className={entry.available
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-muted text-muted-foreground'
@@ -1528,17 +1534,17 @@ function CatalogPage({
       <Sheet open={!!editingId} onOpenChange={(open) => { if (!open) cancelEdit() }}>
         <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
           <SheetHeader className="border-b border-border px-6 py-4">
-            <SheetTitle>Edit item</SheetTitle>
-            <SheetDescription>{editDraft.name || 'Catalog item'}</SheetDescription>
+            <SheetTitle className={undefined}>Edit item</SheetTitle>
+            <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div className="space-y-1.5">
               <Label className="" htmlFor="edit-name">Name</Label>
-              <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+              <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
             </div>
             <div className="space-y-1.5">
               <Label className="" htmlFor="edit-category">Category</Label>
-              <Input className="" id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} />
+              <Input className="" id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} type={undefined} />
               <datalist id="edit-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
             </div>
             <div className="space-y-1.5">
@@ -1573,8 +1579,7 @@ function OrderActionMenu({ order, onViewDetails }) {
       variant="ghost"
       size="icon-sm"
       aria-label="View order details"
-      onClick={onViewDetails}
-    >
+      onClick={onViewDetails} className={undefined}    >
       <Eye className="size-4" />
     </Button>
   )
@@ -1710,7 +1715,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
           </Button>
         </div>
 
-        <Table>
+        <Table className={undefined}>
           <TableHeader className="">
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Order</TableHead>
@@ -1722,7 +1727,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
               <TableHead className="pr-5 text-right text-[10px] font-medium tracking-widest text-muted-foreground uppercase"></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className={undefined}>
             {pageOrders.map((order) => (
               <TableRow
                 key={order.id}
@@ -1735,11 +1740,11 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
                     {new Date(order.createdAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </TableCell>
-                <TableCell>
+                <TableCell className={undefined}>
                   <p className="text-sm font-medium text-foreground">{order.customer.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{[order.customer.phone, order.customer.location].filter(Boolean).join(' · ')}</p>
                 </TableCell>
-                <TableCell>
+                <TableCell className={undefined}>
                   <div className="flex flex-wrap gap-1">
                     {order.items.slice(0, 2).map((item) => (
                       <Badge key={item.id} variant="secondary" className="text-[11px] font-normal">{item.quantity}× {item.name}</Badge>
@@ -1748,8 +1753,8 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
                   </div>
                 </TableCell>
                 <TableCell className="text-sm font-medium font-mono text-foreground">{currency(order.total)}</TableCell>
-                <TableCell><StatusBadge status={order.status} /></TableCell>
-                <TableCell><PaymentBadge status={order.paymentStatus} /></TableCell>
+                <TableCell className={undefined}><StatusBadge status={order.status} /></TableCell>
+                <TableCell className={undefined}><PaymentBadge status={order.paymentStatus} /></TableCell>
                 <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
                   <OrderActionMenu
                     order={order}
@@ -1792,7 +1797,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
             <>
               <SheetHeader className="border-b border-border px-6 py-4">
                 <SheetTitle className="font-mono tracking-wide">{detailOrder.id}</SheetTitle>
-                <SheetDescription>
+                <SheetDescription className={undefined}>
                   {new Date(detailOrder.createdAt).toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                 </SheetDescription>
               </SheetHeader>

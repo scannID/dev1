@@ -1,6 +1,8 @@
 package com.scanit.service;
 
 import com.scanit.dto.OrderResponse;
+import com.scanit.dto.ReceiptDtos.GenerateReceiptRequest;
+import com.scanit.dto.ReceiptDtos.ReceiptItem;
 import com.scanit.dto.RequestDtos.CreateOrderRequest;
 import com.scanit.dto.RequestDtos.OrderItemRequest;
 import com.scanit.dto.RequestDtos.UpdateOrderRequest;
@@ -12,6 +14,9 @@ import com.scanit.exception.ApiException;
 import com.scanit.model.enums.OrderStatus;
 import com.scanit.model.enums.PaymentStatus;
 import com.scanit.repository.OrderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,12 +27,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderService {
 
+    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
+    
     private final BusinessService businessService;
     private final OrderRepository orderRepository;
+    private final ReceiptService receiptService;
 
-    public OrderService(BusinessService businessService, OrderRepository orderRepository) {
+    public OrderService(BusinessService businessService, OrderRepository orderRepository, ReceiptService receiptService) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
+        this.receiptService = receiptService;
     }
 
     @Transactional(readOnly = true)
@@ -142,10 +151,23 @@ public class OrderService {
         Order order = orderRepository.findWithItemsById(orderId)
                 .orElseThrow(() -> new ApiException(404, "Order was not found."));
 
+        PaymentStatus oldStatus = order.getPaymentStatus();
         order.setPaymentStatus(paymentStatus);
         order.setUpdatedAt(Instant.now());
+        
+        Order savedOrder = orderRepository.save(order);
 
-        return OrderResponse.from(orderRepository.save(order));
+        // Auto-generate receipt when payment is marked as Paid
+        if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
+            try {
+                autoGenerateReceipt(savedOrder);
+            } catch (Exception e) {
+                logger.error("Failed to auto-generate receipt for order {}", orderId, e);
+                // Don't fail the order update if receipt generation fails
+            }
+        }
+
+        return OrderResponse.from(savedOrder);
     }
 
     @Transactional
@@ -166,5 +188,48 @@ public class OrderService {
 
     private String trimToEmpty(String value) {
         return value != null ? value.trim() : "";
+    }
+
+    private void autoGenerateReceipt(Order order) {
+        // Convert order line items to receipt items
+        List<ReceiptItem> receiptItems = new ArrayList<>();
+        if (order.getItems() != null) {
+            for (OrderLineItem item : order.getItems()) {
+                receiptItems.add(new ReceiptItem(
+                    item.getName(),
+                    item.getQuantity(),
+                    BigDecimal.valueOf(item.getPrice()),
+                    BigDecimal.valueOf(item.getLineTotal())
+                ));
+            }
+        }
+
+        // Create receipt request
+        GenerateReceiptRequest receiptRequest = new GenerateReceiptRequest(
+            order.getId(),                                  // orderId
+            null,                                           // ticketId
+            null,                                           // quickPaymentId
+            null,                                           // devicePaymentId
+            order.getBusiness().getId(),                    // businessId
+            order.getBusinessName(),                        // businessName
+            order.getMerchantId(),                          // merchantId
+            order.getCustomerName(),                        // customerName
+            null,                                           // customerEmail (order doesn't have email)
+            order.getCustomerPhone(),                       // customerPhone
+            BigDecimal.valueOf(order.getTotal()),           // amount
+            "UGX",                                          // currency
+            "Mobile Money",                                 // paymentMethod
+            order.getPaymentReference(),                    // paymentReference
+            receiptItems,                                   // items
+            BigDecimal.valueOf(order.getTotal()),           // subtotal
+            BigDecimal.ZERO,                                // taxAmount
+            BigDecimal.ZERO,                                // serviceFee
+            order.getCustomerNote(),                        // notes
+            false,                                          // sendEmail (no email available)
+            false                                           // generatePdf
+        );
+
+        receiptService.generateReceipt(receiptRequest);
+        logger.info("Auto-generated receipt for order {}", order.getId());
     }
 }
