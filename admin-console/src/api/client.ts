@@ -1,6 +1,8 @@
 // Admin API Client
 // Base configuration and utilities for admin API calls
 
+import adminKeycloak from './keycloak'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
 
 export class ApiError extends Error {
@@ -20,11 +22,15 @@ async function fetchApi<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
   
+  // Get the Keycloak token if authenticated
+  const token = adminKeycloak.authenticated ? adminKeycloak.token : null
+  
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options?.headers,
       },
     })

@@ -40,23 +40,6 @@ export default function OrdersPage() {
   const { orders, loading, error } = useOrders()
   const [q, setQ] = useState('')
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-        <div className="spinner">Loading orders...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--destructive)', marginBottom: '16px' }}>Error: {error}</p>
-        <p style={{ color: 'var(--muted-foreground)', fontSize: '14px' }}>Using fallback data...</p>
-      </div>
-    )
-  }
-
   // Use API data if available, fallback to static data
   const displayOrders = orders.length > 0 ? orders.map(o => ({
     id: o.id,
@@ -80,6 +63,17 @@ export default function OrdersPage() {
 
   return (
     <>
+      {/* Show error/loading banner if needed */}
+      {error && (
+        <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.96 0.02 30 / 0.15)', border: '1px solid oklch(0.577 0.245 27.325 / 0.4)', borderRadius: '10px', color: 'oklch(0.577 0.245 27.325)', fontSize: '13px', fontWeight: '500' }}>
+          ⚠️ Could not load live data. Showing fallback data.
+        </div>
+      )}
+      {loading && (
+        <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.95 0.01 250 / 0.15)', border: '1px solid oklch(0.60 0.15 250 / 0.4)', borderRadius: '10px', color: 'oklch(0.50 0.15 250)', fontSize: '13px', fontWeight: '500' }}>
+          🔄 Loading live data...
+        </div>
+      )}
       <div className="admin-metric-grid">
         {[
           { label: 'Total Orders Today', value: totalToday.toLocaleString() },

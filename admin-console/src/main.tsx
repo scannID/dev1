@@ -4,7 +4,7 @@ import './admin-index.css'
 import './admin.css'
 import AdminLogin from './AdminLogin'
 import AdminApp from './AdminApp'
-import adminKeycloak from './keycloak'
+import adminKeycloak from './api/keycloak'
 
 // Isolated session key — only this app sets/reads this key
 const SESSION_KEY = 'scanny-admin-authenticated'
@@ -83,9 +83,9 @@ function Root() {
 // Module-level init — handles the post-login redirect (code in URL)
 console.log('[ADMIN] Initializing Keycloak...')
 console.log('[ADMIN] Keycloak config:', {
-  url: 'http://localhost:8080',
-  realm: 'scanny',
-  clientId: 'scanny-admin'
+  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'scanny',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'admin-console'
 })
 
 adminKeycloak
@@ -97,11 +97,12 @@ adminKeycloak
       console.log('[ADMIN] Token parsed:', adminKeycloak.tokenParsed)
       console.log('[ADMIN] Client (azp):', adminKeycloak.tokenParsed?.azp)
       // Only store the flag if Keycloak authenticated via THIS client
-      if (adminKeycloak.tokenParsed?.azp === 'scanny-admin') {
+      const expectedClient = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'admin-console'
+      if (adminKeycloak.tokenParsed?.azp === expectedClient) {
         console.log('[ADMIN] Correct client, storing session')
         sessionStorage.setItem(SESSION_KEY, '1')
       } else {
-        console.warn('[ADMIN] Wrong client, expected scanny-admin but got:', adminKeycloak.tokenParsed?.azp)
+        console.warn('[ADMIN] Wrong client, expected', expectedClient, 'but got:', adminKeycloak.tokenParsed?.azp)
       }
     } else {
       console.log('[ADMIN] Not authenticated')

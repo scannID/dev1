@@ -14,6 +14,10 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    fs: {
+      // Allow serving files from parent directory (for shared node_modules)
+      allow: ['..'],
+    },
   },
   build: {
     outDir: path.resolve(__dirname, 'dist'),

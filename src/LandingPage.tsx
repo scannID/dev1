@@ -393,9 +393,6 @@ export default function LandingPage({ onGetStarted, onCreateTicket }: { onGetSta
 
       <span id="how" />
       <HowItWorks C={C} />
-      <Features C={C} />
-      <BusinessTypes C={C} />
-      <CtaSection onGetStarted={onGetStarted} C={C} />
       <Footer C={C} />
     </div>
   )
