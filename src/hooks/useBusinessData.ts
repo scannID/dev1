@@ -1,86 +1,111 @@
-// Custom hook for business data with API integration
-// Handles loading, caching, and syncing with backend
+// Loads merchant session (me) + business + orders from the API
 
 import { useState, useEffect, useCallback } from 'react'
 import { scanitApi } from '../api/services'
-import type { Business, CatalogItem, Order } from '../api/types'
+import type {
+  Business,
+  CatalogItem,
+  MerchantProfile,
+  OnboardingStatusResponse,
+  Order,
+} from '../api/types'
 
-// Storage keys for backward compatibility
 const BUSINESSES_KEY = 'scanny-businesses-v2'
 const ORDERS_KEY = 'scanny-orders-v1'
 
 export function useBusinessData() {
   const [businesses, setBusinesses] = useState<Business[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [merchant, setMerchant] = useState<MerchantProfile | null>(null)
+  const [onboarding, setOnboarding] = useState<OnboardingStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load businesses from API
-  const loadBusinesses = useCallback(async () => {
+  const loadSession = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await scanitApi.businesses.list()
-      setBusinesses(data)
-      
-      // Also cache in localStorage for offline support
-      localStorage.setItem(BUSINESSES_KEY, JSON.stringify(data))
+
+      const me = await scanitApi.merchant.me()
+      const business: Business = {
+        ...me.business,
+        items: me.business.items ?? [],
+      }
+
+      setMerchant(me.merchant)
+      setOnboarding(me.onboarding)
+      setBusinesses([business])
+      localStorage.setItem(BUSINESSES_KEY, JSON.stringify([business]))
+
+      const orderList = await scanitApi.orders.list(business.id)
+      setOrders(orderList)
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(orderList))
     } catch (err) {
-      console.error('Failed to load businesses:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load businesses')
-      
-      // Fallback to localStorage if API fails
+      console.error('Failed to load merchant session:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load merchant data')
+
       try {
-        const cached = localStorage.getItem(BUSINESSES_KEY)
-        if (cached) {
-          setBusinesses(JSON.parse(cached))
-        }
-      } catch (e) {
-        console.error('Failed to load from cache:', e)
+        const cachedBiz = localStorage.getItem(BUSINESSES_KEY)
+        if (cachedBiz) setBusinesses(JSON.parse(cachedBiz))
+        const cachedOrders = localStorage.getItem(ORDERS_KEY)
+        if (cachedOrders) setOrders(JSON.parse(cachedOrders))
+      } catch {
+        // ignore cache parse errors
       }
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Load orders for a business from API
   const loadOrders = useCallback(async (businessId: string) => {
     try {
       setError(null)
       const data = await scanitApi.orders.list(businessId)
       setOrders(data)
-      
-      // Cache in localStorage
       localStorage.setItem(ORDERS_KEY, JSON.stringify(data))
     } catch (err) {
       console.error('Failed to load orders:', err)
       setError(err instanceof Error ? err.message : 'Failed to load orders')
-      
-      // Fallback to localStorage
-      try {
-        const cached = localStorage.getItem(ORDERS_KEY)
-        if (cached) {
-          setOrders(JSON.parse(cached))
-        }
-      } catch (e) {
-        console.error('Failed to load orders from cache:', e)
-      }
     }
   }, [])
 
-  // Initial load
+  const refreshBusiness = useCallback(async (businessId: string) => {
+    try {
+      const business = await scanitApi.businesses.get(businessId)
+      const withItems: Business = { ...business, items: business.items ?? [] }
+      setBusinesses([withItems])
+      localStorage.setItem(BUSINESSES_KEY, JSON.stringify([withItems]))
+      return withItems
+    } catch (err) {
+      console.error('Failed to refresh business:', err)
+      setError(err instanceof Error ? err.message : 'Failed to refresh business')
+      return null
+    }
+  }, [])
+
+  const updateLocalItems = useCallback((businessId: string, items: CatalogItem[]) => {
+    setBusinesses((current) =>
+      current.map((b) => (b.id === businessId ? { ...b, items } : b))
+    )
+  }, [])
+
   useEffect(() => {
-    loadBusinesses()
-  }, [loadBusinesses])
+    loadSession()
+  }, [loadSession])
 
   return {
     businesses,
     orders,
+    merchant,
+    onboarding,
     loading,
     error,
-    refreshBusinesses: loadBusinesses,
+    refreshBusinesses: loadSession,
+    refreshBusiness,
     loadOrders,
-    setOrders, // For optimistic updates
+    setOrders,
+    setBusinesses,
+    updateLocalItems,
   }
 }
 

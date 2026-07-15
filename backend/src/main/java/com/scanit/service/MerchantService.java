@@ -1,11 +1,13 @@
 package com.scanit.service;
 
+import com.scanit.dto.BusinessResponse;
 import com.scanit.dto.MerchantDtos.*;
 import com.scanit.entity.Merchant;
 import com.scanit.exception.ApiException;
 import com.scanit.repository.MerchantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,11 +22,18 @@ public class MerchantService {
     private final MerchantRepository merchantRepository;
     private final QrCodeService qrCodeService;
     private final KeycloakAdminService keycloakAdminService;
+    private final BusinessService businessService;
     
-    public MerchantService(MerchantRepository merchantRepository, QrCodeService qrCodeService, KeycloakAdminService keycloakAdminService) {
+    public MerchantService(
+            MerchantRepository merchantRepository,
+            QrCodeService qrCodeService,
+            KeycloakAdminService keycloakAdminService,
+            BusinessService businessService
+    ) {
         this.merchantRepository = merchantRepository;
         this.qrCodeService = qrCodeService;
         this.keycloakAdminService = keycloakAdminService;
+        this.businessService = businessService;
     }
 
     /**
@@ -94,12 +103,24 @@ public class MerchantService {
     }
 
     /**
-     * Handle post-login logic - generate QR code on first login if needed
+     * Full post-login payload for the merchant portal.
      */
     @Transactional
-    public MerchantProfile handleLogin(UUID keycloakUserId) {
-        Merchant merchant = merchantRepository.findByKeycloakUserId(keycloakUserId)
-                .orElseThrow(() -> new ApiException(404, "Merchant not found"));
+    public MerchantMeResponse getMe(Jwt jwt) {
+        UUID keycloakUserId = UUID.fromString(jwt.getSubject());
+        MerchantProfile profile = handleLogin(jwt, keycloakUserId);
+        BusinessResponse business = businessService.getBusinessForMerchant(profile.id().toString());
+        OnboardingStatusResponse onboarding = getOnboardingStatus(profile.id());
+        return new MerchantMeResponse(profile, business, onboarding);
+    }
+
+    /**
+     * Handle post-login logic - resolve merchant (auto-provision if needed),
+     * generate QR on first login, ensure ordering Business exists.
+     */
+    @Transactional
+    public MerchantProfile handleLogin(Jwt jwt, UUID keycloakUserId) {
+        Merchant merchant = resolveMerchantForLogin(jwt, keycloakUserId);
         
         // Update last login
         merchant.setLastLoginAt(LocalDateTime.now());
@@ -126,7 +147,125 @@ public class MerchantService {
         }
         
         merchantRepository.save(merchant);
+
+        // Bridge Merchant → Business for catalog/orders
+        BusinessResponse business = businessService.ensureBusinessForMerchant(merchant);
+        // Keep merchant QR URL aligned with customer deep link
+        String customerUrl = business.customerUrl();
+        if (customerUrl != null && !customerUrl.equals(merchant.getQrCodeUrl())) {
+            merchant.setQrCodeUrl(customerUrl);
+            merchantRepository.save(merchant);
+        }
         
+        return toProfileEntity(merchant);
+    }
+
+    /**
+     * Find merchant by Keycloak ID, link by email, or auto-provision on first login.
+     * Any caller of /me already has the MERCHANT role in Keycloak.
+     */
+    private Merchant resolveMerchantForLogin(Jwt jwt, UUID keycloakUserId) {
+        return merchantRepository.findByKeycloakUserId(keycloakUserId)
+                .or(() -> linkMerchantByEmail(jwt, keycloakUserId))
+                .orElseGet(() -> provisionMerchantFromJwt(jwt, keycloakUserId));
+    }
+
+    private java.util.Optional<Merchant> linkMerchantByEmail(Jwt jwt, UUID keycloakUserId) {
+        String email = extractEmail(jwt);
+        if (email == null || email.isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        return merchantRepository.findByEmail(email.toLowerCase().trim())
+                .map(existing -> {
+                    existing.setKeycloakUserId(keycloakUserId);
+                    Merchant linked = merchantRepository.save(existing);
+                    logger.info("Linked existing merchant {} to Keycloak user {}", email, keycloakUserId);
+                    return linked;
+                });
+    }
+
+    private Merchant provisionMerchantFromJwt(Jwt jwt, UUID keycloakUserId) {
+        String email = extractEmail(jwt);
+        if (email == null || email.isBlank()) {
+            throw new ApiException(
+                    400,
+                    "No merchant account found. Add an email to your Keycloak user or register via the merchant signup flow."
+            );
+        }
+
+        email = email.toLowerCase().trim();
+        if (merchantRepository.existsByEmail(email)) {
+            throw new ApiException(409, "Email already registered under a different Keycloak account.");
+        }
+
+        String businessName = extractBusinessName(jwt, email);
+
+        Merchant merchant = new Merchant();
+        merchant.setKeycloakUserId(keycloakUserId);
+        merchant.setEmail(email);
+        merchant.setBusinessName(businessName);
+        merchant.setBusinessType(Merchant.BusinessType.RESTAURANT);
+        merchant.setPhoneNumber("");
+        merchant.setPaymentType(Merchant.PaymentType.MOBILE_MONEY);
+        merchant.setPaymentProvider("MTN");
+        merchant.setPaymentNumber("+256700000000");
+        merchant.setPaymentAccountName(businessName);
+        merchant.setStatus(Merchant.MerchantStatus.ACTIVE);
+        merchant.setEmailVerified(Boolean.TRUE.equals(jwt.getClaim("email_verified")));
+        if (Boolean.TRUE.equals(merchant.getEmailVerified())) {
+            merchant.setEmailVerifiedAt(LocalDateTime.now());
+        }
+        merchant.setOnboardingStep(1);
+
+        merchant = merchantRepository.save(merchant);
+        logger.info("Auto-provisioned merchant {} ({}) for Keycloak user {}", businessName, email, keycloakUserId);
+        return merchant;
+    }
+
+    private static String extractEmail(Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        if (email != null && !email.isBlank()) {
+            return email.trim();
+        }
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (preferredUsername != null && preferredUsername.contains("@")) {
+            return preferredUsername.trim();
+        }
+        return null;
+    }
+
+    private static String extractBusinessName(Jwt jwt, String email) {
+        String name = jwt.getClaimAsString("name");
+        if (name != null && !name.isBlank()) {
+            return name.trim();
+        }
+
+        String givenName = jwt.getClaimAsString("given_name");
+        String familyName = jwt.getClaimAsString("family_name");
+        if (givenName != null && !givenName.isBlank()) {
+            if (familyName != null && !familyName.isBlank()) {
+                return (givenName + " " + familyName).trim();
+            }
+            return givenName.trim();
+        }
+
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (preferredUsername != null && !preferredUsername.isBlank() && !preferredUsername.contains("@")) {
+            return preferredUsername.trim();
+        }
+
+        if (email.contains("@")) {
+            String localPart = email.substring(0, email.indexOf('@')).replace('.', ' ').replace('_', ' ');
+            if (!localPart.isBlank()) {
+                return Character.toUpperCase(localPart.charAt(0)) + localPart.substring(1);
+            }
+        }
+
+        return "My Business";
+    }
+
+    private MerchantProfile toProfileEntity(Merchant merchant) {
         return new MerchantProfile(
             merchant.getId(),
             merchant.getEmail(),

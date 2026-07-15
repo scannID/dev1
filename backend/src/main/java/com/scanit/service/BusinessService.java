@@ -4,6 +4,7 @@ import com.scanit.dto.BusinessResponse;
 import com.scanit.dto.RequestDtos.CreateBusinessRequest;
 import com.scanit.entity.Business;
 import com.scanit.entity.CatalogItem;
+import com.scanit.entity.Merchant;
 import com.scanit.exception.ApiException;
 import com.scanit.model.enums.BusinessType;
 import com.scanit.repository.BusinessRepository;
@@ -99,6 +100,82 @@ public class BusinessService {
 
         Business saved = businessRepository.save(business);
         return BusinessResponse.from(saved, scanBaseUrl, true);
+    }
+
+    @Transactional(readOnly = true)
+    public BusinessResponse getBusinessForMerchant(String merchantId) {
+        Business business = businessRepository.findWithItemsByMerchantId(merchantId)
+                .orElseThrow(() -> new ApiException(404, "Business was not found for this merchant."));
+        return BusinessResponse.from(business, scanBaseUrl, true);
+    }
+
+    /**
+     * Ensure an ordering Business exists for a Merchant profile (bridges dual model).
+     * Syncs QR token + public customer URL shape: /b/{businessId}?qr={token}
+     */
+    @Transactional
+    public BusinessResponse ensureBusinessForMerchant(Merchant merchant) {
+        String merchantId = merchant.getId().toString();
+        Business business = businessRepository.findWithItemsByMerchantId(merchantId).orElse(null);
+
+        if (business == null) {
+            business = new Business();
+            String baseId = CodeUtils.slugify(merchant.getBusinessName());
+            if (baseId.isBlank()) {
+                baseId = "merchant-" + merchantId.substring(0, 8);
+            }
+            String id = businessRepository.existsById(baseId)
+                    ? baseId + "-" + merchantId.substring(0, 8)
+                    : baseId;
+
+            BusinessType type = mapMerchantType(merchant.getBusinessType());
+            String qrToken = merchant.getQrCodeToken() != null
+                    ? merchant.getQrCodeToken()
+                    : CodeUtils.makeCode("SIT", merchant.getBusinessName());
+
+            business.setId(id);
+            business.setMerchantId(merchantId);
+            business.setQrToken(qrToken);
+            business.setName(merchant.getBusinessName());
+            business.setOwnerName(merchant.getBusinessName());
+            business.setPhone(merchant.getPhoneNumber() != null ? merchant.getPhoneNumber() : "");
+            business.setType(type);
+            business.setTableLabel(starterCatalogService.defaultTableLabel(type));
+            business.setPaymentReference(CodeUtils.makeCode("PAY", merchant.getBusinessName()));
+            business.setCreatedAt(Instant.now());
+
+            starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
+            business = businessRepository.save(business);
+        } else if (merchant.getQrCodeToken() != null
+                && !merchant.getQrCodeToken().equals(business.getQrToken())) {
+            business.setQrToken(merchant.getQrCodeToken());
+            business = businessRepository.save(business);
+        }
+
+        return BusinessResponse.from(business, scanBaseUrl, true);
+    }
+
+    @Transactional
+    public void syncQrToken(String merchantId, String qrToken) {
+        businessRepository.findByMerchantId(merchantId).ifPresent(business -> {
+            business.setQrToken(qrToken);
+            businessRepository.save(business);
+        });
+    }
+
+    private static BusinessType mapMerchantType(Merchant.BusinessType type) {
+        if (type == null) {
+            return BusinessType.Restaurant;
+        }
+        return switch (type) {
+            case BAR -> BusinessType.Bar;
+            case EVENT -> BusinessType.Boutique;
+            case SALON -> BusinessType.Boutique;
+            case RETAIL -> BusinessType.Boutique;
+            case PARKING -> BusinessType.Boutique;
+            case OTHER -> BusinessType.Restaurant;
+            case RESTAURANT -> BusinessType.Restaurant;
+        };
     }
 
 }

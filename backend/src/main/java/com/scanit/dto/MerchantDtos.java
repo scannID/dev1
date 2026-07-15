@@ -208,6 +208,13 @@ public class MerchantDtos {
         Long expiresIn
     ) {}
 
+    // Logged-in merchant + linked ordering business
+    public record MerchantMeResponse(
+        MerchantProfile merchant,
+        com.scanit.dto.BusinessResponse business,
+        OnboardingStatusResponse onboarding
+    ) {}
+
     // Helper method to convert entity to profile DTO
     public static MerchantProfile toProfile(Merchant merchant) {
         return new MerchantProfile(

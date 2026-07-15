@@ -6,6 +6,7 @@ import com.scanit.service.QrCodeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -43,6 +44,18 @@ public class MerchantAuthController {
         
         // This is a placeholder - will be replaced with real Keycloak integration
         throw new UnsupportedOperationException("Login will be implemented with Keycloak OAuth2 integration");
+    }
+
+    /**
+     * Current merchant profile + linked business (resolved from JWT subject).
+     * GET /api/auth/merchant/me
+     */
+    @GetMapping("/me")
+    public ResponseEntity<MerchantMeResponse> me(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt
+    ) {
+        MerchantMeResponse response = merchantService.getMe(jwt);
+        return ResponseEntity.ok(response);
     }
 
     /**

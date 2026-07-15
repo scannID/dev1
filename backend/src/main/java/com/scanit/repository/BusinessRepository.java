@@ -17,5 +17,10 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
     @EntityGraph(attributePaths = "items")
     Optional<Business> findWithItemsByQrToken(String qrToken);
 
+    @EntityGraph(attributePaths = "items")
+    Optional<Business> findWithItemsByMerchantId(String merchantId);
+
+    Optional<Business> findByMerchantId(String merchantId);
+
     boolean existsById(String id);
 }

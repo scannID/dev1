@@ -39,6 +39,16 @@ import {
 } from '@/components/ui/table'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import { useBusinessData } from './hooks/useBusinessData'
+import { useCatalog } from './hooks/useCatalog'
+import { useOrders } from './hooks/useOrders'
+import type {
+  Business as ApiBusiness,
+  CatalogItem as ApiCatalogItem,
+  Order as ApiOrder,
+  OrderStatus,
+  PaymentStatus,
+} from './api/types'
 import './App.css'
 
 const ORDERS_KEY = 'scanny-orders-v1'
@@ -87,151 +97,36 @@ function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string
     </svg>
   )
 }
-const SCAN_BASE_URL = 'https://scanny.app'
+const SCAN_BASE_URL = import.meta.env.VITE_SCAN_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
 const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
 type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
-
-type CatalogItem = {
-  id: string
-  name: string
-  category: string
-  price: number
-  description: string
-  available: boolean
-}
-
-type Business = {
-  id: string
-  merchantId: string
-  qrToken: string
-  name: string
-  ownerName: string
-  phone: string
-  type: BusinessType
-  tableLabel: string
-  paymentReference: string
-  accent: string
-  items: CatalogItem[]
-}
-
+type CatalogItem = ApiCatalogItem
+type Business = ApiBusiness
+type Order = ApiOrder
 type CartLine = CatalogItem & {
   quantity: number
   lineTotal: number
 }
-
-type Order = {
-  id: string
-  businessId: string
-  merchantId: string
-  qrToken: string
-  paymentReference: string
-  businessName: string
-  customer: {
-    name: string
-    phone: string
-    location: string
-    note: string
-  }
-  items: Array<Pick<CatalogItem, 'id' | 'name' | 'price'> & { quantity: number; lineTotal: number }>
-  total: number
-  paymentStatus: 'Unpaid' | 'Paid' | 'Refunded'
-  status: 'Pending' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled'
-  createdAt: string
-}
-
 type Customer = Order['customer']
+
+const emptyBusiness: Business = {
+  id: '',
+  merchantId: '',
+  qrToken: '',
+  name: '',
+  ownerName: '',
+  phone: '',
+  type: 'Restaurant',
+  tableLabel: 'Location',
+  paymentReference: '',
+  accent: '#2563eb',
+  items: [],
+}
 
 type QrStyle = CSSProperties & {
   '--accent': string
 }
-
-const defaultBusinesses: Business[] = [
-  {
-    id: 'kampala-grill',
-    merchantId: 'MER-KGL-1001',
-    qrToken: 'SIT-KGL-1001',
-    name: '',
-    ownerName: '',
-    phone: '',
-    type: 'Bar',
-    tableLabel: 'Location',
-    paymentReference: '',
-    accent: '#2563eb',
-    items: [
-      {
-        id: 'beef-plate',
-        name: 'Beef Plate',
-        category: 'Meals',
-        price: 18000,
-        description: 'Grilled beef, rice, greens, and house sauce.',
-        available: true,
-      },
-      {
-        id: 'chicken-wrap',
-        name: 'Chicken Wrap',
-        category: 'Meals',
-        price: 14500,
-        description: 'Soft wrap with chicken, salad, and garlic sauce.',
-        available: true,
-      },
-      {
-        id: 'passion-juice',
-        name: 'Passion Juice',
-        category: 'Drinks',
-        price: 6000,
-        description: 'Fresh passion fruit juice served cold.',
-        available: true,
-      },
-      {
-        id: 'family-platter',
-        name: 'Family Platter',
-        category: 'Meals',
-        price: 42000,
-        description: 'Mixed grill, fries, salad, and two sauces.',
-        available: false,
-      },
-    ],
-  },
-  {
-    id: 'city-lounge',
-    merchantId: 'MER-CLG-1002',
-    qrToken: 'SIT-CLG-1002',
-    name: 'City Lounge',
-    ownerName: '',
-    phone: '',
-    type: 'Bar',
-    tableLabel: 'Seat or area',
-    paymentReference: 'PAY-CLG-1002',
-    accent: '#7c3aed',
-    items: [
-      {
-        id: 'mocktail',
-        name: 'House Mocktail',
-        category: 'Drinks',
-        price: 12000,
-        description: 'Citrus, mint, soda, and crushed ice.',
-        available: true,
-      },
-      {
-        id: 'wings',
-        name: 'Spicy Wings',
-        category: 'Bites',
-        price: 22000,
-        description: 'Six wings with chilli glaze and dip.',
-        available: true,
-      },
-      {
-        id: 'vip-ticket',
-        name: 'Friday VIP Ticket',
-        category: 'Tickets',
-        price: 30000,
-        description: 'Entry ticket for Friday night live DJ event.',
-        available: true,
-      },
-    ],
-  },
-]
 
 function currency(amount) {
   return new Intl.NumberFormat('en-UG', {
@@ -242,22 +137,26 @@ function currency(amount) {
 }
 
 function customerUrl(business: Business) {
+  if (business.customerUrl) return business.customerUrl
+  if (!business.id || !business.qrToken) return SCAN_BASE_URL
   return `${SCAN_BASE_URL}/b/${business.id}?qr=${business.qrToken}`
 }
 
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback
-  } catch {
-    return fallback
-  }
-}
-
 function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: string }) {
-  const [businesses, setBusinesses] = useState(() => readJson(BUSINESSES_KEY, defaultBusinesses))
-  const [activeBusinessId] = useState(() => businesses[0]?.id ?? '')
+  const {
+    businesses,
+    orders,
+    merchant,
+    loading: sessionLoading,
+    error: sessionError,
+    refreshBusinesses,
+    refreshBusiness,
+    loadOrders,
+    setOrders,
+    updateLocalItems,
+  } = useBusinessData()
+
   const [view, setView] = useState('account')
-  const [orders, setOrders] = useState<Order[]>(() => readJson<Order[]>(ORDERS_KEY, []))
   const [cart, setCart] = useState<Record<string, number>>({})
   const [customer, setCustomer] = useState<Customer>({
     name: '',
@@ -272,6 +171,11 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
   })
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const business = businesses[0] ?? emptyBusiness
+  const catalogHook = useCatalog(business.id)
+  const ordersHook = useOrders(business.id)
 
   // Toggle dark mode with 'D' key
   useEffect(() => {
@@ -301,14 +205,22 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
     }
   }, [darkMode])
 
-  const business = businesses.find((entry) => entry.id === activeBusinessId) ?? businesses[0]
+  // Poll orders while on dashboard
+  useEffect(() => {
+    if (!business.id || view !== 'dashboard') return
+    const id = window.setInterval(() => {
+      loadOrders(business.id)
+    }, 15000)
+    return () => window.clearInterval(id)
+  }, [business.id, view, loadOrders])
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const categories = [...new Set(business.items.map((item) => item.category))]
+  const categories = [...new Set((business.items ?? []).map((item) => item.category))]
 
   const cartLines = useMemo<CartLine[]>(() => {
     return Object.entries(cart)
       .map(([itemId, quantity]) => {
-        const item = business.items.find((entry) => entry.id === itemId)
+        const item = (business.items ?? []).find((entry) => entry.id === itemId)
         return item ? { ...item, quantity, lineTotal: item.price * quantity } : null
       })
       .filter((item): item is CartLine => Boolean(item))
@@ -322,19 +234,54 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
   const paidTotal = businessOrders
     .filter((order) => order.paymentStatus === 'Paid')
     .reduce((sum, _order) => sum + _order.total, 0)
-  const availableItems = business.items.filter((item) => item.available).length
+  const availableItems = (business.items ?? []).filter((item) => item.available).length
 
-  useEffect(() => {
-    localStorage.setItem(BUSINESSES_KEY, JSON.stringify(businesses))
-  }, [businesses])
+  async function handleCreateCatalogItem(data: {
+    name: string
+    category: string
+    price: number
+    description: string
+    available: boolean
+  }) {
+    if (!business.id) return
+    setActionError(null)
+    const item = await catalogHook.createItem(data)
+    if (!item) {
+      setActionError(catalogHook.error || 'Failed to create item')
+      return
+    }
+    await refreshBusiness(business.id)
+    setShowAddItem(false)
+  }
 
-  useEffect(() => {
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders))
-  }, [orders])
+  async function handleUpdateCatalogItem(itemId: string, data: Partial<CatalogItem>) {
+    if (!business.id) return
+    setActionError(null)
+    const item = await catalogHook.updateItem(itemId, {
+      name: data.name,
+      category: data.category,
+      price: data.price,
+      description: data.description,
+      available: data.available,
+    })
+    if (!item) {
+      setActionError(catalogHook.error || 'Failed to update item')
+      return
+    }
+    await refreshBusiness(business.id)
+  }
 
-  function updateBusinessItems(nextItems) {
-    setBusinesses((current) =>
-      current.map((entry) => (entry.id === business.id ? { ...entry, items: nextItems } : entry)),
+  async function handleDeleteCatalogItem(itemId: string) {
+    if (!business.id) return
+    setActionError(null)
+    const ok = await catalogHook.deleteItem(itemId)
+    if (!ok) {
+      setActionError(catalogHook.error || 'Failed to delete item')
+      return
+    }
+    updateLocalItems(
+      business.id,
+      (business.items ?? []).filter((entry) => entry.id !== itemId),
     )
   }
 
@@ -355,55 +302,64 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
     })
   }
 
-  function submitOrder(event) {
+  async function submitOrder(event) {
     event.preventDefault()
-    if (!cartLines.length || !customer.name.trim()) return
+    if (!cartLines.length || !customer.name.trim() || !business.id) return
 
-    const order: Order = {
-      id: `ORD-${Date.now().toString().slice(-6)}`,
-      businessId: business.id,
-      merchantId: business.merchantId,
-      qrToken: business.qrToken,
-      paymentReference: business.paymentReference,
-      businessName: business.name,
+    setActionError(null)
+    const created = await ordersHook.createOrder({
       customer: {
         name: customer.name.trim(),
         phone: customer.phone.trim(),
         location: customer.location.trim(),
         note: customer.note.trim(),
       },
-      items: cartLines.map(({ id, name, price, quantity, lineTotal }) => ({
-        id,
-        name,
-        price,
-        quantity,
-        lineTotal,
-      })),
-      total,
-      paymentStatus: 'Unpaid',
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
+      items: cartLines.map(({ id, quantity }) => ({ id, quantity })),
+    })
+
+    if (!created) {
+      setActionError(ordersHook.error || 'Failed to place order')
+      return
     }
 
-    setOrders((current) => [order, ...current])
+    setOrders((current) => [created, ...current])
     setCart({})
     setCustomer({ name: '', phone: '', location: '', note: '' })
     setView('dashboard')
   }
 
-  function updateStatus(orderId, status) {
+  async function updateStatus(orderId: string, status: OrderStatus) {
+    setActionError(null)
+    const updated = await ordersHook.updateStatus(orderId, status)
+    if (!updated) {
+      setActionError(ordersHook.error || 'Failed to update status')
+      return
+    }
     setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status } : order)),
+      current.map((order) => (order.id === orderId ? updated : order)),
     )
   }
 
-  function updatePayment(orderId, paymentStatus) {
+  async function updatePayment(orderId: string, paymentStatus: PaymentStatus) {
+    setActionError(null)
+    const updated = await ordersHook.updatePayment(orderId, paymentStatus)
+    if (!updated) {
+      setActionError(ordersHook.error || 'Failed to update payment')
+      return
+    }
     setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, paymentStatus } : order)),
+      current.map((order) => (order.id === orderId ? updated : order)),
     )
   }
 
-  function clearCompleted() {
+  async function clearCompleted() {
+    if (!business.id) return
+    setActionError(null)
+    const result = await ordersHook.clearCompleted()
+    if (!result) {
+      setActionError(ordersHook.error || 'Failed to clear completed orders')
+      return
+    }
     setOrders((current) =>
       current.filter(
         (order) =>
@@ -422,6 +378,26 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
       localStorage.removeItem(BUSINESSES_KEY)
       window.location.reload()
     }
+  }
+
+  if (sessionLoading) {
+    return (
+      <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
+        <p>Loading merchant portal…</p>
+      </main>
+    )
+  }
+
+  if (!business.id) {
+    return (
+      <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', gap: '1rem' }}>
+        <p>{sessionError || 'No business linked to this merchant yet.'}</p>
+        <button className="primary-action" type="button" onClick={() => refreshBusinesses()}>
+          Retry
+        </button>
+        <button type="button" onClick={handleLogout}>Log out</button>
+      </main>
+    )
   }
 
   return (
@@ -497,11 +473,14 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
               {view === 'reports' && 'Merchant · Reports'}
             </p>
             <h2>
-              {view === 'account' && `Welcome back, ${business.ownerName || 'Merchant'}`}
+              {view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
               {view === 'catalog' && 'Catalog'}
               {view === 'dashboard' && 'Orders'}
               {view === 'reports' && 'Reports'}
             </h2>
+            {(actionError || sessionError) && (
+              <p style={{ color: 'crimson', marginTop: 8, fontSize: 14 }}>{actionError || sessionError}</p>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {view === 'account' && (
@@ -521,8 +500,7 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
                   localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
                   return newMode
                 })
-              }}
-            >
+              } } className={undefined}            >
               {darkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
             </Button>
             {/* Notifications */}
@@ -566,7 +544,9 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
           <div className="page-content">
             <CatalogPage
               business={business}
-              onItemsChange={updateBusinessItems}
+              onCreateItem={handleCreateCatalogItem}
+              onUpdateItem={handleUpdateCatalogItem}
+              onDeleteItem={handleDeleteCatalogItem}
               onAddItem={() => setShowAddItem(true)}
               Sparkline={Sparkline}
             />
@@ -602,10 +582,7 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
             <div className="flex-1 overflow-y-auto">
               <AddItemForm
                 business={business}
-                onItemsChange={(items) => {
-                  updateBusinessItems(items)
-                  setShowAddItem(false)
-                }}
+                onCreateItem={handleCreateCatalogItem}
               />
             </div>
           </SheetContent>
@@ -758,7 +735,7 @@ function OverviewPage({ business, darkMode }: { business: Business; darkMode: bo
           </div>
           <div>
             <span>Goods and prices</span>
-            <strong>{business.items.length} linked items</strong>
+            <strong>{(business.items ?? []).length} linked items</strong>
           </div>
         </div>
       </section>
@@ -1162,10 +1139,16 @@ function CustomerMenu({
 
 function AddItemForm({
   business,
-  onItemsChange,
+  onCreateItem,
 }: {
   business: Business
-  onItemsChange: (items: CatalogItem[]) => void
+  onCreateItem: (data: {
+    name: string
+    category: string
+    price: number
+    description: string
+    available: boolean
+  }) => Promise<void> | void
 }) {
   const emptyItem = {
     name: '',
@@ -1176,9 +1159,10 @@ function AddItemForm({
   }
   const [item, setItem] = useState(emptyItem)
   const [submitted, setSubmitted] = useState(false)
-  const categories = [...new Set<string>(business.items.map((entry) => entry.category))]
+  const [saving, setSaving] = useState(false)
+  const categories = [...new Set<string>((business.items ?? []).map((entry) => entry.category))]
 
-  function submitItem(event) {
+  async function submitItem(event) {
     event.preventDefault()
 
     const name = item.name.trim()
@@ -1189,18 +1173,20 @@ function AddItemForm({
 
     if (!name || !category || !Number.isFinite(price) || price <= 0) return
 
-    const newItem = {
-      id: `${business.id}-${Date.now()}`,
-      name,
-      category,
-      price,
-      description: item.description.trim() || 'No description added yet.',
-      available: item.available,
+    setSaving(true)
+    try {
+      await onCreateItem({
+        name,
+        category,
+        price,
+        description: item.description.trim() || 'No description added yet.',
+        available: item.available,
+      })
+      setItem(emptyItem)
+      setSubmitted(false)
+    } finally {
+      setSaving(false)
     }
-
-    onItemsChange([...business.items, newItem])
-    setItem(emptyItem)
-    setSubmitted(false)
   }
 
   const isItemNameMissing = submitted && !item.name.trim()
@@ -1281,8 +1267,8 @@ function AddItemForm({
         Available to customers
       </label>
 
-      <button className="primary-action" type="submit">
-        Add item
+      <button className="primary-action" type="submit" disabled={saving}>
+        {saving ? 'Saving…' : 'Add item'}
       </button>
     </form>
   )
@@ -1290,11 +1276,17 @@ function AddItemForm({
 function AddItemPage({
   business,
   onBack,
-  onItemsChange,
+  onCreateItem,
 }: {
   business: Business
   onBack: () => void
-  onItemsChange: (items: CatalogItem[]) => void
+  onCreateItem: (data: {
+    name: string
+    category: string
+    price: number
+    description: string
+    available: boolean
+  }) => Promise<void> | void
 }) {
   return (
     <section className="add-item-page">
@@ -1309,24 +1301,34 @@ function AddItemPage({
         </div>
       </div>
 
-      <AddItemForm business={business} onItemsChange={onItemsChange} />
+      <AddItemForm business={business} onCreateItem={onCreateItem} />
     </section>
   )
 }
 
 function CatalogPage({
   business,
-  onItemsChange,
+  onCreateItem,
+  onUpdateItem,
+  onDeleteItem,
   onAddItem,
   Sparkline,
 }: {
   business: Business
-  onItemsChange: (items: CatalogItem[]) => void
+  onCreateItem: (data: {
+    name: string
+    category: string
+    price: number
+    description: string
+    available: boolean
+  }) => Promise<void> | void
+  onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
+  onDeleteItem: (itemId: string) => Promise<void> | void
   onAddItem: () => void
   Sparkline: (props: { data: number[]; color?: string }) => React.ReactElement | null
 }) {
   const PAGE_SIZE = 20
-  const categories = useMemo(() => [...new Set(business.items.map((i) => i.category))], [business.items])
+  const categories = useMemo(() => [...new Set((business.items ?? []).map((i) => i.category))], [business.items])
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -1334,10 +1336,11 @@ function CatalogPage({
   const [page, setPage] = useState(1)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Partial<CatalogItem>>({})
+  const [saving, setSaving] = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return business.items.filter((item) => {
+    return (business.items ?? []).filter((item) => {
       const matchSearch = !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
       const matchCategory = filterCategory === 'all' || item.category === filterCategory
       const matchStatus = filterStatus === 'all' || (filterStatus === 'available' ? item.available : !item.available)
@@ -1359,21 +1362,28 @@ function CatalogPage({
     setEditDraft({})
   }
 
-  function saveEdit() {
-    if (!editDraft.name?.trim() || !editDraft.category?.trim()) return
-    onItemsChange(
-      business.items.map((entry) =>
-        entry.id === editingId
-          ? { ...entry, ...editDraft, price: Number(editDraft.price) || 0 }
-          : entry,
-      ),
-    )
-    cancelEdit()
+  async function saveEdit() {
+    if (!editDraft.name?.trim() || !editDraft.category?.trim() || !editingId) return
+    setSaving(true)
+    try {
+      await onUpdateItem(editingId, {
+        ...editDraft,
+        price: Number(editDraft.price) || 0,
+      })
+      cancelEdit()
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function removeItem(itemId: string) {
-    onItemsChange(business.items.filter((entry) => entry.id !== itemId))
-    if (editingId === itemId) cancelEdit()
+  async function removeItem(itemId: string) {
+    setSaving(true)
+    try {
+      await onDeleteItem(itemId)
+      if (editingId === itemId) cancelEdit()
+    } finally {
+      setSaving(false)
+    }
   }
 
   function resetFilters() {
@@ -1384,6 +1394,9 @@ function CatalogPage({
   }
 
   const isFiltered = search || filterCategory !== 'all' || filterStatus !== 'all'
+
+  // silence unused until bulk-create UI needs it
+  void onCreateItem
 
   return (
     <section className="catalog-page">
@@ -1561,9 +1574,9 @@ function CatalogPage({
             </div>
           </div>
           <div className="border-t border-border px-6 py-4 flex items-center gap-2">
-            <Button className="flex-1" onClick={saveEdit}>Save changes</Button>
-            <Button className="" variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item">
+            <Button className="flex-1" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
+            <Button className="" variant="outline" onClick={cancelEdit} disabled={saving}>Cancel</Button>
+            <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item" disabled={saving}>
               <Trash2 className="size-4" />
             </Button>
           </div>
@@ -1612,51 +1625,7 @@ function Dashboard({ business, orders, onClearCompleted, onPaymentChange, onStat
   const [page, setPage] = useState(1)
   const [detailOrderId, setDetailOrderId] = useState('')
 
-  const sampleOrders = useMemo(() => {
-    const items = business.items.length ? business.items : defaultBusinesses[0].items
-    const pick = (index) => items[index % items.length]
-    const makeItems = (start, count) =>
-      Array.from({ length: count }, (_, index) => {
-        const item = pick(start + index)
-        const quantity = (index % 2) + 1
-        return {
-          id: `${item.id}-sample-${start}-${index}`,
-          name: item.name,
-          price: item.price,
-          quantity,
-          lineTotal: item.price * quantity,
-        }
-      })
-
-    return Array.from({ length: 12 }, (_, index) => {
-      const sampleItems = makeItems(index, (index % 3) + 1)
-      const createdAt = new Date(Date.now() - index * 48 * 60 * 1000).toISOString()
-      const paymentStatus = paymentOptions[index % paymentOptions.length]
-      const status = statusOptions[index % statusOptions.length]
-
-      return {
-        id: `ORD-SAMPLE-${String(index + 1).padStart(3, '0')}`,
-        businessId: business.id,
-        merchantId: business.merchantId,
-        qrToken: business.qrToken,
-        paymentReference: business.paymentReference,
-        businessName: business.name,
-        customer: {
-          name: ['Amina N.', 'Brian K.', 'Clara M.', 'David R.'][index % 4],
-          phone: `07${String(70000000 + index * 1379).slice(0, 8)}`,
-          location: ['Table 4', 'Counter', 'Gate A', 'Pickup'][index % 4],
-          note: index % 3 === 0 ? 'Customer asked for quick pickup.' : '',
-        },
-        items: sampleItems,
-        total: sampleItems.reduce((sum, item) => sum + item.lineTotal, 0),
-        paymentStatus,
-        status,
-        createdAt,
-      }
-    })
-  }, [business])
-
-  const displayOrders = orders.length ? orders : sampleOrders
+  const displayOrders = orders
   const totalPages = Math.max(1, Math.ceil(displayOrders.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageOrders = displayOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)

@@ -32,16 +32,30 @@ Login: `admin` / `admin`
 5. Web origins: `*`
 6. Save
 
-#### Create Test User
+#### Create Test User (automated — recommended)
+
+After `./start-dev.sh`, run:
+
+```bash
+./setup-dev-test-merchant.sh
+```
+
+This creates `testuser` / `password` in the **scanny** realm with the **MERCHANT** role and email `test@scanny.app`.
+
+On first login to the merchant app, the backend **auto-creates** the Postgres `merchants` + `businesses` rows via `GET /api/auth/merchant/me`. You do not need to register manually for local dev.
+
+#### Create Test User (manual)
+
+If you prefer the Keycloak UI:
+
 1. Users → Create user
 2. Username: `testuser`
-3. Email: `test@scanny.app`
+3. Email: `test@scanny.app` (**required** — used to provision the merchant row)
 4. Email verified: ON
-5. Create
-6. Credentials tab → Set password
-7. Password: `password`
-8. Temporary: OFF
-9. Save
+5. Create → Credentials → password `password`, Temporary: OFF
+6. Role mapping → Assign **MERCHANT** realm role
+
+Without the MERCHANT role, the API returns 403. Without an email, auto-provision cannot run.
 
 ---
 

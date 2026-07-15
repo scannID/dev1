@@ -1,5 +1,4 @@
-// API Service Functions
-// All backend API calls organized by domain
+// API Service Functions — paths/payloads aligned with Spring controllers
 
 import { api } from './client'
 import type {
@@ -12,7 +11,6 @@ import type {
   CatalogItemsResponse,
   CreateCatalogItemRequest,
   UpdateCatalogItemRequest,
-  UpdateAvailabilityRequest,
   Order,
   OrderResponse,
   OrdersResponse,
@@ -20,74 +18,97 @@ import type {
   UpdateOrderStatusRequest,
   UpdatePaymentStatusRequest,
   ClearCompletedResponse,
+  MerchantMeResponse,
+  QrCodeResponse,
+  OnboardingStatusResponse,
+  MenuResponse,
 } from './types'
 
-// ============================================================================
-// BUSINESS API
-// ============================================================================
+export const merchantAuthApi = {
+  me: async (): Promise<MerchantMeResponse> => {
+    return api.get<MerchantMeResponse>('/auth/merchant/me')
+  },
+
+  onboarding: async (merchantId: string): Promise<OnboardingStatusResponse> => {
+    return api.get<OnboardingStatusResponse>(`/auth/merchant/onboarding?merchantId=${merchantId}`)
+  },
+
+  completeOnboarding: async (merchantId: string): Promise<void> => {
+    await api.post(`/auth/merchant/onboarding/complete?merchantId=${merchantId}`)
+  },
+
+  getQrCode: async (merchantId: string): Promise<QrCodeResponse> => {
+    return api.get<QrCodeResponse>(`/auth/merchant/qr-code?merchantId=${merchantId}`)
+  },
+
+  generateQrCode: async (merchantId: string, reason = 'MANUAL'): Promise<QrCodeResponse> => {
+    return api.post<QrCodeResponse>(
+      `/auth/merchant/qr-code/generate?merchantId=${merchantId}&reason=${reason}`
+    )
+  },
+
+  markPrinted: async (merchantId: string): Promise<void> => {
+    await api.post(`/auth/merchant/qr-code/mark-printed?merchantId=${merchantId}`)
+  },
+}
 
 export const businessApi = {
-  // List all businesses
   list: async (): Promise<Business[]> => {
     const response = await api.get<BusinessesResponse>('/businesses')
     return response.businesses
   },
 
-  // Get single business
   get: async (businessId: string): Promise<Business> => {
     const response = await api.get<BusinessResponse>(`/businesses/${businessId}`)
     return response.business
   },
 
-  // Create new business
   create: async (data: CreateBusinessRequest): Promise<Business> => {
     const response = await api.post<BusinessResponse>('/businesses', data)
     return response.business
   },
 
-  // Get business by QR token
   getByQr: async (qrToken: string): Promise<Business> => {
     const response = await api.get<BusinessResponse>(`/qr/${qrToken}`)
     return response.business
   },
 
-  // Get business menu (for customer view)
-  getMenu: async (businessId: string, qr?: string): Promise<{ business: Business; items: CatalogItem[] }> => {
-    const url = `/businesses/${businessId}/menu${qr ? `?qr=${qr}` : ''}`
-    return api.get(url)
+  getMenu: async (businessId: string, qr?: string): Promise<MenuResponse> => {
+    const url = `/businesses/${businessId}/menu${qr ? `?qr=${encodeURIComponent(qr)}` : ''}`
+    return api.get<MenuResponse>(url)
   },
 }
 
-// ============================================================================
-// CATALOG API
-// ============================================================================
-
 export const catalogApi = {
-  // List all catalog items for a business
   list: async (businessId: string): Promise<CatalogItem[]> => {
     const response = await api.get<CatalogItemsResponse>(`/businesses/${businessId}/catalog`)
     return response.items
   },
 
-  // Get single catalog item
   get: async (businessId: string, itemId: string): Promise<CatalogItem> => {
     const response = await api.get<CatalogItemResponse>(`/businesses/${businessId}/catalog/${itemId}`)
     return response.item
   },
 
-  // Create new catalog item
   create: async (businessId: string, data: CreateCatalogItemRequest): Promise<CatalogItem> => {
-    const response = await api.post<CatalogItemResponse>(`/businesses/${businessId}/catalog`, data)
+    const response = await api.post<CatalogItemResponse>(`/businesses/${businessId}/catalog`, {
+      name: data.name,
+      category: data.category,
+      price: data.price,
+      description: data.description,
+      available: data.available ?? true,
+    })
     return response.item
   },
 
-  // Update catalog item
   update: async (businessId: string, itemId: string, data: UpdateCatalogItemRequest): Promise<CatalogItem> => {
-    const response = await api.patch<CatalogItemResponse>(`/businesses/${businessId}/catalog/${itemId}`, data)
+    const response = await api.patch<CatalogItemResponse>(
+      `/businesses/${businessId}/catalog/${itemId}`,
+      data
+    )
     return response.item
   },
 
-  // Toggle item availability
   updateAvailability: async (businessId: string, itemId: string, available: boolean): Promise<CatalogItem> => {
     const response = await api.patch<CatalogItemResponse>(
       `/businesses/${businessId}/catalog/${itemId}/availability`,
@@ -96,52 +117,42 @@ export const catalogApi = {
     return response.item
   },
 
-  // Delete catalog item
   delete: async (businessId: string, itemId: string): Promise<void> => {
     await api.delete(`/businesses/${businessId}/catalog/${itemId}`)
   },
 }
 
-// ============================================================================
-// ORDERS API
-// ============================================================================
-
 export const ordersApi = {
-  // List orders for a business
   list: async (businessId: string): Promise<Order[]> => {
     const response = await api.get<OrdersResponse>(`/businesses/${businessId}/orders`)
     return response.orders
   },
 
-  // Create new order
   create: async (businessId: string, data: CreateOrderRequest): Promise<Order> => {
     const response = await api.post<OrderResponse>(`/businesses/${businessId}/orders`, data)
     return response.order
   },
 
-  // Update order status
   updateStatus: async (orderId: string, status: UpdateOrderStatusRequest['status']): Promise<Order> => {
     const response = await api.patch<OrderResponse>(`/orders/${orderId}/status`, { status })
     return response.order
   },
 
-  // Update payment status
-  updatePayment: async (orderId: string, paymentStatus: UpdatePaymentStatusRequest['paymentStatus']): Promise<Order> => {
+  updatePayment: async (
+    orderId: string,
+    paymentStatus: UpdatePaymentStatusRequest['paymentStatus']
+  ): Promise<Order> => {
     const response = await api.patch<OrderResponse>(`/orders/${orderId}/payment`, { paymentStatus })
     return response.order
   },
 
-  // Clear completed orders
   clearCompleted: async (businessId: string): Promise<{ deleted: number; message: string }> => {
     return api.delete<ClearCompletedResponse>(`/businesses/${businessId}/orders/completed`)
   },
 }
 
-// ============================================================================
-// Combined API Export
-// ============================================================================
-
 export const scanitApi = {
+  merchant: merchantAuthApi,
   businesses: businessApi,
   catalog: catalogApi,
   orders: ordersApi,

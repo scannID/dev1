@@ -10,6 +10,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import com.scanit.dto.MerchantDtos.QrCodeResponse;
 import com.scanit.entity.Merchant;
 import com.scanit.exception.ApiException;
+import com.scanit.repository.BusinessRepository;
 import com.scanit.repository.MerchantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,13 +35,19 @@ public class QrCodeService {
     private static final Logger logger = LoggerFactory.getLogger(QrCodeService.class);
     
     private final MerchantRepository merchantRepository;
+    private final BusinessRepository businessRepository;
     private final JdbcTemplate jdbcTemplate;
     
-    @Value("${scanit.scan-base-url:https://scanit.app}")
+    @Value("${scanit.scan-base-url:http://localhost:5173}")
     private String scanBaseUrl;
     
-    public QrCodeService(MerchantRepository merchantRepository, JdbcTemplate jdbcTemplate) {
+    public QrCodeService(
+            MerchantRepository merchantRepository,
+            BusinessRepository businessRepository,
+            JdbcTemplate jdbcTemplate
+    ) {
         this.merchantRepository = merchantRepository;
+        this.businessRepository = businessRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -56,9 +63,14 @@ public class QrCodeService {
         
         // Generate unique token using database function
         String qrToken = generateUniqueToken();
-        
-        // Build QR code URL
-        String qrCodeUrl = scanBaseUrl + "/menu/" + qrToken;
+
+        // Prefer deep link that the Vite customer menu understands
+        String businessId = businessRepository.findByMerchantId(merchantId.toString())
+                .map(b -> b.getId())
+                .orElse(null);
+        String qrCodeUrl = businessId != null
+                ? scanBaseUrl + "/b/" + businessId + "?qr=" + qrToken
+                : scanBaseUrl + "/b?qr=" + qrToken;
         
         // Generate QR code image as base64
         String qrCodeDataUrl = generateQrCodeImage(qrCodeUrl, 512);
@@ -74,6 +86,14 @@ public class QrCodeService {
         }
         
         merchantRepository.save(merchant);
+
+        // Keep ordering business QR in sync when it already exists
+        businessRepository.findByMerchantId(merchantId.toString()).ifPresent(business -> {
+            business.setQrToken(qrToken);
+            businessRepository.save(business);
+            merchant.setQrCodeUrl(scanBaseUrl + "/b/" + business.getId() + "?qr=" + qrToken);
+            merchantRepository.save(merchant);
+        });
         
         // Log generation
         logQrCodeGeneration(merchantId, qrToken, qrCodeUrl, reason);
@@ -81,13 +101,13 @@ public class QrCodeService {
         logger.info("Generated QR code for merchant {} ({}): {}", merchantId, reason, qrToken);
         
         return new QrCodeResponse(
-            qrToken,
-            qrCodeUrl,
+            merchant.getQrCodeToken(),
+            merchant.getQrCodeUrl(),
             qrCodeDataUrl,
             isNewGeneration,
             merchant.getQrCodeGeneratedAt(),
             merchant.getQrCodePrintCount(),
-            qrCodeUrl + "/download"
+            merchant.getQrCodeUrl() + "/download"
         );
     }
 

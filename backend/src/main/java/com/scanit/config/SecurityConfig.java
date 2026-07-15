@@ -34,9 +34,11 @@ public class SecurityConfig {
                 // Public endpoints (no authentication required)
                 .requestMatchers("/health", "/api/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/merchant/register").permitAll()
+                // Customer menu + order placement (must be before /api/businesses/** merchant rule)
+                .requestMatchers(HttpMethod.GET, "/api/businesses/*/menu").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/businesses/*/orders").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/qr/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/menu/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/orders/create").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
                 
                 // Merchant endpoints (requires MERCHANT role)
                 .requestMatchers("/api/auth/merchant/**").hasRole("MERCHANT")

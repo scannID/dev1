@@ -1,5 +1,7 @@
 // API Client for ScanIT Backend
-// Base configuration and utilities
+// Attaches Keycloak JWT when available
+
+import keycloak from '../keycloak'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
 
@@ -7,11 +9,31 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: unknown
   ) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  try {
+    if (keycloak.authenticated) {
+      // Refresh if token expires within 30s
+      await keycloak.updateToken(30)
+      if (keycloak.token) {
+        headers.Authorization = `Bearer ${keycloak.token}`
+      }
+    }
+  } catch {
+    // Proceed without token — public endpoints still work
+  }
+
+  return headers
 }
 
 async function fetchApi<T>(
@@ -19,18 +41,19 @@ async function fetchApi<T>(
   options?: RequestInit
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
-  
+  const authHeaders = await getAuthHeaders()
+
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...authHeaders,
         ...options?.headers,
       },
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null)
+      const errorData = await response.json().catch(() => null) as { message?: string } | null
       throw new ApiError(
         errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
         response.status,
@@ -38,7 +61,6 @@ async function fetchApi<T>(
       )
     }
 
-    // Handle 204 No Content
     if (response.status === 204) {
       return {} as T
     }
@@ -57,19 +79,19 @@ async function fetchApi<T>(
 
 export const api = {
   get: <T>(endpoint: string) => fetchApi<T>(endpoint),
-  
-  post: <T>(endpoint: string, data: any) =>
+
+  post: <T>(endpoint: string, data?: unknown) =>
     fetchApi<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data !== undefined ? JSON.stringify(data) : undefined,
     }),
-  
-  patch: <T>(endpoint: string, data: any) =>
+
+  patch: <T>(endpoint: string, data: unknown) =>
     fetchApi<T>(endpoint, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-  
+
   delete: <T>(endpoint: string) =>
     fetchApi<T>(endpoint, {
       method: 'DELETE',

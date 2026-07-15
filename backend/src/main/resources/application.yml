@@ -42,7 +42,7 @@ server:
   port: 4000
 
 scanit:
-  scan-base-url: https://scanit.app
+  scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
 
 keycloak:
   server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}

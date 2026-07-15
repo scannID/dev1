@@ -20,8 +20,8 @@ See [KEYCLOAK_QUICK_START.md](KEYCLOAK_QUICK_START.md) for detailed setup.
 
 **TL;DR:**
 1. Open http://localhost:8080/admin (admin / admin)
-2. Create clients: `scanny-client` and `superadmin`
-3. Create test user: `testuser` / `password`
+2. Run `./setup-dev-test-merchant.sh` (creates scanny realm user + MERCHANT role)
+3. Or manually create clients: `scanny-client` and `superadmin`
 
 ### 3. Start Backend API
 ```bash

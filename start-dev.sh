@@ -28,6 +28,13 @@ until curl -s http://localhost:8080 > /dev/null; do
 done
 echo "✅ Keycloak is ready!"
 
+# Optional: bootstrap dev merchant user (Keycloak only — DB row created on first /me login)
+if [ -x "./setup-dev-test-merchant.sh" ]; then
+  echo ""
+  echo "👤 Ensuring dev test merchant user (testuser + MERCHANT role)..."
+  ./setup-dev-test-merchant.sh || echo "⚠️  Could not setup test merchant — run ./setup-dev-test-merchant.sh manually"
+fi
+
 # Test PostgreSQL connection
 echo ""
 echo "🔌 Testing database connection..."
