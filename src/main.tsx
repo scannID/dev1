@@ -57,20 +57,11 @@ if (customerRoute) {
       return saved ? JSON.parse(saved) : false
     })
 
-    // Restore session only if THIS app's flag is set
+    // Always open on landing after reload/start.
+    // User explicitly enters app again via "Get Started".
     useEffect(() => {
-      const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
-      if (!hadSession) return
-
-      initKeycloak()
-        .then((authenticated) => {
-          if (authenticated) {
-            setView('app')
-          } else {
-            sessionStorage.removeItem(SESSION_KEY)
-          }
-        })
-        .catch(() => sessionStorage.removeItem(SESSION_KEY))
+      sessionStorage.removeItem(SESSION_KEY)
+      setView('landing')
     }, [])
 
     useEffect(() => {
@@ -107,11 +98,24 @@ if (customerRoute) {
       }
     }
 
+    function handleBackToLanding() {
+      sessionStorage.removeItem(SESSION_KEY)
+      setView('landing')
+    }
+
     const kcUsername = keycloak.authenticated && keycloak.tokenParsed
       ? (keycloak.tokenParsed.name || keycloak.tokenParsed.preferred_username || keycloak.tokenParsed.email || '')
       : ''
 
-    if (view === 'app') return <App onLogout={handleLogout} kcUsername={kcUsername} />
+    if (view === 'app') {
+      return (
+        <App
+          onLogout={handleLogout}
+          onBackToLanding={handleBackToLanding}
+          kcUsername={kcUsername}
+        />
+      )
+    }
     if (view === 'ticket') return <EventTicketPage onBack={() => setView('landing')} />
     return (
       <LandingPage

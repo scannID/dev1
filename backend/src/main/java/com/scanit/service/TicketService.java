@@ -9,25 +9,34 @@ import com.scanit.model.enums.ScanResult;
 import com.scanit.model.enums.TicketStatus;
 import com.scanit.repository.TicketRepository;
 import com.scanit.repository.TicketScanRepository;
+import com.scanit.websocket.TicketStatsWebSocketHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final TicketScanRepository ticketScanRepository;
+    private final TicketStatsWebSocketHandler ticketStatsWebSocketHandler;
 
     @Value("${app.customer-url:https://scanit.app}")
     private String customerUrl;
 
-    public TicketService(TicketRepository ticketRepository, TicketScanRepository ticketScanRepository) {
+    public TicketService(
+        TicketRepository ticketRepository,
+        TicketScanRepository ticketScanRepository,
+        TicketStatsWebSocketHandler ticketStatsWebSocketHandler
+    ) {
         this.ticketRepository = ticketRepository;
         this.ticketScanRepository = ticketScanRepository;
+        this.ticketStatsWebSocketHandler = ticketStatsWebSocketHandler;
     }
 
     @Transactional
@@ -51,6 +60,7 @@ public class TicketService {
         ticket.setPaymentStatus(PaymentStatus.Unpaid);
 
         ticket = ticketRepository.save(ticket);
+        broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
     }
 
@@ -79,6 +89,24 @@ public class TicketService {
     public List<TicketResponse> getTicketsByEvent(String eventName) {
         return ticketRepository.findByEventName(eventName).stream()
             .map(ticket -> TicketResponse.from(ticket, customerUrl))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketDtos.TicketEventStats> getTicketStats(String search) {
+        String normalizedSearch = search == null ? "" : search.trim().toLowerCase();
+        return ticketRepository.findAll().stream()
+            .filter(ticket -> normalizedSearch.isEmpty()
+                || (ticket.getEventName() != null && ticket.getEventName().toLowerCase().contains(normalizedSearch)))
+            .collect(Collectors.groupingBy(ticket -> ticket.getEventName() == null ? "Untitled Event" : ticket.getEventName()))
+            .entrySet()
+            .stream()
+            .map(entry -> new TicketDtos.TicketEventStats(
+                entry.getKey(),
+                entry.getValue().size(),
+                entry.getValue().stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Paid).count()
+            ))
+            .sorted(Comparator.comparing(TicketDtos.TicketEventStats::eventName))
             .toList();
     }
 
@@ -137,6 +165,7 @@ public class TicketService {
         scan.setScanResult(result);
         ticketScanRepository.save(scan);
         ticketRepository.save(ticket);
+        broadcastStatsUpdate();
 
         return new TicketDtos.ScanValidationResponse(
             valid,
@@ -159,6 +188,7 @@ public class TicketService {
         }
         
         ticket = ticketRepository.save(ticket);
+        broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
     }
 
@@ -174,7 +204,12 @@ public class TicketService {
         ticket.setUpdatedAt(Instant.now());
         
         ticket = ticketRepository.save(ticket);
+        broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
+    }
+
+    private void broadcastStatsUpdate() {
+        ticketStatsWebSocketHandler.broadcastTicketStats(getTicketStats(null));
     }
 
     private String generateTicketId() {

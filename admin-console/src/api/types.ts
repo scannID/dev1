@@ -187,3 +187,9 @@ export interface RevenueBreakdownResponse {
 export interface SystemHealthResponse {
   health: SystemHealth
 }
+
+export interface TicketEventStats {
+  eventName: string
+  totalTickets: number
+  purchasedTickets: number
+}

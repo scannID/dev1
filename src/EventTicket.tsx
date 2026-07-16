@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
+import { ticketsApi } from './api/services'
+import type { TicketStats } from './api/types'
 
 /* ─── Tokens ────────────────────────────────────────────────────────── */
 const C = {
-  dark:    '#14201d',
-  darker:  '#0d1612',
+  dark:    'var(--input)',
+  darker:  'var(--card)',
   teal:    '#0f766e',
   tealLt:  '#14b8a6',
-  border:  '#1e332e',
-  muted:   '#6b9e96',
-  white:   '#ffffff',
+  border:  'var(--border)',
+  muted:   'var(--muted-foreground)',
+  white:   'var(--foreground)',
 }
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
@@ -363,7 +365,33 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
 }
 
 /* ─── Ticket output screen ──────────────────────────────────────────── */
-function TicketOutput({ data, qr, onBack }: { data: TicketData; qr: string; onBack: () => void }) {
+function TicketOutput({
+  data,
+  qr,
+  onBack,
+  onRevoke,
+  revoking,
+  revokeMessage,
+  createdEventStats,
+  statsSearch,
+  onStatsSearchChange,
+  filteredStats,
+  statsLoading,
+  statsError,
+}: {
+  data: TicketData
+  qr: string
+  onBack: () => void
+  onRevoke: (ticketId: string) => Promise<void>
+  revoking: boolean
+  revokeMessage: string | null
+  createdEventStats: TicketStats | null
+  statsSearch: string
+  onStatsSearchChange: (value: string) => void
+  filteredStats: TicketStats[]
+  statsLoading: boolean
+  statsError: string | null
+}) {
   // If multiple classes, allow switching which class to preview/print
   const [previewClass, setPreviewClass] = useState(data.ticketClasses[0]?.name || '')
 
@@ -379,10 +407,25 @@ function TicketOutput({ data, qr, onBack }: { data: TicketData; qr: string; onBa
         <button onClick={onBack} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.muted, padding: '8px 18px', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
           ← Edit
         </button>
-        <button onClick={() => window.print()} style={{ background: C.teal, border: 'none', color: C.white, padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          🖨️ Print / Save PDF
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            disabled={revoking}
+            onClick={() => onRevoke(data.ticketId)}
+            style={{ background: '#7f1d1d', border: 'none', color: '#fff', padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: revoking ? 'wait' : 'pointer', opacity: revoking ? 0.8 : 1 }}
+          >
+            {revoking ? 'Revoking...' : 'Revoke ticket'}
+          </button>
+          <button onClick={() => window.print()} style={{ background: C.teal, border: 'none', color: C.white, padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            🖨️ Print / Save PDF
+          </button>
+        </div>
       </div>
+      {revokeMessage && (
+        <div className="no-print" style={{ width: '100%', maxWidth: 560, marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${C.border}`, color: C.white, background: C.darker, fontSize: 13 }}>
+          {revokeMessage}
+        </div>
+      )}
 
       {/* Class switcher — only shown if multiple classes */}
       {data.ticketClasses.length > 1 && (
@@ -419,6 +462,39 @@ function TicketOutput({ data, qr, onBack }: { data: TicketData; qr: string; onBa
       <p className="no-print" style={{ color: C.muted, fontSize: 13, marginTop: 20, textAlign: 'center', maxWidth: 480 }}>
         Use the class switcher above to preview and print each ticket class separately. Each has a unique QR code.
       </p>
+
+      <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 20, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
+        <p style={{ margin: '0 0 8px', color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Purchased tickets
+        </p>
+        <p style={{ margin: '0 0 14px', color: C.muted, fontSize: 13 }}>
+          {createdEventStats
+            ? `${createdEventStats.eventName}: ${createdEventStats.purchasedTickets}/${createdEventStats.totalTickets} purchased`
+            : 'Create a ticket to see purchase totals for this event.'}
+        </p>
+
+        <input
+          type="text"
+          placeholder="Search event name"
+          value={statsSearch}
+          onChange={(e) => onStatsSearchChange(e.target.value)}
+          style={{ ...inp(), marginBottom: 10 }}
+        />
+
+        {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
+        {statsError && !statsLoading && <p style={{ margin: 0, color: '#f87171', fontSize: 12 }}>{statsError}</p>}
+        {!statsLoading && !statsError && (
+          <div style={{ display: 'grid', gap: 8 }}>
+            {filteredStats.slice(0, 6).map((row) => (
+              <div key={row.eventName} style={{ display: 'flex', justifyContent: 'space-between', background: C.dark, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px' }}>
+                <span style={{ color: C.white, fontSize: 13 }}>{row.eventName}</span>
+                <strong style={{ color: C.tealLt, fontSize: 13 }}>{row.purchasedTickets}/{row.totalTickets}</strong>
+              </div>
+            ))}
+            {filteredStats.length === 0 && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>No events found.</p>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -433,7 +509,25 @@ type FormState = {
   tables: TableOption[]
 }
 
-function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => void; onBack: () => void }) {
+function TicketForm({
+  onGenerate,
+  onBack,
+  ticketStats,
+  statsLoading,
+  statsError,
+  statsSearch,
+  onStatsSearchChange,
+  filteredStats,
+}: {
+  onGenerate: (d: TicketData) => Promise<void>
+  onBack: () => void
+  ticketStats: TicketStats[]
+  statsLoading: boolean
+  statsError: string | null
+  statsSearch: string
+  onStatsSearchChange: (value: string) => void
+  filteredStats: TicketStats[]
+}) {
   const [form, setForm] = useState<FormState>({
     eventName: '',
     date: '',
@@ -444,6 +538,13 @@ function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => voi
   })
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [touched, setTouched] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const draftEventStats = useMemo(() => {
+    const eventName = form.eventName.trim().toLowerCase()
+    if (!eventName) return null
+    return ticketStats.find((row) => row.eventName.toLowerCase() === eventName) ?? null
+  }, [form.eventName, ticketStats])
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(f => ({ ...f, [k]: v }))
@@ -460,21 +561,27 @@ function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => voi
     return e
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setTouched(true)
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
-    onGenerate({
-      eventName: form.eventName,
-      date: form.date,
-      paymentDetails: form.paymentDetails,
-      template: form.template,
-      ticketClasses: form.ticketClasses,
-      tables: form.tables,
-      ticketId: uid(),
-      selectedClass: form.ticketClasses[0]?.name || '',
-    })
+    try {
+      setSubmitting(true)
+      await onGenerate({
+        eventName: form.eventName,
+        date: form.date,
+        paymentDetails: form.paymentDetails,
+        template: form.template,
+        ticketClasses: form.ticketClasses,
+        tables: form.tables,
+        ticketId: uid(),
+        selectedClass: form.ticketClasses[0]?.name || '',
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const fieldInp = (field: string): React.CSSProperties => ({
@@ -484,76 +591,186 @@ function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => voi
   })
 
   return (
-    <div style={{ minHeight: '100vh', background: C.dark, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px 60px', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--background)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 18px 56px', fontFamily: "'Inter', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'); * { box-sizing: border-box; }`}</style>
 
-      <div style={{ textAlign: 'center', marginBottom: 36, width: '100%' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 16, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+      <div style={{ textAlign: 'center', marginBottom: 24, width: '100%', maxWidth: 1100 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.tealLt, display: 'inline-block' }} />
           No sign-in required
         </div>
-        <h1 style={{ color: C.white, fontSize: 'clamp(26px,5vw,38px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 10px' }}>Create Event Ticket</h1>
-        <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.6, margin: 0 }}>Set your event details, ticket classes, and payment info — then generate a printable QR ticket.</p>
+        <h1 style={{ color: C.white, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 8px' }}>Create Event Ticket</h1>
+        <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, margin: 0 }}>Set event details, class pricing, and payment destination, then generate a clean printable QR ticket.</p>
+
+        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, borderRadius: 22, padding: '10px 16px', background: C.darker, minWidth: 340 }}>
+            <span style={{ fontSize: 11, color: C.muted, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Purchased</span>
+            <span style={{ color: C.tealLt, fontSize: 18, fontWeight: 900 }}>
+            {draftEventStats
+              ? `${draftEventStats.purchasedTickets}/${draftEventStats.totalTickets}`
+              : form.eventName.trim()
+                ? '0/0'
+                : 'Select event'}
+            </span>
+          </div>
+        </div>
+
+        {statsLoading && <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 11 }}>Refreshing ticket stats...</p>}
+        {statsError && !statsLoading && <p style={{ margin: '8px 0 0', color: '#f87171', fontSize: 11 }}>{statsError}</p>}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: '1400px', background: C.darker, border: `1px solid ${C.border}`, borderRadius: 18, padding: '32px', display: 'grid', gap: 24, position: 'relative' }}>
+      <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: '1100px', background: C.darker, border: `1px solid ${C.border}`, borderRadius: 20, padding: '22px', display: 'grid', gap: 18, position: 'relative', boxShadow: '0 24px 60px rgba(0,0,0,0.18)' }}>
         {/* Back button inside form */}
-        <div style={{ position: 'absolute', top: '32px', left: '32px' }}>
-          <button type="button" onClick={onBack} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.muted, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ position: 'absolute', top: '18px', left: '18px' }}>
+          <button type="button" onClick={onBack} style={{ background: C.dark, border: `1px solid ${C.border}`, color: C.muted, padding: '8px 14px', borderRadius: 10, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
             ← Back to Scanny
           </button>
         </div>
 
         {/* Add padding to account for back button */}
-        <div style={{ height: '24px' }} />
+        <div style={{ height: '42px' }} />
+
+        {/* Live ticket purchases widget (create page) */}
+        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 16px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+            <div>
+              <div style={{ color: C.tealLt, fontSize: 13, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Live ticket purchases
+              </div>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
+                Search by event name (updates live)
+              </div>
+            </div>
+            <div style={{ color: C.muted, fontSize: 12, fontWeight: 700 }}>
+              {filteredStats.length ? `${filteredStats.length} event(s)` : '—'}
+            </div>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search event name (e.g. Kampala Rooftop Bash 2025)"
+            value={statsSearch}
+            onChange={(e) => onStatsSearchChange(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: 12,
+              fontSize: 14,
+              fontFamily: 'inherit',
+              background: C.dark,
+              color: C.white,
+              border: `1.5px solid ${C.border}`,
+              outline: 'none',
+              marginBottom: 12,
+            }}
+          />
+
+          {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
+          {statsError && !statsLoading && <p style={{ margin: 0, color: '#f87171', fontSize: 12 }}>{statsError}</p>}
+
+          {!statsLoading && !statsError && (
+            <div style={{ maxHeight: 210, overflow: 'auto', paddingRight: 6 }}>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {filteredStats.slice(0, 10).map((row) => (
+                  <div
+                    key={row.eventName}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: C.darker,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 12,
+                      padding: '10px 12px',
+                    }}
+                  >
+                    <span style={{ color: C.white, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 10 }}>
+                      {row.eventName}
+                    </span>
+                    <strong style={{ color: C.tealLt, fontSize: 14, fontWeight: 1000, whiteSpace: 'nowrap' }}>
+                      {row.purchasedTickets}/{row.totalTickets}
+                    </strong>
+                  </div>
+                ))}
+                {filteredStats.length === 0 && (
+                  <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>No events found.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Row 1: Event name + Date side by side ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          <label style={{ display: 'grid', gap: 6 }}>
+        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
             <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event name</span>
             <input style={fieldInp('eventName')} type="text" placeholder="e.g. Kampala Rooftop Bash 2025" value={form.eventName} onChange={e => set('eventName', e.target.value)} />
             {touched && errors.eventName && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.eventName}</span>}
           </label>
-          <label style={{ display: 'grid', gap: 6 }}>
+          <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
             <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event date</span>
             <input style={{ ...fieldInp('date'), colorScheme: 'dark' }} type="date" value={form.date} onChange={e => set('date', e.target.value)} />
             {touched && errors.date && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.date}</span>}
           </label>
+
+          <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
+            <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Payment details — where buyers send money</span>
+            <input
+              style={fieldInp('paymentDetails')}
+              type="text"
+              placeholder="e.g. MTN 0771234567 (John D.) or Stanbic 9030012345678"
+              value={form.paymentDetails}
+              onChange={e => set('paymentDetails', e.target.value)}
+            />
+            <span style={{ color: '#6b9e96', fontSize: 11 }}>Mobile Money number, bank account, or Airtel Money. This prints on every ticket.</span>
+            {touched && errors.paymentDetails && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.paymentDetails}</span>}
+          </label>
         </div>
 
-        {/* ── Row 2: Payment details full width ── */}
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Payment details — where buyers send money</span>
-          <input
-            style={fieldInp('paymentDetails')}
-            type="text"
-            placeholder="e.g. MTN 0771234567 (John D.) or Stanbic 9030012345678"
-            value={form.paymentDetails}
-            onChange={e => set('paymentDetails', e.target.value)}
-          />
-          <span style={{ color: '#6b9e96', fontSize: 11 }}>Mobile Money number, bank account, or Airtel Money — this prints on every ticket so buyers know where to pay.</span>
-          {touched && errors.paymentDetails && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.paymentDetails}</span>}
-        </label>
-
-        <div style={{ borderTop: `1px solid ${C.border}` }} />
+        <div style={{ borderTop: `1px solid ${C.border}`, opacity: 0.55 }} />
 
         {/* ── Row 3: Ticket classes + Tables side by side ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'start' }}>
-          <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, alignItems: 'start' }}>
+          <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
             <ClassesEditor classes={form.ticketClasses} onChange={v => set('ticketClasses', v)} />
             {touched && errors.ticketClasses && <span style={{ color: '#f87171', fontSize: 12, marginTop: 4, display: 'block' }}>{errors.ticketClasses}</span>}
           </div>
-          <TablesEditor tables={form.tables} onChange={v => set('tables', v)} />
+          <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+            <TablesEditor tables={form.tables} onChange={v => set('tables', v)} />
+          </div>
         </div>
 
-        <div style={{ borderTop: `1px solid ${C.border}` }} />
+        <div style={{ borderTop: `1px solid ${C.border}`, opacity: 0.55 }} />
 
         {/* ── Row 4: Template picker full width ── */}
-        <TemplatePicker value={form.template} onChange={t => set('template', t)} formData={{ ...form, selectedClass: form.ticketClasses[0]?.name }} />
+        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
+          <TemplatePicker value={form.template} onChange={t => set('template', t)} formData={{ ...form, selectedClass: form.ticketClasses[0]?.name }} />
+        </div>
 
-        <button type="submit" style={{ marginTop: 4, background: C.teal, color: C.white, border: 'none', borderRadius: 10, padding: '14px', fontSize: 16, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          Generate QR Ticket
-          <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            marginTop: 2,
+            background: 'linear-gradient(135deg, #0f766e, #14b8a6)',
+            color: C.white,
+            border: 'none',
+            borderRadius: 12,
+            padding: '14px',
+            fontSize: 16,
+            fontWeight: 800,
+            cursor: submitting ? 'wait' : 'pointer',
+            opacity: submitting ? 0.8 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          {submitting ? 'Generating QR code...' : 'Generate QR Ticket'}
+          {!submitting && (
+            <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          )}
         </button>
       </form>
     </div>
@@ -564,32 +781,143 @@ function TicketForm({ onGenerate, onBack }: { onGenerate: (d: TicketData) => voi
 export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [qr, setQr] = useState('')
+  const [stats, setStats] = useState<TicketStats[]>([])
+  const [statsSearch, setStatsSearch] = useState('')
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState(false)
+  const [revokeMessage, setRevokeMessage] = useState<string | null>(null)
+  const [lastCreatedEventName, setLastCreatedEventName] = useState<string | null>(null)
+
+  async function loadStats(search?: string) {
+    try {
+      setStatsLoading(true)
+      setStatsError(null)
+      const data = await ticketsApi.getStats(search)
+      setStats(data)
+    } catch (err) {
+      setStatsError(err instanceof Error ? err.message : 'Failed to load ticket stats')
+    } finally {
+      setStatsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadStats().catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:4000/ws/tickets/stats')
+    ws.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data) as { type?: string; stats?: TicketStats[] }
+        if (parsed.type === 'TICKET_STATS_UPDATED' && Array.isArray(parsed.stats)) {
+          setStats(parsed.stats)
+        }
+      } catch {
+        // Ignore malformed messages and keep polling/manual refresh behavior.
+      }
+    }
+    return () => ws.close()
+  }, [])
+
+  const filteredStats = useMemo(() => {
+    const query = statsSearch.trim().toLowerCase()
+    if (!query) return stats
+    return stats.filter((row) => row.eventName.toLowerCase().includes(query))
+  }, [stats, statsSearch])
+
+  const createdEventStats = useMemo(() => {
+    if (!lastCreatedEventName) return null
+    return stats.find((row) => row.eventName === lastCreatedEventName) ?? null
+  }, [lastCreatedEventName, stats])
 
   async function handleGenerate(data: TicketData) {
-    const payload = JSON.stringify({
-      id: data.ticketId,
-      event: data.eventName,
-      template: data.template,
-      date: data.date,
-      classes: data.ticketClasses,
-      tables: data.tables,
-      payTo: data.paymentDetails,
-      issued: new Date().toISOString(),
-    })
     try {
-      const url = await QRCode.toDataURL(payload, { color: { dark: '#0d1612', light: '#ffffff' }, margin: 1, width: 280, errorCorrectionLevel: 'M' })
+      setRevokeMessage(null)
+      // Create one reusable event QR that can be scanned by all attendees
+      // until the creator revokes/cancels it.
+      const createdTicket = await ticketsApi.create({
+        ticketType: data.ticketClasses[0]?.name || 'EVENT',
+        eventName: data.eventName,
+        eventDate: new Date(`${data.date}T00:00:00.000Z`).toISOString(),
+        price: Number(data.ticketClasses[0]?.fee || 0),
+        currency: 'UGX',
+        usageLimit: 1000000000,
+        issuedBy: 'merchant-web',
+        metadata: JSON.stringify({
+          reusable: true,
+          template: data.template,
+          payTo: data.paymentDetails,
+          ticketClasses: data.ticketClasses,
+          tables: data.tables,
+        }),
+      })
+
+      const url = await QRCode.toDataURL(createdTicket.qrCodeUrl, {
+        color: { dark: '#0d1612', light: '#ffffff' },
+        margin: 1,
+        width: 280,
+        errorCorrectionLevel: 'M',
+      })
       setQr(url)
-    } catch { /* QR optional */ }
-    setTicket(data)
+      setLastCreatedEventName(data.eventName)
+      setTicket({ ...data, ticketId: createdTicket.id })
+      await loadStats(data.eventName)
+    } catch (err) {
+      setStatsError(err instanceof Error ? err.message : 'Failed to create ticket')
+      throw err
+    }
+  }
+
+  async function handleRevoke(ticketId: string) {
+    try {
+      setRevoking(true)
+      setRevokeMessage(null)
+      await ticketsApi.updateStatus(ticketId, 'Cancelled')
+      setRevokeMessage('Ticket revoked successfully. This QR is now disabled.')
+      await loadStats(lastCreatedEventName ?? undefined)
+    } catch (err) {
+      setRevokeMessage(err instanceof Error ? err.message : 'Failed to revoke ticket')
+    } finally {
+      setRevoking(false)
+    }
   }
 
   if (ticket) {
-    return <TicketOutput data={ticket} qr={qr} onBack={() => { setTicket(null); setQr('') }} />
+    return (
+      <TicketOutput
+        data={ticket}
+        qr={qr}
+        onBack={() => {
+          setTicket(null)
+          setQr('')
+        }}
+        onRevoke={handleRevoke}
+        revoking={revoking}
+        revokeMessage={revokeMessage}
+        createdEventStats={createdEventStats}
+        statsSearch={statsSearch}
+        onStatsSearchChange={setStatsSearch}
+        filteredStats={filteredStats}
+        statsLoading={statsLoading}
+        statsError={statsError}
+      />
+    )
   }
 
   return (
     <div>
-      <TicketForm onGenerate={handleGenerate} onBack={onBack} />
+      <TicketForm
+        onGenerate={handleGenerate}
+        onBack={onBack}
+        ticketStats={stats}
+        statsLoading={statsLoading}
+        statsError={statsError}
+        statsSearch={statsSearch}
+        onStatsSearchChange={setStatsSearch}
+        filteredStats={filteredStats}
+      />
     </div>
   )
 }

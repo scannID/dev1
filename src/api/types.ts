@@ -210,3 +210,54 @@ export interface MenuResponse {
   business: Business
   items: CatalogItem[]
 }
+
+export interface CreateTicketRequest {
+  ticketType: string
+  eventName: string
+  eventDate: string
+  holderName?: string
+  holderPhone?: string
+  holderEmail?: string
+  price: number
+  currency?: string
+  usageLimit: number
+  expiresAt?: string
+  issuedBy?: string
+  metadata?: string
+}
+
+export interface Ticket {
+  id: string
+  qrToken: string
+  ticketType: string
+  eventName: string
+  eventDate: string
+  holderName: string
+  holderPhone: string
+  holderEmail: string
+  price: number
+  currency: string
+  status: 'Active' | 'Redeemed' | 'Cancelled' | 'Expired'
+  usageLimit: number
+  usageCount: number
+  expiresAt?: string
+  paymentReference?: string
+  paymentStatus: 'Unpaid' | 'Paid' | 'Refunded'
+  issuedBy?: string
+  metadata?: string
+  createdAt: string
+  updatedAt?: string
+  redeemedAt?: string
+  canBeUsed: boolean
+  qrCodeUrl: string
+}
+
+export interface UpdateTicketStatusRequest {
+  status: Ticket['status']
+}
+
+export interface TicketStats {
+  eventName: string
+  totalTickets: number
+  purchasedTickets: number
+}

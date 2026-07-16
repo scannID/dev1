@@ -142,7 +142,15 @@ function customerUrl(business: Business) {
   return `${SCAN_BASE_URL}/b/${business.id}?qr=${business.qrToken}`
 }
 
-function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: string }) {
+function App({
+  onLogout,
+  onBackToLanding,
+  kcUsername,
+}: {
+  onLogout?: () => void
+  onBackToLanding?: () => void
+  kcUsername?: string
+}) {
   const {
     businesses,
     orders,
@@ -235,6 +243,17 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
     .filter((order) => order.paymentStatus === 'Paid')
     .reduce((sum, _order) => sum + _order.total, 0)
   const availableItems = (business.items ?? []).filter((item) => item.available).length
+  const hasNetworkIssue = Boolean(
+    sessionError && /failed to fetch|network error|http 0/i.test(sessionError),
+  )
+
+  useEffect(() => {
+    if (!business.id || !hasNetworkIssue || !onBackToLanding) return
+    const timeoutId = window.setTimeout(() => {
+      onBackToLanding()
+    }, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [business.id, hasNetworkIssue, onBackToLanding])
 
   async function handleCreateCatalogItem(data: {
     name: string
@@ -380,6 +399,14 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
     }
   }
 
+  function handleBackToLanding() {
+    if (onBackToLanding) {
+      onBackToLanding()
+      return
+    }
+    handleLogout()
+  }
+
   if (sessionLoading) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
@@ -389,12 +416,21 @@ function App({ onLogout, kcUsername }: { onLogout?: () => void; kcUsername?: str
   }
 
   if (!business.id) {
+    if (hasNetworkIssue) {
+      return null
+    }
+
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', gap: '1rem' }}>
         <p>{sessionError || 'No business linked to this merchant yet.'}</p>
         <button className="primary-action" type="button" onClick={() => refreshBusinesses()}>
           Retry
         </button>
+        {hasNetworkIssue && (
+          <button type="button" onClick={handleBackToLanding}>
+            Back to landing
+          </button>
+        )}
         <button type="button" onClick={handleLogout}>Log out</button>
       </main>
     )

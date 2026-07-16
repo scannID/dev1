@@ -22,6 +22,10 @@ import type {
   QrCodeResponse,
   OnboardingStatusResponse,
   MenuResponse,
+  CreateTicketRequest,
+  Ticket,
+  TicketStats,
+  UpdateTicketStatusRequest,
 } from './types'
 
 export const merchantAuthApi = {
@@ -151,11 +155,32 @@ export const ordersApi = {
   },
 }
 
+export const ticketsApi = {
+  create: async (data: CreateTicketRequest): Promise<Ticket> => {
+    return api.post<Ticket>('/tickets', data)
+  },
+
+  list: async (eventName?: string): Promise<Ticket[]> => {
+    const suffix = eventName ? `?eventName=${encodeURIComponent(eventName)}` : ''
+    return api.get<Ticket[]>(`/tickets${suffix}`)
+  },
+
+  getStats: async (search?: string): Promise<TicketStats[]> => {
+    const suffix = search ? `?search=${encodeURIComponent(search)}` : ''
+    return api.get<TicketStats[]>(`/tickets/stats${suffix}`)
+  },
+
+  updateStatus: async (ticketId: string, status: UpdateTicketStatusRequest['status']): Promise<Ticket> => {
+    return api.patch<Ticket>(`/tickets/${ticketId}/status`, { status })
+  },
+}
+
 export const scanitApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
   catalog: catalogApi,
   orders: ordersApi,
+  tickets: ticketsApi,
 }
 
 export default scanitApi

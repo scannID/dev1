@@ -4,6 +4,7 @@ import com.scanit.model.enums.PaymentStatus;
 import com.scanit.model.enums.ScanResult;
 import com.scanit.model.enums.TicketStatus;
 import java.time.Instant;
+import java.util.List;
 
 public class TicketDtos {
 
@@ -60,5 +61,16 @@ public class TicketDtos {
         ScanResult result,
         String message,
         TicketResponse ticket
+    ) {}
+
+    public record TicketEventStats(
+        String eventName,
+        long totalTickets,
+        long purchasedTickets
+    ) {}
+
+    public record TicketStatsUpdate(
+        String type,
+        List<TicketEventStats> stats
     ) {}
 }

@@ -25,6 +25,7 @@ import type {
   RevenueBreakdownResponse,
   SystemHealth,
   SystemHealthResponse,
+  TicketEventStats,
 } from './types'
 
 // ============================================================================
@@ -142,6 +143,17 @@ export const systemApi = {
 }
 
 // ============================================================================
+// TICKETS API
+// ============================================================================
+
+export const ticketsApi = {
+  getStats: async (search?: string): Promise<TicketEventStats[]> => {
+    const suffix = search ? `?search=${encodeURIComponent(search)}` : ''
+    return api.get<TicketEventStats[]>(`/tickets/stats${suffix}`)
+  },
+}
+
+// ============================================================================
 // Combined Admin API Export
 // ============================================================================
 
@@ -151,6 +163,7 @@ export const adminApi = {
   orders: ordersApi,
   analytics: analyticsApi,
   system: systemApi,
+  tickets: ticketsApi,
 }
 
 export default adminApi
