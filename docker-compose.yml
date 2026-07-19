@@ -1,0 +1,75 @@
+# Canonical local infrastructure stack. Run the API and Vite frontends on the
+# host for fast reloads (API :4000, merchant :5173, admin :5174).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-scanny}
+      POSTGRES_USER: ${POSTGRES_USER:-scanny}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scanny-local}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - scanny_pg_data:/var/lib/postgresql/data
+    networks:
+      - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-scanny-local}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - scanny_redis_data:/data
+    networks:
+      - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${POSTGRES_DB:-scanny}
+      KC_DB_USERNAME: ${POSTGRES_USER:-scanny}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-scanny-local}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    networks:
+      - scanny-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+
+volumes:
+  scanny_pg_data:
+  scanny_redis_data:
+
+networks:
+  scanny-network:
+    name: scanny-network
+    driver: bridge

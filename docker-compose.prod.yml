@@ -1,0 +1,168 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - scanny-network
+    depends_on:
+      api:
+        condition: service_healthy
+      merchant:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 4000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      KEYCLOAK_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URI: https://auth.scanny.app/realms/${KEYCLOAK_REALM:-scanny}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-scanny}/protocol/openid-connect/certs
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-scanny-backend}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?KEYCLOAK_BACKEND_CLIENT_SECRET is required}
+      SCAN_BASE_URL: https://scanny.app
+      SCANNY_CORS_ORIGIN_PATTERNS: https://scanny.app,https://admin.scanny.app
+    expose:
+      - "4000"
+    networks:
+      - scanny-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  merchant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api.scanny.app/api
+        VITE_SCAN_BASE_URL: https://scanny.app
+        VITE_WS_BASE_URL: wss://api.scanny.app
+        VITE_KEYCLOAK_URL: https://auth.scanny.app
+        VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-scanny-client}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - scanny-network
+
+  admin:
+    build:
+      context: ./admin-console
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api.scanny.app/api
+        VITE_KEYCLOAK_URL: https://auth.scanny.app
+        VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_ADMIN_KEYCLOAK_CLIENT_ID:-scanny-admin}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - scanny-network
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - scanny_pg_data:/var/lib/postgresql/data
+    networks:
+      - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - scanny_redis_data:/data
+    networks:
+      - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    restart: unless-stopped
+    command: ["start"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${POSTGRES_DB:?POSTGRES_DB is required}
+      KC_DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: https://auth.scanny.app
+      KC_PROXY_HEADERS: xforwarded
+    expose:
+      - "8080"
+    networks:
+      - scanny-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 10
+
+volumes:
+  scanny_pg_data:
+  scanny_redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  scanny-network:
+    name: scanny-network
+    driver: bridge

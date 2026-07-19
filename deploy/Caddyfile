@@ -1,0 +1,31 @@
+(scanny_common) {
+	encode zstd gzip
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}
+
+scanny.app {
+	import scanny_common
+	reverse_proxy merchant:80
+}
+
+admin.scanny.app {
+	import scanny_common
+	reverse_proxy admin:80
+}
+
+api.scanny.app {
+	import scanny_common
+	# Caddy's reverse proxy forwards WebSocket upgrade requests automatically.
+	reverse_proxy api:4000
+}
+
+auth.scanny.app {
+	import scanny_common
+	reverse_proxy keycloak:8080
+}

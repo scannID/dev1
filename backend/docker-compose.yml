@@ -1,41 +1,5 @@
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: scanit-postgres
-    environment:
-      POSTGRES_DB: scanit
-      POSTGRES_USER: scanit
-      POSTGRES_PASSWORD: scanit
-    ports:
-      - "5432:5432"
-    volumes:
-      - scanit_pg_data:/var/lib/postgresql/data
-    networks:
-      - scanit-network
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0.7
-    container_name: scanit-keycloak
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_HTTP_PORT: 8080
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
-      KC_HEALTH_ENABLED: true
-    ports:
-      - "8080:8080"
-    command:
-      - start-dev
-    networks:
-      - scanit-network
-    depends_on:
-      - postgres
-
-volumes:
-  scanit_pg_data:
-
-networks:
-  scanit-network:
-    driver: bridge
+﻿# Compatibility entry point for developers working from backend/.
+# The repository-root docker-compose.yml is the canonical local infra stack.
+name: scanny
+include:
+  - path: ../docker-compose.yml
