@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { DayPicker, getDefaultClassNames } from "react-day-picker";
+import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -17,6 +17,8 @@ function Calendar({
   formatters,
   components,
   ...props
+}: React.ComponentProps<typeof DayPicker> & {
+  buttonVariant?: React.ComponentProps<typeof Button>["variant"]
 }) {
   const defaultClassNames = getDefaultClassNames()
 
@@ -67,7 +69,7 @@ function Calendar({
         caption_label: cn("font-medium select-none", captionLayout === "label"
           ? "text-sm"
           : "flex items-center gap-1 rounded-(--cell-radius) text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground", defaultClassNames.caption_label),
-        table: "w-full border-collapse",
+        month_grid: "w-full border-collapse",
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
           "flex-1 rounded-(--cell-radius) text-[0.8rem] font-normal text-muted-foreground select-none",
@@ -147,10 +149,12 @@ function CalendarDayButton({
   modifiers,
   locale,
   ...props
+}: React.ComponentProps<typeof DayButton> & {
+  locale?: React.ComponentProps<typeof DayPicker>["locale"]
 }) {
   const defaultClassNames = getDefaultClassNames()
 
-  const ref = React.useRef(null)
+  const ref = React.useRef<HTMLButtonElement>(null)
   React.useEffect(() => {
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
