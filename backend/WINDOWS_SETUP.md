@@ -1,4 +1,4 @@
-# Running ScanIT Backend on Windows (Without Docker)
+# Running Scanny Backend on Windows (Without Docker)
 
 Since Docker may not work reliably on your Windows machine, here are alternative ways to run the backend.
 

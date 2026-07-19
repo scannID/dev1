@@ -61,7 +61,7 @@ Quick Payment Codes allow merchants/service providers to create permanent QR cod
   "paymentDestination": "+256700111222",
   "paymentDestinationType": "MobileMoney",
   "canBeUsed": true,
-  "qrCodeUrl": "https://scanit.app/pay/1c649a6b49ea4dacbb594df35ad4d94b",
+  "qrCodeUrl": "https://scanny.app/pay/1c649a6b49ea4dacbb594df35ad4d94b",
   "createdAt": "2026-07-07T09:05:03.972915Z",
   "updatedAt": null,
   "lastUsedAt": null

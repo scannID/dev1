@@ -1,4 +1,4 @@
-# ScanIT Ticketing API
+# Scanny Ticketing API
 
 One-time QR code ticketing system for events, conferences, and access control.
 
@@ -48,7 +48,7 @@ POST /api/tickets
   "status": "Active",
   "paymentStatus": "Unpaid",
   "canBeUsed": false,
-  "qrCodeUrl": "https://scanit.app/ticket/3f9b76a3387a4a8783299e8ab4ea86c6"
+  "qrCodeUrl": "https://scanny.app/ticket/3f9b76a3387a4a8783299e8ab4ea86c6"
 }
 ```
 

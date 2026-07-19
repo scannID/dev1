@@ -1,4 +1,4 @@
-# ScanIT Backend (Java + Spring Boot + PostgreSQL)
+# Scanny Backend (Java + Spring Boot + PostgreSQL)
 
 REST API for QR-linked businesses, catalog items, orders, and payments.
 
@@ -30,7 +30,7 @@ Edit `src/main/resources/application.yml`:
 | Server port | `4000` |
 | Database | `jdbc:postgresql://localhost:5432/scanit` |
 | DB user/password | `scanit` / `scanit` |
-| Customer URL base | `https://scanit.app` |
+| Customer URL base | `https://scanny.app` |
 
 ## API endpoints
 

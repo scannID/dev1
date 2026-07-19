@@ -1,6 +1,6 @@
-# ScanIT API Documentation
+# Scanny API Documentation
 
-Complete API reference for the ScanIT QR-based payment and ordering platform.
+Complete API reference for the Scanny QR-based payment and ordering platform.
 
 ## 📋 Table of Contents
 
@@ -25,7 +25,7 @@ GET /health
 Response:
 ```json
 {
-  "service": "scanit-backend",
+  "service": "scanny-backend",
   "ok": true
 }
 ```
@@ -72,7 +72,7 @@ POST /api/tickets
   "usageCount": 0,
   "usageLimit": 1,
   "canBeUsed": false,
-  "qrCodeUrl": "https://scanit.app/ticket/3f9b76a3387a4a8783299e8ab4ea86c6",
+  "qrCodeUrl": "https://scanny.app/ticket/3f9b76a3387a4a8783299e8ab4ea86c6",
   "createdAt": "2026-07-07T08:38:49.597894Z"
 }
 ```
@@ -203,7 +203,7 @@ POST /api/quick-payments/codes
   "paymentDestination": "+256700111222",
   "paymentDestinationType": "MobileMoney",
   "canBeUsed": true,
-  "qrCodeUrl": "https://scanit.app/pay/1c649a6b49ea4dacbb594df35ad4d94b",
+  "qrCodeUrl": "https://scanny.app/pay/1c649a6b49ea4dacbb594df35ad4d94b",
   "createdAt": "2026-07-07T09:05:03.972915Z"
 }
 ```
