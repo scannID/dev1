@@ -1,9 +1,4 @@
-// Admin API Types
-// TypeScript type definitions for admin API responses
-
-// ============================================================================
-// DASHBOARD TYPES
-// ============================================================================
+// Admin API Types — aligned with Spring admin DTOs
 
 export interface DashboardMetrics {
   merchants: {
@@ -26,25 +21,24 @@ export interface DashboardMetrics {
   }
 }
 
-export interface PendingOrder {
-  orderId: string
-  businessName: string
-  customerName: string
-  total: number
-  status: string
-  createdAt: string
-}
-
-export interface RecentActivity {
-  activityType: string
+export interface ActivityEvent {
+  id: string
+  type: string
+  title: string
   description: string
   timestamp: string
-  metadata?: Record<string, any>
+  icon: string
 }
 
-// ============================================================================
-// MERCHANT TYPES
-// ============================================================================
+export interface TopMerchant {
+  id: string
+  name: string
+  type: string
+  orders: number
+  revenue: number
+  currency: string
+  status: string
+}
 
 export interface Merchant {
   id: string
@@ -55,137 +49,223 @@ export interface Merchant {
   orders: number
   revenue: number
   currency: string
-  status: 'active' | 'warning' | 'suspended' | 'pending'
+  status: string
   joinedAt: string
 }
 
-export interface MerchantStats {
-  merchantId: string
-  businessName: string
-  totalOrders: number
-  totalRevenue: number
-  averageOrderValue: number
+export interface MerchantSummary {
+  total: number
+  active: number
+  pending: number
+  suspended: number
 }
 
-// ============================================================================
-// ORDER TYPES
-// ============================================================================
+export interface MerchantsListResponse {
+  merchants: Merchant[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  summary: MerchantSummary
+}
 
 export type OrderStatus = 'Pending' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled'
 export type PaymentStatus = 'Unpaid' | 'Paid' | 'Refunded'
 
 export interface AdminOrder {
   id: string
-  businessId: string
-  businessName: string
   merchantId: string
+  merchantName: string
   customerName: string
-  items: Array<{
-    id: string
-    name: string
-    price: number
-    quantity: number
-  }>
+  items: number
   total: number
-  paymentStatus: PaymentStatus
-  status: OrderStatus
+  currency: string
+  paymentStatus: PaymentStatus | string
+  status: OrderStatus | string
   createdAt: string
+  completedAt?: string | null
 }
 
-// ============================================================================
-// ANALYTICS TYPES
-// ============================================================================
+export interface OrdersListResponse {
+  orders: AdminOrder[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  summary: {
+    today: number
+    completed: number
+    pending: number
+    cancelled: number
+  }
+}
 
 export interface TicketAnalytics {
-  totalTickets: number
-  scannedTickets: number
-  activeTickets: number
-  expiredTickets: number
-  totalRevenue: number
+  summary: {
+    totalTickets: number
+    activeTickets: number
+    redeemedTickets: number
+    expiredTickets: number
+  }
+  byType: Array<{ type: string; count: number; revenue: number }>
+  scanActivity: Array<{ date: string; scans: number; successful: number; failed: number }>
 }
 
 export interface QuickPaymentAnalytics {
-  totalCodes: number
-  activeCodes: number
-  totalTransactions: number
-  totalRevenue: number
-  averageTransactionValue: number
+  summary: {
+    totalCodes: number
+    activeCodes: number
+    totalTransactions: number
+    totalRevenue: number
+  }
+  topCodes: Array<{ id: string; description: string; transactions: number; revenue: number }>
+  byCategory: Array<{ category: string; codes: number; transactions: number }>
 }
 
 export interface DeviceAnalytics {
-  totalDevices: number
-  activeDevices: number
-  devicesWithAutoPayment: number
-  averagePaymentMethodsPerDevice: number
+  summary: {
+    totalDevices: number
+    activeDevices: number
+    autoPaymentEnabled: number
+    averageTransactionsPerDevice: number
+  }
+  adoption: Array<{ date: string; newDevices: number; autoPaymentEnabled: number }>
+  topDevices: Array<{ deviceId: string; customerName: string; transactions: number; totalSpent: number }>
 }
 
-export interface RevenueBreakdown {
-  source: string
-  amount: number
-  percentage: number
+export interface RevenueOverview {
+  currentMonth: {
+    revenue: number
+    transactions: number
+    failedPayments: number
+    avgOrderValue: number
+    currency: string
+    growth: {
+      revenue: number
+      transactions: number
+      failedPayments: number
+      avgOrderValue: number
+    }
+  }
+  monthly: Array<{ month: string; revenue: number; transactions: number }>
+  paymentMethods: Array<{ method: string; percentage: number; amount: number }>
 }
 
-// ============================================================================
-// SYSTEM HEALTH TYPES
-// ============================================================================
+export interface ServiceHealth {
+  name: string
+  status: string
+  uptime: string
+  latency: number | null
+  unit: string | null
+  incidents: number | null
+}
 
 export interface SystemHealth {
-  database: {
+  services: ServiceHealth[]
+  overall: {
     status: string
-    responseTime: number
+    uptime: string
+    avgLatency: number
+    openIncidents: number
+    errorRate: number
   }
-  api: {
-    status: string
-    uptime: number
+}
+
+export interface CatalogItemRow {
+  id: string
+  name: string
+  merchant: string
+  merchantId: string
+  category: string
+  price: number
+  currency: string
+  available: boolean
+  orders: number
+}
+
+export interface CatalogListResponse {
+  items: CatalogItemRow[]
+  summary: {
+    total: number
+    available: number
+    hidden: number
+    categories: number
   }
 }
 
-// ============================================================================
-// API RESPONSE WRAPPERS
-// ============================================================================
-
-export interface DashboardMetricsResponse {
-  metrics: DashboardMetrics
+export interface UserRow {
+  id: string
+  name: string
+  email: string
+  role: string
+  orders: number
+  status: string
+  joinedAt: string
 }
 
-export interface PendingOrdersResponse {
-  orders: PendingOrder[]
+export interface UsersListResponse {
+  users: UserRow[]
+  summary: {
+    total: number
+    customers: number
+    merchants: number
+    admins: number
+  }
 }
 
-export interface RecentActivityResponse {
-  activities: RecentActivity[]
+export interface QrActivityResponse {
+  summary: {
+    totalScansToday: number
+    uniqueDevices: number
+    conversionRate: number
+    activeQrCodes: number
+  }
+  hourly: Array<{ hour: number; scans: number }>
+  topCodes: Array<{
+    merchant: string
+    merchantId: string
+    token: string
+    scans: number
+    orders: number
+    conversion: string
+  }>
 }
 
-export interface MerchantsResponse {
-  merchants: Merchant[]
+export interface AuditListResponse {
+  events: Array<{
+    id: string
+    actor: string
+    action: string
+    target: string
+    ip: string
+    timestamp: string
+  }>
+  summary: {
+    eventsToday: number
+    adminActions: number
+    systemEvents: number
+  }
 }
 
-export interface MerchantStatsResponse {
-  stats: MerchantStats[]
+export interface RevenueTransaction {
+  id: string
+  merchant: string
+  amount: number
+  currency: string
+  method: string
+  status: string
+  date: string
 }
 
-export interface OrdersResponse {
-  orders: AdminOrder[]
-}
-
-export interface TicketAnalyticsResponse {
-  analytics: TicketAnalytics
-}
-
-export interface QuickPaymentAnalyticsResponse {
-  analytics: QuickPaymentAnalytics
-}
-
-export interface DeviceAnalyticsResponse {
-  analytics: DeviceAnalytics
-}
-
-export interface RevenueBreakdownResponse {
-  breakdown: RevenueBreakdown[]
-}
-
-export interface SystemHealthResponse {
-  health: SystemHealth
+export interface ReportsOverview {
+  ordersThisMonth: number
+  revenueThisMonth: number
+  newMerchantsThisMonth: number
+  currency: string
 }
 
 export interface TicketEventStats {
@@ -193,3 +273,48 @@ export interface TicketEventStats {
   totalTickets: number
   purchasedTickets: number
 }
+
+export type ConfigSection =
+  | 'platform'
+  | 'auth'
+  | 'payments'
+  | 'orders'
+  | 'qr'
+  | 'notifications'
+  | 'features'
+
+export type ConfigMap = Record<string, string | number | boolean>
+
+export interface PlatformConfigs {
+  platform: ConfigMap
+  auth: ConfigMap
+  payments: ConfigMap
+  orders: ConfigMap
+  qr: ConfigMap
+  notifications: ConfigMap
+  features: ConfigMap
+}
+
+export interface AllConfigsResponse {
+  configs: PlatformConfigs
+}
+
+export interface ConfigSectionResponse {
+  section: ConfigSection
+  config: ConfigMap
+  updatedAt: string | null
+  updatedBy: string | null
+}
+
+export interface ConfigActionResult {
+  success: boolean
+  action: string
+  message: string
+  details: Record<string, unknown>
+}
+
+export type ConfigAction =
+  | 'purge-test-data'
+  | 'clear-qr-scan-logs'
+  | 'revoke-all-sessions'
+  | 'reset-platform'

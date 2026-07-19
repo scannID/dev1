@@ -1,7 +1,7 @@
-// Custom hook for catalog operations with API integration
+﻿// Custom hook for catalog operations with API integration
 
 import { useState, useCallback } from 'react'
-import { scanitApi } from '../api/services'
+import { scannyApi } from '../api/services'
 import type { CatalogItem, CreateCatalogItemRequest, UpdateCatalogItemRequest } from '../api/types'
 
 export function useCatalog(businessId: string) {
@@ -12,7 +12,7 @@ export function useCatalog(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const item = await scanitApi.catalog.create(businessId, data)
+      const item = await scannyApi.catalog.create(businessId, data)
       return item
     } catch (err) {
       console.error('Failed to create catalog item:', err)
@@ -27,7 +27,7 @@ export function useCatalog(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const item = await scanitApi.catalog.update(businessId, itemId, data)
+      const item = await scannyApi.catalog.update(businessId, itemId, data)
       return item
     } catch (err) {
       console.error('Failed to update catalog item:', err)
@@ -42,7 +42,7 @@ export function useCatalog(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const item = await scanitApi.catalog.updateAvailability(businessId, itemId, available)
+      const item = await scannyApi.catalog.updateAvailability(businessId, itemId, available)
       return item
     } catch (err) {
       console.error('Failed to toggle availability:', err)
@@ -57,7 +57,7 @@ export function useCatalog(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      await scanitApi.catalog.delete(businessId, itemId)
+      await scannyApi.catalog.delete(businessId, itemId)
       return true
     } catch (err) {
       console.error('Failed to delete catalog item:', err)

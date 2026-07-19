@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API_BASE_URL } from '../api/client'
 import { adminApi } from '../api/services'
-import type { TicketEventStats } from '../api/types'
+import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
 
-const WEEKLY = [
-  { week: 'W1', merchants: 128, orders: 7840, revenue: 62 },
-  { week: 'W2', merchants: 131, orders: 8920, revenue: 74 },
-  { week: 'W3', merchants: 135, orders: 9410, revenue: 81 },
-  { week: 'W4', merchants: 142, orders: 10240, revenue: 96 },
-]
-const maxOrders = Math.max(...WEEKLY.map((w) => w.orders))
+function currency(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 export default function ReportsPage() {
   const [ticketStats, setTicketStats] = useState<TicketEventStats[]>([])
   const [ticketSearch, setTicketSearch] = useState('')
   const [ticketLoading, setTicketLoading] = useState(false)
   const [ticketError, setTicketError] = useState<string | null>(null)
+  const [overview, setOverview] = useState<ReportsOverview | null>(null)
+  const [revenue, setRevenue] = useState<RevenueOverview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const wsUrl = useMemo(() => {
     const base = API_BASE_URL.replace(/\/api$/, '')
@@ -38,23 +42,79 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [reports, revenueOverview] = await Promise.all([
+          adminApi.reports.getOverview(),
+          adminApi.revenue.getOverview(),
+        ])
+        if (cancelled) return
+        setOverview(reports)
+        setRevenue(revenueOverview)
+        setError(null)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load reports')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     loadTicketStats().catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
-    const ws = new WebSocket(`${wsUrl}/ws/tickets/stats`)
-    ws.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data) as { type?: string; stats?: TicketEventStats[] }
-        if (parsed.type === 'TICKET_STATS_UPDATED' && Array.isArray(parsed.stats)) {
-          setTicketStats(parsed.stats)
+    let reconnectTimer: number | null = null
+    let pollTimer: number | null = null
+    let ws: WebSocket | null = null
+    let attempt = 0
+
+    const startPoll = () => {
+      if (pollTimer != null) return
+      pollTimer = window.setInterval(() => {
+        loadTicketStats(ticketSearch).catch(() => undefined)
+      }, 15000)
+    }
+
+    const connect = () => {
+      ws = new WebSocket(`${wsUrl}/ws/tickets/stats`)
+      ws.onopen = () => {
+        attempt = 0
+        if (pollTimer != null) {
+          window.clearInterval(pollTimer)
+          pollTimer = null
         }
-      } catch {
-        // ignore malformed payloads
+      }
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data) as { type?: string; stats?: TicketEventStats[]; payload?: TicketEventStats[] }
+          const stats = parsed.stats ?? parsed.payload
+          if (parsed.type === 'TICKET_STATS_UPDATED' && Array.isArray(stats)) {
+            setTicketStats(stats)
+          }
+        } catch {
+          // ignore malformed payloads
+        }
+      }
+      ws.onclose = () => {
+        startPoll()
+        const delay = Math.min(30000, 1000 * 2 ** attempt++) + Math.floor(Math.random() * 400)
+        reconnectTimer = window.setTimeout(connect, delay)
+      }
+      ws.onerror = () => {
+        ws?.close()
       }
     }
-    return () => ws.close()
-  }, [wsUrl])
+
+    connect()
+    return () => {
+      if (reconnectTimer != null) window.clearTimeout(reconnectTimer)
+      if (pollTimer != null) window.clearInterval(pollTimer)
+      ws?.close()
+    }
+  }, [wsUrl, ticketSearch])
 
   const filteredTicketStats = useMemo(() => {
     const query = ticketSearch.trim().toLowerCase()
@@ -62,13 +122,20 @@ export default function ReportsPage() {
     return ticketStats.filter((row) => row.eventName.toLowerCase().includes(query))
   }, [ticketSearch, ticketStats])
 
+  const monthly = revenue?.monthly ?? []
+  const maxOrders = Math.max(...monthly.map((m) => m.transactions), 1)
+  const growth = revenue?.currentMonth.growth
+
   return (
     <>
+      {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>{error}</div>}
+      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading reports…</div>}
+
       <div className="admin-metric-grid cols-3">
         {[
-          { label: 'Orders This Month',     value: '36,410' },
-          { label: 'Revenue This Month',    value: 'UGX 313M' },
-          { label: 'New Merchants (Month)', value: '14'      },
+          { label: 'Orders This Month', value: (overview?.ordersThisMonth ?? 0).toLocaleString() },
+          { label: 'Revenue This Month', value: currency(overview?.revenueThisMonth ?? 0) },
+          { label: 'New Merchants (Month)', value: String(overview?.newMerchantsThisMonth ?? 0) },
         ].map((c) => (
           <div key={c.label} className="admin-metric-card">
             <span className="metric-label">{c.label}</span>
@@ -112,35 +179,39 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Weekly orders chart */}
         <div className="admin-card">
-          <div className="admin-card-header"><div><h3>Weekly Orders</h3><p>This month</p></div></div>
+          <div className="admin-card-header"><div><h3>Monthly Orders</h3><p>From revenue analytics</p></div></div>
           <div style={{ padding: '20px' }}>
-            <div className="admin-bar-chart" style={{ height: 120 }}>
-              {WEEKLY.map((w, i) => (
-                <div key={w.week} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{(w.orders / 1000).toFixed(1)}k</span>
-                  <div className={`bar ${i === WEEKLY.length - 1 ? 'accent' : ''}`}
-                    style={{ width: '100%', height: `${(w.orders / maxOrders) * 100}%`, borderRadius: '4px 4px 0 0' }} />
+            {monthly.length === 0 ? (
+              <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No monthly data yet.</p>
+            ) : (
+              <>
+                <div className="admin-bar-chart" style={{ height: 120 }}>
+                  {monthly.map((w, i) => (
+                    <div key={w.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{w.transactions}</span>
+                      <div className={`bar ${i === monthly.length - 1 ? 'accent' : ''}`}
+                        style={{ width: '100%', height: `${(w.transactions / maxOrders) * 100}%`, borderRadius: '4px 4px 0 0' }} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8 }}>
-              {WEEKLY.map((w) => <span key={w.week} style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{w.week}</span>)}
-            </div>
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8 }}>
+                  {monthly.map((w) => <span key={w.month} style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{w.month}</span>)}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Growth summary */}
         <div className="admin-card">
-          <div className="admin-card-header"><div><h3>Growth Summary</h3><p>Week over week</p></div></div>
+          <div className="admin-card-header"><div><h3>Growth Summary</h3><p>Current month vs prior</p></div></div>
           <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             {[
-              { label: 'Order Growth',    value: '+8.8%',  up: true  },
-              { label: 'Revenue Growth',  value: '+18.5%', up: true  },
-              { label: 'New Merchants',   value: '+3',     up: true  },
-              { label: 'Failed Payments', value: '-12.3%', up: false },
-              { label: 'Avg Order Value', value: '+4.2%',  up: true  },
+              { label: 'Order Growth', value: `${(growth?.transactions ?? 0) >= 0 ? '+' : ''}${(growth?.transactions ?? 0).toFixed(1)}%`, up: (growth?.transactions ?? 0) >= 0 },
+              { label: 'Revenue Growth', value: `${(growth?.revenue ?? 0) >= 0 ? '+' : ''}${(growth?.revenue ?? 0).toFixed(1)}%`, up: (growth?.revenue ?? 0) >= 0 },
+              { label: 'New Merchants', value: `+${overview?.newMerchantsThisMonth ?? 0}`, up: true },
+              { label: 'Failed Payments', value: `${(growth?.failedPayments ?? 0) >= 0 ? '+' : ''}${(growth?.failedPayments ?? 0).toFixed(1)}%`, up: (growth?.failedPayments ?? 0) <= 0 },
+              { label: 'Avg Order Value', value: `${(growth?.avgOrderValue ?? 0) >= 0 ? '+' : ''}${(growth?.avgOrderValue ?? 0).toFixed(1)}%`, up: (growth?.avgOrderValue ?? 0) >= 0 },
             ].map((item) => (
               <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
                 <span style={{ color: 'var(--muted-foreground)' }}>{item.label}</span>
@@ -151,25 +222,25 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Weekly table */}
       <div className="admin-card">
-        <div className="admin-card-header"><div><h3>Weekly Breakdown</h3></div></div>
+        <div className="admin-card-header"><div><h3>Monthly Breakdown</h3></div></div>
         <div className="admin-table-wrap">
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Week', 'Active Merchants', 'Orders', 'Revenue (UGX M)'].map((h) => (
+                {['Month', 'Orders', 'Revenue'].map((h) => (
                   <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 10, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {WEEKLY.map((w) => (
-                <tr key={w.week} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--foreground)' }}>{w.week}</td>
-                  <td style={{ padding: '10px 16px', color: 'var(--foreground)' }}>{w.merchants}</td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{w.orders.toLocaleString()}</td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{w.revenue}M</td>
+              {monthly.length === 0 ? (
+                <tr><td colSpan={3} style={{ padding: 16, color: 'var(--muted-foreground)' }}>No monthly breakdown yet.</td></tr>
+              ) : monthly.map((w) => (
+                <tr key={w.month} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px 16px', fontWeight: 600 }}>{w.month}</td>
+                  <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>{w.transactions.toLocaleString()}</td>
+                  <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>{currency(w.revenue)}</td>
                 </tr>
               ))}
             </tbody>

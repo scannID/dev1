@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   LogOut,
   Moon,
-  Package,
   QrCode,
   Settings,
   ShoppingCart,
@@ -29,7 +28,6 @@ import {
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
 import OrdersPage from './pages/OrdersPage'
-import CatalogPage from './pages/CatalogPage'
 import UsersPage from './pages/UsersPage'
 import RevenuePaymentsPage from './pages/RevenuePaymentsPage'
 import QRActivityPage from './pages/QRActivityPage'
@@ -39,7 +37,7 @@ import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 
 type View =
-  | 'overview' | 'merchants' | 'orders' | 'catalog'
+  | 'overview' | 'merchants' | 'orders'
   | 'users' | 'revenue' | 'qr-activity' | 'reports'
   | 'system' | 'audit' | 'configs'
 
@@ -48,9 +46,8 @@ const NAV_SECTIONS = [
     label: 'Platform',
     items: [
       { id: 'overview',    label: 'Overview',          icon: LayoutGrid   },
-      { id: 'merchants',   label: 'Merchants',          icon: Building2,   badge: 3, badgeType: 'green' },
+      { id: 'merchants',   label: 'Merchants',          icon: Building2    },
       { id: 'orders',      label: 'All Orders',         icon: ShoppingCart },
-      { id: 'catalog',     label: 'Catalog Items',      icon: Package      },
       { id: 'users',       label: 'Users',              icon: Users        },
     ],
   },
@@ -81,7 +78,6 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   overview:      { eyebrow: 'Admin · Platform',    title: 'Overview'           },
   merchants:     { eyebrow: 'Admin · Platform',    title: 'Merchants'          },
   orders:        { eyebrow: 'Admin · Platform',    title: 'All Orders'         },
-  catalog:       { eyebrow: 'Admin · Platform',    title: 'Catalog Items'      },
   users:         { eyebrow: 'Admin · Platform',    title: 'Users'              },
   revenue:       { eyebrow: 'Admin · Finance',     title: 'Revenue & Payments' },
   'qr-activity': { eyebrow: 'Admin · Analytics',  title: 'QR Activity'        },
@@ -208,7 +204,6 @@ export default function AdminApp({
           {view === 'overview'    && <OverviewPage />}
           {view === 'merchants'   && <MerchantsPage />}
           {view === 'orders'      && <OrdersPage />}
-          {view === 'catalog'     && <CatalogPage />}
           {view === 'users'       && <UsersPage />}
           {view === 'revenue'     && <RevenuePaymentsPage />}
           {view === 'qr-activity' && <QRActivityPage />}

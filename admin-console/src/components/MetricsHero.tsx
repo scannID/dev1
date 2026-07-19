@@ -85,10 +85,10 @@ function xStep(n: number) {
   return Math.ceil(n / 7)
 }
 
-// Animate SVG path morph
-function useMorphPath(target: string) {
+// Animate SVG path morph (kept for chart transitions; currently unused by MetricsHero)
+function _useMorphPath(target: string) {
   const [displayed, setDisplayed] = useState(target)
-  const [animating, setAnimating] = useState(false)
+  const [_animating, setAnimating] = useState(false)
   const prev = useRef(target)
 
   useEffect(() => {
@@ -105,6 +105,8 @@ function useMorphPath(target: string) {
 
   return displayed
 }
+
+void _useMorphPath
 
 export default function MetricsHero() {
   const [range, setRange] = useState<Range>('daily')

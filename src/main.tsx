@@ -38,31 +38,16 @@ if (customerRoute) {
   )
 } else {
   const SESSION_KEY = 'scanny-merchant-authenticated'
-
-  let kcInitPromise: Promise<boolean> | null = null
-
-  function initKeycloak() {
-    if (!kcInitPromise) {
-      kcInitPromise = keycloak.init({ onLoad: 'check-sso', checkLoginIframe: false })
-    }
-    return kcInitPromise
-  }
+  const PENDING_LOGIN_KEY = 'scanny-pending-login'
 
   type View = 'landing' | 'app' | 'ticket'
 
-  function Root() {
-    const [view, setView] = useState<View>('landing')
+  function Root({ initialView }: { initialView: View }) {
+    const [view, setView] = useState<View>(initialView)
     const [darkMode, setDarkMode] = useState(() => {
       const saved = localStorage.getItem('scanny-dark-mode')
       return saved ? JSON.parse(saved) : false
     })
-
-    // Always open on landing after reload/start.
-    // User explicitly enters app again via "Get Started".
-    useEffect(() => {
-      sessionStorage.removeItem(SESSION_KEY)
-      setView('landing')
-    }, [])
 
     useEffect(() => {
       function handleKeyPress(e: KeyboardEvent) {
@@ -84,13 +69,18 @@ if (customerRoute) {
     }, [darkMode])
 
     function handleGetStarted() {
+      // Already signed in (SSO session) — enter the app without another round trip.
+      if (keycloak.authenticated) {
+        sessionStorage.setItem(SESSION_KEY, '1')
+        setView('app')
+        return
+      }
+      sessionStorage.setItem(PENDING_LOGIN_KEY, '1')
       keycloak.login({ redirectUri: window.location.origin }).catch(console.error)
     }
 
     function handleLogout() {
       sessionStorage.removeItem(SESSION_KEY)
-      localStorage.removeItem('scanny-orders-v1')
-      localStorage.removeItem('scanny-businesses-v2')
       if (keycloak.authenticated) {
         keycloak.logout({ redirectUri: window.location.origin })
       } else {
@@ -129,20 +119,29 @@ if (customerRoute) {
   keycloak
     .init({ onLoad: 'check-sso', checkLoginIframe: false })
     .then((authenticated) => {
-      kcInitPromise = Promise.resolve(authenticated)
-      if (authenticated) {
-        if (keycloak.tokenParsed?.azp === 'scanny-client') {
-          sessionStorage.setItem(SESSION_KEY, '1')
-        }
+      if (authenticated && keycloak.tokenParsed?.azp === 'scanny-client') {
+        sessionStorage.setItem(SESSION_KEY, '1')
       }
     })
     .catch(() => {
-      kcInitPromise = Promise.resolve(false)
+      // Keep landing view if SSO check fails
     })
     .finally(() => {
+      // Decide the initial view ONCE, outside React, so StrictMode's
+      // double-invocation of effects can't reset it. If we just came back
+      // from a Keycloak login redirect and are authenticated, open the app.
+      const justLoggedIn = sessionStorage.getItem(PENDING_LOGIN_KEY) === '1'
+      sessionStorage.removeItem(PENDING_LOGIN_KEY)
+      const signedIntoApp =
+        Boolean(keycloak.authenticated) && keycloak.tokenParsed?.azp === 'scanny-client'
+      const initialView: View = justLoggedIn && signedIntoApp ? 'app' : 'landing'
+      if (!(justLoggedIn && signedIntoApp)) {
+        sessionStorage.removeItem(SESSION_KEY)
+      }
+
       createRoot(document.getElementById('root')!).render(
         <StrictMode>
-          <Root />
+          <Root initialView={initialView} />
         </StrictMode>
       )
     })

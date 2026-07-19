@@ -1,4 +1,4 @@
-// TypeScript types for ScanIT API — aligned with backend DTOs
+﻿// TypeScript types for Scanny API — aligned with backend DTOs
 
 export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
 
@@ -260,4 +260,35 @@ export interface TicketStats {
   eventName: string
   totalTickets: number
   purchasedTickets: number
+}
+
+export interface DevicePaymentMethod {
+  id: number
+  phoneNumber: string
+  paymentProvider: string
+  accountName: string
+  isDefault: boolean
+  isVerified: boolean
+}
+
+export interface RegisteredDevice {
+  id: string
+  deviceId: string
+  deviceName: string
+  primaryPhone: string
+  secondaryPhone?: string | null
+  customerName?: string
+  autoPaymentEnabled: boolean
+  paymentMethods: DevicePaymentMethod[]
+}
+
+export interface RegisterDeviceRequest {
+  deviceId: string
+  deviceName?: string
+  deviceModel?: string
+  deviceOs?: string
+  deviceFingerprint?: string
+  primaryPhone: string
+  customerName?: string
+  customerEmail?: string
 }

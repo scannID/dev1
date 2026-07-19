@@ -1,7 +1,7 @@
-// Custom hook for order operations with API integration
+﻿// Custom hook for order operations with API integration
 
 import { useState, useCallback } from 'react'
-import { scanitApi } from '../api/services'
+import { scannyApi } from '../api/services'
 import type { Order, CreateOrderRequest, OrderStatus, PaymentStatus } from '../api/types'
 
 export function useOrders(businessId: string) {
@@ -12,7 +12,7 @@ export function useOrders(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const order = await scanitApi.orders.create(businessId, data)
+      const order = await scannyApi.orders.create(businessId, data)
       return order
     } catch (err) {
       console.error('Failed to create order:', err)
@@ -27,7 +27,7 @@ export function useOrders(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const order = await scanitApi.orders.updateStatus(orderId, status)
+      const order = await scannyApi.orders.updateStatus(orderId, status)
       return order
     } catch (err) {
       console.error('Failed to update order status:', err)
@@ -42,7 +42,7 @@ export function useOrders(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const order = await scanitApi.orders.updatePayment(orderId, paymentStatus)
+      const order = await scannyApi.orders.updatePayment(orderId, paymentStatus)
       return order
     } catch (err) {
       console.error('Failed to update payment status:', err)
@@ -57,7 +57,7 @@ export function useOrders(businessId: string) {
     try {
       setLoading(true)
       setError(null)
-      const result = await scanitApi.orders.clearCompleted(businessId)
+      const result = await scannyApi.orders.clearCompleted(businessId)
       return result
     } catch (err) {
       console.error('Failed to clear completed orders:', err)

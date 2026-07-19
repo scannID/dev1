@@ -1,3 +1,4 @@
+import { getWsBaseUrl } from './lib/realtime'
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { ticketsApi } from './api/services'
@@ -85,7 +86,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
     <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Inter', sans-serif", background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.4)' }}>
       <div style={{ background: accent, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>ScanIT · Event Ticket</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Scanny · Event Ticket</p>
           <h2 style={{ margin: '5px 0 0', color: '#fff', fontSize: 22, fontWeight: 900, lineHeight: 1.2, letterSpacing: '-0.02em' }}>{d.eventName || 'Event Name'}</h2>
         </div>
         <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4, letterSpacing: '0.04em' }}>{cls}</span>
@@ -116,7 +117,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px dashed #e5e7eb', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>scanit.app · Powered by ScanIT</span>
+        <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>scanny.app · Powered by Scanny</span>
         <span style={{ fontSize: 10, color: '#9ca3af' }}>Non-transferable</span>
       </div>
     </div>
@@ -133,7 +134,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
       <div style={{ height: 4, background: 'linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)' }} />
       <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #21262d', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>ScanIT · Festival Ticket</p>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scanny · Festival Ticket</p>
           <h2 style={{ margin: 0, color: '#f0f6fc', fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{d.eventName || 'Event Name'}</h2>
         </div>
         <span style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
@@ -154,7 +155,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
         </div>
       </div>
       <div style={{ background: '#161b22', borderTop: '1px solid #21262d', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>scanit.app</span>
+        <span style={{ fontSize: 10, fontWeight: 700, background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>scanny.app</span>
         <span style={{ fontSize: 10, color: '#6e7681' }}>Non-transferable</span>
       </div>
     </div>
@@ -192,7 +193,7 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '9px 28px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>scanit.app · Powered by ScanIT</span>
+        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>scanny.app · Powered by Scanny</span>
         <span style={{ fontSize: 10, color: '#9ca3af' }}>Non-transferable</span>
       </div>
     </div>
@@ -807,7 +808,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   }, [])
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:4000/ws/tickets/stats')
+    const ws = new WebSocket(`${getWsBaseUrl()}/ws/tickets/stats`)
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data) as { type?: string; stats?: TicketStats[] }

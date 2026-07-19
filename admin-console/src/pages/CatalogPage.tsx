@@ -1,24 +1,34 @@
 import { Badge } from '@/components/ui/badge'
+import { useCatalog } from '../hooks/usePlatform'
 
-const ITEMS = [
-  { merchant: 'Kampala Grill', name: 'Beef Plate',     category: 'Meals',   price: 'UGX 18,000', available: true,  orders: 892 },
-  { merchant: 'Kampala Grill', name: 'Chicken Wrap',   category: 'Meals',   price: 'UGX 14,500', available: true,  orders: 641 },
-  { merchant: 'City Lounge',   name: 'House Mocktail', category: 'Drinks',  price: 'UGX 12,000', available: true,  orders: 520 },
-  { merchant: 'City Lounge',   name: 'Spicy Wings',    category: 'Bites',   price: 'UGX 22,000', available: true,  orders: 480 },
-  { merchant: 'Nile Cafe',     name: 'Passion Juice',  category: 'Drinks',  price: 'UGX 6,000',  available: false, orders: 390 },
-  { merchant: 'Pearl Events',  name: 'VIP Ticket',     category: 'Tickets', price: 'UGX 50,000', available: true,  orders: 210 },
-  { merchant: 'Garden Bistro', name: 'Family Platter', category: 'Meals',   price: 'UGX 42,000', available: false, orders: 178 },
-]
+function currency(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
 
 export default function CatalogPage() {
+  const { data, loading, error } = useCatalog()
+  const items = data?.items ?? []
+  const summary = data?.summary
+
   return (
     <>
+      {error && (
+        <div style={{ padding: '12px 16px', marginBottom: '16px', color: 'oklch(0.577 0.245 27.325)', fontSize: 13 }}>
+          Could not load catalog: {error}
+        </div>
+      )}
+      {loading && <div style={{ padding: '12px 16px', marginBottom: '16px', fontSize: 13 }}>Loading catalog…</div>}
+
       <div className="admin-metric-grid">
         {[
-          { label: 'Total Items',      value: '1,204' },
-          { label: 'Available',        value: '1,089' },
-          { label: 'Hidden / Paused',  value: '115'   },
-          { label: 'Categories',       value: '38'    },
+          { label: 'Total Items', value: String(summary?.total ?? 0) },
+          { label: 'Available', value: String(summary?.available ?? 0) },
+          { label: 'Hidden / Paused', value: String(summary?.hidden ?? 0) },
+          { label: 'Categories', value: String(summary?.categories ?? 0) },
         ].map((c) => (
           <div key={c.label} className="admin-metric-card">
             <span className="metric-label">{c.label}</span>
@@ -41,21 +51,20 @@ export default function CatalogPage() {
               </tr>
             </thead>
             <tbody>
-              {ITEMS.map((item, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-                >
-                  <td style={{ padding: '10px 16px', fontWeight: 500, color: 'var(--foreground)' }}>{item.name}</td>
+              {items.length === 0 ? (
+                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No catalog items yet.'}</td></tr>
+              ) : items.map((item) => (
+                <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px 16px', fontWeight: 500 }}>{item.name}</td>
                   <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{item.merchant}</td>
                   <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{item.category}</td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{item.price}</td>
+                  <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>{currency(item.price)}</td>
                   <td style={{ padding: '10px 16px' }}>
                     <Badge variant="secondary" className={item.available ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'}>
                       {item.available ? 'Available' : 'Hidden'}
                     </Badge>
                   </td>
-                  <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{item.orders}</td>
+                  <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>{item.orders}</td>
                 </tr>
               ))}
             </tbody>

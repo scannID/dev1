@@ -1,4 +1,4 @@
-// API Client for ScanIT Backend
+﻿// API Client for Scanny Backend
 // Attaches Keycloak JWT when available
 
 import keycloak from '../keycloak'

@@ -2,6 +2,7 @@ import { ArrowUpRight, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
 import { useDashboard } from '../hooks/useDashboard'
+import { useSystemHealth } from '../hooks/usePlatform'
 
 function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?: string }) {
   if (data.length < 2) return null
@@ -27,33 +28,6 @@ function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?:
   )
 }
 
-const METRICS = [
-  { label: 'Total Merchants',   value: '142',      sub: '+3 this week',  delta: '+2.2%',  up: true,  color: '#3b82f6', data: [110,118,124,128,133,138,142] },
-  { label: 'Orders Today',      value: '1,847',    sub: 'across all merchants', delta: '+14.3%', up: true,  color: '#10b981', data: [1200,1340,1180,1560,1420,1690,1847] },
-  { label: 'Active QR Scans',   value: '8,304',    sub: 'last 24 hours', delta: '+8.1%',  up: true,  color: '#8b5cf6', data: [6100,6800,7200,6900,7600,8000,8304] },
-  { label: 'Platform Revenue',  value: 'UGX 4.2M', sub: 'this month',    delta: '+19.4%', up: true,  color: '#f59e0b', data: [2.1,2.4,2.8,3.1,3.5,3.9,4.2] },
-]
-
-const RECENT_ACTIVITY = [
-  { icon: '🏪', bg: 'oklch(0.95 0.015 145)', title: 'New merchant registered',     sub: 'Kampala Grill · just now',       time: 'now' },
-  { icon: '📦', bg: 'oklch(0.95 0.01 250)',  title: '284 orders placed',            sub: 'across 38 merchants · today',    time: '2m'  },
-  { icon: '⚠️', bg: 'oklch(0.96 0.02 30)',   title: 'Payment failure spike',        sub: 'Merchant MER-004 · 3 failed',    time: '8m'  },
-  { icon: '📱', bg: 'oklch(0.95 0.015 280)', title: 'QR scan milestone',            sub: '10k scans this week · platform', time: '1h'  },
-  { icon: '✅', bg: 'oklch(0.95 0.015 145)', title: 'System backup completed',      sub: 'All data safe · automated',      time: '2h'  },
-  { icon: '👤', bg: 'oklch(0.95 0.01 250)',  title: '14 new user accounts',         sub: 'Customer registrations',         time: '3h'  },
-  { icon: '💳', bg: 'oklch(0.95 0.015 75)',  title: 'Payout processed',             sub: 'UGX 1.8M to 12 merchants',       time: '5h'  },
-]
-
-const TOP_MERCHANTS = [
-  { name: 'Kampala Grill',    type: 'Restaurant', orders: 312, revenue: 'UGX 5.6M', status: 'active' },
-  { name: 'City Lounge',      type: 'Bar',        orders: 278, revenue: 'UGX 4.1M', status: 'active' },
-  { name: 'Nile Cafe',        type: 'Restaurant', orders: 241, revenue: 'UGX 3.8M', status: 'active' },
-  { name: 'Pearl Events',     type: 'Events',     orders: 198, revenue: 'UGX 3.2M', status: 'active' },
-  { name: 'Garden Bistro',    type: 'Restaurant', orders: 167, revenue: 'UGX 2.9M', status: 'warning'},
-]
-
-const _ORDERS_BY_HOUR = [480,620,540,780,920,1040,1120,980,840,760,680,540]
-
 function currency(amount: number) {
   return new Intl.NumberFormat('en-UG', {
     style: 'currency',
@@ -62,71 +36,78 @@ function currency(amount: number) {
   }).format(amount)
 }
 
+function activityIcon(type: string) {
+  if (type.includes('merchant')) return { icon: '🏪', bg: 'oklch(0.95 0.015 145)' }
+  if (type.includes('order')) return { icon: '📦', bg: 'oklch(0.95 0.01 250)' }
+  return { icon: '✅', bg: 'oklch(0.95 0.015 145)' }
+}
+
 export default function OverviewPage() {
-  const { metrics, recentActivity, loading, error } = useDashboard()
+  const { metrics, recentActivity, topMerchants, loading, error } = useDashboard()
+  const { data: health } = useSystemHealth()
 
-  // Use API data if available, fallback to static data
-  const displayMetrics = metrics ? [
-    { 
-      label: 'Total Merchants', 
-      value: metrics.merchants.total.toString(), 
-      sub: `+${metrics.merchants.thisWeek} this week`, 
-      delta: metrics.merchants.change, 
-      up: true, 
-      color: '#3b82f6', 
-      data: Array.from({length: 7}, (_, i) => metrics.merchants.total - (6-i) * 2) 
-    },
-    { 
-      label: 'Orders Today', 
-      value: metrics.ordersToday.total.toLocaleString(), 
-      sub: 'across all merchants', 
-      delta: metrics.ordersToday.change, 
-      up: true, 
-      color: '#10b981', 
-      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.ordersToday.total * (0.6 + i * 0.08))) 
-    },
-    { 
-      label: 'Active QR Scans', 
-      value: metrics.qrScans.last24Hours.toLocaleString(), 
-      sub: 'last 24 hours', 
-      delta: metrics.qrScans.change, 
-      up: true, 
-      color: '#8b5cf6', 
-      data: Array.from({length: 7}, (_, i) => Math.floor(metrics.qrScans.last24Hours * (0.7 + i * 0.05))) 
-    },
-    { 
-      label: 'Platform Revenue', 
-      value: currency(metrics.revenue.thisMonth), 
-      sub: 'this month', 
-      delta: metrics.revenue.change, 
-      up: true, 
-      color: '#f59e0b', 
-      data: Array.from({length: 7}, (_, i) => metrics.revenue.thisMonth * (0.5 + i * 0.08)) 
-    },
-  ] : METRICS
+  const displayMetrics = metrics
+    ? [
+        {
+          label: 'Total Merchants',
+          value: metrics.merchants.total.toString(),
+          sub: `+${metrics.merchants.thisWeek} this week`,
+          delta: metrics.merchants.change,
+          up: true,
+          color: '#3b82f6',
+          data: Array.from({ length: 7 }, () => metrics.merchants.total),
+        },
+        {
+          label: 'Orders Today',
+          value: metrics.ordersToday.total.toLocaleString(),
+          sub: 'across all merchants',
+          delta: metrics.ordersToday.change,
+          up: true,
+          color: '#10b981',
+          data: Array.from({ length: 7 }, () => metrics.ordersToday.total),
+        },
+        {
+          label: 'Active QR Scans',
+          value: metrics.qrScans.last24Hours.toLocaleString(),
+          sub: 'last 24 hours',
+          delta: metrics.qrScans.change,
+          up: true,
+          color: '#8b5cf6',
+          data: Array.from({ length: 7 }, () => metrics.qrScans.last24Hours),
+        },
+        {
+          label: 'Platform Revenue',
+          value: currency(metrics.revenue.thisMonth),
+          sub: 'this month',
+          delta: metrics.revenue.change,
+          up: true,
+          color: '#f59e0b',
+          data: Array.from({ length: 7 }, () => metrics.revenue.thisMonth),
+        },
+      ]
+    : []
 
-  const displayActivity = recentActivity.length > 0 ? recentActivity.map(a => ({
-    icon: '📦',
-    bg: 'oklch(0.95 0.01 250)',
-    title: a.activityType,
-    sub: a.description,
-    time: new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  })) : RECENT_ACTIVITY
+  const serviceStrip = health?.services?.length
+    ? health.services.map((s) => ({
+        label: s.name,
+        status: s.status.charAt(0).toUpperCase() + s.status.slice(1),
+        dot: s.status === 'operational' ? 'green' : s.status === 'degraded' ? 'amber' : 'red',
+      }))
+    : []
 
   return (
     <>
-      {/* Show error/loading banner if needed */}
       {error && (
         <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.96 0.02 30 / 0.15)', border: '1px solid oklch(0.577 0.245 27.325 / 0.4)', borderRadius: '10px', color: 'oklch(0.577 0.245 27.325)', fontSize: '13px', fontWeight: '500' }}>
-          ⚠️ Could not load live data. Showing fallback data.
+          Could not load dashboard: {error}
         </div>
       )}
       {loading && (
         <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.95 0.01 250 / 0.15)', border: '1px solid oklch(0.60 0.15 250 / 0.4)', borderRadius: '10px', color: 'oklch(0.50 0.15 250)', fontSize: '13px', fontWeight: '500' }}>
-          🔄 Loading live data...
+          Loading live data…
         </div>
       )}
-      {/* Metric cards */}
+
       <div className="admin-metric-grid">
         {displayMetrics.map((m) => (
           <div key={m.label} className="admin-metric-card">
@@ -142,50 +123,62 @@ export default function OverviewPage() {
             <Sparkline data={m.data} color={m.color} />
           </div>
         ))}
+        {!loading && !displayMetrics.length && !error && (
+          <div className="admin-metric-card">
+            <span className="metric-label">No metrics yet</span>
+            <span className="metric-value">0</span>
+          </div>
+        )}
       </div>
 
-      {/* Platform status strip */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {[
-          { label: 'API', status: 'Operational', dot: 'green' },
-          { label: 'Database', status: 'Operational', dot: 'green' },
-          { label: 'QR Engine', status: 'Operational', dot: 'green' },
-          { label: 'Payments', status: 'Degraded', dot: 'amber' },
-          { label: 'Notifications', status: 'Operational', dot: 'green' },
-        ].map((s) => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
-            <span className={`status-dot ${s.dot}`} />
-            <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{s.label}</span>
-            <span style={{ color: 'var(--muted-foreground)' }}>{s.status}</span>
-          </div>
-        ))}
-      </div>
+      {serviceStrip.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {serviceStrip.map((s) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
+              <span className={`status-dot ${s.dot}`} />
+              <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{s.label}</span>
+              <span style={{ color: 'var(--muted-foreground)' }}>{s.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="admin-two-col">
-        {/* MetricsHero — replaces orders-by-hour chart */}
         <MetricsHero />
 
-        {/* Recent activity */}
         <div className="admin-card">
           <div className="admin-card-header">
             <div><h3>Platform Activity</h3><p>Latest events across the system</p></div>
           </div>
           <ul className="admin-activity-list">
-            {displayActivity.slice(0, 7).map((a, i) => (
-              <li key={i}>
-                <div className="admin-activity-icon" style={{ background: a.bg }}>{a.icon}</div>
+            {recentActivity.length === 0 ? (
+              <li>
                 <div className="admin-activity-body">
-                  <strong>{a.title}</strong>
-                  <span>{a.sub}</span>
+                  <strong>No recent activity</strong>
+                  <span>New merchants and orders will appear here</span>
                 </div>
-                <span className="admin-activity-time">{a.time}</span>
               </li>
-            ))}
+            ) : (
+              recentActivity.slice(0, 7).map((a) => {
+                const visual = activityIcon(a.type)
+                return (
+                  <li key={a.id}>
+                    <div className="admin-activity-icon" style={{ background: visual.bg }}>{visual.icon}</div>
+                    <div className="admin-activity-body">
+                      <strong>{a.title}</strong>
+                      <span>{a.description}</span>
+                    </div>
+                    <span className="admin-activity-time">
+                      {new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </li>
+                )
+              })
+            )}
           </ul>
         </div>
       </div>
 
-      {/* Top merchants */}
       <div className="admin-card">
         <div className="admin-card-header">
           <div><h3>Top Merchants by Orders</h3><p>This month</p></div>
@@ -203,19 +196,25 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {TOP_MERCHANTS.map((m) => (
-                <tr key={m.name} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '10px 20px', fontWeight: 500, color: 'var(--foreground)' }}>{m.name}</td>
-                  <td style={{ padding: '10px 20px', color: 'var(--muted-foreground)' }}>{m.type}</td>
-                  <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{m.orders}</td>
-                  <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{m.revenue}</td>
-                  <td style={{ padding: '10px 20px' }}>
-                    <Badge variant="secondary" className={m.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}>
-                      {m.status === 'active' ? 'Active' : 'Warning'}
-                    </Badge>
-                  </td>
+              {topMerchants.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '16px 20px', color: 'var(--muted-foreground)' }}>No merchant order activity yet.</td>
                 </tr>
-              ))}
+              ) : (
+                topMerchants.map((m) => (
+                  <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 20px', fontWeight: 500, color: 'var(--foreground)' }}>{m.name}</td>
+                    <td style={{ padding: '10px 20px', color: 'var(--muted-foreground)' }}>{m.type}</td>
+                    <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{m.orders}</td>
+                    <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{currency(m.revenue)}</td>
+                    <td style={{ padding: '10px 20px' }}>
+                      <Badge variant="secondary" className={m.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}>
+                        {m.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

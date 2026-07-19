@@ -1,4 +1,4 @@
-// API Service Functions — paths/payloads aligned with Spring controllers
+﻿// API Service Functions — paths/payloads aligned with Spring controllers
 
 import { api } from './client'
 import type {
@@ -26,6 +26,8 @@ import type {
   Ticket,
   TicketStats,
   UpdateTicketStatusRequest,
+  RegisterDeviceRequest,
+  RegisteredDevice,
 } from './types'
 
 export const merchantAuthApi = {
@@ -175,12 +177,27 @@ export const ticketsApi = {
   },
 }
 
-export const scanitApi = {
+export const devicesApi = {
+  check: async (deviceId: string): Promise<boolean> => {
+    return api.get<boolean>(`/devices/${encodeURIComponent(deviceId)}/check`)
+  },
+
+  get: async (deviceId: string): Promise<RegisteredDevice> => {
+    return api.get<RegisteredDevice>(`/devices/${encodeURIComponent(deviceId)}`)
+  },
+
+  register: async (data: RegisterDeviceRequest): Promise<RegisteredDevice> => {
+    return api.post<RegisteredDevice>('/devices/register', data)
+  },
+}
+
+export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
   catalog: catalogApi,
   orders: ordersApi,
   tickets: ticketsApi,
+  devices: devicesApi,
 }
 
-export default scanitApi
+export default scannyApi

@@ -1,150 +1,171 @@
-// Admin API Services
-// All admin API calls organized by domain
+// Admin API Services — paths aligned with Spring controllers
 
 import { api } from './client'
 import type {
   DashboardMetrics,
-  DashboardMetricsResponse,
-  PendingOrder,
-  PendingOrdersResponse,
-  RecentActivity,
-  RecentActivityResponse,
+  ActivityEvent,
+  TopMerchant,
+  MerchantsListResponse,
   Merchant,
-  MerchantsResponse,
-  MerchantStats,
-  MerchantStatsResponse,
+  OrdersListResponse,
   AdminOrder,
-  OrdersResponse,
   TicketAnalytics,
-  TicketAnalyticsResponse,
   QuickPaymentAnalytics,
-  QuickPaymentAnalyticsResponse,
   DeviceAnalytics,
-  DeviceAnalyticsResponse,
-  RevenueBreakdown,
-  RevenueBreakdownResponse,
+  RevenueOverview,
   SystemHealth,
-  SystemHealthResponse,
+  CatalogListResponse,
+  UsersListResponse,
+  QrActivityResponse,
+  AuditListResponse,
+  RevenueTransaction,
+  ReportsOverview,
   TicketEventStats,
+  AllConfigsResponse,
+  ConfigSection,
+  ConfigSectionResponse,
+  ConfigMap,
+  ConfigAction,
+  ConfigActionResult,
 } from './types'
 
-// ============================================================================
-// DASHBOARD API
-// ============================================================================
-
 export const dashboardApi = {
-  // Get dashboard metrics
   getMetrics: async (): Promise<DashboardMetrics> => {
-    const response = await api.get<DashboardMetricsResponse>('/admin/dashboard')
-    return response.metrics
+    return api.get<DashboardMetrics>('/admin/dashboard/metrics')
   },
 
-  // Get pending orders
-  getPendingOrders: async (): Promise<PendingOrder[]> => {
-    const response = await api.get<PendingOrdersResponse>('/admin/dashboard/pending-orders')
-    return response.orders
+  getRecentActivity: async (): Promise<ActivityEvent[]> => {
+    return api.get<ActivityEvent[]>('/admin/dashboard/activity')
   },
 
-  // Get recent activity
-  getRecentActivity: async (): Promise<RecentActivity[]> => {
-    const response = await api.get<RecentActivityResponse>('/admin/dashboard/recent-activity')
-    return response.activities
+  getTopMerchants: async (period = 'month', sortBy = 'orders', limit = 5): Promise<TopMerchant[]> => {
+    return api.get<TopMerchant[]>(
+      `/admin/dashboard/top-merchants?period=${period}&sortBy=${sortBy}&limit=${limit}`
+    )
   },
 }
-
-// ============================================================================
-// MERCHANTS API
-// ============================================================================
 
 export const merchantsApi = {
-  // List all merchants
-  list: async (): Promise<Merchant[]> => {
-    const response = await api.get<MerchantsResponse>('/admin/merchants')
-    return response.merchants
+  list: async (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: string
+    type?: string
+  }): Promise<MerchantsListResponse> => {
+    const query = new URLSearchParams()
+    query.set('page', String(params?.page ?? 1))
+    query.set('limit', String(params?.limit ?? 100))
+    if (params?.search) query.set('search', params.search)
+    if (params?.status) query.set('status', params.status)
+    if (params?.type) query.set('type', params.type)
+    return api.get<MerchantsListResponse>(`/admin/merchants?${query.toString()}`)
   },
 
-  // Get merchant stats
-  getStats: async (): Promise<MerchantStats[]> => {
-    const response = await api.get<MerchantStatsResponse>('/admin/merchants/stats')
-    return response.stats
-  },
-
-  // Get single merchant
   get: async (merchantId: string): Promise<Merchant> => {
-    const response = await api.get<{ merchant: Merchant }>(`/admin/merchants/${merchantId}`)
-    return response.merchant
+    return api.get<Merchant>(`/admin/merchants/${merchantId}`)
+  },
+
+  update: async (merchantId: string, data: { name?: string; plan?: string; status?: string }) => {
+    return api.patch(`/admin/merchants/${merchantId}`, data)
+  },
+
+  remove: async (merchantId: string) => {
+    await api.delete(`/admin/merchants/${merchantId}`)
+  },
+
+  register: async (payload: unknown) => {
+    return api.post('/auth/merchant/register', payload)
   },
 }
-
-// ============================================================================
-// ORDERS API
-// ============================================================================
 
 export const ordersApi = {
-  // List all orders (platform-wide)
-  list: async (): Promise<AdminOrder[]> => {
-    const response = await api.get<OrdersResponse>('/admin/orders')
-    return response.orders
+  list: async (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: string
+    paymentStatus?: string
+    merchantId?: string
+  }): Promise<OrdersListResponse> => {
+    const query = new URLSearchParams()
+    query.set('page', String(params?.page ?? 1))
+    query.set('limit', String(params?.limit ?? 100))
+    if (params?.search) query.set('search', params.search)
+    if (params?.status) query.set('status', params.status)
+    if (params?.paymentStatus) query.set('paymentStatus', params.paymentStatus)
+    if (params?.merchantId) query.set('merchantId', params.merchantId)
+    return api.get<OrdersListResponse>(`/admin/orders?${query.toString()}`)
   },
 
-  // Get orders by status
-  getByStatus: async (status: string): Promise<AdminOrder[]> => {
-    const response = await api.get<OrdersResponse>(`/admin/orders/status/${status}`)
-    return response.orders
-  },
-
-  // Get orders by payment status
-  getByPaymentStatus: async (paymentStatus: string): Promise<AdminOrder[]> => {
-    const response = await api.get<OrdersResponse>(`/admin/orders/payment/${paymentStatus}`)
-    return response.orders
+  get: async (orderId: string): Promise<AdminOrder> => {
+    return api.get<AdminOrder>(`/admin/orders/${orderId}`)
   },
 }
-
-// ============================================================================
-// ANALYTICS API
-// ============================================================================
 
 export const analyticsApi = {
-  // Get ticket analytics
   getTicketAnalytics: async (): Promise<TicketAnalytics> => {
-    const response = await api.get<TicketAnalyticsResponse>('/admin/analytics/tickets')
-    return response.analytics
+    return api.get<TicketAnalytics>('/admin/analytics/tickets')
   },
 
-  // Get quick payment analytics
   getQuickPaymentAnalytics: async (): Promise<QuickPaymentAnalytics> => {
-    const response = await api.get<QuickPaymentAnalyticsResponse>('/admin/analytics/quick-payments')
-    return response.analytics
+    return api.get<QuickPaymentAnalytics>('/admin/analytics/quick-payments')
   },
 
-  // Get device analytics
   getDeviceAnalytics: async (): Promise<DeviceAnalytics> => {
-    const response = await api.get<DeviceAnalyticsResponse>('/admin/analytics/devices')
-    return response.analytics
+    return api.get<DeviceAnalytics>('/admin/analytics/devices')
   },
 
-  // Get revenue breakdown
-  getRevenueBreakdown: async (): Promise<RevenueBreakdown[]> => {
-    const response = await api.get<RevenueBreakdownResponse>('/admin/analytics/revenue')
-    return response.breakdown
+  getRevenueOverview: async (): Promise<RevenueOverview> => {
+    return api.get<RevenueOverview>('/admin/revenue/overview')
   },
 }
-
-// ============================================================================
-// SYSTEM API
-// ============================================================================
 
 export const systemApi = {
-  // Get system health
   getHealth: async (): Promise<SystemHealth> => {
-    const response = await api.get<SystemHealthResponse>('/admin/system/health')
-    return response.health
+    return api.get<SystemHealth>('/admin/system/status')
   },
 }
 
-// ============================================================================
-// TICKETS API
-// ============================================================================
+export const catalogApi = {
+  list: async (): Promise<CatalogListResponse> => {
+    return api.get<CatalogListResponse>('/admin/catalog')
+  },
+}
+
+export const usersApi = {
+  list: async (): Promise<UsersListResponse> => {
+    return api.get<UsersListResponse>('/admin/users')
+  },
+}
+
+export const qrActivityApi = {
+  get: async (): Promise<QrActivityResponse> => {
+    return api.get<QrActivityResponse>('/admin/qr-activity')
+  },
+}
+
+export const auditApi = {
+  list: async (): Promise<AuditListResponse> => {
+    return api.get<AuditListResponse>('/admin/audit')
+  },
+}
+
+export const revenueApi = {
+  getOverview: async (): Promise<RevenueOverview> => {
+    return api.get<RevenueOverview>('/admin/revenue/overview')
+  },
+  listTransactions: async (): Promise<RevenueTransaction[]> => {
+    const response = await api.get<{ transactions: RevenueTransaction[] }>('/admin/revenue/transactions')
+    return response.transactions
+  },
+}
+
+export const reportsApi = {
+  getOverview: async (): Promise<ReportsOverview> => {
+    return api.get<ReportsOverview>('/admin/reports/overview')
+  },
+}
 
 export const ticketsApi = {
   getStats: async (search?: string): Promise<TicketEventStats[]> => {
@@ -153,9 +174,23 @@ export const ticketsApi = {
   },
 }
 
-// ============================================================================
-// Combined Admin API Export
-// ============================================================================
+export const configsApi = {
+  getAll: async (): Promise<AllConfigsResponse> => {
+    return api.get<AllConfigsResponse>('/admin/configs')
+  },
+
+  getSection: async (section: ConfigSection): Promise<ConfigSectionResponse> => {
+    return api.get<ConfigSectionResponse>(`/admin/configs/${section}`)
+  },
+
+  updateSection: async (section: ConfigSection, config: ConfigMap): Promise<ConfigSectionResponse> => {
+    return api.put<ConfigSectionResponse>(`/admin/configs/${section}`, { config })
+  },
+
+  runAction: async (action: ConfigAction): Promise<ConfigActionResult> => {
+    return api.post<ConfigActionResult>(`/admin/configs/actions/${action}`)
+  },
+}
 
 export const adminApi = {
   dashboard: dashboardApi,
@@ -163,7 +198,14 @@ export const adminApi = {
   orders: ordersApi,
   analytics: analyticsApi,
   system: systemApi,
+  catalog: catalogApi,
+  users: usersApi,
+  qrActivity: qrActivityApi,
+  audit: auditApi,
+  revenue: revenueApi,
+  reports: reportsApi,
   tickets: ticketsApi,
+  configs: configsApi,
 }
 
 export default adminApi
