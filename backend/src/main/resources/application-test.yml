@@ -1,0 +1,42 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:scanny;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+keycloak:
+  admin-username: test
+  admin-password: test
+
+scanny:
+  scan-base-url: http://localhost:5173
+  cors:
+    allowed-origin-patterns: http://localhost:*
+  rate-limit:
+    enabled: false
+
+spring.security.oauth2.resourceserver.jwt:
+  issuer-uri: http://localhost:8080/realms/scanny
+  jwk-set-uri: http://localhost:8080/realms/scanny/protocol/openid-connect/certs
+
+logging:
+  level:
+    root: WARN
+    com.scanny: INFO

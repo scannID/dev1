@@ -1,0 +1,108 @@
+package com.scanny.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Value("${scanny.cors.allowed-origin-patterns}")
+    private String allowedOriginPatterns;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/health", "/api/health", "/actuator/health", "/actuator/health/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/merchant/register").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/businesses/*/menu").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/businesses/*/orders").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/qr/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/menu/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/devices").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/devices/*/registered").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/devices/*/pay").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/tickets/*/scan").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/tickets/stats").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/api/auth/merchant/**").hasRole("MERCHANT")
+                .requestMatchers("/api/businesses/**").hasRole("MERCHANT")
+                .requestMatchers("/api/catalog/**").hasRole("MERCHANT")
+                .requestMatchers("/api/orders/**").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/api/receipts/**").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/api/quick-payments/**").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/api/devices/**").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+            if (realmAccess == null || !realmAccess.containsKey("roles")) {
+                return List.of();
+            }
+            @SuppressWarnings("unchecked")
+            Collection<String> roles = (Collection<String>) realmAccess.get("roles");
+            return roles.stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                    .collect(Collectors.toList());
+        });
+        return converter;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        List<String> patterns = Arrays.stream(allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        configuration.setAllowedOriginPatterns(patterns);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("X-Correlation-Id", "Retry-After"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}

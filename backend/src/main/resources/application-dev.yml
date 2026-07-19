@@ -1,0 +1,29 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:scanny}
+    username: ${POSTGRES_USER:scanny}
+    password: ${POSTGRES_PASSWORD:scanny}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+keycloak:
+  admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+
+scanny:
+  scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
+  redis:
+    enabled: ${REDIS_ENABLED:false}
+  cors:
+    allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*.*:*,http://10.*.*.*:*,https://scanny.app,https://*.scanny.app}
+
+logging:
+  level:
+    com.scanny: DEBUG
+    org.springframework.security: INFO

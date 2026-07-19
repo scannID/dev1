@@ -1,10 +1,12 @@
 spring:
   application:
-    name: scanit-backend
-  datasource:
-    url: jdbc:postgresql://localhost:5432/scanit
-    username: scanit
-    password: scanit
+    name: scanny-backend
+  profiles:
+    default: dev
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   jpa:
     hibernate:
       ddl-auto: validate
@@ -16,9 +18,6 @@ spring:
   flyway:
     enabled: true
   mail:
-    # Email configuration for receipt sending
-    # For development, you can use a fake SMTP server like MailHog or Mailtrap
-    # For production, configure with your email provider (Gmail, SendGrid, etc.)
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USERNAME:}
@@ -31,24 +30,54 @@ spring:
             enable: ${MAIL_SMTP_STARTTLS:false}
             required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
     default-encoding: UTF-8
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/scanny}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/scanny/protocol/openid-connect/certs}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
 
 server:
-  port: 4000
+  port: ${SERVER_PORT:4000}
+  forward-headers-strategy: framework
 
-scanit:
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+
+scanny:
   scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
+  redis:
+    enabled: ${REDIS_ENABLED:false}
+  cors:
+    allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*.*:*,http://10.*.*.*:*}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    register-per-min: ${RATE_LIMIT_REGISTER_PER_MIN:5}
+    orders-per-min: ${RATE_LIMIT_ORDERS_PER_MIN:30}
+    menu-per-min: ${RATE_LIMIT_MENU_PER_MIN:120}
+    devices-per-min: ${RATE_LIMIT_DEVICES_PER_MIN:20}
+    ticket-scan-per-min: ${RATE_LIMIT_TICKET_SCAN_PER_MIN:60}
+    websocket-per-min: ${RATE_LIMIT_WEBSOCKET_PER_MIN:30}
+  websocket:
+    auth-timeout-ms: ${WS_AUTH_TIMEOUT_MS:5000}
 
 keycloak:
   server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
   realm: ${KEYCLOAK_REALM:scanny}
   admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-  admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
-  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+  admin-username: ${KEYCLOAK_ADMIN_USERNAME:}
+  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:}
   client-id: ${KEYCLOAK_CLIENT_ID:scanny-backend}
   client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+
+spring.security.oauth2.resourceserver.jwt:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/scanny}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/scanny/protocol/openid-connect/certs}
