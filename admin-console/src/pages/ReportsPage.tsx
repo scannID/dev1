@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { API_BASE_URL } from '../api/client'
 import { adminApi } from '../api/services'
 import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
+import { InlineSpinner } from '../components/LoadingSpinner'
 
 function currency(amount: number) {
   return new Intl.NumberFormat('en-UG', {
@@ -129,7 +130,11 @@ export default function ReportsPage() {
   return (
     <>
       {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>{error}</div>}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading reports…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading reports…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid cols-3">
         {[
@@ -161,7 +166,7 @@ export default function ReportsPage() {
               placeholder="Search event name"
               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--card)', color: 'var(--foreground)' }}
             />
-            {ticketLoading && <p style={{ margin: 0, fontSize: 12, color: 'var(--muted-foreground)' }}>Loading ticket stats...</p>}
+            {ticketLoading && <InlineSpinner label="Loading ticket stats…" />}
             {ticketError && !ticketLoading && <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>{ticketError}</p>}
             {!ticketLoading && !ticketError && (
               <div style={{ display: 'grid', gap: 8 }}>

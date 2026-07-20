@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useCatalog } from '../hooks/usePlatform'
 
 function currency(amount: number) {
@@ -21,7 +22,11 @@ export default function CatalogPage() {
           Could not load catalog: {error}
         </div>
       )}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: '16px', fontSize: 13 }}>Loading catalog…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading catalog…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid">
         {[
@@ -52,7 +57,7 @@ export default function CatalogPage() {
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No catalog items yet.'}</td></tr>
+                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No catalog items yet.'}</td></tr>
               ) : items.map((item) => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 500 }}>{item.name}</td>

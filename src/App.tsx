@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LoadingSpinner } from './components/LoadingSpinner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -360,7 +361,7 @@ function App({
   if (sessionLoading) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-        <p>Loading merchant portal…</p>
+        <LoadingSpinner label="Loading merchant portal…" />
       </main>
     )
   }

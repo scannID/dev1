@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useUsers } from '../hooks/usePlatform'
 
 const ROLE_STYLE: Record<string, string> = {
@@ -21,7 +22,11 @@ export default function UsersPage() {
   return (
     <>
       {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>Could not load users: {error}</div>}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading users…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading users…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid">
         {[
@@ -52,7 +57,7 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {users.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No users found.'}</td></tr>
+                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No users found.'}</td></tr>
               ) : users.map((u) => {
                 const status = (u.status || 'active').toLowerCase()
                 return (

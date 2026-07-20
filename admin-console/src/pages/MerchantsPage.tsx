@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useMerchants } from '../hooks/useMerchants'
 import { adminApi } from '../api/services'
 
@@ -127,8 +128,8 @@ export default function MerchantsPage() {
         </div>
       )}
       {loading && (
-        <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.95 0.01 250 / 0.15)', border: '1px solid oklch(0.60 0.15 250 / 0.4)', borderRadius: '10px', color: 'oklch(0.50 0.15 250)', fontSize: '13px', fontWeight: '500' }}>
-          Loading merchants…
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading merchants…" />
         </div>
       )}
 
@@ -171,7 +172,7 @@ export default function MerchantsPage() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
-                    {loading ? 'Loading…' : 'No merchants found.'}
+                    {loading ? <InlineSpinner label="Loading…" /> : 'No merchants found.'}
                   </td>
                 </tr>
               ) : (

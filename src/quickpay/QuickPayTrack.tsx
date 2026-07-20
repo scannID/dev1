@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPayTrackingMetrics, QuickPaymentTransaction } from '../api/types'
+import { InlineSpinner } from '../components/LoadingSpinner'
 
 export const DEMO_TRACKING_NUMBER = 'TRK-DEMO2026'
 
@@ -235,7 +236,7 @@ export default function QuickPayTrack({ trackingNumber: initial, onBack }: Props
               spellCheck={false}
             />
             <button type="submit" disabled={loading} className="scanny-btn scanny-btn-primary">
-              {loading ? 'Loading…' : 'Look up'}
+              {loading ? <InlineSpinner label="Loading…" /> : 'Look up'}
             </button>
           </form>
           {error ? <p className="scanny-error" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}

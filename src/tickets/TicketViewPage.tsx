@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { publicTicketsApi } from '../api/services'
 import type { AttendeeTicketView } from '../api/types'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 type Props = { accessToken: string }
 
@@ -45,9 +46,7 @@ export default function TicketViewPage({ accessToken }: Props) {
   if (loading) {
     return (
       <div className="scanny-page">
-        <div className="scanny-page-narrow">
-          <p className="scanny-hint" style={{ textAlign: 'center' }}>Loading ticket…</p>
-        </div>
+        <LoadingSpinner fullPage label="Loading ticket…" />
       </div>
     )
   }

@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
 import type { GateScanResponse } from '../api/types'
+import { LoadingSpinner, InlineSpinner } from '../components/LoadingSpinner'
 
 type Props = { gateToken: string }
 
@@ -40,9 +41,7 @@ export default function TicketGatePage({ gateToken }: Props) {
   if (loading) {
     return (
       <div className="scanny-page">
-        <div className="scanny-page-narrow">
-          <p className="scanny-hint" style={{ textAlign: 'center' }}>Loading…</p>
-        </div>
+        <LoadingSpinner fullPage label="Loading…" />
       </div>
     )
   }
@@ -67,7 +66,7 @@ export default function TicketGatePage({ gateToken }: Props) {
               />
             </label>
             <button type="submit" disabled={scanning} className="scanny-btn scanny-btn-primary">
-              {scanning ? 'Checking…' : 'Check ticket'}
+              {scanning ? <InlineSpinner label="Checking…" /> : 'Check ticket'}
             </button>
           </form>
 

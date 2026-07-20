@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useOrders } from '../hooks/useOrders'
 
 const S_STATUS: Record<string, string> = {
@@ -52,8 +53,8 @@ export default function OrdersPage() {
         </div>
       )}
       {loading && (
-        <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.95 0.01 250 / 0.15)', border: '1px solid oklch(0.60 0.15 250 / 0.4)', borderRadius: '10px', color: 'oklch(0.50 0.15 250)', fontSize: '13px', fontWeight: '500' }}>
-          Loading orders…
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading orders…" />
         </div>
       )}
 
@@ -92,7 +93,7 @@ export default function OrdersPage() {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
-                    {loading ? 'Loading…' : 'No orders found.'}
+                    {loading ? <InlineSpinner label="Loading…" /> : 'No orders found.'}
                   </td>
                 </tr>
               ) : (

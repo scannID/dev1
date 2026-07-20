@@ -1,5 +1,6 @@
 import { TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useRevenue } from '../hooks/usePlatform'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -30,7 +31,11 @@ export default function RevenuePaymentsPage() {
   return (
     <>
       {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>Could not load revenue: {error}</div>}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading revenue…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading revenue…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid">
         {[
@@ -127,7 +132,7 @@ export default function RevenuePaymentsPage() {
             </thead>
             <tbody>
               {transactions.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No transactions yet.'}</td></tr>
+                <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No transactions yet.'}</td></tr>
               ) : transactions.map((t) => (
                 <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, fontWeight: 500 }}>{t.id}</td>

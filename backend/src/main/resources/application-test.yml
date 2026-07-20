@@ -33,8 +33,11 @@ scanny:
     enabled: false
 
 spring.security.oauth2.resourceserver.jwt:
-  issuer-uri: http://localhost:8080/realms/scanny
   jwk-set-uri: http://localhost:8080/realms/scanny/protocol/openid-connect/certs
+
+scanny.jwt:
+  accepted-issuers: http://localhost:8080/realms/scanny,http://127.0.0.1:8080/realms/scanny
+  allow-lan-issuers: false
 
 logging:
   level:

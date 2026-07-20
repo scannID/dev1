@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useConfigs } from '@/hooks/usePlatform'
 import type { ConfigAction, ConfigMap, ConfigSection } from '@/api/types'
 
@@ -110,7 +111,7 @@ export default function ConfigsPage() {
   }
 
   if (loading && !draft) {
-    return <p style={{ color: 'var(--muted-foreground)' }}>Loading configs…</p>
+    return <LoadingSpinner fullPage label="Loading configs…" />
   }
 
   if (error && !draft) {

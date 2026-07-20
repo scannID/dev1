@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../api/services'
 import type { ScansOrdersRange, ScansOrdersSeries } from '../api/types'
+import { InlineSpinner } from './LoadingSpinner'
 
 type Range = ScansOrdersRange
 
@@ -180,7 +181,7 @@ export default function MetricsHero() {
           <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Orders</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#f07848', marginLeft: 2 }}>{fmt(totalOrders)}</span>
         </div>
-        {loading && <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading…</span>}
+        {loading && <InlineSpinner label="Loading…" />}
         {error && <span style={{ fontSize: 11, color: 'var(--destructive)' }}>{error}</span>}
       </div>
 

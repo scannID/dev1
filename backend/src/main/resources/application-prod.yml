@@ -21,8 +21,11 @@ keycloak:
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
 
 spring.security.oauth2.resourceserver.jwt:
-  issuer-uri: ${KEYCLOAK_ISSUER_URI}
   jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
+
+scanny.jwt:
+  accepted-issuers: ${KEYCLOAK_ISSUER_URI}
+  allow-lan-issuers: false
 
 scanny:
   scan-base-url: ${SCAN_BASE_URL}

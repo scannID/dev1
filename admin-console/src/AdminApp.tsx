@@ -34,6 +34,7 @@ import ReportsPage from './pages/ReportsPage'
 import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
+import { InlineSpinner } from './components/LoadingSpinner'
 import { useNotifications, useSystemHealth } from './hooks/usePlatform'
 
 type View =
@@ -333,7 +334,9 @@ function AdminNotificationsPanel({
           Recent
         </p>
         {loading && (
-          <p style={{ padding: '16px 20px', fontSize: 13, color: 'var(--muted-foreground)' }}>Loading…</p>
+          <div style={{ padding: '16px 20px' }}>
+            <InlineSpinner label="Loading…" />
+          </div>
         )}
         {error && (
           <p style={{ padding: '16px 20px', fontSize: 13, color: 'var(--destructive)' }}>{error}</p>

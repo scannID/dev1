@@ -19,6 +19,7 @@ import { MenuStep } from './steps/MenuStep'
 import { PayStep } from './steps/PayStep'
 import { WaitingStep } from './steps/WaitingStep'
 import { currency, formatUgPhoneHint, getOrCreateDeviceId } from './utils'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 import './CustomerApp.css'
 
 const PROGRESS_STEPS: CheckoutStep[] = ['menu', 'cart', 'details', 'pay']
@@ -372,7 +373,7 @@ export default function CustomerApp({
     return (
       <div className="cm-page cm-centered">
         <ScannyMark />
-        <p className="cm-muted">Loading menu…</p>
+        <LoadingSpinner label="Loading menu…" />
       </div>
     )
   }
@@ -541,6 +542,7 @@ export default function CustomerApp({
           total={payTotal}
           label={submitting ? 'Sending…' : `Pay ${currency(payTotal)}`}
           onAction={() => void submitPayment()}
+          loading={submitting}
           disabled={submitting || (!placedOrderId && cartCount === 0)}
         />
       )}

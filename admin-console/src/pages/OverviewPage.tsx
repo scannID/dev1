@@ -1,6 +1,7 @@
 import { ArrowUpRight, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useDashboard } from '../hooks/useDashboard'
 import { useSystemHealth } from '../hooks/usePlatform'
 
@@ -111,8 +112,8 @@ export default function OverviewPage() {
         </div>
       )}
       {loading && (
-        <div style={{ padding: '12px 16px', marginBottom: '16px', background: 'oklch(0.95 0.01 250 / 0.15)', border: '1px solid oklch(0.60 0.15 250 / 0.4)', borderRadius: '10px', color: 'oklch(0.50 0.15 250)', fontSize: '13px', fontWeight: '500' }}>
-          Loading live data…
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading live data…" />
         </div>
       )}
 

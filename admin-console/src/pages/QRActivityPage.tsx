@@ -1,3 +1,4 @@
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useQrActivity } from '../hooks/usePlatform'
 
 export default function QRActivityPage() {
@@ -10,7 +11,11 @@ export default function QRActivityPage() {
   return (
     <>
       {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>Could not load QR activity: {error}</div>}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading QR activity…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading QR activity…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid">
         {[
@@ -64,7 +69,7 @@ export default function QRActivityPage() {
             </thead>
             <tbody>
               {topCodes.length === 0 ? (
-                <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No QR codes yet.'}</td></tr>
+                <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No QR codes yet.'}</td></tr>
               ) : topCodes.map((q) => (
                 <tr key={q.token} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 500 }}>{q.merchant}</td>

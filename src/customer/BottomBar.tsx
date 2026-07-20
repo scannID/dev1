@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Loader2 } from 'lucide-react'
 import { currency } from './utils'
 
 export function BottomBar({
@@ -7,12 +7,14 @@ export function BottomBar({
   label,
   onAction,
   disabled,
+  loading,
 }: {
   count: number
   total: number
   label: string
   onAction: () => void
   disabled?: boolean
+  loading?: boolean
 }) {
   return (
     <div className="cm-bottom-bar">
@@ -22,8 +24,17 @@ export function BottomBar({
         </span>
         <strong>{currency(total)}</strong>
       </div>
-      <button type="button" className="cm-primary" disabled={disabled} onClick={onAction}>
-        {label} <ChevronRight size={16} />
+      <button type="button" className="cm-primary" disabled={disabled || loading} onClick={onAction}>
+        {loading ? (
+          <>
+            <Loader2 size={16} className="cm-spin" aria-hidden="true" />
+            {label}
+          </>
+        ) : (
+          <>
+            {label} <ChevronRight size={16} />
+          </>
+        )}
       </button>
     </div>
   )

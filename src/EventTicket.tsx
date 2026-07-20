@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { ticketsApi } from './api/services'
 import type { TicketStats } from './api/types'
+import { InlineSpinner } from './components/LoadingSpinner'
 
 /* ─── Tokens ────────────────────────────────────────────────────────── */
 const C = {
@@ -497,7 +498,7 @@ function TicketOutput({
           style={{ ...inp(), marginBottom: 10 }}
         />
 
-        {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
+        {statsLoading && <InlineSpinner label="Loading ticket stats…" />}
         {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
         {!statsLoading && !statsError && (
           <div style={{ display: 'grid', gap: 8 }}>
@@ -631,7 +632,7 @@ function TicketForm({
           </div>
         </div>
 
-        {statsLoading && <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 11 }}>Refreshing ticket stats...</p>}
+        {statsLoading && <InlineSpinner label="Refreshing ticket stats…" />}
         {statsError && !statsLoading && <p style={{ margin: '8px 0 0', color: 'var(--destructive)', fontSize: 11 }}>{statsError}</p>}
       </div>
 

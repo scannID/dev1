@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { InlineSpinner } from '../components/LoadingSpinner'
 import { useAuditLog } from '../hooks/usePlatform'
 
 export default function AuditLogPage() {
@@ -9,7 +10,11 @@ export default function AuditLogPage() {
   return (
     <>
       {error && <div style={{ padding: '12px 16px', marginBottom: 16, color: 'crimson', fontSize: 13 }}>Could not load audit log: {error}</div>}
-      {loading && <div style={{ padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>Loading audit log…</div>}
+      {loading && (
+        <div className="admin-loading-banner">
+          <InlineSpinner label="Loading audit log…" />
+        </div>
+      )}
 
       <div className="admin-metric-grid cols-3">
         {[
@@ -37,7 +42,7 @@ export default function AuditLogPage() {
             </thead>
             <tbody>
               {events.length === 0 ? (
-                <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? 'Loading…' : 'No audit events yet.'}</td></tr>
+                <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No audit events yet.'}</td></tr>
               ) : events.map((log) => (
                 <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12 }}>{log.actor}</td>
