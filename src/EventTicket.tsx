@@ -682,7 +682,7 @@ function TicketForm({
             }}
           />
 
-          {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
+          {statsLoading && <InlineSpinner label="Loading ticket stats…" />}
           {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
 
           {!statsLoading && !statsError && (
