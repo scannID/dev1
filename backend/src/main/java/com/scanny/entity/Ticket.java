@@ -85,6 +85,18 @@ public class Ticket {
     @Column(name = "redeemed_at")
     private Instant redeemedAt;
 
+    /** Event template ticket id — null for master templates, set for each attendee ticket. */
+    @Column(name = "master_ticket_id")
+    private String masterTicketId;
+
+    /** Secret link token for attendee to open their ticket without login. */
+    @Column(name = "access_token")
+    private String accessToken;
+
+    /** Secret link for gate staff to scan tickets — no login required. */
+    @Column(name = "gate_token")
+    private String gateToken;
+
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("scannedAt DESC")
     private List<TicketScan> scans = new ArrayList<>();
@@ -257,6 +269,38 @@ public class Ticket {
 
     public void setRedeemedAt(Instant redeemedAt) {
         this.redeemedAt = redeemedAt;
+    }
+
+    public String getMasterTicketId() {
+        return masterTicketId;
+    }
+
+    public void setMasterTicketId(String masterTicketId) {
+        this.masterTicketId = masterTicketId;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getGateToken() {
+        return gateToken;
+    }
+
+    public void setGateToken(String gateToken) {
+        this.gateToken = gateToken;
+    }
+
+    public boolean isEventTemplate() {
+        return masterTicketId == null && usageLimit > 1_000_000;
+    }
+
+    public boolean isAttendeeTicket() {
+        return masterTicketId != null;
     }
 
     public List<TicketScan> getScans() {

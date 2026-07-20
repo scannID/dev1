@@ -23,9 +23,12 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -191,29 +194,37 @@ public class QrCodeService {
     }
 
     /**
-     * Generate unique QR token using database function
+     * Generate a unique QR token in-app so H2 and Postgres both work.
+     * Format matches the Postgres helper: QR-{12 hex}-{epoch seconds}
      */
     private String generateUniqueToken() {
-        String token = jdbcTemplate.queryForObject(
-            "SELECT generate_qr_token()",
-            String.class
-        );
-        
-        if (token == null || token.isBlank()) {
-            throw new ApiException(500, "Failed to generate QR token");
+        SecureRandom random = new SecureRandom();
+        for (int attempt = 0; attempt < 20; attempt++) {
+            byte[] bytes = new byte[6];
+            random.nextBytes(bytes);
+            String token = "QR-"
+                    + HexFormat.of().withUpperCase().formatHex(bytes)
+                    + "-"
+                    + Instant.now().getEpochSecond();
+            if (!merchantRepository.findByQrCodeToken(token).isPresent()) {
+                return token;
+            }
         }
-        
-        return token;
+        throw new ApiException(500, "Failed to generate QR token");
     }
 
     /**
-     * Log QR code generation to database
+     * Log QR code generation to database when the audit table exists.
      */
     private void logQrCodeGeneration(UUID merchantId, String qrToken, String qrUrl, String reason) {
-        jdbcTemplate.update(
-            "INSERT INTO qr_code_generations (merchant_id, qr_token, qr_url, generation_reason) VALUES (?, ?, ?, ?)",
-            merchantId, qrToken, qrUrl, reason
-        );
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO qr_code_generations (merchant_id, qr_token, qr_url, generation_reason) VALUES (?, ?, ?, ?)",
+                merchantId, qrToken, qrUrl, reason
+            );
+        } catch (Exception e) {
+            logger.warn("Skipping QR generation audit log: {}", e.getMessage());
+        }
     }
 
     /**

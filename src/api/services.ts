@@ -28,6 +28,19 @@ import type {
   UpdateTicketStatusRequest,
   RegisterDeviceRequest,
   RegisteredDevice,
+  PublicCreateQuickPaymentRequest,
+  QuickPaymentCode,
+  QuickPayTrackingMetrics,
+  QuickPayInitiateResponse,
+  PaymentInitiateRequest,
+  PaymentInitiateResponse,
+  PaymentStatusResponse,
+  TicketPurchaseRequest,
+  TicketPurchaseResponse,
+  TicketEventInfo,
+  AttendeeTicketView,
+  GateScanResponse,
+  GateEventResponse,
 } from './types'
 
 export const merchantAuthApi = {
@@ -191,6 +204,68 @@ export const devicesApi = {
   },
 }
 
+export const quickPaymentsApi = {
+  createPublic: async (data: PublicCreateQuickPaymentRequest): Promise<QuickPaymentCode> => {
+    return api.post<QuickPaymentCode>('/quick-payments/public/codes', data)
+  },
+
+  track: async (trackingNumber: string): Promise<QuickPayTrackingMetrics> => {
+    return api.get<QuickPayTrackingMetrics>(
+      `/quick-payments/public/track/${encodeURIComponent(trackingNumber.trim())}`
+    )
+  },
+
+  getByQr: async (qrToken: string): Promise<QuickPaymentCode> => {
+    return api.get<QuickPaymentCode>(`/quick-payments/codes/qr/${encodeURIComponent(qrToken)}`)
+  },
+
+  pay: async (
+    qrToken: string,
+    data: { customerPhone: string; customerName?: string; paymentMethod?: string }
+  ): Promise<QuickPayInitiateResponse> => {
+    return api.post<QuickPayInitiateResponse>(
+      `/quick-payments/codes/qr/${encodeURIComponent(qrToken)}/pay`,
+      data
+    )
+  },
+}
+
+export const paymentsApi = {
+  providers: async (): Promise<PaymentProvidersResponse> => {
+    return api.get<PaymentProvidersResponse>('/payments/providers')
+  },
+
+  initiate: async (data: PaymentInitiateRequest): Promise<PaymentInitiateResponse> => {
+    return api.post<PaymentInitiateResponse>('/payments/initiate', data)
+  },
+
+  status: async (paymentId: string): Promise<PaymentStatusResponse> => {
+    return api.get<PaymentStatusResponse>(`/payments/${encodeURIComponent(paymentId)}/status`)
+  },
+}
+
+export const publicTicketsApi = {
+  getEvent: async (masterQrToken: string): Promise<TicketEventInfo> => {
+    return api.get<TicketEventInfo>(`/tickets/public/event/${encodeURIComponent(masterQrToken)}`)
+  },
+
+  purchase: async (data: TicketPurchaseRequest): Promise<TicketPurchaseResponse> => {
+    return api.post<TicketPurchaseResponse>('/tickets/public/purchase', data)
+  },
+
+  view: async (accessToken: string): Promise<AttendeeTicketView> => {
+    return api.get<AttendeeTicketView>(`/tickets/public/view/${encodeURIComponent(accessToken)}`)
+  },
+
+  getGateEvent: async (gateToken: string): Promise<GateEventResponse> => {
+    return api.get<GateEventResponse>(`/tickets/public/gate/${encodeURIComponent(gateToken)}`)
+  },
+
+  gateScan: async (gateToken: string, qrToken: string): Promise<GateScanResponse> => {
+    return api.post<GateScanResponse>(`/tickets/public/gate/${encodeURIComponent(gateToken)}/scan`, { qrToken })
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -198,6 +273,9 @@ export const scannyApi = {
   orders: ordersApi,
   tickets: ticketsApi,
   devices: devicesApi,
+  quickPayments: quickPaymentsApi,
+  payments: paymentsApi,
+  publicTickets: publicTicketsApi,
 }
 
 export default scannyApi

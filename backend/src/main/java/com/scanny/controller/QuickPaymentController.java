@@ -2,8 +2,7 @@ package com.scanny.controller;
 
 import com.scanny.dto.QuickPaymentCodeResponse;
 import com.scanny.dto.QuickPaymentDtos;
-import com.scanny.model.enums.QuickPaymentCodeStatus;
-import com.scanny.model.enums.TransactionStatus;
+import com.scanny.exception.ApiException;
 import com.scanny.service.QuickPaymentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,118 +26,88 @@ public class QuickPaymentController {
         this.quickPaymentService = quickPaymentService;
     }
 
+    /** Landing-page create — no login. Returns QR + tracking number and emails the owner. */
+    @PostMapping("/public/codes")
+    public ResponseEntity<QuickPaymentCodeResponse> createPublicCode(
+            @RequestBody QuickPaymentDtos.PublicCreateQuickPaymentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(quickPaymentService.createPublicCode(request));
+    }
+
+    /** Public metrics by tracking number (acts as the owner's access key). */
+    @GetMapping("/public/track/{trackingNumber}")
+    public ResponseEntity<QuickPaymentDtos.TrackingMetricsResponse> trackByNumber(
+            @PathVariable String trackingNumber) {
+        return ResponseEntity.ok(quickPaymentService.getTrackingMetrics(trackingNumber));
+    }
+
     @PostMapping("/codes")
     public ResponseEntity<QuickPaymentCodeResponse> createCode(
             @RequestBody QuickPaymentDtos.CreateQuickPaymentCodeRequest request) {
-        try {
-            QuickPaymentCodeResponse code = quickPaymentService.createQuickPaymentCode(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(code);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(quickPaymentService.createQuickPaymentCode(request));
     }
 
     @GetMapping("/codes")
     public ResponseEntity<List<QuickPaymentCodeResponse>> getAllCodes(
             @RequestParam(required = false) String merchantId,
             @RequestParam(required = false) String businessId) {
-        try {
-            List<QuickPaymentCodeResponse> codes;
-            if (merchantId != null) {
-                codes = quickPaymentService.getCodesByMerchant(merchantId);
-            } else if (businessId != null) {
-                codes = quickPaymentService.getCodesByBusiness(businessId);
-            } else {
-                codes = quickPaymentService.getAllCodes();
-            }
-            return ResponseEntity.ok(codes);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        List<QuickPaymentCodeResponse> codes;
+        if (merchantId != null) {
+            codes = quickPaymentService.getCodesByMerchant(merchantId);
+        } else if (businessId != null) {
+            codes = quickPaymentService.getCodesByBusiness(businessId);
+        } else {
+            codes = quickPaymentService.getAllCodes();
         }
+        return ResponseEntity.ok(codes);
     }
 
     @GetMapping("/codes/{codeId}")
     public ResponseEntity<QuickPaymentCodeResponse> getCode(@PathVariable String codeId) {
-        try {
-            QuickPaymentCodeResponse code = quickPaymentService.getCode(codeId);
-            return ResponseEntity.ok(code);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.getCode(codeId));
     }
 
     @GetMapping("/codes/qr/{qrToken}")
     public ResponseEntity<QuickPaymentCodeResponse> getCodeByQr(@PathVariable String qrToken) {
-        try {
-            QuickPaymentCodeResponse code = quickPaymentService.getCodeByQrToken(qrToken);
-            return ResponseEntity.ok(code);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.getCodeByQrToken(qrToken));
     }
 
     @PostMapping("/codes/qr/{qrToken}/pay")
     public ResponseEntity<QuickPaymentDtos.PaymentValidationResponse> initiatePayment(
             @PathVariable String qrToken,
             @RequestBody QuickPaymentDtos.InitiatePaymentRequest request) {
-        try {
-            QuickPaymentDtos.PaymentValidationResponse response = 
-                quickPaymentService.initiatePayment(qrToken, request);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.initiatePayment(qrToken, request));
     }
 
     @PatchMapping("/codes/{codeId}/status")
     public ResponseEntity<QuickPaymentCodeResponse> updateCodeStatus(
             @PathVariable String codeId,
             @RequestBody QuickPaymentDtos.UpdateCodeStatusRequest request) {
-        try {
-            QuickPaymentCodeResponse code = quickPaymentService.updateCodeStatus(codeId, request.status());
-            return ResponseEntity.ok(code);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.updateCodeStatus(codeId, request.status()));
     }
 
     @GetMapping("/transactions/{transactionRef}")
     public ResponseEntity<QuickPaymentDtos.TransactionResponse> getTransaction(
             @PathVariable String transactionRef) {
-        try {
-            QuickPaymentDtos.TransactionResponse transaction = 
-                quickPaymentService.getTransaction(transactionRef);
-            return ResponseEntity.ok(transaction);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.getTransaction(transactionRef));
     }
 
     @GetMapping("/codes/{codeId}/transactions")
     public ResponseEntity<List<QuickPaymentDtos.TransactionResponse>> getTransactionsByCode(
             @PathVariable String codeId) {
-        try {
-            List<QuickPaymentDtos.TransactionResponse> transactions = 
-                quickPaymentService.getTransactionsByCode(codeId);
-            return ResponseEntity.ok(transactions);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        return ResponseEntity.ok(quickPaymentService.getTransactionsByCode(codeId));
     }
 
     @PostMapping("/transactions/{transactionRef}/complete")
     public ResponseEntity<QuickPaymentDtos.TransactionResponse> completeTransaction(
             @PathVariable String transactionRef,
             @RequestBody QuickPaymentDtos.CompleteTransactionRequest request) {
-        try {
-            QuickPaymentDtos.TransactionResponse transaction = quickPaymentService.completeTransaction(
-                transactionRef,
-                request.status(),
-                request.failureReason()
-            );
-            return ResponseEntity.ok(transaction);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if (request.status() == null) {
+            throw new ApiException(400, "Transaction status is required");
         }
+        return ResponseEntity.ok(quickPaymentService.completeTransaction(
+            transactionRef,
+            request.status(),
+            request.failureReason()
+        ));
     }
 }

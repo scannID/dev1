@@ -50,6 +50,7 @@ import type {
   PaymentStatus,
 } from './api/types'
 import { buildMetricSeries, buildReportData, dailySeries, type MetricRange } from './lib/orderAnalytics'
+import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
 import './App.css'
 
 // Sparkline component with area fill - moved outside render to fix React hooks error
@@ -135,7 +136,7 @@ function customerUrl(business: Business) {
 
 function App({
   onLogout,
-  onBackToLanding,
+  onBackToLanding: _onBackToLanding,
   kcUsername,
 }: {
   onLogout?: () => void
@@ -148,7 +149,6 @@ function App({
     merchant,
     loading: sessionLoading,
     error: sessionError,
-    refreshBusinesses,
     refreshBusiness,
     loadOrders,
     setOrders,
@@ -159,10 +159,7 @@ function App({
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('scanny-dark-mode')
-    return saved ? JSON.parse(saved) : false
-  })
+  const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const [actionError, setActionError] = useState<string | null>(null)
 
   const business = businesses[0] ?? emptyBusiness
@@ -198,13 +195,12 @@ function App({
   useEffect(() => {
     function handleKeyPress(e: KeyboardEvent) {
       if (e.key === 'd' || e.key === 'D') {
-        // Don't toggle if user is typing in an input field
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
           return
         }
         setDarkMode((prev: boolean) => {
           const newMode = !prev
-          localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
+          persistDarkMode(newMode)
           return newMode
         })
       }
@@ -213,13 +209,8 @@ function App({
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [])
 
-  // Apply dark mode class to body
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark-mode')
-    } else {
-      document.documentElement.classList.remove('dark-mode')
-    }
+    applyDarkMode(darkMode)
   }, [darkMode])
 
   // Realtime orders with polling fallback
@@ -267,17 +258,6 @@ function App({
     .filter((order) => order.paymentStatus === 'Paid')
     .reduce((sum, _order) => sum + _order.total, 0)
   const availableItems = (business.items ?? []).filter((item) => item.available).length
-  const hasNetworkIssue = Boolean(
-    sessionError && /failed to fetch|network error|http 0/i.test(sessionError),
-  )
-
-  useEffect(() => {
-    if (!business.id || !hasNetworkIssue || !onBackToLanding) return
-    const timeoutId = window.setTimeout(() => {
-      onBackToLanding()
-    }, 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [business.id, hasNetworkIssue, onBackToLanding])
 
   async function handleCreateCatalogItem(data: {
     name: string
@@ -377,14 +357,6 @@ function App({
     }
   }
 
-  function handleBackToLanding() {
-    if (onBackToLanding) {
-      onBackToLanding()
-      return
-    }
-    handleLogout()
-  }
-
   if (sessionLoading) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
@@ -393,26 +365,7 @@ function App({
     )
   }
 
-  if (!business.id) {
-    if (hasNetworkIssue) {
-      return null
-    }
-
-    return (
-      <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', gap: '1rem' }}>
-        <p>{sessionError || 'No business linked to this merchant yet.'}</p>
-        <button className="primary-action" type="button" onClick={() => refreshBusinesses()}>
-          Retry
-        </button>
-        {hasNetworkIssue && (
-          <button type="button" onClick={handleBackToLanding}>
-            Back to landing
-          </button>
-        )}
-        <button type="button" onClick={handleLogout}>Log out</button>
-      </main>
-    )
-  }
+  if (!business.id) return null
 
   return (
     <main className="company-shell">
@@ -493,7 +446,7 @@ function App({
               {view === 'reports' && 'Reports'}
             </h2>
             {(actionError || sessionError) && (
-              <p style={{ color: 'crimson', marginTop: 8, fontSize: 14 }}>{actionError || sessionError}</p>
+              <p className="scanny-error" role="alert" style={{ marginTop: 8 }}>{actionError || sessionError}</p>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -511,7 +464,7 @@ function App({
               onClick={() => {
                 setDarkMode((prev: boolean) => {
                   const newMode = !prev
-                  localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
+                  persistDarkMode(newMode)
                   return newMode
                 })
               } } className={undefined}            >
@@ -738,6 +691,12 @@ function OverviewPage({
   orders: Order[]
   darkMode: boolean
 }) {
+  const openOrders = orders.filter(
+    (order) => order.status !== 'Completed' && order.status !== 'Cancelled',
+  ).length
+  const menuItems = (business.items ?? []).filter((item) => item.available).length
+  const totalItems = (business.items ?? []).length
+
   return (
     <div className="account-layout">
       <MetricsCard business={business} orders={orders} darkMode={darkMode} />
@@ -746,18 +705,35 @@ function OverviewPage({
         <QrPanel business={business} />
 
         <div className="link-map">
-          <h3>What customers access</h3>
+          <h3>At a glance</h3>
           <div>
             <span>Customer menu</span>
-            <strong>{customerUrl(business)}</strong>
+            <strong>Open by scanning your QR code</strong>
           </div>
           <div>
-            <span>Orders</span>
-            <strong>{business.merchantId}</strong>
+            <span>Open orders</span>
+            <strong>
+              {openOrders === 0
+                ? 'None right now'
+                : openOrders === 1
+                  ? '1 order waiting'
+                  : `${openOrders} orders waiting`}
+            </strong>
           </div>
           <div>
-            <span>Goods and prices</span>
-            <strong>{(business.items ?? []).length} linked items</strong>
+            <span>Menu items</span>
+            <strong>
+              {totalItems === 0
+                ? 'No items yet — add some in Catalog'
+                : `${menuItems} available · ${totalItems} total`}
+            </strong>
+          </div>
+          <div>
+            <span>Business</span>
+            <strong>
+              {business.name}
+              {business.type ? ` · ${business.type}` : ''}
+            </strong>
           </div>
         </div>
       </section>
@@ -926,7 +902,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
       <div className="print-card">
         <div className="print-brand">Scanny</div>
         <h3>{business.name}</h3>
-        <p>Scan to view prices, goods, tickets, and place orders.</p>
+        <p>Scan to view prices, browse the menu, and place orders.</p>
         {qrImage ? <img src={qrImage} alt={`${business.name} QR code`} /> : <div className="qr-loading" />}
       </div>
 
@@ -935,12 +911,12 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
           <>
             <dl>
               <div>
-                <dt>Merchant ID</dt>
-                <dd>{business.merchantId}</dd>
+                <dt>Business</dt>
+                <dd>{business.name}</dd>
               </div>
               <div>
-                <dt>QR token</dt>
-                <dd>{business.qrToken}</dd>
+                <dt>How it works</dt>
+                <dd>Customers scan this code to open your menu and place an order</dd>
               </div>
             </dl>
             <div className="qr-actions">
@@ -1016,7 +992,7 @@ function AddItemForm({
     <form className="catalog-form universal-item-form" noValidate onSubmit={submitItem}>
       <div>
         <p className="eyebrow">Add item</p>
-        <h3>New item, service, or ticket</h3>
+        <h3>New item or service</h3>
       </div>
 
       <label>
@@ -1027,7 +1003,7 @@ function AddItemForm({
           className={isItemNameMissing ? 'field-error' : undefined}
           value={item.name}
           onChange={(event) => setItem({ ...item, name: event.target.value })}
-          placeholder="Burger, cocktail, VIP ticket, uniform, school lunch..."
+          placeholder="Burger, cocktail, uniform, school lunch..."
         />
         {isItemNameMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
       </label>
@@ -1041,7 +1017,7 @@ function AddItemForm({
           list="catalog-categories"
           value={item.category}
           onChange={(event) => setItem({ ...item, category: event.target.value })}
-          placeholder="Meals, Drinks, Tickets, Services, Goods..."
+          placeholder="Meals, Drinks, Services, Goods..."
         />
         {isCategoryMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
       </label>
@@ -1513,6 +1489,10 @@ function Dashboard({
             <TableRow className="hover:bg-transparent border-b border-border">
               <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Order</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Customer</TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+                {business.tableLabel || 'Table'}
+              </TableHead>
+              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Note</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Items</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Total</TableHead>
               <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
@@ -1535,7 +1515,21 @@ function Dashboard({
                 </TableCell>
                 <TableCell className={undefined}>
                   <p className="text-sm font-medium text-foreground">{order.customer.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{[order.customer.phone, order.customer.location].filter(Boolean).join(' · ')}</p>
+                  {order.customer.phone ? (
+                    <p className="text-xs text-muted-foreground mt-0.5">{order.customer.phone}</p>
+                  ) : null}
+                </TableCell>
+                <TableCell className="text-sm text-foreground">
+                  {order.customer.location?.trim() || <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="max-w-[160px]">
+                  {order.customer.note?.trim() ? (
+                    <p className="text-sm text-foreground truncate" title={order.customer.note}>
+                      {order.customer.note}
+                    </p>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell className={undefined}>
                   <div className="flex flex-wrap gap-1">
@@ -1599,8 +1593,26 @@ function Dashboard({
                 <div>
                   <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">Customer</p>
                   <p className="text-sm font-medium text-foreground">{detailOrder.customer.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{[detailOrder.customer.phone, detailOrder.customer.location].filter(Boolean).join(' · ')}</p>
-                  {detailOrder.customer.note && <p className="text-xs text-muted-foreground mt-1 italic">{detailOrder.customer.note}</p>}
+                  {detailOrder.customer.phone ? (
+                    <p className="text-xs text-muted-foreground mt-0.5">{detailOrder.customer.phone}</p>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">
+                      {business.tableLabel || 'Table'}
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {detailOrder.customer.location?.trim() || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">Note</p>
+                    <p className="text-sm text-foreground">
+                      {detailOrder.customer.note?.trim() || '—'}
+                    </p>
+                  </div>
                 </div>
 
                 <Separator className="" />

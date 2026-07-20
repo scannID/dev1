@@ -306,7 +306,7 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
       filtered
         .filter((order) => order.status === status)
         .map((order) => ({
-          id: order.publicId || order.id,
+          id: order.id,
           customer: order.customer.name,
           items: order.items.map((item) => `${item.quantity}x ${item.name}`),
           total: order.total,

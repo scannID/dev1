@@ -1,6 +1,7 @@
 package com.scanny.service;
 
 import com.scanny.dto.admin.AdminPlatformDtos;
+import com.scanny.dto.admin.SystemHealthDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.CatalogItem;
 import com.scanny.entity.Merchant;
@@ -37,19 +38,22 @@ public class AdminPlatformService {
     private final MerchantRepository merchantRepository;
     private final TicketScanRepository ticketScanRepository;
     private final AuditService auditService;
+    private final SystemHealthService systemHealthService;
 
     public AdminPlatformService(
         BusinessRepository businessRepository,
         OrderRepository orderRepository,
         MerchantRepository merchantRepository,
         TicketScanRepository ticketScanRepository,
-        AuditService auditService
+        AuditService auditService,
+        SystemHealthService systemHealthService
     ) {
         this.businessRepository = businessRepository;
         this.orderRepository = orderRepository;
         this.merchantRepository = merchantRepository;
         this.ticketScanRepository = ticketScanRepository;
         this.auditService = auditService;
+        this.systemHealthService = systemHealthService;
     }
 
     @Transactional(readOnly = true)
@@ -315,11 +319,113 @@ public class AdminPlatformService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public AdminPlatformDtos.NotificationsResponse getNotifications() {
+        List<AdminPlatformDtos.NotificationItem> items = new ArrayList<>();
+        Instant now = Instant.now();
+        Instant oneDayAgo = now.minus(24, ChronoUnit.HOURS);
+        Instant startOfToday = now.truncatedTo(ChronoUnit.DAYS);
+
+        SystemHealthDtos.SystemHealthResponse health = systemHealthService.getSystemHealth();
+        if (health.overall().openIncidents() != null && health.overall().openIncidents() > 0) {
+            items.add(new AdminPlatformDtos.NotificationItem(
+                "notif-health",
+                "⚠️",
+                "System health alert",
+                health.overall().openIncidents() + " open incident(s) · status " + health.overall().status(),
+                now.toString(),
+                "system",
+                true
+            ));
+        }
+        for (SystemHealthDtos.ServiceHealth service : health.services()) {
+            if (!"operational".equalsIgnoreCase(service.status())) {
+                items.add(new AdminPlatformDtos.NotificationItem(
+                    "notif-svc-" + service.name().toLowerCase().replace(' ', '-'),
+                    "⚠️",
+                    service.name() + " " + service.status(),
+                    service.incidents() != null && service.incidents() > 0
+                        ? service.incidents() + " incident(s)"
+                        : "Service is " + service.status(),
+                    now.toString(),
+                    "system",
+                    true
+                ));
+            }
+        }
+
+        businessRepository.findAll().stream()
+            .filter(b -> b.getCreatedAt().isAfter(oneDayAgo))
+            .sorted(Comparator.comparing(Business::getCreatedAt).reversed())
+            .limit(5)
+            .forEach(business -> items.add(new AdminPlatformDtos.NotificationItem(
+                "notif-merchant-" + business.getId(),
+                "🏪",
+                "New merchant registered",
+                business.getName(),
+                business.getCreatedAt().toString(),
+                "merchant",
+                business.getCreatedAt().isAfter(now.minus(2, ChronoUnit.HOURS))
+            )));
+
+        long ordersToday = orderRepository.findAll().stream()
+            .filter(o -> o.getCreatedAt().isAfter(startOfToday))
+            .count();
+        if (ordersToday > 0) {
+            long merchants = orderRepository.findAll().stream()
+                .filter(o -> o.getCreatedAt().isAfter(startOfToday))
+                .map(Order::getMerchantId)
+                .distinct()
+                .count();
+            items.add(new AdminPlatformDtos.NotificationItem(
+                "notif-orders-today",
+                "📦",
+                ordersToday + " orders placed today",
+                "Across " + merchants + " active merchants",
+                now.toString(),
+                "orders",
+                true
+            ));
+        }
+
+        long scansToday = ticketScanRepository.findAll().stream()
+            .filter(s -> s.getScannedAt().isAfter(startOfToday))
+            .count();
+        if (scansToday > 0) {
+            items.add(new AdminPlatformDtos.NotificationItem(
+                "notif-scans-today",
+                "📱",
+                scansToday + " QR scans today",
+                "Platform scan activity",
+                now.toString(),
+                "qr",
+                false
+            ));
+        }
+
+        auditService.list(0, 8).getContent().forEach(event -> items.add(new AdminPlatformDtos.NotificationItem(
+            "notif-audit-" + event.getId(),
+            "🔒",
+            event.getAction(),
+            (event.getActorEmail() != null ? event.getActorEmail() : event.getActorId())
+                + (event.getClientIp() != null ? " · " + event.getClientIp() : ""),
+            event.getOccurredAt().toString(),
+            "audit",
+            event.getOccurredAt().isAfter(now.minus(6, ChronoUnit.HOURS))
+        )));
+
+        List<AdminPlatformDtos.NotificationItem> sorted = items.stream()
+            .sorted(Comparator.comparing(AdminPlatformDtos.NotificationItem::timestamp).reversed())
+            .limit(25)
+            .toList();
+        int unread = (int) sorted.stream().filter(AdminPlatformDtos.NotificationItem::unread).count();
+        return new AdminPlatformDtos.NotificationsResponse(sorted, unread);
+    }
+
     private static String normalizeInstant(String value) {
         if (value == null) {
             return Instant.EPOCH.toString();
         }
-        // LocalDateTime strings from merchant entity need a Z suffix for Instant.parse
         if (!value.endsWith("Z") && !value.contains("+") && value.contains("T")) {
             return value + "Z";
         }

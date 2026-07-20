@@ -8,6 +8,7 @@ import adminKeycloak from './api/keycloak'
 
 // Isolated session key — only this app sets/reads this key
 const SESSION_KEY = 'scanny-admin-authenticated'
+const EXPECTED_CLIENT = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-admin'
 
 let kcInitPromise: Promise<boolean> | null = null
 
@@ -18,57 +19,73 @@ function initKc() {
   return kcInitPromise
 }
 
+function hasAdminRole(): boolean {
+  const roles = (adminKeycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
+  return roles.includes('ADMIN')
+}
+
+function isAdminClient(): boolean {
+  return adminKeycloak.tokenParsed?.azp === EXPECTED_CLIENT
+}
+
+function redirectUri() {
+  return window.location.origin
+}
+
 type View = 'landing' | 'app'
 
 function Root() {
   const [view, setView] = useState<View>('landing')
   const [kcUsername, setKcUsername] = useState('Admin')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [loginBusy, setLoginBusy] = useState(false)
 
   // Restore session only if THIS app's flag is set
   useEffect(() => {
     const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
-    console.log('[ADMIN] Checking session on mount, hadSession:', hadSession)
     if (!hadSession) return
 
-    console.log('[ADMIN] Restoring session...')
     initKc()
       .then((authenticated) => {
-        console.log('[ADMIN] Session restore - authenticated:', authenticated)
-        if (authenticated) {
+        if (authenticated && isAdminClient() && hasAdminRole()) {
           const name = adminKeycloak.tokenParsed?.name
             || adminKeycloak.tokenParsed?.preferred_username
             || adminKeycloak.tokenParsed?.email
             || 'Admin'
-          console.log('[ADMIN] User authenticated as:', name)
           setKcUsername(name)
           setView('app')
-        } else {
-          console.log('[ADMIN] Not authenticated, clearing session')
-          sessionStorage.removeItem(SESSION_KEY)
+          return
         }
+        sessionStorage.removeItem(SESSION_KEY)
       })
-      .catch((err) => {
-        console.error('[ADMIN] Session restore error:', err)
+      .catch(() => {
         sessionStorage.removeItem(SESSION_KEY)
       })
   }, [])
 
-  function handleLogin() {
-    console.log('[ADMIN] Login button clicked, redirecting to Keycloak...')
-    console.log('[ADMIN] Redirect URI:', 'http://localhost:5174')
-    adminKeycloak.login({ redirectUri: 'http://localhost:5174' }).catch((err) => {
+  async function handleLogin() {
+    setAuthError(null)
+    setLoginBusy(true)
+    try {
+      await initKc()
+      // Force the Keycloak login form — silent SSO can leave a merchant
+      // session in place and make Sign in appear to do nothing.
+      await adminKeycloak.login({
+        redirectUri: redirectUri(),
+        prompt: 'login',
+      })
+    } catch (err) {
       console.error('[ADMIN] Login error:', err)
-    })
+      setAuthError(err instanceof Error ? err.message : 'Failed to start Keycloak login')
+      setLoginBusy(false)
+    }
   }
 
   function handleLogout() {
-    console.log('[ADMIN] Logout initiated')
     sessionStorage.removeItem(SESSION_KEY)
     if (adminKeycloak.authenticated) {
-      console.log('[ADMIN] Logging out from Keycloak')
-      adminKeycloak.logout({ redirectUri: 'http://localhost:5174' })
+      adminKeycloak.logout({ redirectUri: redirectUri() })
     } else {
-      console.log('[ADMIN] No active Keycloak session, returning to landing')
       setView('landing')
     }
   }
@@ -77,43 +94,48 @@ function Root() {
     return <AdminApp kcUsername={kcUsername} onLogout={handleLogout} />
   }
 
-  return <AdminLogin onLogin={handleLogin} />
+  return (
+    <AdminLogin
+      onLogin={handleLogin}
+      error={authError}
+      busy={loginBusy}
+    />
+  )
 }
 
-// Module-level init — handles the post-login redirect (code in URL)
-console.log('[ADMIN] Initializing Keycloak...')
-console.log('[ADMIN] Keycloak config:', {
+console.log('[ADMIN] Initializing Keycloak...', {
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'scanny',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'admin-console'
+  clientId: EXPECTED_CLIENT,
 })
 
-adminKeycloak
-  .init({ onLoad: 'check-sso', checkLoginIframe: false })
+kcInitPromise = adminKeycloak.init({ onLoad: 'check-sso', checkLoginIframe: false })
+
+kcInitPromise
   .then((authenticated) => {
     console.log('[ADMIN] Keycloak init complete - authenticated:', authenticated)
-    kcInitPromise = Promise.resolve(authenticated)
-    if (authenticated) {
-      console.log('[ADMIN] Token parsed:', adminKeycloak.tokenParsed)
-      console.log('[ADMIN] Client (azp):', adminKeycloak.tokenParsed?.azp)
-      // Only store the flag if Keycloak authenticated via THIS client
-      const expectedClient = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'admin-console'
-      if (adminKeycloak.tokenParsed?.azp === expectedClient) {
-        console.log('[ADMIN] Correct client, storing session')
-        sessionStorage.setItem(SESSION_KEY, '1')
-      } else {
-        console.warn('[ADMIN] Wrong client, expected', expectedClient, 'but got:', adminKeycloak.tokenParsed?.azp)
-      }
-    } else {
-      console.log('[ADMIN] Not authenticated')
+    if (!authenticated) return
+
+    console.log('[ADMIN] Token:', {
+      azp: adminKeycloak.tokenParsed?.azp,
+      roles: (adminKeycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles,
+    })
+
+    if (isAdminClient() && hasAdminRole()) {
+      sessionStorage.setItem(SESSION_KEY, '1')
+      return
+    }
+
+    sessionStorage.removeItem(SESSION_KEY)
+    if (isAdminClient() && !hasAdminRole()) {
+      console.warn('[ADMIN] Signed in without ADMIN realm role')
     }
   })
-  .catch((err) => { 
+  .catch((err) => {
     console.error('[ADMIN] Keycloak init error:', err)
-    kcInitPromise = Promise.resolve(false) 
+    kcInitPromise = Promise.resolve(false)
   })
   .finally(() => {
-    console.log('[ADMIN] Rendering app')
     createRoot(document.getElementById('admin-root')!).render(
       <StrictMode><Root /></StrictMode>
     )

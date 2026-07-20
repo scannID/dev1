@@ -6,10 +6,10 @@ import type { TicketStats } from './api/types'
 
 /* ─── Tokens ────────────────────────────────────────────────────────── */
 const C = {
-  dark:    'var(--input)',
+  dark:    'var(--muted)',
   darker:  'var(--card)',
-  teal:    '#0f766e',
-  tealLt:  '#14b8a6',
+  teal:    'var(--primary)',
+  tealLt:  'var(--primary)',
   border:  'var(--border)',
   muted:   'var(--muted-foreground)',
   white:   'var(--foreground)',
@@ -39,7 +39,9 @@ type TicketData = {
   ticketClasses: TicketClass[]
   tables: TableOption[]
   ticketId: string
-  selectedClass: string    // which class this individual ticket is for
+  selectedClass: string
+  purchaseUrl?: string
+  gateUrl?: string | null
 }
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
@@ -239,7 +241,7 @@ function TemplatePicker({ value, onChange, formData }: { value: TemplateId; onCh
 
 /* ─── Shared input style factory ────────────────────────────────────── */
 function inp(hasError?: boolean): React.CSSProperties {
-  return { width: '100%', padding: '10px 13px', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: C.dark, color: C.white, outline: 'none', border: `1.5px solid ${hasError ? '#ef4444' : C.border}` }
+  return { width: '100%', padding: '10px 13px', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', border: `1.5px solid ${hasError ? 'var(--destructive)' : C.border}` }
 }
 
 /* ─── Ticket classes editor ─────────────────────────────────────────── */
@@ -305,7 +307,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
             style={inp()}
           />
           <button type="button" onClick={() => removeClass(cls.id)}
-            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: '#f87171', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: 'var(--destructive)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             ×
           </button>
         </div>
@@ -352,7 +354,7 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
           <input type="number" min="1" value={t.seats} onChange={e => updateTable(t.id, 'seats', e.target.value)} placeholder="6" style={inp()} />
           <input type="number" min="0" value={t.price} onChange={e => updateTable(t.id, 'price', e.target.value)} placeholder="200000" style={inp()} />
           <button type="button" onClick={() => removeTable(t.id)}
-            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: '#f87171', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: 'var(--destructive)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             ×
           </button>
         </div>
@@ -442,6 +444,19 @@ function TicketOutput({
 
       <TicketRenderer d={{ ...data, selectedClass: previewClass }} qr={qr} />
 
+      <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 20, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 18px' }}>
+        <p style={{ margin: '0 0 8px', color: C.tealLt, fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Two links</p>
+        <p style={{ margin: '0 0 10px', color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+          <strong style={{ color: C.white }}>Poster QR</strong> — attendees scan to buy.
+          {data.gateUrl ? (
+            <>
+              {' '}<strong style={{ color: C.white }}>Gate link</strong> — send to bouncer (no login):{' '}
+              <a href={data.gateUrl} style={{ color: C.tealLt, wordBreak: 'break-all' }}>{data.gateUrl}</a>
+            </>
+          ) : null}
+        </p>
+      </div>
+
       {/* Tables summary */}
       {data.tables.length > 0 && (
         <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 24, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
@@ -483,7 +498,7 @@ function TicketOutput({
         />
 
         {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
-        {statsError && !statsLoading && <p style={{ margin: 0, color: '#f87171', fontSize: 12 }}>{statsError}</p>}
+        {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
         {!statsLoading && !statsError && (
           <div style={{ display: 'grid', gap: 8 }}>
             {filteredStats.slice(0, 6).map((row) => (
@@ -588,7 +603,7 @@ function TicketForm({
   const fieldInp = (field: string): React.CSSProperties => ({
     width: '100%', padding: '11px 14px', borderRadius: 9, fontSize: 15, fontFamily: 'inherit',
     background: C.dark, color: C.white, outline: 'none',
-    border: `1.5px solid ${touched && errors[field] ? '#ef4444' : C.border}`,
+    border: `1.5px solid ${touched && errors[field] ? 'var(--destructive)' : C.border}`,
   })
 
   return (
@@ -617,7 +632,7 @@ function TicketForm({
         </div>
 
         {statsLoading && <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 11 }}>Refreshing ticket stats...</p>}
-        {statsError && !statsLoading && <p style={{ margin: '8px 0 0', color: '#f87171', fontSize: 11 }}>{statsError}</p>}
+        {statsError && !statsLoading && <p style={{ margin: '8px 0 0', color: 'var(--destructive)', fontSize: 11 }}>{statsError}</p>}
       </div>
 
       <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: '1100px', background: C.darker, border: `1px solid ${C.border}`, borderRadius: 20, padding: '22px', display: 'grid', gap: 18, position: 'relative', boxShadow: '0 24px 60px rgba(0,0,0,0.18)' }}>
@@ -667,7 +682,7 @@ function TicketForm({
           />
 
           {statsLoading && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Loading ticket stats...</p>}
-          {statsError && !statsLoading && <p style={{ margin: 0, color: '#f87171', fontSize: 12 }}>{statsError}</p>}
+          {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
 
           {!statsLoading && !statsError && (
             <div style={{ maxHeight: 210, overflow: 'auto', paddingRight: 6 }}>
@@ -706,12 +721,12 @@ function TicketForm({
           <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
             <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event name</span>
             <input style={fieldInp('eventName')} type="text" placeholder="e.g. Kampala Rooftop Bash 2025" value={form.eventName} onChange={e => set('eventName', e.target.value)} />
-            {touched && errors.eventName && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.eventName}</span>}
+            {touched && errors.eventName && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.eventName}</span>}
           </label>
           <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
             <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event date</span>
             <input style={{ ...fieldInp('date'), colorScheme: 'dark' }} type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-            {touched && errors.date && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.date}</span>}
+            {touched && errors.date && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.date}</span>}
           </label>
 
           <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
@@ -724,7 +739,7 @@ function TicketForm({
               onChange={e => set('paymentDetails', e.target.value)}
             />
             <span style={{ color: '#6b9e96', fontSize: 11 }}>Mobile Money number, bank account, or Airtel Money. This prints on every ticket.</span>
-            {touched && errors.paymentDetails && <span style={{ color: '#f87171', fontSize: 12 }}>{errors.paymentDetails}</span>}
+            {touched && errors.paymentDetails && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.paymentDetails}</span>}
           </label>
         </div>
 
@@ -734,7 +749,7 @@ function TicketForm({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, alignItems: 'start' }}>
           <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
             <ClassesEditor classes={form.ticketClasses} onChange={v => set('ticketClasses', v)} />
-            {touched && errors.ticketClasses && <span style={{ color: '#f87171', fontSize: 12, marginTop: 4, display: 'block' }}>{errors.ticketClasses}</span>}
+            {touched && errors.ticketClasses && <span style={{ color: 'var(--destructive)', fontSize: 12, marginTop: 4, display: 'block' }}>{errors.ticketClasses}</span>}
           </div>
           <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
             <TablesEditor tables={form.tables} onChange={v => set('tables', v)} />
@@ -863,7 +878,12 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       })
       setQr(url)
       setLastCreatedEventName(data.eventName)
-      setTicket({ ...data, ticketId: createdTicket.id })
+      setTicket({
+        ...data,
+        ticketId: createdTicket.id,
+        purchaseUrl: createdTicket.qrCodeUrl,
+        gateUrl: createdTicket.gateUrl ?? null,
+      })
       await loadStats(data.eventName)
     } catch (err) {
       setStatsError(err instanceof Error ? err.message : 'Failed to create ticket')

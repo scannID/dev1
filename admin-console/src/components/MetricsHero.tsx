@@ -1,57 +1,33 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { adminApi } from '../api/services'
+import type { ScansOrdersRange, ScansOrdersSeries } from '../api/types'
 
-type Range = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+type Range = ScansOrdersRange
 
 const RANGES: { key: Range; label: string }[] = [
-  { key: 'hourly',  label: 'Hourly'  },
-  { key: 'daily',   label: 'Daily'   },
-  { key: 'weekly',  label: 'Weekly'  },
+  { key: 'hourly', label: 'Hourly' },
+  { key: 'daily', label: 'Daily' },
+  { key: 'weekly', label: 'Weekly' },
   { key: 'monthly', label: 'Monthly' },
-  { key: 'yearly',  label: 'Yearly'  },
+  { key: 'yearly', label: 'Yearly' },
 ]
 
-const DATA: Record<Range, { scans: number[]; orders: number[]; yMax: number; xLabels: string[] }> = {
-  hourly: {
-    scans:  [320,480,420,600,780,920,1040,880,760,840,980,1120,1040,900,820,760,680,580,520,460,400,360,320,280],
-    orders: [28,42,36,55,68,82,96,78,66,74,88,104,96,82,72,66,58,48,44,38,32,28,24,20],
-    yMax: 1200,
-    xLabels: ['12a','2a','4a','6a','8a','10a','12p','2p','4p','6p','8p','10p'],
-  },
-  daily: {
-    scans:  [4200,5800,4900,7200,6400,8800,7600,9200,8400,10200,9600,8800,10400,9200,8000,7400,8800,10000,9200,8400,7800,9400,10800,9600,8200,7600,9000,10200],
-    orders: [380,520,440,640,580,780,680,820,740,900,860,780,920,820,700,640,780,880,820,740,680,840,960,860,720,660,800,920],
-    yMax: 12000,
-    xLabels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
-  },
-  weekly: {
-    scans:  [28000,32000,38000,44000,52000,48000,56000,62000,58000,68000,72000,64000,70000,78000,74000,80000],
-    orders: [2400,2800,3200,3800,4400,4100,4800,5200,4900,5700,6000,5400,5900,6500,6100,6800],
-    yMax: 85000,
-    xLabels: ['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12','W13','W14','W15','W16'],
-  },
-  monthly: {
-    scans:  [120000,145000,132000,168000,184000,210000,196000,228000,214000,248000,236000,262000],
-    orders: [10200,12400,11200,14200,15600,17800,16400,19200,18000,20800,19600,22000],
-    yMax: 280000,
-    xLabels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-  },
-  yearly: {
-    scans:  [820000,980000,1140000,1320000,1580000],
-    orders: [68000,82000,96000,112000,134000],
-    yMax: 1700000,
-    xLabels: ['2021','2022','2023','2024','2025'],
-  },
+const EMPTY: ScansOrdersSeries = {
+  range: 'daily',
+  scans: [0, 0],
+  orders: [0, 0],
+  yMax: 10,
+  xLabels: ['—', '—'],
 }
 
-// Fixed logical coordinate space — SVG scales to fit container
 const VW = 600
 const VH = 220
 const PL = 40, PR = 10, PT = 16, PB = 28
 const CW = VW - PL - PR
 const CH = VH - PT - PB
 
-function tx(i: number, n: number) { return PL + (i / (n - 1)) * CW }
-function ty(v: number, max: number) { return PT + CH - (v / max) * CH }
+function tx(i: number, n: number) { return PL + (i / Math.max(n - 1, 1)) * CW }
+function ty(v: number, max: number) { return PT + CH - (v / Math.max(max, 1)) * CH }
 
 function smooth(pts: [number, number][]) {
   if (pts.length < 2) return ''
@@ -70,12 +46,14 @@ function areaPath(pts: [number, number][]) {
 
 function fmt(v: number) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}k`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
   return String(v)
 }
 
 function peaks(data: number[], t = 0.72) {
+  if (!data.length) return []
   const mx = Math.max(...data)
+  if (mx <= 0) return []
   return data.reduce<number[]>((a, v, i) => { if (v >= mx * t) a.push(i); return a }, [])
 }
 
@@ -85,48 +63,57 @@ function xStep(n: number) {
   return Math.ceil(n / 7)
 }
 
-// Animate SVG path morph (kept for chart transitions; currently unused by MetricsHero)
-function _useMorphPath(target: string) {
-  const [displayed, setDisplayed] = useState(target)
-  const [_animating, setAnimating] = useState(false)
-  const prev = useRef(target)
-
-  useEffect(() => {
-    if (target === prev.current) return
-    prev.current = target
-    setAnimating(true)
-    // tiny delay so browser gets the "from" state before transitioning
-    const id = setTimeout(() => {
-      setDisplayed(target)
-      setAnimating(false)
-    }, 20)
-    return () => clearTimeout(id)
-  }, [target])
-
-  return displayed
-}
-
-void _useMorphPath
-
 export default function MetricsHero() {
   const [range, setRange] = useState<Range>('daily')
-  const d = DATA[range]
+  const [series, setSeries] = useState<ScansOrdersSeries>(EMPTY)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await adminApi.analytics.getScansOrders(range)
+        if (!cancelled) {
+          setSeries({
+            ...data,
+            scans: data.scans?.length ? data.scans : EMPTY.scans,
+            orders: data.orders?.length ? data.orders : EMPTY.orders,
+            xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
+            yMax: Math.max(data.yMax || 1, 1),
+          })
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load chart')
+          setSeries(EMPTY)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [range])
+
+  const d = series
   const n = d.scans.length
 
-  const scanPts  = d.scans.map((v, i):  [number, number] => [tx(i, n), ty(v, d.yMax)])
+  const scanPts = d.scans.map((v, i): [number, number] => [tx(i, n), ty(v, d.yMax)])
   const orderPts = d.orders.map((v, i): [number, number] => [tx(i, n), ty(v, d.yMax)])
 
-  const scanLine  = smooth(scanPts)
-  const scanArea  = areaPath(scanPts)
+  const scanLine = smooth(scanPts)
+  const scanArea = areaPath(scanPts)
   const orderLine = smooth(orderPts)
   const orderArea = areaPath(orderPts)
 
-  const scanPeaks  = peaks(d.scans)
+  const scanPeaks = peaks(d.scans)
   const orderPeaks = peaks(d.orders)
-  const step = xStep(n)
+  const step = xStep(d.xLabels.length)
   const yTicks = [0.25, 0.5, 0.75, 1].map(f => Math.round(d.yMax * f))
 
-  const totalScans  = d.scans.reduce((a, b) => a + b, 0)
+  const totalScans = d.scans.reduce((a, b) => a + b, 0)
   const totalOrders = d.orders.reduce((a, b) => a + b, 0)
 
   return (
@@ -140,7 +127,6 @@ export default function MetricsHero() {
       overflow: 'hidden',
       border: '1px solid var(--border)',
     }}>
-      {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -158,7 +144,6 @@ export default function MetricsHero() {
           </p>
         </div>
 
-        {/* Range tabs */}
         <div style={{ display: 'flex', gap: 2, background: 'var(--muted)', borderRadius: 8, padding: 3 }}>
           {RANGES.map(r => (
             <button
@@ -184,7 +169,6 @@ export default function MetricsHero() {
         </div>
       </div>
 
-      {/* Legend */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '8px 16px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 20, height: 2, borderRadius: 2, background: '#5ac8fa', display: 'inline-block' }} />
@@ -196,9 +180,10 @@ export default function MetricsHero() {
           <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Orders</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#f07848', marginLeft: 2 }}>{fmt(totalOrders)}</span>
         </div>
+        {loading && <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Loading…</span>}
+        {error && <span style={{ fontSize: 11, color: 'var(--destructive)' }}>{error}</span>}
       </div>
 
-      {/* Chart — fills remaining space */}
       <div style={{ flex: 1, minHeight: 0, padding: '4px 0 0' }}>
         <svg
           viewBox={`0 0 ${VW} ${VH}`}
@@ -208,11 +193,11 @@ export default function MetricsHero() {
         >
           <defs>
             <linearGradient id="mh-fill-scan" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="#5ac8fa" stopOpacity="0.35" />
+              <stop offset="0%" stopColor="#5ac8fa" stopOpacity="0.35" />
               <stop offset="100%" stopColor="#5ac8fa" stopOpacity="0.02" />
             </linearGradient>
             <linearGradient id="mh-fill-order" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="#f07848" stopOpacity="0.28" />
+              <stop offset="0%" stopColor="#f07848" stopOpacity="0.28" />
               <stop offset="100%" stopColor="#f07848" stopOpacity="0.02" />
             </linearGradient>
             <filter id="mh-glow-b" x="-80%" y="-80%" width="260%" height="260%">
@@ -225,7 +210,6 @@ export default function MetricsHero() {
             </filter>
           </defs>
 
-          {/* Y grid + labels */}
           {yTicks.map(v => {
             const y = ty(v, d.yMax)
             return (
@@ -241,10 +225,11 @@ export default function MetricsHero() {
             )
           })}
 
-          {/* X labels */}
           {d.xLabels.map((label, i) => {
             if (i % step !== 0 && i !== d.xLabels.length - 1) return null
-            const ri = Math.round(i * (n - 1) / (d.xLabels.length - 1))
+            const ri = d.xLabels.length === n
+              ? i
+              : Math.round(i * (n - 1) / Math.max(d.xLabels.length - 1, 1))
             return (
               <text key={`${label}-${i}`} x={tx(ri, n)} y={VH - 6}
                 textAnchor="middle" fontSize="8"
@@ -255,40 +240,19 @@ export default function MetricsHero() {
             )
           })}
 
-          {/* Areas — animated via CSS transition on d attribute */}
-          <path
-            d={scanArea}
-            fill="url(#mh-fill-scan)"
-            style={{ transition: 'd 0.4s ease' }}
-          />
-          <path
-            d={orderArea}
-            fill="url(#mh-fill-order)"
-            style={{ transition: 'd 0.4s ease' }}
-          />
+          <path d={scanArea} fill="url(#mh-fill-scan)" style={{ transition: 'd 0.4s ease' }} />
+          <path d={orderArea} fill="url(#mh-fill-order)" style={{ transition: 'd 0.4s ease' }} />
+          <path d={scanLine} fill="none" stroke="#5ac8fa" strokeWidth="2" strokeLinejoin="round" style={{ transition: 'd 0.4s ease' }} />
+          <path d={orderLine} fill="none" stroke="#f07848" strokeWidth="1.8" strokeLinejoin="round" style={{ transition: 'd 0.4s ease' }} />
 
-          {/* Lines */}
-          <path
-            d={scanLine}
-            fill="none" stroke="#5ac8fa" strokeWidth="2" strokeLinejoin="round"
-            style={{ transition: 'd 0.4s ease' }}
-          />
-          <path
-            d={orderLine}
-            fill="none" stroke="#f07848" strokeWidth="1.8" strokeLinejoin="round"
-            style={{ transition: 'd 0.4s ease' }}
-          />
-
-          {/* Scan peak dots */}
           {scanPeaks.map(i => (
             <g key={`sp-${i}`} filter="url(#mh-glow-b)">
               <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="5.5" fill="#5ac8fa" opacity="0.22" />
-              <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="3"   fill="#5ac8fa" />
+              <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="3" fill="#5ac8fa" />
               <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="1.4" fill="#e8f8ff" />
             </g>
           ))}
 
-          {/* Order peak dots */}
           {orderPeaks.map(i => (
             <g key={`op-${i}`} filter="url(#mh-glow-o)">
               <circle cx={orderPts[i][0]} cy={orderPts[i][1]} r="4.5" fill="#f07848" opacity="0.22" />

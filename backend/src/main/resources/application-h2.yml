@@ -18,6 +18,10 @@ spring:
 
 scanny:
   scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
+  payments:
+    fallback-to-stub: true
+    stub:
+      auto-complete-seconds: 10
 
 keycloak:
   admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}

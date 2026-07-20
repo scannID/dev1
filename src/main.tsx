@@ -3,51 +3,135 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import LandingPage from './LandingPage'
-import EventTicketPage from './EventTicket'
 import CustomerMenu from './CustomerMenu'
-import keycloak from './keycloak'
+import QuickPayTrack from './quickpay/QuickPayTrack'
+import QuickPayCustomer from './quickpay/QuickPayCustomer'
+import TicketPurchasePage from './tickets/TicketPurchasePage'
+import TicketViewPage from './tickets/TicketViewPage'
+import TicketGatePage from './tickets/TicketGatePage'
+import keycloak, { hasMerchantSession, initKeycloak, waitForKeycloak } from './keycloak'
+import { applyDarkMode, initThemeFromStorage, persistDarkMode, readDarkMode } from './lib/theme'
+
+initThemeFromStorage()
 
 function resolveCustomerRoute(): { businessId: string; qrToken: string | null } | null {
   const url = new URL(window.location.href)
   const bid = url.searchParams.get('bid')
   const qr = url.searchParams.get('qr')
 
-  // Preferred deep link from backend: /b/{businessId}?qr=TOKEN
   const pathMatch = url.pathname.match(/^\/b\/([^/]+)\/?$/)
   if (pathMatch) {
     return { businessId: decodeURIComponent(pathMatch[1]), qrToken: qr }
   }
 
-  // Legacy: ?bid=
   if (bid) {
     return { businessId: bid, qrToken: qr }
   }
 
-  // QR-only link with path /b?qr=TOKEN — resolve via API later if needed
   return null
 }
 
-const customerRoute = resolveCustomerRoute()
+function resolvePayRoute(): string | null {
+  const match = window.location.pathname.match(/^\/pay\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
 
-// Customer menu — no Keycloak
+function resolveTrackRoute(): string | null {
+  const match = window.location.pathname.match(/^\/track\/([^/]+)\/?$/)
+  if (match) return decodeURIComponent(match[1])
+  return new URL(window.location.href).searchParams.get('track')
+}
+
+function resolveTicketViewRoute(): string | null {
+  const match = window.location.pathname.match(/^\/ticket\/view\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+function resolveTicketPurchaseRoute(): string | null {
+  const match = window.location.pathname.match(/^\/ticket\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+function resolveGateRoute(): string | null {
+  const match = window.location.pathname.match(/^\/gate\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+function goToLanding() {
+  window.location.href = '/'
+}
+
+const customerRoute = resolveCustomerRoute()
+const payToken = resolvePayRoute()
+const trackNumber = resolveTrackRoute()
+const ticketViewToken = resolveTicketViewRoute()
+const gateToken = resolveGateRoute()
+const ticketMasterToken = resolveTicketPurchaseRoute()
+
 if (customerRoute) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
     </StrictMode>
   )
+} else if (gateToken) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <TicketGatePage gateToken={gateToken} />
+    </StrictMode>
+  )
+} else if (ticketViewToken) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <TicketViewPage accessToken={ticketViewToken} />
+    </StrictMode>
+  )
+} else if (ticketMasterToken) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <TicketPurchasePage masterQrToken={ticketMasterToken} />
+    </StrictMode>
+  )
+} else if (payToken) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QuickPayCustomer qrToken={payToken} />
+    </StrictMode>
+  )
+} else if (trackNumber) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QuickPayTrack trackingNumber={trackNumber} onBack={goToLanding} />
+    </StrictMode>
+  )
 } else {
   const SESSION_KEY = 'scanny-merchant-authenticated'
-  const PENDING_LOGIN_KEY = 'scanny-pending-login'
+  const MERCHANT_REDIRECT_URI = window.location.origin
 
-  type View = 'landing' | 'app' | 'ticket'
+  type View = 'landing' | 'app'
 
-  function Root({ initialView }: { initialView: View }) {
-    const [view, setView] = useState<View>(initialView)
-    const [darkMode, setDarkMode] = useState(() => {
-      const saved = localStorage.getItem('scanny-dark-mode')
-      return saved ? JSON.parse(saved) : false
-    })
+  function Root() {
+    const [view, setView] = useState<View>('landing')
+    const [darkMode, setDarkMode] = useState(() => readDarkMode())
+
+    // Restore dashboard after Keycloak redirect (same pattern as admin console)
+    useEffect(() => {
+      const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
+      if (!hadSession && !hasMerchantSession()) return
+
+      waitForKeycloak()
+        .then((authenticated) => {
+          if (authenticated && hasMerchantSession()) {
+            sessionStorage.setItem(SESSION_KEY, '1')
+            setView('app')
+          } else {
+            sessionStorage.removeItem(SESSION_KEY)
+          }
+        })
+        .catch(() => {
+          sessionStorage.removeItem(SESSION_KEY)
+        })
+    }, [])
 
     useEffect(() => {
       function handleKeyPress(e: KeyboardEvent) {
@@ -55,7 +139,7 @@ if (customerRoute) {
           if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
           setDarkMode((prev: boolean) => {
             const newMode = !prev
-            localStorage.setItem('scanny-dark-mode', JSON.stringify(newMode))
+            persistDarkMode(newMode)
             return newMode
           })
         }
@@ -65,24 +149,17 @@ if (customerRoute) {
     }, [])
 
     useEffect(() => {
-      document.body.classList.toggle('dark-mode', darkMode)
+      applyDarkMode(darkMode)
     }, [darkMode])
 
     function handleGetStarted() {
-      // Already signed in (SSO session) — enter the app without another round trip.
-      if (keycloak.authenticated) {
-        sessionStorage.setItem(SESSION_KEY, '1')
-        setView('app')
-        return
-      }
-      sessionStorage.setItem(PENDING_LOGIN_KEY, '1')
-      keycloak.login({ redirectUri: window.location.origin }).catch(console.error)
+      keycloak.login({ redirectUri: MERCHANT_REDIRECT_URI, prompt: 'login' }).catch(console.error)
     }
 
     function handleLogout() {
       sessionStorage.removeItem(SESSION_KEY)
       if (keycloak.authenticated) {
-        keycloak.logout({ redirectUri: window.location.origin })
+        keycloak.logout({ redirectUri: MERCHANT_REDIRECT_URI })
       } else {
         setView('landing')
       }
@@ -106,42 +183,24 @@ if (customerRoute) {
         />
       )
     }
-    if (view === 'ticket') return <EventTicketPage onBack={() => setView('landing')} />
-    return (
-      <LandingPage
-        onGetStarted={handleGetStarted}
-        onCreateTicket={() => setView('ticket')}
-      />
-    )
+    return <LandingPage onGetStarted={handleGetStarted} />
   }
 
-  // Module-level init — handles post-login redirect (auth code in URL)
-  keycloak
-    .init({ onLoad: 'check-sso', checkLoginIframe: false })
+  initKeycloak()
     .then((authenticated) => {
-      if (authenticated && keycloak.tokenParsed?.azp === 'scanny-client') {
+      if (authenticated && hasMerchantSession()) {
         sessionStorage.setItem(SESSION_KEY, '1')
+      } else {
+        sessionStorage.removeItem(SESSION_KEY)
       }
     })
     .catch(() => {
-      // Keep landing view if SSO check fails
+      sessionStorage.removeItem(SESSION_KEY)
     })
     .finally(() => {
-      // Decide the initial view ONCE, outside React, so StrictMode's
-      // double-invocation of effects can't reset it. If we just came back
-      // from a Keycloak login redirect and are authenticated, open the app.
-      const justLoggedIn = sessionStorage.getItem(PENDING_LOGIN_KEY) === '1'
-      sessionStorage.removeItem(PENDING_LOGIN_KEY)
-      const signedIntoApp =
-        Boolean(keycloak.authenticated) && keycloak.tokenParsed?.azp === 'scanny-client'
-      const initialView: View = justLoggedIn && signedIntoApp ? 'app' : 'landing'
-      if (!(justLoggedIn && signedIntoApp)) {
-        sessionStorage.removeItem(SESSION_KEY)
-      }
-
       createRoot(document.getElementById('root')!).render(
         <StrictMode>
-          <Root initialView={initialView} />
+          <Root />
         </StrictMode>
       )
     })

@@ -167,18 +167,29 @@ public class OrderService {
     @Transactional
     public OrderResponse updatePaymentStatus(String orderId, PaymentStatus paymentStatus) {
         Order order = requireOwnedOrder(orderId);
+        return applyPaymentStatus(order, paymentStatus);
+    }
 
+    /** Called by the payment gateway when a provider confirms payment — no merchant auth required. */
+    @Transactional
+    public void confirmPaymentFromGateway(String orderId, PaymentStatus paymentStatus) {
+        Order order = orderRepository.findWithItemsById(orderId)
+            .orElseThrow(() -> new ApiException(404, "Order was not found."));
+        applyPaymentStatus(order, paymentStatus);
+    }
+
+    private OrderResponse applyPaymentStatus(Order order, PaymentStatus paymentStatus) {
         PaymentStatus oldStatus = order.getPaymentStatus();
         order.setPaymentStatus(paymentStatus);
         order.setUpdatedAt(Instant.now());
-        
+
         Order savedOrder = orderRepository.save(order);
 
         if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
             try {
                 autoGenerateReceipt(savedOrder);
             } catch (Exception e) {
-                logger.error("Failed to auto-generate receipt for order {}", orderId, e);
+                logger.error("Failed to auto-generate receipt for order {}", order.getId(), e);
             }
         }
 

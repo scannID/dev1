@@ -119,4 +119,12 @@ public class AdminAnalyticsDtos {
         List<MonthlyRevenue> monthly,
         List<PaymentMethodBreakdown> paymentMethods
     ) {}
+
+    public record ScansOrdersSeries(
+        String range,
+        List<Integer> scans,
+        List<Integer> orders,
+        int yMax,
+        List<String> xLabels
+    ) {}
 }

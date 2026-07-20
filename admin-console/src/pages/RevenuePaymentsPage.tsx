@@ -34,19 +34,33 @@ export default function RevenuePaymentsPage() {
 
       <div className="admin-metric-grid">
         {[
-          { label: 'Total Revenue (MTD)', value: currency(current?.revenue ?? 0), delta: pct(current?.growth.revenue ?? 0) },
-          { label: 'Transactions (MTD)', value: String(current?.transactions ?? 0), delta: pct(current?.growth.transactions ?? 0) },
-          { label: 'Failed Payments', value: String(current?.failedPayments ?? 0), delta: pct(current?.growth.failedPayments ?? 0) },
-          { label: 'Avg Order Value', value: currency(current?.avgOrderValue ?? 0), delta: pct(current?.growth.avgOrderValue ?? 0) },
-        ].map((c) => (
-          <div key={c.label} className="admin-metric-card">
-            <span className="metric-label">{c.label}</span>
-            <span className="metric-value">{c.value}</span>
-            <span className="metric-delta up" style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 500, color: '#16a34a' }}>
-              <TrendingUp size={10} />{c.delta}
-            </span>
-          </div>
-        ))}
+          { label: 'Total Revenue (MTD)', value: currency(current?.revenue ?? 0), delta: current?.growth.revenue ?? 0 },
+          { label: 'Transactions (MTD)', value: String(current?.transactions ?? 0), delta: current?.growth.transactions ?? 0 },
+          { label: 'Failed Payments', value: String(current?.failedPayments ?? 0), delta: current?.growth.failedPayments ?? 0 },
+          { label: 'Avg Order Value', value: currency(current?.avgOrderValue ?? 0), delta: current?.growth.avgOrderValue ?? 0 },
+        ].map((c) => {
+          const up = c.delta >= 0
+          return (
+            <div key={c.label} className="admin-metric-card">
+              <span className="metric-label">{c.label}</span>
+              <span className="metric-value">{c.value}</span>
+              <span
+                className={`metric-delta ${up ? 'up' : 'down'}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: up ? '#16a34a' : '#dc2626',
+                }}
+              >
+                <TrendingUp size={10} style={{ transform: up ? undefined : 'rotate(180deg)' }} />
+                {pct(c.delta)}
+              </span>
+            </div>
+          )
+        })}
       </div>
 
       <div className="admin-two-col">

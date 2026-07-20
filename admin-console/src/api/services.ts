@@ -27,6 +27,9 @@ import type {
   ConfigMap,
   ConfigAction,
   ConfigActionResult,
+  ScansOrdersRange,
+  ScansOrdersSeries,
+  NotificationsResponse,
 } from './types'
 
 export const dashboardApi = {
@@ -116,6 +119,10 @@ export const analyticsApi = {
     return api.get<DeviceAnalytics>('/admin/analytics/devices')
   },
 
+  getScansOrders: async (range: ScansOrdersRange = 'daily'): Promise<ScansOrdersSeries> => {
+    return api.get<ScansOrdersSeries>(`/admin/analytics/scans-orders?range=${range}`)
+  },
+
   getRevenueOverview: async (): Promise<RevenueOverview> => {
     return api.get<RevenueOverview>('/admin/revenue/overview')
   },
@@ -192,6 +199,12 @@ export const configsApi = {
   },
 }
 
+export const notificationsApi = {
+  list: async (): Promise<NotificationsResponse> => {
+    return api.get<NotificationsResponse>('/admin/notifications')
+  },
+}
+
 export const adminApi = {
   dashboard: dashboardApi,
   merchants: merchantsApi,
@@ -206,6 +219,7 @@ export const adminApi = {
   reports: reportsApi,
   tickets: ticketsApi,
   configs: configsApi,
+  notifications: notificationsApi,
 }
 
 export default adminApi

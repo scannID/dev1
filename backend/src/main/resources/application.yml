@@ -66,8 +66,30 @@ scanny:
     devices-per-min: ${RATE_LIMIT_DEVICES_PER_MIN:20}
     ticket-scan-per-min: ${RATE_LIMIT_TICKET_SCAN_PER_MIN:60}
     websocket-per-min: ${RATE_LIMIT_WEBSOCKET_PER_MIN:30}
+    quick-pay-create-per-min: ${RATE_LIMIT_QUICK_PAY_CREATE_PER_MIN:10}
   websocket:
     auth-timeout-ms: ${WS_AUTH_TIMEOUT_MS:5000}
+  mail:
+    from: ${MAIL_FROM:noreply@scanny.app}
+  payments:
+    default-provider: stub
+    fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:true}
+    stub:
+      auto-complete-seconds: ${PAYMENTS_STUB_AUTO_COMPLETE_SECONDS:0}
+    mtn-momo:
+      enabled: ${MTN_MOMO_ENABLED:false}
+      api-url: ${MTN_MOMO_API_URL:}
+      api-key: ${MTN_MOMO_API_KEY:}
+      api-secret: ${MTN_MOMO_API_SECRET:}
+      subscription-key: ${MTN_MOMO_SUBSCRIPTION_KEY:}
+      callback-url: ${MTN_MOMO_CALLBACK_URL:}
+    airtel-money:
+      enabled: ${AIRTEL_MONEY_ENABLED:false}
+      api-url: ${AIRTEL_MONEY_API_URL:}
+      api-key: ${AIRTEL_MONEY_API_KEY:}
+      api-secret: ${AIRTEL_MONEY_API_SECRET:}
+      subscription-key: ${AIRTEL_MONEY_SUBSCRIPTION_KEY:}
+      callback-url: ${AIRTEL_MONEY_CALLBACK_URL:}
 
 keycloak:
   server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}

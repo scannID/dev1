@@ -22,6 +22,7 @@ public class RateLimitService {
     private final int devicesPerMin;
     private final int ticketScanPerMin;
     private final int websocketPerMin;
+    private final int quickPayCreatePerMin;
     private final Map<String, WindowCounter> localCounters = new ConcurrentHashMap<>();
 
     public RateLimitService(
@@ -32,7 +33,8 @@ public class RateLimitService {
             @Value("${scanny.rate-limit.menu-per-min:120}") int menuPerMin,
             @Value("${scanny.rate-limit.devices-per-min:20}") int devicesPerMin,
             @Value("${scanny.rate-limit.ticket-scan-per-min:60}") int ticketScanPerMin,
-            @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin
+            @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin,
+            @Value("${scanny.rate-limit.quick-pay-create-per-min:10}") int quickPayCreatePerMin
     ) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.enabled = enabled;
@@ -42,6 +44,7 @@ public class RateLimitService {
         this.devicesPerMin = devicesPerMin;
         this.ticketScanPerMin = ticketScanPerMin;
         this.websocketPerMin = websocketPerMin;
+        this.quickPayCreatePerMin = quickPayCreatePerMin;
     }
 
     public String resolveBucket(HttpServletRequest request) {
@@ -55,6 +58,9 @@ public class RateLimitService {
         }
         if ("POST".equalsIgnoreCase(method) && path.equals("/api/auth/merchant/register")) {
             return "register:" + registerPerMin;
+        }
+        if ("POST".equalsIgnoreCase(method) && path.equals("/api/quick-payments/public/codes")) {
+            return "quick-pay-create:" + quickPayCreatePerMin;
         }
         if ("POST".equalsIgnoreCase(method) && path.matches("/api/businesses/[^/]+/orders")) {
             return "orders:" + ordersPerMin;

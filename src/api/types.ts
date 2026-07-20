@@ -250,6 +250,7 @@ export interface Ticket {
   redeemedAt?: string
   canBeUsed: boolean
   qrCodeUrl: string
+  gateUrl?: string | null
 }
 
 export interface UpdateTicketStatusRequest {
@@ -260,6 +261,71 @@ export interface TicketStats {
   eventName: string
   totalTickets: number
   purchasedTickets: number
+}
+
+export interface TicketClassOption {
+  name: string
+  price: number
+}
+
+export interface TicketEventInfo {
+  masterTicketId: string
+  eventName: string
+  eventDate: string | null
+  currency: string
+  template: string
+  ticketClasses: TicketClassOption[]
+  paymentDestination: string
+  purchaseUrl: string
+}
+
+export interface TicketPurchaseRequest {
+  masterQrToken: string
+  ticketClass: string
+  holderName: string
+  holderEmail: string
+  holderPhone: string
+  provider?: string
+}
+
+export interface TicketPurchaseResponse {
+  attendeeTicketId: string
+  paymentId: string
+  paymentStatus: PaymentIntentStatus
+  message: string
+  viewUrl: string
+}
+
+export interface GateScanResponse {
+  valid: boolean
+  result: string
+  message: string
+  holderName: string
+  ticketType: string
+  eventName: string
+}
+
+export interface GateEventResponse {
+  eventName: string
+  eventDate: string | null
+}
+
+export interface AttendeeTicketView {
+  id: string
+  ticketType: string
+  eventName: string
+  eventDate: string | null
+  holderName: string
+  holderEmail: string
+  price: number
+  currency: string
+  status: string
+  paymentStatus: string
+  canBeUsed: boolean
+  template: string
+  metadata: string
+  viewUrl: string
+  qrToken: string
 }
 
 export interface DevicePaymentMethod {
@@ -292,3 +358,134 @@ export interface RegisterDeviceRequest {
   customerName?: string
   customerEmail?: string
 }
+
+export interface PublicCreateQuickPaymentRequest {
+  description: string
+  amount: number
+  currency?: string
+  ownerName: string
+  ownerPhone?: string
+  ownerEmail: string
+  paymentDestination: string
+  paymentDestinationType?: string
+}
+
+export interface QuickPaymentCode {
+  id: string
+  qrToken: string
+  trackingNumber: string
+  codeType: string
+  description: string
+  amount: number
+  currency: string
+  status: 'Active' | 'Cancelled' | 'Invalid'
+  usageCount: number
+  ownerName: string
+  ownerPhone: string
+  ownerEmail: string
+  paymentDestination: string
+  paymentDestinationType: string
+  merchantId?: string | null
+  businessId?: string | null
+  createdAt: string
+  updatedAt?: string | null
+  lastUsedAt?: string | null
+  canBeUsed: boolean
+  qrCodeUrl: string
+  trackUrl: string
+  emailSent: boolean
+}
+
+export interface QuickPaymentTransaction {
+  id: number
+  codeId: string
+  transactionRef: string
+  amount: number
+  currency: string
+  customerPhone: string
+  customerName: string
+  paymentMethod: string
+  paymentProvider: string
+  status: 'Pending' | 'Processing' | 'Completed' | 'Failed' | 'Refunded' | 'Cancelled'
+  deviceInfo?: string | null
+  location: string
+  createdAt: string
+  completedAt?: string | null
+  failedAt?: string | null
+  failureReason?: string | null
+}
+
+export interface QuickPayTrackingMetrics {
+  trackingNumber: string
+  id: string
+  description: string
+  amount: number
+  currency: string
+  status: QuickPaymentCode['status']
+  usageCount: number
+  completedPayments: number
+  pendingPayments: number
+  failedPayments: number
+  totalCollected: number
+  ownerName: string
+  ownerEmail: string
+  paymentDestination: string
+  paymentDestinationType: string
+  qrCodeUrl: string
+  trackUrl: string
+  createdAt: string
+  lastUsedAt?: string | null
+  recentTransactions: QuickPaymentTransaction[]
+}
+
+export interface QuickPayInitiateResponse {
+  valid: boolean
+  message: string
+  code: QuickPaymentCode
+  transactionRef: string | null
+}
+
+export type PaymentContext = 'ORDER' | 'QUICK_PAY' | 'TICKET'
+
+export type PaymentIntentStatus = 'Pending' | 'Processing' | 'Paid' | 'Failed' | 'Cancelled'
+
+export interface PaymentInitiateRequest {
+  context: PaymentContext
+  referenceId: string
+  provider?: string
+  amount: number
+  currency?: string
+  customerPhone: string
+  customerName?: string
+  businessId?: string
+  description?: string
+}
+
+export interface PaymentInitiateResponse {
+  paymentId: string
+  providerId: string
+  providerReference: string
+  status: PaymentIntentStatus
+  message: string
+}
+
+export interface PaymentStatusResponse {
+  paymentId: string
+  providerId: string
+  status: PaymentIntentStatus
+  message: string
+  failureReason?: string | null
+  updatedAt: string
+}
+
+export interface PaymentProviderInfo {
+  id: string
+  displayName: string
+  available: boolean
+}
+
+export interface PaymentProvidersResponse {
+  providers: PaymentProviderInfo[]
+  defaultProvider: string
+}
+

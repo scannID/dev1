@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { scannyApi } from '../api/services'
+import keycloak, { waitForKeycloak } from '../keycloak'
 import type {
   Business,
   CatalogItem,
@@ -22,6 +23,15 @@ export function useBusinessData() {
     try {
       setLoading(true)
       setError(null)
+
+      await waitForKeycloak()
+      if (!keycloak.authenticated) {
+        throw new Error('Not authenticated')
+      }
+      await keycloak.updateToken(5).catch(() => undefined)
+      if (!keycloak.token) {
+        throw new Error('Not authenticated')
+      }
 
       const me = await scannyApi.merchant.me()
       const business: Business = {
@@ -83,6 +93,15 @@ export function useBusinessData() {
 
     ;(async () => {
       try {
+        await waitForKeycloak()
+        if (!keycloak.authenticated) {
+          throw new Error('Not authenticated')
+        }
+        await keycloak.updateToken(5).catch(() => undefined)
+        if (!keycloak.token) {
+          throw new Error('Not authenticated')
+        }
+
         const me = await scannyApi.merchant.me()
         if (cancelled) return
 

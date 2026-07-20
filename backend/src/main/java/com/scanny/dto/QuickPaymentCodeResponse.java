@@ -7,6 +7,7 @@ import java.time.Instant;
 public record QuickPaymentCodeResponse(
     String id,
     String qrToken,
+    String trackingNumber,
     String codeType,
     String description,
     int amount,
@@ -15,6 +16,7 @@ public record QuickPaymentCodeResponse(
     int usageCount,
     String ownerName,
     String ownerPhone,
+    String ownerEmail,
     String paymentDestination,
     String paymentDestinationType,
     String merchantId,
@@ -24,12 +26,19 @@ public record QuickPaymentCodeResponse(
     Instant updatedAt,
     Instant lastUsedAt,
     boolean canBeUsed,
-    String qrCodeUrl
+    String qrCodeUrl,
+    String trackUrl,
+    boolean emailSent
 ) {
     public static QuickPaymentCodeResponse from(QuickPaymentCode code, String baseUrl) {
+        return from(code, baseUrl, false);
+    }
+
+    public static QuickPaymentCodeResponse from(QuickPaymentCode code, String baseUrl, boolean emailSent) {
         return new QuickPaymentCodeResponse(
             code.getId(),
             code.getQrToken(),
+            code.getTrackingNumber(),
             code.getCodeType(),
             code.getDescription(),
             code.getAmount(),
@@ -38,6 +47,7 @@ public record QuickPaymentCodeResponse(
             code.getUsageCount(),
             code.getOwnerName(),
             code.getOwnerPhone(),
+            code.getOwnerEmail(),
             code.getPaymentDestination(),
             code.getPaymentDestinationType(),
             code.getMerchantId(),
@@ -47,7 +57,9 @@ public record QuickPaymentCodeResponse(
             code.getUpdatedAt(),
             code.getLastUsedAt(),
             code.canBeUsed(),
-            baseUrl + "/pay/" + code.getQrToken()
+            baseUrl + "/pay/" + code.getQrToken(),
+            baseUrl + "/track/" + code.getTrackingNumber(),
+            emailSent
         );
     }
 }

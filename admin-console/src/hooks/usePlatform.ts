@@ -282,3 +282,69 @@ export function useConfigs() {
 
   return { configs, loading, error, saving, refresh, updateSection, runAction }
 }
+
+export function useNotifications() {
+  const [data, setData] = useState<Awaited<ReturnType<typeof adminApi.notifications.list>> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('scanny-admin-notif-read')
+      return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+    } catch {
+      return new Set()
+    }
+  })
+
+  const refresh = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      setData(await adminApi.notifications.list())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications')
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await adminApi.notifications.list()
+        if (!cancelled) {
+          setData(response)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load notifications')
+          setData(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const markAllRead = useCallback(() => {
+    const ids = data?.notifications.map((n) => n.id) ?? []
+    const next = new Set([...readIds, ...ids])
+    setReadIds(next)
+    localStorage.setItem('scanny-admin-notif-read', JSON.stringify([...next]))
+  }, [data, readIds])
+
+  const notifications = (data?.notifications ?? []).map((n) => ({
+    ...n,
+    unread: n.unread && !readIds.has(n.id),
+  }))
+  const unread = notifications.filter((n) => n.unread).length
+
+  return { notifications, unread, loading, error, refresh, markAllRead }
+}
+

@@ -57,13 +57,16 @@ Wait for `http://localhost:8080` to respond. The local Keycloak administrator de
 
 ### Windows
 
-The PowerShell bootstrap creates or updates the `scanny` realm, `MERCHANT`, `ADMIN`, and `CUSTOMER` roles, public browser clients, and a local merchant user:
+The PowerShell bootstrap creates or updates the `scanny` realm, `MERCHANT`, `ADMIN`, and `CUSTOMER` roles, public browser clients, and local users:
 
 ```powershell
 .\backend\setup-scanny-realm.ps1
 ```
 
-The merchant test login is `testuser` / `password`.
+Local logins:
+
+- Merchant app (`:5173`): `testuser` / `password` (`MERCHANT` role)
+- Admin console (`:5174`): `adminuser` / `Admin@2026!` (`ADMIN` role)
 
 ### macOS and Linux
 
@@ -79,7 +82,7 @@ Then add application roles and backend client configuration:
 ./setup-scanny-realm.sh
 ```
 
-Create local users in Keycloak and assign `MERCHANT` or `ADMIN` realm roles as needed. Never use these development credentials outside a local environment.
+On Windows, prefer `.\backend\setup-scanny-realm.ps1` which also seeds `adminuser` (`ADMIN`) and `testuser` (`MERCHANT`). Never use these development credentials outside a local environment.
 
 ## Run the backend
 

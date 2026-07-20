@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface QuickPaymentCodeRepository extends JpaRepository<QuickPaymentCode, String> {
     
     Optional<QuickPaymentCode> findByQrToken(String qrToken);
+
+    Optional<QuickPaymentCode> findByTrackingNumber(String trackingNumber);
     
     List<QuickPaymentCode> findByStatus(QuickPaymentCodeStatus status);
     

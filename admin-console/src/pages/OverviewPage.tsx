@@ -53,36 +53,44 @@ export default function OverviewPage() {
           value: metrics.merchants.total.toString(),
           sub: `+${metrics.merchants.thisWeek} this week`,
           delta: metrics.merchants.change,
-          up: true,
+          up: !metrics.merchants.change.startsWith('-'),
           color: '#3b82f6',
-          data: Array.from({ length: 7 }, () => metrics.merchants.total),
+          data: metrics.sparklines?.merchants?.length
+            ? metrics.sparklines.merchants
+            : [metrics.merchants.total],
         },
         {
           label: 'Orders Today',
           value: metrics.ordersToday.total.toLocaleString(),
           sub: 'across all merchants',
           delta: metrics.ordersToday.change,
-          up: true,
+          up: !metrics.ordersToday.change.startsWith('-'),
           color: '#10b981',
-          data: Array.from({ length: 7 }, () => metrics.ordersToday.total),
+          data: metrics.sparklines?.ordersToday?.length
+            ? metrics.sparklines.ordersToday
+            : [metrics.ordersToday.total],
         },
         {
           label: 'Active QR Scans',
           value: metrics.qrScans.last24Hours.toLocaleString(),
           sub: 'last 24 hours',
           delta: metrics.qrScans.change,
-          up: true,
+          up: !metrics.qrScans.change.startsWith('-'),
           color: '#8b5cf6',
-          data: Array.from({ length: 7 }, () => metrics.qrScans.last24Hours),
+          data: metrics.sparklines?.qrScans?.length
+            ? metrics.sparklines.qrScans
+            : [metrics.qrScans.last24Hours],
         },
         {
           label: 'Platform Revenue',
           value: currency(metrics.revenue.thisMonth),
           sub: 'this month',
           delta: metrics.revenue.change,
-          up: true,
+          up: !metrics.revenue.change.startsWith('-'),
           color: '#f59e0b',
-          data: Array.from({ length: 7 }, () => metrics.revenue.thisMonth),
+          data: metrics.sparklines?.revenue?.length
+            ? metrics.sparklines.revenue.map(Number)
+            : [metrics.revenue.thisMonth],
         },
       ]
     : []

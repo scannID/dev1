@@ -2,6 +2,8 @@ package com.scanny.service;
 
 import com.scanny.dto.admin.AdminAnalyticsDtos;
 import com.scanny.entity.*;
+import com.scanny.model.enums.OrderStatus;
+import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TicketStatus;
 import com.scanny.model.enums.TransactionStatus;
 import com.scanny.repository.*;
@@ -9,10 +11,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -25,6 +32,7 @@ public class AdminAnalyticsService {
     private final QuickPaymentTransactionRepository quickPaymentTransactionRepository;
     private final RegisteredDeviceRepository registeredDeviceRepository;
     private final DeviceTransactionRepository deviceTransactionRepository;
+    private final OrderRepository orderRepository;
 
     public AdminAnalyticsService(
         TicketRepository ticketRepository,
@@ -32,7 +40,8 @@ public class AdminAnalyticsService {
         QuickPaymentCodeRepository quickPaymentCodeRepository,
         QuickPaymentTransactionRepository quickPaymentTransactionRepository,
         RegisteredDeviceRepository registeredDeviceRepository,
-        DeviceTransactionRepository deviceTransactionRepository
+        DeviceTransactionRepository deviceTransactionRepository,
+        OrderRepository orderRepository
     ) {
         this.ticketRepository = ticketRepository;
         this.ticketScanRepository = ticketScanRepository;
@@ -40,6 +49,7 @@ public class AdminAnalyticsService {
         this.quickPaymentTransactionRepository = quickPaymentTransactionRepository;
         this.registeredDeviceRepository = registeredDeviceRepository;
         this.deviceTransactionRepository = deviceTransactionRepository;
+        this.orderRepository = orderRepository;
     }
 
     @Transactional(readOnly = true)
@@ -184,63 +194,332 @@ public class AdminAnalyticsService {
 
     @Transactional(readOnly = true)
     public AdminAnalyticsDtos.RevenueOverview getRevenueOverview() {
-        // Get all transactions from different sources
         List<QuickPaymentTransaction> qpTransactions = quickPaymentTransactionRepository.findAll();
         List<DeviceTransaction> deviceTransactions = deviceTransactionRepository.findAll();
+        List<Order> orders = orderRepository.findAll();
 
-        // Current month revenue
-        Instant startOfMonth = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS);
-        
-        long qpRevenue = qpTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Completed)
-            .mapToLong(QuickPaymentTransaction::getAmount)
-            .sum();
+        Instant now = Instant.now();
+        Instant periodStart = now.truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS);
+        Instant prevStart = periodStart.minus(30, ChronoUnit.DAYS);
 
-        long deviceRevenue = deviceTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Completed)
-            .mapToLong(DeviceTransaction::getAmount)
-            .sum();
-
-        long totalRevenue = qpRevenue + deviceRevenue;
-        int totalTransactions = (int) (qpTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Completed)
-            .count() + deviceTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Completed)
-            .count());
-
-        int failedPayments = (int) (qpTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Failed)
-            .count() + deviceTransactions.stream()
-            .filter(t -> t.getCreatedAt().isAfter(startOfMonth))
-            .filter(t -> t.getStatus() == TransactionStatus.Failed)
-            .count());
-
-        long avgOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+        PeriodTotals current = totalsInRange(qpTransactions, deviceTransactions, orders, periodStart, now);
+        PeriodTotals previous = totalsInRange(qpTransactions, deviceTransactions, orders, prevStart, periodStart);
 
         AdminAnalyticsDtos.RevenueGrowth growth = new AdminAnalyticsDtos.RevenueGrowth(
-            14.2, 9.8, -12.3, 3.1
+            percentChange(current.revenue, previous.revenue),
+            percentChange(current.transactions, previous.transactions),
+            percentChange(current.failed, previous.failed),
+            percentChange(current.avgOrderValue(), previous.avgOrderValue())
         );
 
         AdminAnalyticsDtos.CurrentMonthRevenue currentMonth = new AdminAnalyticsDtos.CurrentMonthRevenue(
-            totalRevenue, totalTransactions, failedPayments, avgOrderValue, "UGX", growth
+            current.revenue,
+            current.transactions,
+            current.failed,
+            current.avgOrderValue(),
+            "UGX",
+            growth
         );
 
-        // Monthly breakdown - simplified
-        List<AdminAnalyticsDtos.MonthlyRevenue> monthly = new ArrayList<>();
+        List<AdminAnalyticsDtos.MonthlyRevenue> monthly = buildMonthlyRevenue(
+            qpTransactions, deviceTransactions, orders, now
+        );
 
-        // Payment methods breakdown
-        long totalAmount = totalRevenue;
-        List<AdminAnalyticsDtos.PaymentMethodBreakdown> paymentMethods = List.of(
-            new AdminAnalyticsDtos.PaymentMethodBreakdown("Mobile Money", 64.0, (long) (totalAmount * 0.64)),
-            new AdminAnalyticsDtos.PaymentMethodBreakdown("Card", 22.0, (long) (totalAmount * 0.22)),
-            new AdminAnalyticsDtos.PaymentMethodBreakdown("Cash", 14.0, (long) (totalAmount * 0.14))
+        List<AdminAnalyticsDtos.PaymentMethodBreakdown> paymentMethods = buildPaymentMethods(
+            qpTransactions, deviceTransactions, orders, periodStart, now
         );
 
         return new AdminAnalyticsDtos.RevenueOverview(currentMonth, monthly, paymentMethods);
+    }
+
+    private record PeriodTotals(long revenue, int transactions, int failed) {
+        long avgOrderValue() {
+            return transactions > 0 ? revenue / transactions : 0;
+        }
+    }
+
+    private PeriodTotals totalsInRange(
+        List<QuickPaymentTransaction> qpTransactions,
+        List<DeviceTransaction> deviceTransactions,
+        List<Order> orders,
+        Instant start,
+        Instant end
+    ) {
+        long qpRevenue = qpTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Completed)
+            .mapToLong(QuickPaymentTransaction::getAmount)
+            .sum();
+        int qpCount = (int) qpTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Completed)
+            .count();
+        int qpFailed = (int) qpTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Failed)
+            .count();
+
+        long deviceRevenue = deviceTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Completed)
+            .mapToLong(DeviceTransaction::getAmount)
+            .sum();
+        int deviceCount = (int) deviceTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Completed)
+            .count();
+        int deviceFailed = (int) deviceTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Failed)
+            .count();
+
+        long orderRevenue = orders.stream()
+            .filter(o -> inRange(o.getCreatedAt(), start, end))
+            .filter(this::isPaidOrder)
+            .mapToLong(Order::getTotal)
+            .sum();
+        int orderCount = (int) orders.stream()
+            .filter(o -> inRange(o.getCreatedAt(), start, end))
+            .filter(this::isPaidOrder)
+            .count();
+        int orderFailed = (int) orders.stream()
+            .filter(o -> inRange(o.getCreatedAt(), start, end))
+            .filter(o -> o.getPaymentStatus() == PaymentStatus.Unpaid
+                && o.getStatus() == OrderStatus.Cancelled)
+            .count();
+
+        return new PeriodTotals(
+            qpRevenue + deviceRevenue + orderRevenue,
+            qpCount + deviceCount + orderCount,
+            qpFailed + deviceFailed + orderFailed
+        );
+    }
+
+    private boolean isPaidOrder(Order order) {
+        return order.getPaymentStatus() == PaymentStatus.Paid
+            || order.getStatus() == OrderStatus.Completed;
+    }
+
+    private static boolean inRange(Instant ts, Instant start, Instant end) {
+        return ts != null && !ts.isBefore(start) && ts.isBefore(end);
+    }
+
+    private static double percentChange(long current, long previous) {
+        if (previous == 0) {
+            return current == 0 ? 0.0 : 100.0;
+        }
+        return ((double) (current - previous) / previous) * 100.0;
+    }
+
+    private List<AdminAnalyticsDtos.MonthlyRevenue> buildMonthlyRevenue(
+        List<QuickPaymentTransaction> qpTransactions,
+        List<DeviceTransaction> deviceTransactions,
+        List<Order> orders,
+        Instant now
+    ) {
+        YearMonth current = YearMonth.from(LocalDate.ofInstant(now, ZoneOffset.UTC));
+        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH);
+        List<AdminAnalyticsDtos.MonthlyRevenue> monthly = new ArrayList<>(6);
+
+        for (int i = 5; i >= 0; i--) {
+            YearMonth month = current.minusMonths(i);
+            Instant start = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant end = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            PeriodTotals totals = totalsInRange(qpTransactions, deviceTransactions, orders, start, end);
+            monthly.add(new AdminAnalyticsDtos.MonthlyRevenue(
+                monthFmt.format(month.atDay(1)),
+                totals.revenue,
+                totals.transactions
+            ));
+        }
+        return monthly;
+    }
+
+    private List<AdminAnalyticsDtos.PaymentMethodBreakdown> buildPaymentMethods(
+        List<QuickPaymentTransaction> qpTransactions,
+        List<DeviceTransaction> deviceTransactions,
+        List<Order> orders,
+        Instant start,
+        Instant end
+    ) {
+        Map<String, Long> byMethod = new java.util.LinkedHashMap<>();
+
+        for (QuickPaymentTransaction t : qpTransactions) {
+            if (!inRange(t.getCreatedAt(), start, end) || t.getStatus() != TransactionStatus.Completed) {
+                continue;
+            }
+            String method = t.getPaymentMethod() != null && !t.getPaymentMethod().isBlank()
+                ? t.getPaymentMethod()
+                : (t.getPaymentProvider() != null ? t.getPaymentProvider() : "Quick Pay");
+            byMethod.merge(method, (long) t.getAmount(), Long::sum);
+        }
+
+        long deviceAmount = deviceTransactions.stream()
+            .filter(t -> inRange(t.getCreatedAt(), start, end))
+            .filter(t -> t.getStatus() == TransactionStatus.Completed)
+            .mapToLong(DeviceTransaction::getAmount)
+            .sum();
+        if (deviceAmount > 0) {
+            byMethod.merge("Device Pay", deviceAmount, Long::sum);
+        }
+
+        long orderAmount = orders.stream()
+            .filter(o -> inRange(o.getCreatedAt(), start, end))
+            .filter(this::isPaidOrder)
+            .mapToLong(Order::getTotal)
+            .sum();
+        if (orderAmount > 0) {
+            byMethod.merge("Orders", orderAmount, Long::sum);
+        }
+
+        long total = byMethod.values().stream().mapToLong(Long::longValue).sum();
+        if (total <= 0) {
+            return List.of();
+        }
+
+        return byMethod.entrySet().stream()
+            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            .map(e -> new AdminAnalyticsDtos.PaymentMethodBreakdown(
+                e.getKey(),
+                Math.round((e.getValue() * 1000.0) / total) / 10.0,
+                e.getValue()
+            ))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminAnalyticsDtos.ScansOrdersSeries getScansOrders(String range) {
+        String normalized = range == null ? "daily" : range.toLowerCase(Locale.ROOT);
+        List<TicketScan> scans = ticketScanRepository.findAll();
+        List<Order> orders = orderRepository.findAll();
+        Instant now = Instant.now();
+
+        return switch (normalized) {
+            case "hourly" -> buildHourlySeries(scans, orders, now);
+            case "weekly" -> buildWeeklySeries(scans, orders, now);
+            case "monthly" -> buildMonthlySeries(scans, orders, now);
+            case "yearly" -> buildYearlySeries(scans, orders, now);
+            default -> buildDailySeries(scans, orders, now);
+        };
+    }
+
+    private AdminAnalyticsDtos.ScansOrdersSeries buildHourlySeries(
+        List<TicketScan> scans, List<Order> orders, Instant now
+    ) {
+        List<Integer> scanBuckets = new ArrayList<>(24);
+        List<Integer> orderBuckets = new ArrayList<>(24);
+        List<String> labels = new ArrayList<>(24);
+        Instant start = now.truncatedTo(ChronoUnit.HOURS).minus(23, ChronoUnit.HOURS);
+
+        for (int i = 0; i < 24; i++) {
+            Instant bucketStart = start.plus(i, ChronoUnit.HOURS);
+            Instant bucketEnd = bucketStart.plus(1, ChronoUnit.HOURS);
+            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
+            int hour = bucketStart.atZone(ZoneOffset.UTC).getHour();
+            labels.add(String.format("%d%s", hour % 12 == 0 ? 12 : hour % 12, hour < 12 ? "a" : "p"));
+        }
+        return series("hourly", scanBuckets, orderBuckets, labels);
+    }
+
+    private AdminAnalyticsDtos.ScansOrdersSeries buildDailySeries(
+        List<TicketScan> scans, List<Order> orders, Instant now
+    ) {
+        List<Integer> scanBuckets = new ArrayList<>(28);
+        List<Integer> orderBuckets = new ArrayList<>(28);
+        List<String> labels = new ArrayList<>(28);
+        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH);
+
+        for (int i = 27; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            Instant bucketStart = day.atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant bucketEnd = day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
+            labels.add(dayFmt.format(day));
+        }
+        return series("daily", scanBuckets, orderBuckets, labels);
+    }
+
+    private AdminAnalyticsDtos.ScansOrdersSeries buildWeeklySeries(
+        List<TicketScan> scans, List<Order> orders, Instant now
+    ) {
+        List<Integer> scanBuckets = new ArrayList<>(16);
+        List<Integer> orderBuckets = new ArrayList<>(16);
+        List<String> labels = new ArrayList<>(16);
+        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
+
+        for (int i = 15; i >= 0; i--) {
+            LocalDate start = weekStart.minusWeeks(i);
+            Instant bucketStart = start.atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant bucketEnd = start.plusWeeks(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
+            labels.add("W" + (16 - i));
+        }
+        return series("weekly", scanBuckets, orderBuckets, labels);
+    }
+
+    private AdminAnalyticsDtos.ScansOrdersSeries buildMonthlySeries(
+        List<TicketScan> scans, List<Order> orders, Instant now
+    ) {
+        List<Integer> scanBuckets = new ArrayList<>(12);
+        List<Integer> orderBuckets = new ArrayList<>(12);
+        List<String> labels = new ArrayList<>(12);
+        YearMonth current = YearMonth.from(LocalDate.ofInstant(now, ZoneOffset.UTC));
+        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH);
+
+        for (int i = 11; i >= 0; i--) {
+            YearMonth month = current.minusMonths(i);
+            Instant bucketStart = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant bucketEnd = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
+            labels.add(monthFmt.format(month.atDay(1)));
+        }
+        return series("monthly", scanBuckets, orderBuckets, labels);
+    }
+
+    private AdminAnalyticsDtos.ScansOrdersSeries buildYearlySeries(
+        List<TicketScan> scans, List<Order> orders, Instant now
+    ) {
+        List<Integer> scanBuckets = new ArrayList<>(5);
+        List<Integer> orderBuckets = new ArrayList<>(5);
+        List<String> labels = new ArrayList<>(5);
+        int currentYear = LocalDate.ofInstant(now, ZoneOffset.UTC).getYear();
+
+        for (int i = 4; i >= 0; i--) {
+            int year = currentYear - i;
+            Instant bucketStart = LocalDate.of(year, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant bucketEnd = LocalDate.of(year + 1, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
+            labels.add(String.valueOf(year));
+        }
+        return series("yearly", scanBuckets, orderBuckets, labels);
+    }
+
+    private static int countScans(List<TicketScan> scans, Instant start, Instant end) {
+        return (int) scans.stream()
+            .filter(s -> !s.getScannedAt().isBefore(start) && s.getScannedAt().isBefore(end))
+            .count();
+    }
+
+    private static int countOrders(List<Order> orders, Instant start, Instant end) {
+        return (int) orders.stream()
+            .filter(o -> !o.getCreatedAt().isBefore(start) && o.getCreatedAt().isBefore(end))
+            .count();
+    }
+
+    private static AdminAnalyticsDtos.ScansOrdersSeries series(
+        String range, List<Integer> scans, List<Integer> orders, List<String> labels
+    ) {
+        int maxScan = scans.stream().mapToInt(Integer::intValue).max().orElse(0);
+        int maxOrder = orders.stream().mapToInt(Integer::intValue).max().orElse(0);
+        int yMax = Math.max(10, (int) Math.ceil(Math.max(maxScan, maxOrder) * 1.15));
+        if (yMax < 1) yMax = 1;
+        return new AdminAnalyticsDtos.ScansOrdersSeries(range, scans, orders, yMax, labels);
     }
 }

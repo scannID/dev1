@@ -67,6 +67,10 @@ public class TicketService {
         ticket.setStatus(TicketStatus.Active);
         ticket.setPaymentStatus(PaymentStatus.Unpaid);
 
+        if (request.usageLimit() > 1_000_000) {
+            ticket.setGateToken(generateGateToken());
+        }
+
         ticket = ticketRepository.save(ticket);
         broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
@@ -104,6 +108,7 @@ public class TicketService {
     public List<TicketDtos.TicketEventStats> getTicketStats(String search) {
         String normalizedSearch = search == null ? "" : search.trim().toLowerCase();
         return ticketRepository.findAll().stream()
+            .filter(Ticket::isAttendeeTicket)
             .filter(ticket -> normalizedSearch.isEmpty()
                 || (ticket.getEventName() != null && ticket.getEventName().toLowerCase().contains(normalizedSearch)))
             .collect(Collectors.groupingBy(ticket -> ticket.getEventName() == null ? "Untitled Event" : ticket.getEventName()))
@@ -222,11 +227,19 @@ public class TicketService {
         realtimeEventPublisher.publishTicketStats(stats);
     }
 
+    public void refreshStatsBroadcast() {
+        broadcastStatsUpdate();
+    }
+
     private String generateTicketId() {
         return "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private String generateQrToken() {
         return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String generateGateToken() {
+        return "GATE-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
     }
 }

@@ -3,7 +3,16 @@
 
 import keycloak from '../keycloak'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+/** Use same host as the page (works on phone via LAN IP, not only localhost). */
+function resolveApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location
+    return `${protocol}//${hostname}:4000/api`
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 export class ApiError extends Error {
   constructor(
@@ -21,16 +30,15 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     'Content-Type': 'application/json',
   }
 
-  try {
-    if (keycloak.authenticated) {
-      // Refresh if token expires within 30s
+  if (keycloak.authenticated) {
+    try {
       await keycloak.updateToken(30)
-      if (keycloak.token) {
-        headers.Authorization = `Bearer ${keycloak.token}`
-      }
+    } catch {
+      // Keep using the current token when refresh is not needed yet.
     }
-  } catch {
-    // Proceed without token — public endpoints still work
+    if (keycloak.token) {
+      headers.Authorization = `Bearer ${keycloak.token}`
+    }
   }
 
   return headers
@@ -53,9 +61,9 @@ async function fetchApi<T>(
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null) as { message?: string } | null
+      const errorData = await response.json().catch(() => null) as { message?: string; error?: string } | null
       throw new ApiError(
-        errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
+        errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
         response.status,
         errorData
       )

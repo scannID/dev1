@@ -45,4 +45,9 @@ public class AdminPlatformController {
     public AdminPlatformDtos.ReportsOverview getReportsOverview() {
         return adminPlatformService.getReportsOverview();
     }
+
+    @GetMapping("/notifications")
+    public AdminPlatformDtos.NotificationsResponse getNotifications() {
+        return adminPlatformService.getNotifications();
+    }
 }

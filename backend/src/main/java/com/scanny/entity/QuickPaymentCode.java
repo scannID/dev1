@@ -52,6 +52,12 @@ public class QuickPaymentCode {
     @Column(name = "owner_phone", nullable = false)
     private String ownerPhone = "";
 
+    @Column(name = "owner_email", nullable = false)
+    private String ownerEmail = "";
+
+    @Column(name = "tracking_number", nullable = false, unique = true)
+    private String trackingNumber;
+
     @Column(name = "payment_destination", nullable = false)
     private String paymentDestination;
 
@@ -161,6 +167,22 @@ public class QuickPaymentCode {
 
     public void setOwnerPhone(String ownerPhone) {
         this.ownerPhone = ownerPhone;
+    }
+
+    public String getOwnerEmail() {
+        return ownerEmail;
+    }
+
+    public void setOwnerEmail(String ownerEmail) {
+        this.ownerEmail = ownerEmail;
+    }
+
+    public String getTrackingNumber() {
+        return trackingNumber;
+    }
+
+    public void setTrackingNumber(String trackingNumber) {
+        this.trackingNumber = trackingNumber;
     }
 
     public String getPaymentDestination() {

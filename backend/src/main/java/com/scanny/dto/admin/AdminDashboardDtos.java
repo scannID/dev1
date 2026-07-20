@@ -28,11 +28,19 @@ public class AdminDashboardDtos {
         String change
     ) {}
 
+    public record SparklineMetrics(
+        List<Integer> merchants,
+        List<Integer> ordersToday,
+        List<Integer> qrScans,
+        List<Long> revenue
+    ) {}
+
     public record DashboardMetrics(
         MerchantMetrics merchants,
         OrdersMetrics ordersToday,
         QrScansMetrics qrScans,
-        RevenueMetrics revenue
+        RevenueMetrics revenue,
+        SparklineMetrics sparklines
     ) {}
 
     public record ActivityEvent(

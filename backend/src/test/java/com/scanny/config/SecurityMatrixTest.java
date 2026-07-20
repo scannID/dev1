@@ -41,6 +41,22 @@ class SecurityMatrixTest {
     }
 
     @Test
+    void quickPayTrackIsPublic() throws Exception {
+        mockMvc.perform(get("/api/quick-payments/public/track/TRK-NOTEXIST"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 401 || status == 403) {
+                        throw new AssertionError("Public track must not require auth, got " + status);
+                    }
+                });
+    }
+
+    @Test
+    void quickPayListRequiresAuth() throws Exception {
+        mockMvc.perform(get("/api/quick-payments/codes")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void publicMenuIsAllowed() throws Exception {
         mockMvc.perform(get("/api/businesses/demo/menu"))
                 .andExpect(result -> {

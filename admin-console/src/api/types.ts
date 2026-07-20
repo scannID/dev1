@@ -19,6 +19,12 @@ export interface DashboardMetrics {
     currency: string
     change: string
   }
+  sparklines: {
+    merchants: number[]
+    ordersToday: number[]
+    qrScans: number[]
+    revenue: number[]
+  }
 }
 
 export interface ActivityEvent {
@@ -318,3 +324,28 @@ export type ConfigAction =
   | 'clear-qr-scan-logs'
   | 'revoke-all-sessions'
   | 'reset-platform'
+
+export type ScansOrdersRange = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+export interface ScansOrdersSeries {
+  range: ScansOrdersRange | string
+  scans: number[]
+  orders: number[]
+  yMax: number
+  xLabels: string[]
+}
+
+export interface AdminNotification {
+  id: string
+  icon: string
+  title: string
+  sub: string
+  timestamp: string
+  type: string
+  unread: boolean
+}
+
+export interface NotificationsResponse {
+  notifications: AdminNotification[]
+  unread: number
+}

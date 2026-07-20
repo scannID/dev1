@@ -1,7 +1,15 @@
 import { Shield, BarChart3, Building2, QrCode, Users, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
+export default function AdminLogin({
+  onLogin,
+  error,
+  busy,
+}: {
+  onLogin: () => void
+  error?: string | null
+  busy?: boolean
+}) {
   return (
     <div style={S.page}>
       <style>{`
@@ -21,9 +29,9 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={S.navBadge}>Restricted Access</span>
-          <Button className="" size="sm" onClick={onLogin} style={S.navBtn}>
+          <Button className="" size="sm" onClick={onLogin} disabled={busy} style={S.navBtn}>
             <Shield size={13} />
-            Sign in
+            {busy ? 'Redirecting…' : 'Sign in'}
           </Button>
         </div>
       </nav>
@@ -49,13 +57,15 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
             Monitor merchants, orders, revenue, QR activity, and system health — all from one place. Restricted to authorised administrators.
           </p>
 
-          <Button className="" onClick={onLogin} style={S.heroBtn}>
+          {error ? <p style={S.error}>{error}</p> : null}
+
+          <Button className="" onClick={onLogin} disabled={busy} style={S.heroBtn}>
             <Shield size={16} />
-            Sign in with SSO
+            {busy ? 'Redirecting to Keycloak…' : 'Sign in with SSO'}
           </Button>
 
           <p style={S.heroHint}>
-            Single sign-on via Keycloak · Authorised personnel only
+            Single sign-on via Keycloak · Use adminuser / Admin@2026!
           </p>
         </div>
       </section>
@@ -78,23 +88,13 @@ export default function AdminLogin({ onLogin }: { onLogin: () => void }) {
         })}
       </section>
 
-      {/* ── Stats strip ── */}
-      <section style={S.statsStrip}>
-        {STATS.map((s) => (
-          <div key={s.label} style={S.stat}>
-            <span style={S.statValue}>{s.value}</span>
-            <span style={S.statLabel}>{s.label}</span>
-          </div>
-        ))}
-      </section>
-
       {/* ── CTA ── */}
       <section style={S.cta}>
         <h2 style={S.ctaH2}>Ready to manage the platform?</h2>
         <p style={S.ctaSub}>Sign in with your admin credentials to access the console.</p>
-        <Button className="" onClick={onLogin} style={S.ctaBtn}>
+        <Button className="" onClick={onLogin} disabled={busy} style={S.ctaBtn}>
           <Shield size={16} />
-          Sign in with SSO
+          {busy ? 'Redirecting…' : 'Sign in with SSO'}
         </Button>
       </section>
 
@@ -114,13 +114,6 @@ const FEATURES = [
   { label: 'User Administration',  desc: 'Manage customer accounts, merchant users, and admin roles.',             icon: Users,     bg: 'oklch(0.94 0.04 320)', color: '#6b21a8' },
   { label: 'System Health',        desc: 'Monitor uptime, latency, incidents, and service status live.',           icon: Activity,  bg: 'oklch(0.94 0.04 15)',  color: '#9f1239' },
   { label: 'Audit Logs',           desc: 'Full trail of every admin action with actor, IP, and timestamp.',        icon: Shield,    bg: 'oklch(0.94 0.04 195)', color: '#0e7490' },
-]
-
-const STATS = [
-  { value: '142',    label: 'Active merchants'    },
-  { value: '18,304', label: 'QR scans today'      },
-  { value: '1,847',  label: 'Orders today'        },
-  { value: '99.98%', label: 'Platform uptime'     },
 ]
 
 /* ── Styles ── */
@@ -230,6 +223,16 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: '#9ca3af',
   },
+  error: {
+    margin: 0,
+    fontSize: 13,
+    color: '#9f1239',
+    background: 'oklch(0.95 0.03 15)',
+    border: '1px solid oklch(0.88 0.05 15)',
+    borderRadius: 8,
+    padding: '10px 14px',
+    maxWidth: 440,
+  },
 
   /* Features */
   features: {
@@ -260,27 +263,6 @@ const S: Record<string, React.CSSProperties> = {
   },
   featureLabel: { margin: 0, fontSize: 14, fontWeight: 600, color: '#111827' },
   featureDesc: { margin: '4px 0 0', fontSize: 12, color: '#6b7280', lineHeight: 1.5 },
-
-  /* Stats strip */
-  statsStrip: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: 0,
-    background: TEAL,
-    padding: '32px 40px',
-  },
-  stat: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-    maxWidth: 200,
-    borderRight: '1px solid rgba(255,255,255,0.15)',
-    padding: '0 32px',
-  },
-  statValue: { fontSize: 32, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' },
-  statLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.04em' },
 
   /* CTA */
   cta: {

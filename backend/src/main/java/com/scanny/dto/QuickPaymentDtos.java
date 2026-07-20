@@ -3,6 +3,7 @@ package com.scanny.dto;
 import com.scanny.model.enums.QuickPaymentCodeStatus;
 import com.scanny.model.enums.TransactionStatus;
 import java.time.Instant;
+import java.util.List;
 
 public class QuickPaymentDtos {
 
@@ -18,11 +19,24 @@ public class QuickPaymentDtos {
         String currency,
         String ownerName,
         String ownerPhone,
+        String ownerEmail,
         String paymentDestination,
         String paymentDestinationType,
         String merchantId,
         String businessId,
         String metadata
+    ) {}
+
+    /** Landing-page public create — no merchant account required. */
+    public record PublicCreateQuickPaymentRequest(
+        String description,
+        int amount,
+        String currency,
+        String ownerName,
+        String ownerPhone,
+        String ownerEmail,
+        String paymentDestination,
+        String paymentDestinationType
     ) {}
 
     public record InitiatePaymentRequest(
@@ -69,5 +83,28 @@ public class QuickPaymentDtos {
         String message,
         QuickPaymentCodeResponse code,
         String transactionRef
+    ) {}
+
+    public record TrackingMetricsResponse(
+        String trackingNumber,
+        String id,
+        String description,
+        int amount,
+        String currency,
+        QuickPaymentCodeStatus status,
+        int usageCount,
+        long completedPayments,
+        long pendingPayments,
+        long failedPayments,
+        long totalCollected,
+        String ownerName,
+        String ownerEmail,
+        String paymentDestination,
+        String paymentDestinationType,
+        String qrCodeUrl,
+        String trackUrl,
+        Instant createdAt,
+        Instant lastUsedAt,
+        List<TransactionResponse> recentTransactions
     ) {}
 }

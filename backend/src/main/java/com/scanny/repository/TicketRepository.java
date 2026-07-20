@@ -17,4 +17,14 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
     List<Ticket> findByIssuedBy(String issuedBy);
     
     List<Ticket> findByEventName(String eventName);
+
+    boolean existsByEventNameAndHolderEmailIgnoreCaseAndPaymentStatusAndMasterTicketIdIsNotNull(
+        String eventName,
+        String holderEmail,
+        com.scanny.model.enums.PaymentStatus paymentStatus
+    );
+
+    Optional<Ticket> findByAccessToken(String accessToken);
+
+    Optional<Ticket> findByGateToken(String gateToken);
 }

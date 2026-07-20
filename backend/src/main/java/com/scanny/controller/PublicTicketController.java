@@ -1,0 +1,50 @@
+package com.scanny.controller;
+
+import com.scanny.dto.PublicTicketDtos;
+import com.scanny.service.TicketPurchaseService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/tickets/public")
+public class PublicTicketController {
+
+    private final TicketPurchaseService ticketPurchaseService;
+
+    public PublicTicketController(TicketPurchaseService ticketPurchaseService) {
+        this.ticketPurchaseService = ticketPurchaseService;
+    }
+
+    @GetMapping("/event/{masterQrToken}")
+    public ResponseEntity<PublicTicketDtos.EventInfoResponse> getEvent(@PathVariable String masterQrToken) {
+        return ResponseEntity.ok(ticketPurchaseService.getEventForPurchase(masterQrToken));
+    }
+
+    @PostMapping("/purchase")
+    public ResponseEntity<PublicTicketDtos.PurchaseResponse> purchase(@Valid @RequestBody PublicTicketDtos.PurchaseRequest request) {
+        return ResponseEntity.ok(ticketPurchaseService.startPurchase(request));
+    }
+
+    @GetMapping("/view/{accessToken}")
+    public ResponseEntity<PublicTicketDtos.AttendeeTicketView> view(@PathVariable String accessToken) {
+        return ResponseEntity.ok(ticketPurchaseService.getAttendeeView(accessToken));
+    }
+
+    @GetMapping("/gate/{gateToken}")
+    public ResponseEntity<PublicTicketDtos.GateEventResponse> gateEvent(@PathVariable String gateToken) {
+        return ResponseEntity.ok(ticketPurchaseService.getGateEvent(gateToken));
+    }
+
+    @PostMapping("/gate/{gateToken}/scan")
+    public ResponseEntity<PublicTicketDtos.GateScanResponse> gateScan(
+            @PathVariable String gateToken,
+            @RequestBody PublicTicketDtos.GateScanRequest request) {
+        return ResponseEntity.ok(ticketPurchaseService.scanAtGate(gateToken, request.qrToken()));
+    }
+}

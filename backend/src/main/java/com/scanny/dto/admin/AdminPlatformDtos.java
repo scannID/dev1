@@ -117,4 +117,19 @@ public class AdminPlatformDtos {
         long newMerchantsThisMonth,
         String currency
     ) {}
+
+    public record NotificationItem(
+        String id,
+        String icon,
+        String title,
+        String sub,
+        String timestamp,
+        String type,
+        boolean unread
+    ) {}
+
+    public record NotificationsResponse(
+        List<NotificationItem> notifications,
+        int unread
+    ) {}
 }
