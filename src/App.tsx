@@ -14,6 +14,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from './components/LoadingSpinner'
+import CategoryField from './components/CategoryField'
+import CategoryManager from './components/CategoryManager'
+import { businessCategories } from './lib/catalogCategories'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -313,6 +316,16 @@ function App({
     )
   }
 
+  async function handleAddCategory(name: string) {
+    if (!business.id) {
+      throw new Error('Business not loaded')
+    }
+    setActionError(null)
+    const categories = await catalogHook.addCategory(name)
+    await refreshBusiness(business.id)
+    return categories
+  }
+
   async function updateStatus(orderId: string, status: OrderStatus) {
     setActionError(null)
     const updated = await ordersHook.updateStatus(orderId, status)
@@ -535,6 +548,7 @@ function App({
               onCreateItem={handleCreateCatalogItem}
               onUpdateItem={handleUpdateCatalogItem}
               onDeleteItem={handleDeleteCatalogItem}
+              onAddCategory={handleAddCategory}
               onAddItem={() => setShowAddItem(true)}
               Sparkline={Sparkline}
             />
@@ -571,6 +585,7 @@ function App({
               <AddItemForm
                 business={business}
                 onCreateItem={handleCreateCatalogItem}
+                onAddCategory={handleAddCategory}
               />
             </div>
           </SheetContent>
@@ -1007,6 +1022,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
 function AddItemForm({
   business,
   onCreateItem,
+  onAddCategory,
 }: {
   business: Business
   onCreateItem: (data: {
@@ -1016,6 +1032,7 @@ function AddItemForm({
     description: string
     available: boolean
   }) => Promise<void> | void
+  onAddCategory: (name: string) => Promise<string[] | void>
 }) {
   const emptyItem = {
     name: '',
@@ -1027,7 +1044,7 @@ function AddItemForm({
   const [item, setItem] = useState(emptyItem)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
-  const categories = [...new Set<string>((business.items ?? []).map((entry) => entry.category))]
+  const categories = businessCategories(business)
 
   async function submitItem(event) {
     event.preventDefault()
@@ -1062,81 +1079,79 @@ function AddItemForm({
   const isPriceMissing = submitted && (!Number.isFinite(price) || price <= 0)
 
   return (
-    <form className="catalog-form universal-item-form" noValidate onSubmit={submitItem}>
-      <div>
-        <p className="eyebrow">Add item</p>
-        <h3>New item or service</h3>
-      </div>
-
-      <label>
-        Item name
-        <input
+    <form className="flex flex-col gap-4 px-6 py-5" noValidate onSubmit={submitItem}>
+      <div className="grid gap-1.5">
+        <Label htmlFor="add-item-name">Item name</Label>
+        <Input
+          id="add-item-name"
           required
           aria-invalid={isItemNameMissing}
-          className={isItemNameMissing ? 'field-error' : undefined}
+          className={isItemNameMissing ? 'border-destructive' : undefined}
           value={item.name}
           onChange={(event) => setItem({ ...item, name: event.target.value })}
-          placeholder="Burger, cocktail, uniform, school lunch..."
+          placeholder="Burger, cocktail, uniform..."
         />
-        {isItemNameMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
-      </label>
+        {isItemNameMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+      </div>
 
-      <label>
-        Category
-        <input
-          required
-          aria-invalid={isCategoryMissing}
-          className={isCategoryMissing ? 'field-error' : undefined}
-          list="catalog-categories"
+      <div className="grid gap-1.5">
+        <CategoryField
+          id="add-item-category"
+          categories={categories}
           value={item.category}
-          onChange={(event) => setItem({ ...item, category: event.target.value })}
-          placeholder="Meals, Drinks, Services, Goods..."
+          onChange={(category) => setItem({ ...item, category })}
+          onAddCategory={onAddCategory}
+          error={isCategoryMissing}
+          disabled={saving}
         />
-        {isCategoryMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
-      </label>
+        {isCategoryMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+      </div>
 
-      <datalist id="catalog-categories">
-        {categories.map((category) => (
-          <option value={category} key={category} />
-        ))}
-      </datalist>
-
-      <label>
-        Price
-        <input
+      <div className="grid gap-1.5">
+        <Label htmlFor="add-item-price">Price (UGX)</Label>
+        <Input
+          id="add-item-price"
           required
           aria-invalid={isPriceMissing}
-          className={isPriceMissing ? 'field-error' : undefined}
+          className={isPriceMissing ? 'border-destructive' : undefined}
           min="1"
           type="number"
           value={item.price}
           onChange={(event) => setItem({ ...item, price: event.target.value })}
           placeholder="18000"
         />
-        {isPriceMissing && <span className="field-error-message">{REQUIRED_FIELD_MESSAGE}</span>}
-      </label>
+        {isPriceMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+      </div>
 
-      <label>
-        Description
-        <textarea
+      <div className="grid gap-1.5">
+        <Label htmlFor="add-item-description">Description</Label>
+        <Textarea
+          id="add-item-description"
+          rows={3}
           value={item.description}
           onChange={(event) => setItem({ ...item, description: event.target.value })}
-          placeholder="Size, flavor, seat type, pickup details, event date, or customer note"
+          placeholder="Size, flavor, seat type, pickup details..."
         />
-      </label>
+      </div>
 
-      <label className="inline-check">
+      <div className="flex items-center gap-2">
         <input
+          id="add-item-available"
           checked={item.available}
           type="checkbox"
+          className="size-4 rounded border-border accent-primary"
           onChange={(event) => setItem({ ...item, available: event.target.checked })}
         />
-        Available to customers
-      </label>
+        <Label htmlFor="add-item-available" className="cursor-pointer font-normal">
+          Available to customers
+        </Label>
+      </div>
 
-      <button className="primary-action" type="submit" disabled={saving}>
-        {saving ? 'Saving…' : 'Add item'}
-      </button>
+      <div className="border-t border-border pt-4">
+        <Button className="w-full" type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Add item'}
+        </Button>
+      </div>
     </form>
   )
 }
@@ -1145,6 +1160,7 @@ function CatalogPage({
   onCreateItem,
   onUpdateItem,
   onDeleteItem,
+  onAddCategory,
   onAddItem,
   Sparkline,
 }: {
@@ -1158,11 +1174,12 @@ function CatalogPage({
   }) => Promise<void> | void
   onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
   onDeleteItem: (itemId: string) => Promise<void> | void
+  onAddCategory: (name: string) => Promise<string[] | void>
   onAddItem: () => void
   Sparkline: (props: { data: number[]; color?: string }) => ReactElement | null
 }) {
   const PAGE_SIZE = 20
-  const categories = useMemo(() => [...new Set((business.items ?? []).map((i) => i.category))], [business.items])
+  const categories = useMemo(() => businessCategories(business), [business])
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -1256,6 +1273,12 @@ function CatalogPage({
           <Sparkline data={Array.from({ length: 7 }, () => categories.length)} color="#8b5cf6" />
         </div>
       </section>
+
+      <CategoryManager
+        categories={categories}
+        onAddCategory={async (name) => { await onAddCategory(name) }}
+        disabled={saving}
+      />
 
       {/* Table card */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -1384,27 +1407,34 @@ function CatalogPage({
             <SheetTitle className={undefined}>Edit item</SheetTitle>
             <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            <div className="space-y-1.5">
-              <Label className="" htmlFor="edit-name">Name</Label>
-              <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="" htmlFor="edit-category">Category</Label>
-              <Input className="" id="edit-category" list="edit-categories" value={editDraft.category ?? ''} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} type={undefined} />
-              <datalist id="edit-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="" htmlFor="edit-price">Price (UGX)</Label>
-              <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="" htmlFor="edit-description">Description</Label>
-              <Textarea className="" id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
-              <Label htmlFor="edit-available" className="cursor-pointer">Available to customers</Label>
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-1.5">
+                <Label className="" htmlFor="edit-name">Name</Label>
+                <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
+              </div>
+              <div className="grid gap-1.5">
+                <CategoryField
+                  id="edit-category"
+                  categories={categories}
+                  value={editDraft.category ?? ''}
+                  onChange={(category) => setEditDraft({ ...editDraft, category })}
+                  onAddCategory={onAddCategory}
+                  disabled={saving}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="" htmlFor="edit-price">Price (UGX)</Label>
+                <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="" htmlFor="edit-description">Description</Label>
+                <Textarea className="" id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
+                <Label htmlFor="edit-available" className="cursor-pointer font-normal">Available to customers</Label>
+              </div>
             </div>
           </div>
           <div className="border-t border-border px-6 py-4 flex items-center gap-2">

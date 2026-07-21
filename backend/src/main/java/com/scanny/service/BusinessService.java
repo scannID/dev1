@@ -11,7 +11,9 @@ import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.MerchantRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CodeUtils;
+import com.scanny.util.CatalogCategories;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -118,6 +120,7 @@ public class BusinessService {
         business.setTableLabel(starterCatalogService.defaultTableLabel(type));
         business.setPaymentReference(CodeUtils.makeCode("PAY", businessName));
         business.setCreatedAt(Instant.now());
+        business.setCustomCategories(new ArrayList<>(CatalogCategories.defaultNames(type)));
 
         starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
 
@@ -163,6 +166,7 @@ public class BusinessService {
             business.setTableLabel(starterCatalogService.defaultTableLabel(type));
             business.setPaymentReference(CodeUtils.makeCode("PAY", merchant.getBusinessName()));
             business.setCreatedAt(Instant.now());
+            business.setCustomCategories(new ArrayList<>(CatalogCategories.defaultNames(type)));
 
             starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
             business = businessRepository.save(business);
@@ -179,7 +183,13 @@ public class BusinessService {
         String logoUrl = merchantRepository.findById(UUID.fromString(business.getMerchantId()))
                 .map(Merchant::getBusinessLogoUrl)
                 .orElse(null);
-        return BusinessResponse.from(business, scanBaseUrl, includeItems, logoUrl);
+        return BusinessResponse.from(
+            business,
+            scanBaseUrl,
+            includeItems,
+            logoUrl,
+            CatalogCategories.merged(business)
+        );
     }
 
     @Transactional

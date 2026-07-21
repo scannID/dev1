@@ -53,6 +53,10 @@ public class Business {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "custom_categories")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private List<String> customCategories = new ArrayList<>();
+
     @OneToMany(mappedBy = "business", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("name ASC")
     private List<CatalogItem> items = new ArrayList<>();
@@ -143,6 +147,23 @@ public class Business {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public List<String> getCustomCategories() {
+        return customCategories;
+    }
+
+    public void setCustomCategories(List<String> customCategories) {
+        this.customCategories = customCategories != null ? new ArrayList<>(customCategories) : new ArrayList<>();
+    }
+
+    public void addCustomCategory(String category) {
+        if (customCategories == null) {
+            customCategories = new ArrayList<>();
+        }
+        if (!customCategories.contains(category)) {
+            customCategories.add(category);
+        }
     }
 
     public List<CatalogItem> getItems() {

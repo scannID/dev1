@@ -248,18 +248,21 @@ public class AdminDashboardService {
             default -> Instant.now().minus(30, ChronoUnit.DAYS);
         };
 
-        List<Order> orders = orderRepository.findAll().stream()
+        List<Order> ordersInPeriod = orderRepository.findAll().stream()
             .filter(o -> o.getCreatedAt().isAfter(cutoffDate))
-            .filter(o -> o.getStatus() == OrderStatus.Completed)
+            .filter(o -> o.getStatus() != OrderStatus.Cancelled)
             .toList();
 
-        Map<String, List<Order>> ordersByMerchant = orders.stream()
+        Map<String, List<Order>> ordersByMerchant = ordersInPeriod.stream()
             .collect(Collectors.groupingBy(Order::getMerchantId));
 
         List<AdminDashboardDtos.TopMerchant> topMerchants = new ArrayList<>();
         for (Map.Entry<String, List<Order>> entry : ordersByMerchant.entrySet()) {
             String merchantId = entry.getKey();
             List<Order> merchantOrders = entry.getValue();
+            List<Order> completedOrders = merchantOrders.stream()
+                .filter(o -> o.getStatus() == OrderStatus.Completed)
+                .toList();
 
             Business business = businessRepository.findByMerchantId(merchantId)
                 .or(() -> businessRepository.findById(merchantId))
@@ -267,7 +270,7 @@ public class AdminDashboardService {
             if (business == null) {
                 Order sample = merchantOrders.get(0);
                 int orderCount = merchantOrders.size();
-                long revenue = merchantOrders.stream().mapToLong(Order::getTotal).sum();
+                long revenue = completedOrders.stream().mapToLong(Order::getTotal).sum();
                 topMerchants.add(new AdminDashboardDtos.TopMerchant(
                     merchantId,
                     sample.getBusinessName() != null ? sample.getBusinessName() : merchantId,
@@ -281,7 +284,7 @@ public class AdminDashboardService {
             }
 
             int orderCount = merchantOrders.size();
-            long revenue = merchantOrders.stream().mapToLong(Order::getTotal).sum();
+            long revenue = completedOrders.stream().mapToLong(Order::getTotal).sum();
 
             topMerchants.add(new AdminDashboardDtos.TopMerchant(
                 business.getId(),

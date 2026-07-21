@@ -13,6 +13,14 @@ const RANGES: { key: Range; label: string }[] = [
   { key: 'yearly', label: 'Yearly' },
 ]
 
+const RANGE_TOTALS: Record<Range, string> = {
+  hourly: 'last 24 hours',
+  daily: 'last 28 days',
+  weekly: 'last 16 weeks',
+  monthly: 'last 12 months',
+  yearly: 'last 5 years',
+}
+
 const EMPTY: ScansOrdersSeries = {
   range: 'daily',
   scans: [0, 0],
@@ -65,7 +73,7 @@ function xStep(n: number) {
 }
 
 export default function MetricsHero() {
-  const [range, setRange] = useState<Range>('daily')
+  const [range, setRange] = useState<Range>('hourly')
   const [series, setSeries] = useState<ScansOrdersSeries>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -127,6 +135,7 @@ export default function MetricsHero() {
 
   const totalScans = d.scans.reduce((a, b) => a + b, 0)
   const totalOrders = d.orders.reduce((a, b) => a + b, 0)
+  const rangeLabel = RANGE_TOTALS[range]
 
   return (
     <div style={{
@@ -181,16 +190,18 @@ export default function MetricsHero() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '8px 16px 0' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '8px 16px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 20, height: 2, borderRadius: 2, background: '#5ac8fa', display: 'inline-block' }} />
           <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Scans</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#5ac8fa', marginLeft: 2 }}>{fmt(totalScans)}</span>
+          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {rangeLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 20, height: 2, borderRadius: 2, background: '#f07848', display: 'inline-block' }} />
           <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Orders</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#f07848', marginLeft: 2 }}>{fmt(totalOrders)}</span>
+          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {rangeLabel}</span>
         </div>
         {loading && <InlineSpinner label="Loading…" />}
         {error && <span style={{ fontSize: 11, color: 'var(--destructive)' }}>{error}</span>}

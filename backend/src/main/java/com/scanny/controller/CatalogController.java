@@ -19,6 +19,20 @@ public class CatalogController {
         this.catalogService = catalogService;
     }
 
+    @GetMapping("/categories")
+    public CatalogDtos.CategoriesResponse listCategories(@PathVariable String businessId) {
+        return catalogService.listCategories(businessId);
+    }
+
+    @PostMapping("/categories")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CatalogDtos.CategoriesResponse addCategory(
+        @PathVariable String businessId,
+        @Valid @RequestBody CatalogDtos.AddCategoryRequest request
+    ) {
+        return catalogService.addCustomCategory(businessId, request.name());
+    }
+
     @GetMapping
     public Map<String, List<CatalogDtos.CatalogItemResponse>> getCatalogItems(@PathVariable String businessId) {
         return Map.of("items", catalogService.getCatalogItems(businessId));

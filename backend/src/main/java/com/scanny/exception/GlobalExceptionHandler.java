@@ -3,6 +3,7 @@ package com.scanny.exception;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,6 +31,14 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage() != null ? error.getDefaultMessage() : "Validation failed.")
                 .orElse("Validation failed.");
         return ResponseEntity.badRequest().body(Map.of("error", message));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, String>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(405).body(Map.of(
+            "error",
+            "This action is not available yet. Restart the backend to load the latest API."
+        ));
     }
 
     @ExceptionHandler(Exception.class)

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { scannyApi } from '../api/services'
+import { ApiError } from '../api/client'
 import type { CatalogItem, CreateCatalogItemRequest, UpdateCatalogItemRequest } from '../api/types'
 
 export function useCatalog(businessId: string) {
@@ -68,6 +69,25 @@ export function useCatalog(businessId: string) {
     }
   }, [businessId])
 
+  const addCategory = useCallback(async (name: string): Promise<string[]> => {
+    try {
+      setLoading(true)
+      setError(null)
+      return await scannyApi.catalog.addCategory(businessId, name)
+    } catch (err) {
+      const message = err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : 'Failed to add category'
+      console.error('Failed to add category:', err)
+      setError(message)
+      throw new Error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [businessId])
+
   return {
     loading,
     error,
@@ -75,6 +95,7 @@ export function useCatalog(businessId: string) {
     updateItem,
     toggleAvailability,
     deleteItem,
+    addCategory,
   }
 }
 

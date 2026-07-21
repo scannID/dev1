@@ -5,7 +5,9 @@ import com.scanny.entity.Business;
 import com.scanny.entity.CatalogItem;
 import com.scanny.exception.ApiException;
 import com.scanny.repository.CatalogItemRepository;
+import com.scanny.repository.BusinessRepository;
 import com.scanny.security.MerchantAccessService;
+import com.scanny.util.CatalogCategories;
 import com.scanny.websocket.RealtimeEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,17 +20,20 @@ import java.util.UUID;
 public class CatalogService {
 
     private final CatalogItemRepository catalogItemRepository;
+    private final BusinessRepository businessRepository;
     private final MerchantAccessService merchantAccessService;
     private final AuditService auditService;
     private final RealtimeEventPublisher realtimeEventPublisher;
 
     public CatalogService(
             CatalogItemRepository catalogItemRepository,
+            BusinessRepository businessRepository,
             MerchantAccessService merchantAccessService,
             AuditService auditService,
             RealtimeEventPublisher realtimeEventPublisher
     ) {
         this.catalogItemRepository = catalogItemRepository;
+        this.businessRepository = businessRepository;
         this.merchantAccessService = merchantAccessService;
         this.auditService = auditService;
         this.realtimeEventPublisher = realtimeEventPublisher;
@@ -46,18 +51,45 @@ public class CatalogService {
         return CatalogDtos.CatalogItemResponse.from(item);
     }
 
+    @Transactional(readOnly = true)
+    public CatalogDtos.CategoriesResponse listCategories(String businessId) {
+        Business business = merchantAccessService.requireOwnedBusiness(businessId);
+        return new CatalogDtos.CategoriesResponse(CatalogCategories.merged(business));
+    }
+
+    @Transactional
+    public CatalogDtos.CategoriesResponse addCustomCategory(String businessId, String rawName) {
+        Business business = merchantAccessService.requireOwnedBusiness(businessId);
+        String name = CatalogCategories.normalize(rawName);
+        if (name.isBlank()) {
+            throw new ApiException(400, "Category name is required.");
+        }
+        business.addCustomCategory(name);
+        businessRepository.save(business);
+        auditService.success("CATALOG_CATEGORY_ADDED", "business", businessId, Map.of("category", name));
+        return new CatalogDtos.CategoriesResponse(CatalogCategories.merged(business));
+    }
+
     @Transactional
     public CatalogDtos.CatalogItemResponse createCatalogItem(String businessId, CatalogDtos.CreateCatalogItemRequest request) {
         Business business = merchantAccessService.requireOwnedBusiness(businessId);
+
+        String category = CatalogCategories.normalize(request.category());
+        if (category.isBlank()) {
+            throw new ApiException(400, "Category is required.");
+        }
 
         CatalogItem item = new CatalogItem();
         item.setId(generateItemId());
         item.setBusiness(business);
         item.setName(request.name());
-        item.setCategory(request.category());
+        item.setCategory(category);
         item.setPrice(request.price());
         item.setDescription(request.description() != null ? request.description() : "");
         item.setAvailable(request.available());
+
+        business.addCustomCategory(category);
+        businessRepository.save(business);
 
         item = catalogItemRepository.save(item);
         CatalogDtos.CatalogItemResponse response = CatalogDtos.CatalogItemResponse.from(item);
@@ -78,7 +110,13 @@ public class CatalogService {
             item.setName(request.name());
         }
         if (request.category() != null) {
-            item.setCategory(request.category());
+            String category = CatalogCategories.normalize(request.category());
+            if (category.isBlank()) {
+                throw new ApiException(400, "Category is required.");
+            }
+            item.setCategory(category);
+            item.getBusiness().addCustomCategory(category);
+            businessRepository.save(item.getBusiness());
         }
         if (request.price() != null) {
             item.setPrice(request.price());

@@ -1,6 +1,7 @@
 package com.scanny.dto;
 
 import com.scanny.entity.CatalogItem;
+import java.util.List;
 
 public class CatalogDtos {
 
@@ -22,6 +23,14 @@ public class CatalogDtos {
 
     public record UpdateAvailabilityRequest(
         boolean available
+    ) {}
+
+    public record AddCategoryRequest(
+        String name
+    ) {}
+
+    public record CategoriesResponse(
+        List<String> categories
     ) {}
 
     public record CatalogItemResponse(

@@ -3,7 +3,6 @@ import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { useDashboard } from '../hooks/useDashboard'
-import { useSystemHealth } from '../hooks/usePlatform'
 
 function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?: string }) {
   if (data.length < 2) return null
@@ -45,7 +44,6 @@ function activityIcon(type: string) {
 
 export default function OverviewPage() {
   const { metrics, recentActivity, topMerchants, loading, error } = useDashboard()
-  const { data: health } = useSystemHealth()
 
   const displayMetrics = metrics
     ? [
@@ -72,7 +70,7 @@ export default function OverviewPage() {
             : [metrics.ordersToday.total],
         },
         {
-          label: 'Active QR Scans',
+          label: 'QR Scans',
           value: metrics.qrScans.last24Hours.toLocaleString(),
           sub: 'last 24 hours',
           delta: metrics.qrScans.change,
@@ -94,14 +92,6 @@ export default function OverviewPage() {
             : [metrics.revenue.thisMonth],
         },
       ]
-    : []
-
-  const serviceStrip = health?.services?.length
-    ? health.services.map((s) => ({
-        label: s.name,
-        status: s.status.charAt(0).toUpperCase() + s.status.slice(1),
-        dot: s.status === 'operational' ? 'green' : s.status === 'degraded' ? 'amber' : 'red',
-      }))
     : []
 
   return (
@@ -139,18 +129,6 @@ export default function OverviewPage() {
           </div>
         )}
       </div>
-
-      {serviceStrip.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {serviceStrip.map((s) => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
-              <span className={`status-dot ${s.dot}`} />
-              <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{s.label}</span>
-              <span style={{ color: 'var(--muted-foreground)' }}>{s.status}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="admin-two-col">
         <MetricsHero />

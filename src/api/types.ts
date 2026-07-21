@@ -26,6 +26,7 @@ export interface Business {
   customerUrl?: string
   createdAt?: string
   items: CatalogItem[]
+  categories?: string[]
 }
 
 export interface CreateBusinessRequest {
@@ -57,6 +58,10 @@ export interface UpdateCatalogItemRequest {
   price?: number
   description?: string
   available?: boolean
+}
+
+export interface CategoriesResponse {
+  categories: string[]
 }
 
 export interface CatalogItemResponse {

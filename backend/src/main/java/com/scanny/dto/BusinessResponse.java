@@ -21,13 +21,24 @@ public record BusinessResponse(
         String logoUrl,
         String customerUrl,
         Instant createdAt,
-        List<CatalogItemResponse> items
+        List<CatalogItemResponse> items,
+        List<String> categories
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
-        return from(business, scanBaseUrl, includeItems, null);
+        return from(business, scanBaseUrl, includeItems, null, null);
     }
 
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems, String logoUrl) {
+        return from(business, scanBaseUrl, includeItems, logoUrl, null);
+    }
+
+    public static BusinessResponse from(
+        Business business,
+        String scanBaseUrl,
+        boolean includeItems,
+        String logoUrl,
+        List<String> categories
+    ) {
         List<CatalogItemResponse> items = includeItems
                 ? business.getItems().stream().map(CatalogItemResponse::from).toList()
                 : null;
@@ -46,7 +57,8 @@ public record BusinessResponse(
                 logoUrl,
                 scanBaseUrl + "/b/" + business.getId() + "?qr=" + business.getQrToken(),
                 business.getCreatedAt(),
-                items
+                items,
+                categories
         );
     }
 }

@@ -9,6 +9,7 @@ import type {
   CatalogItem,
   CatalogItemResponse,
   CatalogItemsResponse,
+  CategoriesResponse,
   CreateCatalogItemRequest,
   UpdateCatalogItemRequest,
   Order,
@@ -152,6 +153,16 @@ export const catalogApi = {
 
   delete: async (businessId: string, itemId: string): Promise<void> => {
     await api.delete(`/businesses/${businessId}/catalog/${itemId}`)
+  },
+
+  listCategories: async (businessId: string): Promise<string[]> => {
+    const response = await api.get<CategoriesResponse>(`/businesses/${businessId}/catalog/categories`)
+    return response.categories
+  },
+
+  addCategory: async (businessId: string, name: string): Promise<string[]> => {
+    const response = await api.post<CategoriesResponse>(`/businesses/${businessId}/catalog/categories`, { name })
+    return response.categories
   },
 }
 
