@@ -107,8 +107,8 @@ export function ScannyPhoneDemo() {
               background: 'linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0))',
               fontFamily: "'Poppins', sans-serif"
             }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#000' }}>9:41</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>📶 📡 🔋</div>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#000' }}>9:41</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}>📶 📡 🔋</div>
             </div>
 
             {/* Dynamic Island */}
@@ -129,7 +129,7 @@ export function ScannyPhoneDemo() {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px',
                 fontFamily: "'Poppins', sans-serif"
               }}>
-                <p style={{ fontSize: '11px', color: '#64748b', margin: 0, fontWeight: 500 }}>
+                <p style={{ fontSize: '9px', color: '#64748b', margin: 0, fontWeight: 500 }}>
                   point camera at table qr code
                 </p>
                 <div style={{ 
@@ -175,8 +175,8 @@ export function ScannyPhoneDemo() {
                   display: 'flex', alignItems: 'center', gap: '8px', 
                   background: 'rgba(10,132,255,0.1)', padding: '8px 16px', borderRadius: '20px' 
                 }}>
-                  <span style={{ fontSize: '14px' }}>📍</span>
-                  <p style={{ fontSize: '11px', color: '#0a84ff', margin: 0, fontWeight: 600 }}>table 12</p>
+                  <span style={{ fontSize: '11px' }}>📍</span>
+                  <p style={{ fontSize: '9px', color: '#0a84ff', margin: 0, fontWeight: 600 }}>table 12</p>
                 </div>
               </div>
 
@@ -191,15 +191,15 @@ export function ScannyPhoneDemo() {
                 <div style={{ 
                   width: '72px', height: '72px', borderRadius: '20px', 
                   background: '#0a84ff', display: 'flex', 
-                  alignItems: 'center', justifyContent: 'center', fontSize: '32px', 
+                  alignItems: 'center', justifyContent: 'center', fontSize: '26px', 
                   boxShadow: '0 8px 24px rgba(10,132,255,0.3)' 
                 }}>📱</div>
                 <p style={{ 
-                  fontSize: '19px', fontWeight: 700, margin: '6px 0 0', 
+                  fontSize: '15px', fontWeight: 700, margin: '6px 0 0', 
                   color: '#0f172a', letterSpacing: '-0.02em' 
                 }}>scanny</p>
                 <p style={{ 
-                  fontSize: '12px', color: '#64748b', margin: 0, 
+                  fontSize: '10px', color: '#64748b', margin: 0, 
                   textAlign: 'center', padding: '0 40px', fontWeight: 500 
                 }}>connecting to tasty grill house</p>
               </div>
@@ -212,12 +212,12 @@ export function ScannyPhoneDemo() {
                 fontFamily: "'Poppins', sans-serif"
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
-                  <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  <p style={{ fontSize: '8px', color: '#94a3b8', margin: 0, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                     tasty grill house
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <p style={{ fontSize: '16px', fontWeight: 700, margin: '4px 0 0', color: '#0f172a' }}>menu</p>
-                    <span style={{ fontSize: '18px' }}>🛒</span>
+                    <p style={{ fontSize: '13px', fontWeight: 700, margin: '4px 0 0', color: '#0f172a' }}>menu</p>
+                    <span style={{ fontSize: '14px' }}>🛒</span>
                   </div>
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', padding: '8px 16px', overflow: 'hidden' }}>
@@ -235,7 +235,7 @@ export function ScannyPhoneDemo() {
                       <div style={{ 
                         width: '52px', height: '52px', borderRadius: '14px', 
                         display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        flexShrink: 0, background: p.bg, fontSize: '24px', 
+                        flexShrink: 0, background: p.bg, fontSize: '18px', 
                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                         border: `2px solid ${p.bg}`,
                         position: 'relative'
@@ -244,18 +244,18 @@ export function ScannyPhoneDemo() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ 
-                          fontSize: '13px', fontWeight: 700, margin: 0, color: '#1E293B',
+                          fontSize: '11px', fontWeight: 700, margin: 0, color: '#1E293B',
                           letterSpacing: '-0.01em', lineHeight: 1.3
                         }}>{p.name}</p>
                         <p style={{ 
-                          fontSize: '11px', color: '#3B82F6', margin: '3px 0 0', 
+                          fontSize: '9px', color: '#3B82F6', margin: '3px 0 0', 
                           fontWeight: 700, letterSpacing: '-0.01em' 
                         }}>
                           UGX {p.price.toLocaleString()}
                         </p>
                       </div>
                       <div style={{ 
-                        fontSize: '22px', 
+                        fontSize: '16px', 
                         color: selectedProducts.includes(i) ? '#3B82F6' : '#D1D5DB',
                         transition: 'all 0.3s ease',
                         transform: selectedProducts.includes(i) ? 'rotate(90deg) scale(1.1)' : 'rotate(0deg) scale(1)'
@@ -275,10 +275,10 @@ export function ScannyPhoneDemo() {
                 fontFamily: "'Poppins', sans-serif"
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
-                  <p style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#0f172a' }}>your order</p>
+                  <p style={{ fontSize: '13px', fontWeight: 700, margin: 0, color: '#0f172a' }}>your order</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                    <span style={{ fontSize: '13px' }}>📍</span>
-                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0, fontWeight: 500 }}>table 12</p>
+                    <span style={{ fontSize: '10px' }}>📍</span>
+                    <p style={{ fontSize: '9px', color: '#64748b', margin: 0, fontWeight: 500 }}>table 12</p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 16px' }}>
@@ -293,13 +293,13 @@ export function ScannyPhoneDemo() {
                         <div style={{ 
                           width: '40px', height: '40px', borderRadius: '10px', 
                           display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                          background: p.bg, fontSize: '16px', 
+                          background: p.bg, fontSize: '13px', 
                           boxShadow: '0 2px 8px rgba(0,0,0,0.08)' 
                         }}>{p.icon}</div>
                         <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: '12px', fontWeight: 600, margin: 0, color: '#0f172a' }}>{p.name}</p>
+                          <p style={{ fontSize: '10px', fontWeight: 600, margin: 0, color: '#0f172a' }}>{p.name}</p>
                         </div>
-                        <p style={{ fontSize: '12px', fontWeight: 700, margin: 0, color: '#0a84ff' }}>
+                        <p style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: '#0a84ff' }}>
                           UGX {p.price.toLocaleString()}
                         </p>
                       </div>
@@ -310,13 +310,13 @@ export function ScannyPhoneDemo() {
                   marginTop: 'auto', padding: '16px', background: '#ffffff', 
                   borderTop: '1px solid #e2e8f0' 
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '12px' }}>
                     <span style={{ color: '#64748b', fontWeight: 600 }}>total</span>
                     <span style={{ fontWeight: 700, color: '#0f172a' }}>UGX {total.toLocaleString()}</span>
                   </div>
                   <button style={{ 
                     width: '100%', background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)', 
-                    color: '#fff', border: 'none', padding: '14px', fontSize: '13px', 
+                    color: '#fff', border: 'none', padding: '14px', fontSize: '11px', 
                     fontWeight: 700, borderRadius: '12px', cursor: 'pointer', 
                     boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
                     fontFamily: "'Poppins', sans-serif"
@@ -332,8 +332,8 @@ export function ScannyPhoneDemo() {
                 fontFamily: "'Poppins', sans-serif"
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
-                  <p style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#0f172a' }}>pay with</p>
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
+                  <p style={{ fontSize: '13px', fontWeight: 700, margin: 0, color: '#0f172a' }}>pay with</p>
+                  <p style={{ fontSize: '9px', color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
                     choose mobile money
                   </p>
                 </div>
@@ -347,15 +347,15 @@ export function ScannyPhoneDemo() {
                     <div style={{ 
                       width: '42px', height: '42px', borderRadius: '10px', 
                       display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      fontSize: '11px', fontWeight: 700, flexShrink: 0, 
+                      fontSize: '9px', fontWeight: 700, flexShrink: 0, 
                       background: '#FAEEDA', color: '#412402', 
                       boxShadow: '0 2px 8px rgba(0,0,0,0.08)' 
                     }}>MTN</div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '12px', fontWeight: 600, margin: 0, color: '#0f172a' }}>mtn mobile money</p>
-                      <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', fontWeight: 500 }}>**** 4421</p>
+                      <p style={{ fontSize: '10px', fontWeight: 600, margin: 0, color: '#0f172a' }}>mtn mobile money</p>
+                      <p style={{ fontSize: '9px', color: '#64748b', margin: '2px 0 0', fontWeight: 500 }}>**** 4421</p>
                     </div>
-                    <div style={{ fontSize: '20px', color: selectedPayment === 'mtn' ? '#0a84ff' : '#cbd5e1' }}>
+                    <div style={{ fontSize: '16px', color: selectedPayment === 'mtn' ? '#0a84ff' : '#cbd5e1' }}>
                       {selectedPayment === 'mtn' ? '✅' : '⭕'}
                     </div>
                   </div>
@@ -367,21 +367,21 @@ export function ScannyPhoneDemo() {
                     <div style={{ 
                       width: '42px', height: '42px', borderRadius: '10px', 
                       display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      fontSize: '10px', fontWeight: 700, flexShrink: 0, 
+                      fontSize: '8px', fontWeight: 700, flexShrink: 0, 
                       background: '#FCEBEB', color: '#501313', 
                       boxShadow: '0 2px 8px rgba(0,0,0,0.08)' 
                     }}>Airtel</div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '12px', fontWeight: 600, margin: 0, color: '#0f172a' }}>airtel money</p>
-                      <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0', fontWeight: 500 }}>**** 0093</p>
+                      <p style={{ fontSize: '10px', fontWeight: 600, margin: 0, color: '#0f172a' }}>airtel money</p>
+                      <p style={{ fontSize: '9px', color: '#64748b', margin: '2px 0 0', fontWeight: 500 }}>**** 0093</p>
                     </div>
-                    <div style={{ fontSize: '20px', color: '#cbd5e1' }}>⭕</div>
+                    <div style={{ fontSize: '16px', color: '#cbd5e1' }}>⭕</div>
                   </div>
                 </div>
                 <div style={{ marginTop: 'auto', padding: '16px', background: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
                   <button style={{ 
                     width: '100%', background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)', 
-                    color: '#fff', border: 'none', padding: '14px', fontSize: '13px', 
+                    color: '#fff', border: 'none', padding: '14px', fontSize: '11px', 
                     fontWeight: 700, borderRadius: '12px', cursor: 'pointer', 
                     boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
                     fontFamily: "'Poppins', sans-serif"
@@ -404,15 +404,15 @@ export function ScannyPhoneDemo() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', 
                   transform: showCheck ? 'scale(1)' : 'scale(0)', 
                   transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)', 
-                  fontSize: '36px', color: '#ffffff', 
+                  fontSize: '28px', color: '#ffffff', 
                   boxShadow: '0 8px 24px rgba(16,185,129,0.3)' 
                 }}>✓</div>
                 <div style={{ textAlign: 'center', padding: '0 32px' }}>
-                  <p style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: '#166534' }}>
+                  <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#166534' }}>
                     payment successful
                   </p>
                   <p style={{ 
-                    fontSize: '12px', color: '#15803d', margin: '8px 0 0', 
+                    fontSize: '10px', color: '#15803d', margin: '8px 0 0', 
                     fontWeight: 500, lineHeight: 1.5 
                   }}>
                     order sent to tasty grill house kitchen

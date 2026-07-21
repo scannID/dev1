@@ -1,5 +1,6 @@
-import { type CSSProperties, useState, useEffect } from 'react'
-import { ScannyPhoneDemo } from './ScannyPhoneDemo'
+import { type CSSProperties, useState, useEffect, useRef } from 'react'
+import { ScannyDeviceStack } from './ScannyDeviceStack'
+import { SiteFooter } from './marketing/SiteFooter'
 
 /* ─── Design tokens (follow global light/dark via CSS vars) ─────────── */
 type LandingTokens = {
@@ -15,12 +16,12 @@ type LandingTokens = {
 }
 
 const C: LandingTokens = {
-  bg:      'var(--background)',
-  bgAlt:   'var(--card)',
+  bg:      '#ffffff',
+  bgAlt:   '#ffffff',
   text:    'var(--foreground)',
   textAlt: 'var(--foreground)',
   muted:   'var(--muted-foreground)',
-  border:  'var(--border)',
+  border:  'transparent',
   teal:    'var(--primary)',
   tealLt:  'var(--primary)',
   tealXlt: 'var(--accent)',
@@ -28,24 +29,137 @@ const C: LandingTokens = {
 
 /* ─── Inline styles ─────────────────────────────────────────────────── */
 const getStyles = (tokens: LandingTokens): Record<string, CSSProperties> => ({
-  page: { fontFamily: "'Outfit Variable', sans-serif", background: tokens.bg, color: tokens.text, overflowX: 'hidden', minHeight: '100vh' },
-  nav: { background: tokens.bgAlt, borderBottom: `1px solid ${tokens.border}`, position: 'sticky', top: 0, zIndex: 50 },
-  navInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', maxWidth: 1160, margin: '0 auto', height: 60 },
+  page: { fontFamily: "'Outfit Variable', sans-serif", background: 'transparent', color: tokens.text, overflowX: 'hidden', minHeight: '100vh', position: 'relative' },
+  nav: { background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: 'none', position: 'sticky', top: 0, zIndex: 50, overflow: 'visible' },
+  navInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', maxWidth: 1160, margin: '0 auto', height: 60, gap: 16, overflow: 'visible' },
   logo: { display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' },
   logoMark: { width: 32, height: 32, background: tokens.teal, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   logoText: { color: tokens.text, fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' },
   navLinks: { display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 },
   navLink: { color: tokens.muted, fontSize: 14, textDecoration: 'none' },
   navCta: { background: tokens.teal, color: 'var(--primary-foreground)', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: 'none' },
-  hero: { background: tokens.bg, padding: '100px 48px 100px', position: 'relative', overflow: 'hidden' },
+  hero: { background: 'transparent', padding: '100px 48px 100px', position: 'relative', overflow: 'hidden' },
   heroInner: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, alignItems: 'center', maxWidth: '100%' },
-  eyebrow: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', color: tokens.tealLt, fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 20, marginBottom: 24, letterSpacing: '0.02em' },
-  heroH1: { color: tokens.text, fontSize: 'clamp(36px,5vw,60px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 20px' },
-  heroSub: { color: tokens.muted, fontSize: 'clamp(16px,2vw,19px)', lineHeight: 1.6, margin: '0 0 40px', maxWidth: 460 },
+  eyebrow: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', color: tokens.tealLt, fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.02em' },
+  heroH1: { color: tokens.text, fontSize: 'clamp(30px,4vw,48px)', fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px' },
+  heroSub: { color: tokens.muted, fontSize: 'clamp(14px,1.7vw,17px)', lineHeight: 1.6, margin: '0 0 36px', maxWidth: 420 },
   ctaRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   ctaPrimary: { background: tokens.teal, color: 'var(--primary-foreground)', padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer' },
   ctaSecondary: { background: 'transparent', color: tokens.text, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: `1.5px solid ${tokens.border}`, cursor: 'pointer' },
 })
+
+/* ─── Stripe-style fluid mesh gradient background ───────────────────── */
+function MeshGradientBackground() {
+  return (
+    <div className="scanny-mesh" aria-hidden>
+      <div className="scanny-mesh__base" />
+      <div className="scanny-mesh__blob scanny-mesh__blob--violet" />
+      <div className="scanny-mesh__blob scanny-mesh__blob--pink" />
+      <div className="scanny-mesh__blob scanny-mesh__blob--blue" />
+      <div className="scanny-mesh__blob scanny-mesh__blob--peach" />
+      <div className="scanny-mesh__blob scanny-mesh__blob--lilac" />
+      <div className="scanny-mesh__wash" />
+      <style>{`
+        .scanny-mesh {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .scanny-mesh__base {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(120% 80% at 10% 0%, #fce7f3 0%, transparent 55%),
+            radial-gradient(100% 70% at 90% 10%, #e0e7ff 0%, transparent 50%),
+            radial-gradient(90% 60% at 50% 100%, #ffedd5 0%, transparent 55%),
+            linear-gradient(160deg, #faf5ff 0%, #f0f9ff 45%, #fff7ed 100%);
+        }
+        .scanny-mesh__blob {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(80px);
+          mix-blend-mode: multiply;
+          opacity: 0.72;
+          will-change: transform;
+        }
+        .scanny-mesh__blob--violet {
+          width: min(58vw, 720px);
+          height: min(58vw, 720px);
+          top: -12%;
+          left: -8%;
+          background: radial-gradient(circle, #8b5cf6 0%, #a78bfa 35%, transparent 70%);
+          animation: scannyMeshA 22s ease-in-out infinite;
+        }
+        .scanny-mesh__blob--pink {
+          width: min(52vw, 640px);
+          height: min(52vw, 640px);
+          top: 8%;
+          right: -10%;
+          background: radial-gradient(circle, #ec4899 0%, #f472b6 40%, transparent 72%);
+          animation: scannyMeshB 26s ease-in-out infinite;
+        }
+        .scanny-mesh__blob--blue {
+          width: min(60vw, 760px);
+          height: min(60vw, 760px);
+          bottom: -18%;
+          left: 18%;
+          background: radial-gradient(circle, #38bdf8 0%, #7dd3fc 38%, transparent 70%);
+          animation: scannyMeshC 24s ease-in-out infinite;
+        }
+        .scanny-mesh__blob--peach {
+          width: min(48vw, 580px);
+          height: min(48vw, 580px);
+          bottom: 10%;
+          right: 5%;
+          background: radial-gradient(circle, #fdba74 0%, #fed7aa 42%, transparent 72%);
+          animation: scannyMeshD 20s ease-in-out infinite;
+        }
+        .scanny-mesh__blob--lilac {
+          width: min(40vw, 480px);
+          height: min(40vw, 480px);
+          top: 38%;
+          left: 36%;
+          background: radial-gradient(circle, #c4b5fd 0%, #ddd6fe 45%, transparent 70%);
+          opacity: 0.55;
+          animation: scannyMeshE 28s ease-in-out infinite;
+        }
+        .scanny-mesh__wash {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.35) 100%);
+        }
+        @keyframes scannyMeshA {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(12%, 18%) scale(1.12); }
+          66% { transform: translate(22%, 6%) scale(0.94); }
+        }
+        @keyframes scannyMeshB {
+          0%, 100% { transform: translate(0, 0) scale(1.05); }
+          40% { transform: translate(-16%, 14%) scale(0.92); }
+          70% { transform: translate(-8%, 22%) scale(1.1); }
+        }
+        @keyframes scannyMeshC {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(14%, -18%) scale(1.15); }
+        }
+        @keyframes scannyMeshD {
+          0%, 100% { transform: translate(0, 0) scale(0.96); }
+          35% { transform: translate(-18%, -12%) scale(1.08); }
+          65% { transform: translate(-6%, -22%) scale(1); }
+        }
+        @keyframes scannyMeshE {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-20%, 10%) scale(1.2); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .scanny-mesh__blob { animation: none !important; }
+        }
+      `}</style>
+    </div>
+  )
+}
 
 /* ─── QR Mockup ─────────────────────────────────────────────────────── */
 function _QRMockup({ C: tokens }: { C: LandingTokens }) {
@@ -110,27 +224,403 @@ function _QRMockup({ C: tokens }: { C: LandingTokens }) {
   )
 }
 
+/* ─── Interactive cursor field (blank-area hover) ───────────────────── */
+function isBlankHoverTarget(el: Element | null) {
+  if (!el) return true
+  const interactive = el.closest(
+    'a, button, input, textarea, select, label, [role="button"], .scanny-device-stack, .scanny-footer, nav, img, svg'
+  )
+  return !interactive
+}
+
+type Particle = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  r: number
+  base: number
+}
+
+function CursorField() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const coarse = window.matchMedia('(pointer: coarse)').matches
+    const canvas = canvasRef.current
+    if (reduce || coarse || !canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const mouse = { x: -9999, y: -9999, active: false }
+    let raf = 0
+    let w = 0
+    let h = 0
+    let particles: Particle[] = []
+
+    const colors = [
+      '139, 92, 246',
+      '236, 72, 153',
+      '56, 189, 248',
+      '251, 146, 60',
+    ]
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      w = window.innerWidth
+      h = window.innerHeight
+      canvas.width = Math.floor(w * dpr)
+      canvas.height = Math.floor(h * dpr)
+      canvas.style.width = `${w}px`
+      canvas.style.height = `${h}px`
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      const count = Math.min(90, Math.floor((w * h) / 18000))
+      particles = Array.from({ length: count }, () => {
+        const base = 1.2 + Math.random() * 1.8
+        return {
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: (Math.random() - 0.5) * 0.25,
+          r: base,
+          base,
+        }
+      })
+    }
+
+    const onMove = (e: MouseEvent) => {
+      mouse.x = e.clientX
+      mouse.y = e.clientY
+      mouse.active = isBlankHoverTarget(e.target as Element)
+    }
+    const onLeave = () => {
+      mouse.active = false
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h)
+
+      for (const p of particles) {
+        p.x += p.vx
+        p.y += p.vy
+
+        if (p.x < -20) p.x = w + 20
+        if (p.x > w + 20) p.x = -20
+        if (p.y < -20) p.y = h + 20
+        if (p.y > h + 20) p.y = -20
+
+        if (mouse.active) {
+          const dx = mouse.x - p.x
+          const dy = mouse.y - p.y
+          const dist = Math.hypot(dx, dy) || 1
+          const radius = 160
+          if (dist < radius) {
+            const force = (1 - dist / radius) * 0.085
+            // Soft swirl + attract
+            p.vx += dx * force * 0.04 - dy * force * 0.03
+            p.vy += dy * force * 0.04 + dx * force * 0.03
+            p.r = p.base + (1 - dist / radius) * 2.2
+          } else {
+            p.r += (p.base - p.r) * 0.08
+          }
+        } else {
+          p.r += (p.base - p.r) * 0.08
+        }
+
+        p.vx *= 0.96
+        p.vy *= 0.96
+        p.vx += (Math.random() - 0.5) * 0.02
+        p.vy += (Math.random() - 0.5) * 0.02
+      }
+
+      // Links near cursor / between close particles
+      for (let i = 0; i < particles.length; i++) {
+        const a = particles[i]
+        for (let j = i + 1; j < particles.length; j++) {
+          const b = particles[j]
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const dist = Math.hypot(dx, dy)
+          if (dist > 110) continue
+          const nearCursor =
+            mouse.active &&
+            Math.hypot((a.x + b.x) / 2 - mouse.x, (a.y + b.y) / 2 - mouse.y) < 180
+          if (!nearCursor && dist > 70) continue
+          const alpha = nearCursor ? 0.22 * (1 - dist / 110) : 0.08 * (1 - dist / 70)
+          ctx.beginPath()
+          ctx.moveTo(a.x, a.y)
+          ctx.lineTo(b.x, b.y)
+          ctx.strokeStyle = `rgba(99, 102, 241, ${alpha})`
+          ctx.lineWidth = nearCursor ? 1.2 : 0.7
+          ctx.stroke()
+        }
+      }
+
+      particles.forEach((p, i) => {
+        const near =
+          mouse.active ? Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / 160) : 0
+        const rgb = colors[i % colors.length]
+        const alpha = 0.2 + near * 0.55
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`
+        ctx.fill()
+        if (near > 0.35) {
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.r * 3.2, 0, Math.PI * 2)
+          ctx.fillStyle = `rgba(${rgb}, ${near * 0.12})`
+          ctx.fill()
+        }
+      })
+
+      // Soft core at cursor when blank
+      if (mouse.active) {
+        const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 90)
+        g.addColorStop(0, 'rgba(255,255,255,0.35)')
+        g.addColorStop(0.35, 'rgba(167,139,250,0.16)')
+        g.addColorStop(1, 'rgba(167,139,250,0)')
+        ctx.beginPath()
+        ctx.fillStyle = g
+        ctx.arc(mouse.x, mouse.y, 90, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      raf = requestAnimationFrame(draw)
+    }
+
+    resize()
+    draw()
+    window.addEventListener('resize', resize)
+    window.addEventListener('mousemove', onMove, { passive: true })
+    document.documentElement.addEventListener('mouseleave', onLeave)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+      window.removeEventListener('mousemove', onMove)
+      document.documentElement.removeEventListener('mouseleave', onLeave)
+    }
+  }, [])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden
+      className="scanny-cursor-field"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2,
+        pointerEvents: 'none',
+        width: '100%',
+        height: '100%',
+      }}
+    />
+  )
+}
+
+/* ─── Venue marquee (Uganda restaurants & hotels) ───────────────────── */
+type Venue = { name: string; logo: string }
+
+const venueRowA: Venue[] = [
+  { name: 'Serena Hotel Kampala', logo: '/venues/serena.svg' },
+  { name: 'Cafe Javas', logo: '/venues/javas.svg' },
+  { name: 'Speke Resort Munyonyo', logo: '/venues/speke.png' },
+  { name: 'Yujo Izakaya', logo: '/venues/yujo.svg' },
+  { name: 'Sheraton Kampala', logo: '/venues/sheraton.png' },
+  { name: 'The Lawns', logo: '/venues/lawns.svg' },
+  { name: 'Protea Hotel Kampala', logo: '/venues/protea.svg' },
+  { name: 'Faze 2', logo: '/venues/faze2.svg' },
+]
+
+const venueRowB: Venue[] = [
+  { name: 'Kampala Hilton', logo: '/venues/hilton.png' },
+  { name: 'Prunes Restaurant', logo: '/venues/prunes.svg' },
+  { name: 'Four Points by Sheraton', logo: '/venues/fourpoints.png' },
+  { name: 'Mediterraneo', logo: '/venues/mediterraneo.svg' },
+  { name: 'Hotel Africana', logo: '/venues/africana.png' },
+  { name: 'Cayenne', logo: '/venues/cayenne.svg' },
+  { name: 'Lake Victoria Serena', logo: '/venues/serena.svg' },
+  { name: 'Mama Ashanti', logo: '/venues/mamaashanti.svg' },
+]
+
+function VenuePill({ venue }: { venue: Venue }) {
+  const [failed, setFailed] = useState(false)
+  const initial = venue.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 18px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          overflow: 'hidden',
+          background: 'rgba(255,255,255,0.9)',
+          boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {!failed ? (
+          <img
+            src={venue.logo}
+            alt=""
+            width={28}
+            height={28}
+            onError={() => setFailed(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
+            {initial}
+          </span>
+        )}
+      </div>
+      <span
+        style={{
+          fontSize: 'clamp(12px, 1.4vw, 15px)',
+          fontWeight: 600,
+          letterSpacing: '-0.02em',
+          color: 'var(--foreground)',
+          opacity: 0.78,
+        }}
+      >
+        {venue.name}
+      </span>
+    </div>
+  )
+}
+
+function MarqueeRow({
+  items,
+  reverse = false,
+  duration = 40,
+}: {
+  items: Venue[]
+  reverse?: boolean
+  duration?: number
+}) {
+  const loop = [...items, ...items]
+  return (
+    <div className="scanny-marquee-track" style={{ overflow: 'hidden', width: '100%' }}>
+      <div
+        className={`scanny-marquee-strip${reverse ? ' scanny-marquee-strip--reverse' : ''}`}
+        style={{ animationDuration: `${duration}s` }}
+      >
+        {loop.map((venue, i) => (
+          <VenuePill key={`${venue.name}-${i}`} venue={venue} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VenueCarousel({ C }: { C: LandingTokens }) {
+  return (
+    <section
+      style={{
+        position: 'relative',
+        zIndex: 1,
+        padding: '28px 0 48px',
+        overflow: 'hidden',
+      }}
+    >
+      <style>{`
+        .scanny-marquee-strip {
+          display: flex;
+          width: max-content;
+          animation: scannyMarqueeLeft linear infinite;
+        }
+        .scanny-marquee-strip--reverse {
+          animation-name: scannyMarqueeRight;
+        }
+        @keyframes scannyMarqueeLeft {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        @keyframes scannyMarqueeRight {
+          from { transform: translateX(-50%); }
+          to { transform: translateX(0); }
+        }
+        .scanny-marquee-fade {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          background: linear-gradient(
+            90deg,
+            rgba(255,255,255,0.55) 0%,
+            transparent 12%,
+            transparent 88%,
+            rgba(255,255,255,0.55) 100%
+          );
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .scanny-marquee-strip {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
+      <p
+        style={{
+          textAlign: 'center',
+          color: C.muted,
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          margin: '0 0 28px',
+        }}
+      >
+        Trusted by leading venues across Uganda
+      </p>
+
+      <div style={{ position: 'relative' }}>
+        <div className="scanny-marquee-fade" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <MarqueeRow items={venueRowA} duration={38} />
+          <MarqueeRow items={venueRowB} reverse duration={44} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
 /* ─── How it works section ──────────────────────────────────────────── */
 const steps = [
-  { n: '01', title: 'Add your items', body: 'Create your catalog — meals, drinks, services, or goods. Each item gets a name, price, and availability toggle.' },
-  { n: '02', title: 'Share your QR', body: 'Print or display your auto-generated QR code. Customers scan it and browse your live menu from their phone.' },
-  { n: '03', title: 'Manage from dashboard', body: 'New orders appear instantly. Update statuses, track payments, and clear completed orders — all in one place.' },
+  { n: '01', title: 'Build your catalog', body: 'Add items with prices and availability. Changes go live instantly.' },
+  { n: '02', title: 'Share your QR', body: 'Display your code. Customers scan and order from their phone.' },
+  { n: '03', title: 'Run your dashboard', body: 'Track orders, update status, and manage payments in real time.' },
 ]
 
 function HowItWorks({ C }: { C: LandingTokens }) {
   return (
-    <section style={{ background: C.bgAlt, padding: '80px 24px', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
+    <section style={{ background: 'transparent', padding: '80px 24px', position: 'relative', zIndex: 1 }}>
       <div style={{ maxWidth: 1160, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
           <p style={{ color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>How it works</p>
-          <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>Up and running in minutes</h2>
+          <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>Live in minutes</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 40 }}>
           {steps.map(s => (
-            <div key={s.n} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: '32px 28px' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                <span style={{ color: C.tealLt, fontSize: 13, fontWeight: 800 }}>{s.n}</span>
-              </div>
+            <div key={s.n} style={{ padding: '8px 4px' }}>
+              <span style={{ color: C.tealLt, fontSize: 13, fontWeight: 800, display: 'block', marginBottom: 16 }}>{s.n}</span>
               <h3 style={{ color: C.text, fontSize: 18, fontWeight: 700, margin: '0 0 10px', letterSpacing: '-0.01em' }}>{s.title}</h3>
               <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.65, margin: 0 }}>{s.body}</p>
             </div>
@@ -227,14 +717,184 @@ function CtaSection({ onGetStarted, C }: { onGetStarted: () => void; C: LandingT
   )
 }
 
-/* ─── Footer ─────────────────────────────────────────────────────────── */
-function Footer({ C }: { C: LandingTokens }) {
+/* ─── Top nav with hover info ────────────────────────────────────────── */
+const navItems = [
+  {
+    label: 'Ordering',
+    href: '#how',
+    title: 'QR customer ordering',
+    body: 'Guests scan your code, browse the live menu, and place orders from their phone — no app install.',
+    points: ['Unique QR per business', 'Works on any smartphone', 'Orders sync instantly'],
+  },
+  {
+    label: 'Dashboard',
+    href: '#how',
+    title: 'Live merchant dashboard',
+    body: 'See every open order in one place. Update status, track payments, and clear completed tickets fast.',
+    points: ['Real-time order feed', 'Status in one tap', 'Open / paid summaries'],
+  },
+  {
+    label: 'Catalog',
+    href: '#how',
+    title: 'Menu & catalog control',
+    body: 'Add meals, drinks, or services with prices. Toggle availability and push changes live to customers.',
+    points: ['Instant price updates', 'Hide sold-out items', 'Built for any business type'],
+  },
+  {
+    label: 'Payments',
+    href: '#how',
+    title: 'Payment tracking',
+    body: 'Mark orders Paid or Unpaid, spot what is awaiting payment, and keep sales totals in view.',
+    points: ['Paid vs unpaid at a glance', 'Mobile money friendly', 'Clear revenue snapshot'],
+  },
+]
+
+function NavHoverLink({
+  item,
+}: {
+  item: (typeof navItems)[number]
+}) {
   return (
-    <footer style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '36px 24px' }}>
-      <div style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 28, height: 28, background: C.teal, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+    <li className="scanny-nav-item">
+      <a href={item.href} className="scanny-nav-link">
+        {item.label}
+      </a>
+      <div className="scanny-nav-panel" role="tooltip">
+        <p className="scanny-nav-panel__title">{item.title}</p>
+        <p className="scanny-nav-panel__body">{item.body}</p>
+        <ul className="scanny-nav-panel__list">
+          {item.points.map(p => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      </div>
+    </li>
+  )
+}
+
+function TopNav({
+  onGetStarted,
+  S,
+}: {
+  onGetStarted: () => void
+  S: Record<string, CSSProperties>
+}) {
+  return (
+    <nav style={S.nav}>
+      <style>{`
+        .scanny-nav-links {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          flex: 1;
+          justify-content: center;
+        }
+        .scanny-nav-item {
+          position: relative;
+        }
+        .scanny-nav-link {
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 14px;
+          border-radius: 8px;
+          color: var(--muted-foreground);
+          font-size: 14px;
+          font-weight: 550;
+          text-decoration: none;
+          transition: color 0.15s ease, background 0.15s ease;
+        }
+        .scanny-nav-link:hover,
+        .scanny-nav-item:focus-within .scanny-nav-link {
+          color: var(--foreground);
+          background: rgba(255,255,255,0.55);
+          opacity: 1;
+        }
+        .scanny-nav-panel {
+          position: absolute;
+          top: calc(100% + 10px);
+          left: 50%;
+          transform: translateX(-50%) translateY(6px);
+          width: 280px;
+          padding: 16px 16px 14px;
+          background: rgba(255,255,255,0.96);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 14px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+          z-index: 60;
+        }
+        .scanny-nav-panel::before {
+          content: '';
+          position: absolute;
+          top: -6px;
+          left: 50%;
+          width: 12px;
+          height: 12px;
+          background: rgba(255,255,255,0.96);
+          border-left: 1px solid rgba(15, 23, 42, 0.08);
+          border-top: 1px solid rgba(15, 23, 42, 0.08);
+          transform: translateX(-50%) rotate(45deg);
+        }
+        .scanny-nav-item:hover .scanny-nav-panel,
+        .scanny-nav-item:focus-within .scanny-nav-panel {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+          transform: translateX(-50%) translateY(0);
+        }
+        .scanny-nav-panel__title {
+          margin: 0 0 6px;
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--foreground);
+          letter-spacing: -0.02em;
+        }
+        .scanny-nav-panel__body {
+          margin: 0 0 12px;
+          font-size: 13px;
+          line-height: 1.5;
+          color: var(--muted-foreground);
+        }
+        .scanny-nav-panel__list {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+        .scanny-nav-panel__list li {
+          position: relative;
+          padding-left: 14px;
+          font-size: 12.5px;
+          font-weight: 550;
+          color: var(--foreground);
+          line-height: 1.35;
+        }
+        .scanny-nav-panel__list li::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 6px;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--primary);
+        }
+        @media (max-width: 768px) {
+          .scanny-nav-links { display: none; }
+        }
+      `}</style>
+      <div style={S.navInner}>
+        <a href="#" style={S.logo}>
+          <div style={S.logoMark}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <rect x="1"  y="1"  width="6" height="6" rx="1" fill="white"/>
               <rect x="11" y="1"  width="6" height="6" rx="1" fill="white"/>
               <rect x="1"  y="11" width="6" height="6" rx="1" fill="white"/>
@@ -244,12 +904,18 @@ function Footer({ C }: { C: LandingTokens }) {
               <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white"/>
             </svg>
           </div>
-          <span style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>Scanny</span>
-          <span style={{ color: C.muted, fontSize: 13, marginLeft: 8 }}>QR-powered ordering for every business</span>
-        </div>
-        <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>© {new Date().getFullYear()} Scanny. All rights reserved.</p>
+          <span style={S.logoText}>Scanny</span>
+        </a>
+
+        <ul className="scanny-nav-links">
+          {navItems.map(item => (
+            <NavHoverLink key={item.label} item={item} />
+          ))}
+        </ul>
+
+        <button onClick={onGetStarted} style={S.navCta} className="cta-primary">Get started</button>
       </div>
-    </footer>
+    </nav>
   )
 }
 
@@ -262,7 +928,9 @@ export default function LandingPage({
   const S = getStyles(C)
   
   return (
-    <div style={S.page}>
+    <div style={S.page} className="scanny-force-light">
+      <MeshGradientBackground />
+      <CursorField />
       <style>{`
         * { box-sizing: border-box; }
         a:hover { opacity: 0.85; }
@@ -275,54 +943,34 @@ export default function LandingPage({
         }
       `}</style>
 
+      <div style={{ position: 'relative', zIndex: 1 }}>
       {/* NAV */}
-      <nav style={S.nav}>
-        <div style={S.navInner}>
-          <a href="#" style={S.logo}>
-            <div style={S.logoMark}>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="1"  y="1"  width="6" height="6" rx="1" fill="white"/>
-                <rect x="11" y="1"  width="6" height="6" rx="1" fill="white"/>
-                <rect x="1"  y="11" width="6" height="6" rx="1" fill="white"/>
-                <rect x="11" y="11" width="3" height="3" rx="0.5" fill="white"/>
-                <rect x="15" y="11" width="2" height="2" rx="0.5" fill="white"/>
-                <rect x="11" y="15" width="2" height="2" rx="0.5" fill="white"/>
-                <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white"/>
-              </svg>
-            </div>
-            <span style={S.logoText}>Scanny</span>
-          </a>
-          <button onClick={onGetStarted} style={S.navCta} className="cta-primary">Get started</button>
-        </div>
-      </nav>
+      <TopNav onGetStarted={onGetStarted} S={S} />
 
       {/* HERO */}
       <section style={S.hero}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(${C.border} 1px, transparent 1px), linear-gradient(90deg, ${C.border} 1px, transparent 1px)`, backgroundSize: '48px 48px', opacity: 0.3, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 120, background: `linear-gradient(to top, ${C.bg}, transparent)`, pointerEvents: 'none' }} />
         <div style={{ ...S.heroInner, position: 'relative', zIndex: 1 }} className="hero-grid">
           <div>
-            <div style={S.eyebrow}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.tealLt, display: 'inline-block' }} />
-              QR-powered ordering
-            </div>
             <h1 style={S.heroH1}>
-              Let customers<br />order by scanning<br />
-              <span style={{ color: C.tealLt }}>a code.</span>
+              One scan.<br />
+              <span style={{ color: C.tealLt }}>Total control.</span>
             </h1>
             <p style={S.heroSub}>
-              Scanny turns your menu or catalog into a scannable QR experience. Customers browse and order from their phone — you manage everything from one live dashboard.
+              Customers order from their phone. You run every order from one live dashboard.
             </p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }} className="hero-visual">
-            <ScannyPhoneDemo />
+            <ScannyDeviceStack />
           </div>
         </div>
       </section>
 
+      <VenueCarousel C={C} />
+
       <span id="how" />
       <HowItWorks C={C} />
-      <Footer C={C} />
+      <SiteFooter />
+      </div>
     </div>
   )
 }

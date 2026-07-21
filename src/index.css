@@ -136,6 +136,31 @@ body.dark-mode,
   --sidebar-ring: oklch(0.77 0.15 75);
 }
 
+/* Public marketing surfaces stay light even when the app is in dark mode */
+.scanny-force-light {
+  color-scheme: light;
+  --background: oklch(0.973 0.012 90);
+  --foreground: oklch(0.18 0.012 145);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.012 145);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.012 145);
+  --primary: oklch(0.55 0.14 150);
+  --primary-foreground: oklch(0.98 0.012 90);
+  --secondary: oklch(0.77 0.15 75);
+  --secondary-foreground: oklch(0.20 0.05 150);
+  --muted: oklch(0.95 0.008 90);
+  --muted-foreground: oklch(0.50 0.018 145);
+  --accent: oklch(0.93 0.05 90);
+  --accent-foreground: oklch(0.55 0.14 150);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.006 90);
+  --input: oklch(0.92 0.006 90);
+  --ring: oklch(0.77 0.15 75);
+  background: #ffffff;
+  color: var(--foreground);
+}
+
 * {
   box-sizing: border-box;
 }

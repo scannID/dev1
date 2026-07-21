@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import CategoryField from './components/CategoryField'
-import CategoryManager from './components/CategoryManager'
 import { businessCategories } from './lib/catalogCategories'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -1273,12 +1272,6 @@ function CatalogPage({
           <Sparkline data={Array.from({ length: 7 }, () => categories.length)} color="#8b5cf6" />
         </div>
       </section>
-
-      <CategoryManager
-        categories={categories}
-        onAddCategory={async (name) => { await onAddCategory(name) }}
-        disabled={saving}
-      />
 
       {/* Table card */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">

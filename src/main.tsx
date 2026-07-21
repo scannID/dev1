@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import LandingPage from './LandingPage'
+import MarketingLayout from './marketing/MarketingLayout'
+import { slugFromPathname, type MarketingSlug } from './marketing/routes'
 import CustomerMenu from './CustomerMenu'
 import QuickPayTrack from './quickpay/QuickPayTrack'
 import QuickPayCustomer from './quickpay/QuickPayCustomer'
@@ -113,6 +115,15 @@ if (customerRoute) {
   function Root() {
     const [view, setView] = useState<View>('landing')
     const [darkMode, setDarkMode] = useState(() => readDarkMode())
+    const [marketingSlug, setMarketingSlug] = useState<MarketingSlug | null>(() =>
+      slugFromPathname(window.location.pathname),
+    )
+
+    useEffect(() => {
+      const syncPath = () => setMarketingSlug(slugFromPathname(window.location.pathname))
+      window.addEventListener('popstate', syncPath)
+      return () => window.removeEventListener('popstate', syncPath)
+    }, [])
 
     // Restore dashboard after Keycloak redirect (same pattern as admin console)
     useEffect(() => {
@@ -183,6 +194,11 @@ if (customerRoute) {
         />
       )
     }
+
+    if (marketingSlug) {
+      return <MarketingLayout slug={marketingSlug} onGetStarted={handleGetStarted} />
+    }
+
     return <LandingPage onGetStarted={handleGetStarted} />
   }
 
