@@ -1,0 +1,31 @@
+---
+description: Start Scanny local dev with the startup script instead of manual steps
+alwaysApply: true
+---
+
+# Scanny local dev startup
+
+When the user asks to start the backend, Keycloak, or the dev environment:
+
+1. Run `scanny` from any directory (one global command).
+2. Use `scanny -All` if they also need the Vite apps.
+3. Use `scanny-stop` to shut down.
+4. Do **not** manually start `kc.bat` or `mvnw` unless the script fails.
+
+This machine has **no Docker**. Use the **H2 profile** backend (`h2`) with local Keycloak on `:8080`.
+
+## URLs
+
+- API: http://localhost:4000
+- Keycloak admin: http://localhost:8080/admin (admin / admin)
+- Merchant app: http://localhost:5173
+- Admin console: http://localhost:5174
+
+## Test credentials
+
+- Samantha Restaurant: `samantha@scanny.local` / `Samantha@2026!`
+- Always use `localhost` in URLs (not `127.0.0.1`) to avoid JWT issuer mismatch.
+
+## Stop
+
+Run `.\stop-dev.ps1` from the repo root.

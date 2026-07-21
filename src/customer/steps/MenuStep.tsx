@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Minus, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
+import { getCategoryImage } from '../../lib/categoryImages'
 import { currency } from '../utils'
 
 const PAGE_SIZE = 10
@@ -82,6 +83,12 @@ export function MenuStep({
             className={selectedCategory === category ? 'active' : ''}
             onClick={() => selectCategory(category)}
           >
+            <img
+              src={getCategoryImage(category)}
+              alt=""
+              className="cm-cat-icon"
+              aria-hidden="true"
+            />
             {category === 'all' ? 'All' : category}
           </button>
         ))}
@@ -92,6 +99,12 @@ export function MenuStep({
           const qty = cart[item.id] || 0
           return (
             <article key={item.id} className="cm-row">
+              <img
+                src={getCategoryImage(item.category)}
+                alt=""
+                className="cm-item-thumb"
+                aria-hidden="true"
+              />
               <div className="cm-row-body">
                 <h3>{item.name}</h3>
                 {item.description ? <p>{item.description}</p> : null}

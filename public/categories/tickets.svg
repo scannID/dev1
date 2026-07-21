@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#EDE9FE"/>
+  <path d="M16 22h32a4 4 0 0 1 4 4v4a6 6 0 0 0 0 12v4a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4v-4a6 6 0 0 0 0-12v-4a4 4 0 0 1 4-4z" fill="#fff" stroke="#7C3AED" stroke-width="2"/>
+  <line x1="32" y1="22" x2="32" y2="46" stroke="#C4B5FD" stroke-width="2" stroke-dasharray="3 3"/>
+  <text x="22" y="37" font-family="Arial,sans-serif" font-size="10" font-weight="700" fill="#7C3AED">VIP</text>
+</svg>

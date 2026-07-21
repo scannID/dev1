@@ -8,6 +8,7 @@ import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.BusinessType;
 import com.scanny.repository.BusinessRepository;
+import com.scanny.repository.MerchantRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CodeUtils;
 import java.time.Instant;
@@ -21,17 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class BusinessService {
 
     private final BusinessRepository businessRepository;
+    private final MerchantRepository merchantRepository;
     private final StarterCatalogService starterCatalogService;
     private final MerchantAccessService merchantAccessService;
     private final String scanBaseUrl;
 
     public BusinessService(
             BusinessRepository businessRepository,
+            MerchantRepository merchantRepository,
             StarterCatalogService starterCatalogService,
             MerchantAccessService merchantAccessService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
     ) {
         this.businessRepository = businessRepository;
+        this.merchantRepository = merchantRepository;
         this.starterCatalogService = starterCatalogService;
         this.merchantAccessService = merchantAccessService;
         this.scanBaseUrl = scanBaseUrl;
@@ -41,12 +45,12 @@ public class BusinessService {
     public List<BusinessResponse> listBusinesses() {
         if (merchantAccessService.isAdmin()) {
             return businessRepository.findAll().stream()
-                    .map(business -> BusinessResponse.from(business, scanBaseUrl, true))
+                    .map(business -> toResponse(business, true))
                     .toList();
         }
         Merchant merchant = merchantAccessService.requireCurrentMerchant();
         return businessRepository.findWithItemsByMerchantId(merchant.getId().toString())
-                .map(business -> List.of(BusinessResponse.from(business, scanBaseUrl, true)))
+                .map(business -> List.of(toResponse(business, true)))
                 .orElse(List.of());
     }
 
@@ -54,19 +58,19 @@ public class BusinessService {
     public BusinessResponse getBusiness(String businessId) {
         Business business = requireBusiness(businessId);
         merchantAccessService.assertOwnsBusiness(business);
-        return BusinessResponse.from(business, scanBaseUrl, true);
+        return toResponse(business, true);
     }
 
     @Transactional(readOnly = true)
     public BusinessResponse getBusinessPublic(String businessId) {
-        return BusinessResponse.from(requireBusiness(businessId), scanBaseUrl, false);
+        return toResponse(requireBusiness(businessId), false);
     }
 
     @Transactional(readOnly = true)
     public BusinessResponse getBusinessByQrToken(String qrToken) {
         Business business = businessRepository.findWithItemsByQrToken(qrToken)
                 .orElseThrow(() -> new ApiException(404, "QR code was not found."));
-        return BusinessResponse.from(business, scanBaseUrl, true);
+        return toResponse(business, true);
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +122,7 @@ public class BusinessService {
         starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
 
         Business saved = businessRepository.save(business);
-        return BusinessResponse.from(saved, scanBaseUrl, true);
+        return toResponse(saved, true);
     }
 
     @Transactional(readOnly = true)
@@ -126,7 +130,7 @@ public class BusinessService {
         merchantAccessService.requireMerchantById(UUID.fromString(merchantId));
         Business business = businessRepository.findWithItemsByMerchantId(merchantId)
                 .orElseThrow(() -> new ApiException(404, "Business was not found for this merchant."));
-        return BusinessResponse.from(business, scanBaseUrl, true);
+        return toResponse(business, true);
     }
 
     @Transactional
@@ -168,7 +172,14 @@ public class BusinessService {
             business = businessRepository.save(business);
         }
 
-        return BusinessResponse.from(business, scanBaseUrl, true);
+        return toResponse(business, true);
+    }
+
+    private BusinessResponse toResponse(Business business, boolean includeItems) {
+        String logoUrl = merchantRepository.findById(UUID.fromString(business.getMerchantId()))
+                .map(Merchant::getBusinessLogoUrl)
+                .orElse(null);
+        return BusinessResponse.from(business, scanBaseUrl, includeItems, logoUrl);
     }
 
     @Transactional

@@ -1,6 +1,7 @@
 package com.scanny.service;
 
 import com.scanny.dto.BusinessResponse;
+import com.scanny.dto.MerchantDtos;
 import com.scanny.dto.MerchantDtos.*;
 import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
@@ -269,22 +270,7 @@ public class MerchantService {
     }
 
     private MerchantProfile toProfileEntity(Merchant merchant) {
-        return new MerchantProfile(
-            merchant.getId(),
-            merchant.getEmail(),
-            merchant.getBusinessName(),
-            merchant.getBusinessType(),
-            merchant.getPhoneNumber(),
-            merchant.getQrCodeToken(),
-            merchant.getQrCodeUrl(),
-            merchant.getQrCodeToken() != null,
-            merchant.getEmailVerified(),
-            merchant.getOnboardingCompleted(),
-            merchant.getOnboardingStep(),
-            merchant.getStatus(),
-            merchant.getPlan(),
-            merchant.getCreatedAt()
-        );
+        return MerchantDtos.toProfile(merchant);
     }
 
     /**
@@ -295,22 +281,7 @@ public class MerchantService {
         Merchant merchant = merchantRepository.findById(merchantId)
                 .orElseThrow(() -> new ApiException(404, "Merchant not found"));
         
-        return new MerchantProfile(
-            merchant.getId(),
-            merchant.getEmail(),
-            merchant.getBusinessName(),
-            merchant.getBusinessType(),
-            merchant.getPhoneNumber(),
-            merchant.getQrCodeToken(),
-            merchant.getQrCodeUrl(),
-            merchant.getQrCodeToken() != null,
-            merchant.getEmailVerified(),
-            merchant.getOnboardingCompleted(),
-            merchant.getOnboardingStep(),
-            merchant.getStatus(),
-            merchant.getPlan(),
-            merchant.getCreatedAt()
-        );
+        return MerchantDtos.toProfile(merchant);
     }
 
     /**
@@ -321,22 +292,7 @@ public class MerchantService {
         Merchant merchant = merchantRepository.findByKeycloakUserId(keycloakUserId)
                 .orElseThrow(() -> new ApiException(404, "Merchant not found"));
         
-        return new MerchantProfile(
-            merchant.getId(),
-            merchant.getEmail(),
-            merchant.getBusinessName(),
-            merchant.getBusinessType(),
-            merchant.getPhoneNumber(),
-            merchant.getQrCodeToken(),
-            merchant.getQrCodeUrl(),
-            merchant.getQrCodeToken() != null,
-            merchant.getEmailVerified(),
-            merchant.getOnboardingCompleted(),
-            merchant.getOnboardingStep(),
-            merchant.getStatus(),
-            merchant.getPlan(),
-            merchant.getCreatedAt()
-        );
+        return MerchantDtos.toProfile(merchant);
     }
 
     /**
@@ -360,29 +316,23 @@ public class MerchantService {
             merchant.setPhoneNumber(request.phoneNumber());
         }
         if (request.businessLogoUrl() != null) {
-            merchant.setBusinessLogoUrl(request.businessLogoUrl());
+            String logoUrl = request.businessLogoUrl().trim();
+            if (logoUrl.isEmpty()) {
+                merchant.setBusinessLogoUrl(null);
+            } else if (logoUrl.length() > 500_000) {
+                throw new ApiException(400, "Logo image is too large. Maximum size is 500KB.");
+            } else if (!logoUrl.startsWith("data:image/") && !logoUrl.startsWith("http://") && !logoUrl.startsWith("https://")) {
+                throw new ApiException(400, "Logo must be an uploaded image or a valid image URL.");
+            } else {
+                merchant.setBusinessLogoUrl(logoUrl);
+            }
         }
         
         merchant = merchantRepository.save(merchant);
         
         logger.info("Updated merchant profile: {}", merchantId);
         
-        return new MerchantProfile(
-            merchant.getId(),
-            merchant.getEmail(),
-            merchant.getBusinessName(),
-            merchant.getBusinessType(),
-            merchant.getPhoneNumber(),
-            merchant.getQrCodeToken(),
-            merchant.getQrCodeUrl(),
-            merchant.getQrCodeToken() != null,
-            merchant.getEmailVerified(),
-            merchant.getOnboardingCompleted(),
-            merchant.getOnboardingStep(),
-            merchant.getStatus(),
-            merchant.getPlan(),
-            merchant.getCreatedAt()
-        );
+        return MerchantDtos.toProfile(merchant);
     }
 
     /**

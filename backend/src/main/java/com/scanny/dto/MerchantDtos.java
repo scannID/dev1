@@ -99,6 +99,7 @@ public class MerchantDtos {
         Integer onboardingStep,
         Merchant.MerchantStatus status,
         Merchant.SubscriptionPlan plan,
+        String businessLogoUrl,
         LocalDateTime createdAt
     ) {}
 
@@ -231,6 +232,7 @@ public class MerchantDtos {
             merchant.getOnboardingStep(),
             merchant.getStatus(),
             merchant.getPlan(),
+            merchant.getBusinessLogoUrl(),
             merchant.getCreatedAt()
         );
     }

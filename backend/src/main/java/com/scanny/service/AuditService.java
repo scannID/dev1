@@ -17,7 +17,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class AuditService {
@@ -41,7 +40,6 @@ public class AuditService {
     @Transactional
     public void record(String action, String resourceType, String resourceId, String outcome, Map<String, ?> metadata) {
         AuditEvent event = new AuditEvent();
-        event.setId(UUID.randomUUID());
         event.setOccurredAt(Instant.now());
         event.setActorId(merchantAccessService.actorId());
         event.setActorEmail(merchantAccessService.actorEmail());

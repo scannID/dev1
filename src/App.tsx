@@ -1,5 +1,5 @@
-import { type CSSProperties, type PointerEvent, type ReactElement, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Bell, Eye, Home, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
+import { type ChangeEvent, type CSSProperties, type PointerEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
+import { BarChart3, Bell, Eye, Home, ImagePlus, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import {
   AlertDialog,
@@ -50,6 +50,8 @@ import type {
   OrderStatus,
   PaymentStatus,
 } from './api/types'
+import { scannyApi } from './api/services'
+import { resizeImageFile } from './lib/resizeImage'
 import { buildMetricSeries, buildReportData, dailySeries, type MetricRange } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
 import './App.css'
@@ -151,6 +153,7 @@ function App({
     loading: sessionLoading,
     error: sessionError,
     refreshBusiness,
+    refreshBusinesses,
     loadOrders,
     setOrders,
     updateLocalItems,
@@ -162,6 +165,7 @@ function App({
   const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const [actionError, setActionError] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
 
   const business = businesses[0] ?? emptyBusiness
   const catalogHook = useCatalog(business.id)
@@ -350,6 +354,19 @@ function App({
     )
   }
 
+  async function handleLogoUpload(dataUrl: string) {
+    setLogoUploading(true)
+    setActionError(null)
+    try {
+      await scannyApi.merchant.updateProfile({ businessLogoUrl: dataUrl })
+      await refreshBusinesses()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to upload logo')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
   function handleLogout() {
     if (onLogout) {
       onLogout()
@@ -409,7 +426,10 @@ function App({
 
         <SidebarProfile
           business={business}
-          kcUsername={kcUsername || ''}
+          businessName={merchant?.businessName || business.name || 'Business'}
+          logoUrl={business.logoUrl ?? merchant?.businessLogoUrl}
+          onLogoUpload={handleLogoUpload}
+          logoUploading={logoUploading}
           onLogoutRequest={() => setShowLogoutDialog(true)}
         />
 
@@ -647,29 +667,81 @@ function NotificationsPanel({ businessName, orders }: { businessName: string; or
 
 function SidebarProfile({
   business,
-  kcUsername,
+  businessName,
+  logoUrl,
+  onLogoUpload,
+  logoUploading,
   onLogoutRequest,
 }: {
   business: Business
-  kcUsername: string
+  businessName: string
+  logoUrl?: string | null
+  onLogoUpload: (dataUrl: string) => Promise<void>
+  logoUploading?: boolean
   onLogoutRequest: () => void
 }) {
-  const displayName = kcUsername || business.ownerName || business.name || 'Merchant'
-  const initials = displayName
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const initials = businessName
     .split(' ')
     .map((w) => w[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
 
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose an image file (PNG, JPG, or WebP).')
+      return
+    }
+    if (file.size > 512 * 1024) {
+      setUploadError('Image must be 512KB or smaller.')
+      return
+    }
+    setUploadError(null)
+
+    try {
+      const dataUrl = await resizeImageFile(file)
+      await onLogoUpload(dataUrl)
+    } catch {
+      setUploadError('Could not process that image. Try another file.')
+    }
+  }
+
   return (
     <div className="sidebar-profile">
-      <div className="sidebar-profile-avatar" style={{ background: business.accent }}>
-        {initials}
-      </div>
+      <button
+        type="button"
+        className="sidebar-profile-avatar"
+        style={logoUrl ? undefined : { background: business.accent }}
+        title="Tap to upload your logo"
+        aria-label="Upload business logo"
+        disabled={logoUploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {logoUrl ? (
+          <img src={logoUrl} alt="" className="sidebar-profile-avatar-img" />
+        ) : (
+          initials
+        )}
+        <span className="sidebar-profile-avatar-badge" aria-hidden="true">
+          <ImagePlus size={10} />
+        </span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="sr-only"
+        onChange={handleFileChange}
+        disabled={logoUploading}
+      />
       <div className="sidebar-profile-info">
-        <strong>{displayName}</strong>
-        <span>{business.name || 'Business'}</span>
+        <strong>{businessName}</strong>
+        {uploadError ? <span className="sidebar-profile-error">{uploadError}</span> : null}
       </div>
       <button
         type="button"

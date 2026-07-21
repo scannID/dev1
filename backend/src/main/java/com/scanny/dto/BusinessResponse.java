@@ -18,11 +18,16 @@ public record BusinessResponse(
         String tableLabel,
         String paymentReference,
         String accent,
+        String logoUrl,
         String customerUrl,
         Instant createdAt,
         List<CatalogItemResponse> items
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
+        return from(business, scanBaseUrl, includeItems, null);
+    }
+
+    public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems, String logoUrl) {
         List<CatalogItemResponse> items = includeItems
                 ? business.getItems().stream().map(CatalogItemResponse::from).toList()
                 : null;
@@ -38,6 +43,7 @@ public record BusinessResponse(
                 business.getTableLabel(),
                 business.getPaymentReference(),
                 business.getAccent(),
+                logoUrl,
                 scanBaseUrl + "/b/" + business.getId() + "?qr=" + business.getQrToken(),
                 business.getCreatedAt(),
                 items

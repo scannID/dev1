@@ -14,7 +14,7 @@ import java.util.UUID;
 public class AuditEvent {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "occurred_at", nullable = false)
