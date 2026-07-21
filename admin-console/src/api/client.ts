@@ -2,7 +2,16 @@
 
 import adminKeycloak from './keycloak'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+/** Match page host so admin works on LAN IP, not only localhost. */
+function resolveApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location
+    return `${protocol}//${hostname}:4000/api`
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 export class ApiError extends Error {
   constructor(
@@ -48,9 +57,12 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     })
 
     if (!response.ok) {
-      const errorData = (await response.json().catch(() => null)) as { message?: string } | null
+      const errorData = (await response.json().catch(() => null)) as {
+        message?: string
+        error?: string
+      } | null
       throw new ApiError(
-        errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
+        errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
         response.status,
         errorData
       )

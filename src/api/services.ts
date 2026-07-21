@@ -14,6 +14,8 @@ import type {
   Order,
   OrderResponse,
   OrdersResponse,
+  CustomerOrderTracking,
+  CustomerOrderTrackingResponse,
   CreateOrderRequest,
   UpdateOrderStatusRequest,
   UpdatePaymentStatusRequest,
@@ -43,9 +45,21 @@ import type {
   GateEventResponse,
 } from './types'
 
+export interface UpdateMerchantProfileRequest {
+  businessName?: string
+  businessDescription?: string
+  businessAddress?: string
+  phoneNumber?: string
+  businessLogoUrl?: string | null
+}
+
 export const merchantAuthApi = {
   me: async (): Promise<MerchantMeResponse> => {
     return api.get<MerchantMeResponse>('/auth/merchant/me')
+  },
+
+  updateProfile: async (data: UpdateMerchantProfileRequest): Promise<MerchantProfile> => {
+    return api.patch<MerchantProfile>('/auth/merchant/profile', data)
   },
 
   onboarding: async (merchantId: string): Promise<OnboardingStatusResponse> => {
@@ -167,6 +181,14 @@ export const ordersApi = {
 
   clearCompleted: async (businessId: string): Promise<{ deleted: number; message: string }> => {
     return api.delete<ClearCompletedResponse>(`/businesses/${businessId}/orders/completed`)
+  },
+
+  trackPublic: async (publicId: string, phone: string): Promise<CustomerOrderTracking> => {
+    const params = new URLSearchParams({ phone: phone.trim() })
+    const response = await api.get<CustomerOrderTrackingResponse>(
+      `/orders/public/${encodeURIComponent(publicId)}?${params}`
+    )
+    return response.order
   },
 }
 

@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ShoppingCart, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Package, ShoppingCart, X } from 'lucide-react'
 import { businessApi, devicesApi, ordersApi } from '../api/services'
-import type { Business, CatalogItem, RegisteredDevice } from '../api/types'
+import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
 import { ScannyMark } from './ScannyMark'
 import {
+  clearActiveOrder,
   clearCheckoutDraft,
+  loadActiveOrder,
   loadCheckoutDraft,
+  saveActiveOrder,
   saveCheckoutDraft,
   type CheckoutStep,
 } from './session'
@@ -18,6 +21,8 @@ import { DoneStep } from './steps/DoneStep'
 import { MenuStep } from './steps/MenuStep'
 import { PayStep } from './steps/PayStep'
 import { WaitingStep } from './steps/WaitingStep'
+import { OrderTrackingPanel } from './OrderTrackingPanel'
+import { useOrderTracking } from './useOrderTracking'
 import { currency, formatUgPhoneHint, getOrCreateDeviceId } from './utils'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import './CustomerApp.css'
@@ -32,6 +37,7 @@ export default function CustomerApp({
   qrToken?: string | null
 }) {
   const draft = useMemo(() => loadCheckoutDraft(businessId), [businessId])
+  const savedActiveOrder = useMemo(() => loadActiveOrder(businessId), [businessId])
 
   const [business, setBusiness] = useState<Business | null>(null)
   const [items, setItems] = useState<CatalogItem[]>([])
@@ -60,10 +66,32 @@ export default function CustomerApp({
   const [savedDevice, setSavedDevice] = useState<RegisteredDevice | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null)
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(savedActiveOrder?.orderId ?? null)
+  const [orderPublicId, setOrderPublicId] = useState<string | null>(savedActiveOrder?.publicId ?? null)
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('PENDING')
   const [paidTotal, setPaidTotal] = useState(0)
+  const [fulfillmentStatus, setFulfillmentStatus] = useState<OrderStatus>('Pending')
+  const [showTracking, setShowTracking] = useState(false)
+
+  const trackOrder = Boolean(orderPublicId) && Boolean(phone.trim())
+  const {
+    order: trackedOrder,
+    loading: trackingLoading,
+    error: trackingError,
+  } = useOrderTracking(orderPublicId, phone, trackOrder)
+
+  useEffect(() => {
+    if (!trackedOrder) return
+    setFulfillmentStatus(trackedOrder.status)
+    setPaidTotal(trackedOrder.total)
+    if (trackedOrder.paymentStatus === 'Paid' && step === 'waiting' && paymentStatus !== 'PAID') {
+      setPaymentStatus('PAID')
+      clearCheckoutDraft(businessId)
+      setCart({})
+      setStep('done')
+    }
+  }, [trackedOrder, step, paymentStatus, businessId])
 
   useEffect(() => {
     let cancelled = false
@@ -87,6 +115,19 @@ export default function CustomerApp({
       cancelled = true
     }
   }, [businessId, qrToken])
+
+  const restoredActiveOrder = useRef(false)
+
+  useEffect(() => {
+    if (restoredActiveOrder.current || !savedActiveOrder || draft?.step) return
+    restoredActiveOrder.current = true
+    setPlacedOrderId(savedActiveOrder.orderId)
+    setOrderPublicId(savedActiveOrder.publicId)
+    if (savedActiveOrder.phone) {
+      setPhone(savedActiveOrder.phone)
+    }
+    setStep('waiting')
+  }, [savedActiveOrder, draft?.step])
 
   useEffect(() => {
     const deviceId = getOrCreateDeviceId()
@@ -260,6 +301,14 @@ export default function CustomerApp({
 
       setPlacedOrderId(order.id)
       setPaidTotal(order.total || cartTotal)
+      if (order.publicId) {
+        setOrderPublicId(order.publicId)
+        saveActiveOrder(businessId, {
+          publicId: order.publicId,
+          orderId: order.id,
+          phone: phone.trim(),
+        })
+      }
 
       if (!deviceKnown && saveNumber) {
         try {
@@ -337,19 +386,23 @@ export default function CustomerApp({
 
   function orderMore() {
     clearCheckoutDraft(businessId)
+    clearActiveOrder(businessId)
     setCart({})
     setCustomerNote('')
     setCustomerLocation('')
     setPlacedOrderId(null)
+    setOrderPublicId(null)
     setPaymentId(null)
     setPaymentStatus('PENDING')
     setPaidTotal(0)
+    setFulfillmentStatus('Pending')
     setError(null)
     setStep('menu')
   }
 
   function cancelFlow() {
     clearCheckoutDraft(businessId)
+    clearActiveOrder(businessId)
     setCart({})
     setCustomerName('')
     setCustomerLocation('')
@@ -361,9 +414,11 @@ export default function CustomerApp({
     setPhoneError(null)
     setSubmitting(false)
     setPlacedOrderId(null)
+    setOrderPublicId(null)
     setPaymentId(null)
     setPaymentStatus('PENDING')
     setPaidTotal(0)
+    setFulfillmentStatus('Pending')
     setError(null)
     setSelectedCategory('all')
     setStep('menu')
@@ -402,7 +457,11 @@ export default function CustomerApp({
     <div className="cm-page" style={{ ['--cm-accent' as string]: accent }}>
       <header className="cm-topbar">
         <div className="cm-brand">
-          <ScannyMark size={30} />
+          {business.logoUrl ? (
+            <img src={business.logoUrl} alt="" className="cm-brand-logo" />
+          ) : (
+            <ScannyMark size={30} />
+          )}
           <div className="cm-brand-text">
             <span className="cm-brand-name">Scanny</span>
             <span className="cm-brand-biz">{business.name}</span>
@@ -412,6 +471,16 @@ export default function CustomerApp({
           {canCancel ? (
             <button type="button" className="cm-cancel-btn" onClick={cancelFlow} disabled={submitting}>
               <X size={16} /> Cancel
+            </button>
+          ) : null}
+          {orderPublicId ? (
+            <button
+              type="button"
+              className="cm-track-btn"
+              onClick={() => setShowTracking(true)}
+              aria-label="Track order"
+            >
+              <Package size={18} />
             </button>
           ) : null}
           {step === 'menu' ? (
@@ -503,6 +572,8 @@ export default function CustomerApp({
           provider={provider}
           phone={phone}
           status={paymentStatus}
+          orderStatus={trackedOrder?.status ?? fulfillmentStatus}
+          trackingLoading={trackingLoading}
           error={error}
           onRetry={() => void retryPayment()}
           onChangeNumber={() => {
@@ -517,6 +588,9 @@ export default function CustomerApp({
           businessName={business.name}
           orderId={placedOrderId}
           total={paidTotal}
+          orderStatus={trackedOrder?.status ?? fulfillmentStatus}
+          trackingLoading={trackingLoading}
+          trackingError={trackingError}
           onOrderMore={orderMore}
         />
       )}
@@ -546,6 +620,14 @@ export default function CustomerApp({
           disabled={submitting || (!placedOrderId && cartCount === 0)}
         />
       )}
+
+      <OrderTrackingPanel
+        open={showTracking}
+        order={trackedOrder}
+        loading={trackingLoading}
+        error={trackingError}
+        onClose={() => setShowTracking(false)}
+      />
     </div>
   )
 }

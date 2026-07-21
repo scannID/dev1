@@ -42,3 +42,39 @@ export function clearCheckoutDraft(businessId: string) {
     // ignore
   }
 }
+
+export interface ActiveOrderTracking {
+  publicId: string
+  orderId: string
+  phone: string
+}
+
+function activeOrderKey(businessId: string) {
+  return `scanny-active-order:${businessId}`
+}
+
+export function loadActiveOrder(businessId: string): ActiveOrderTracking | null {
+  try {
+    const raw = sessionStorage.getItem(activeOrderKey(businessId))
+    if (!raw) return null
+    return JSON.parse(raw) as ActiveOrderTracking
+  } catch {
+    return null
+  }
+}
+
+export function saveActiveOrder(businessId: string, tracking: ActiveOrderTracking) {
+  try {
+    sessionStorage.setItem(activeOrderKey(businessId), JSON.stringify(tracking))
+  } catch {
+    // ignore
+  }
+}
+
+export function clearActiveOrder(businessId: string) {
+  try {
+    sessionStorage.removeItem(activeOrderKey(businessId))
+  } catch {
+    // ignore
+  }
+}

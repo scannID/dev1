@@ -194,6 +194,7 @@ Write-Host "  Phone URL:  $ScanBaseUrl"
 Write-Host ''
 Write-Host 'Local logins:'
 Write-Host '  Merchant app  (:5173): samantha@scanny.local / Samantha@2026!'
+Write-Host '  Merchant app  (:5173): lolo@scanny.local / Lolo@2026!'
 Write-Host '  Merchant app  (:5173): testuser / password'
 Write-Host '  Admin console (:5174): adminuser / Admin@2026!'
 Write-Host ''

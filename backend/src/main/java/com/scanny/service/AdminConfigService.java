@@ -8,6 +8,7 @@ import com.scanny.exception.ApiException;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.OrderRepository;
 import com.scanny.repository.PlatformConfigRepository;
+import com.scanny.repository.QrScanEventRepository;
 import com.scanny.repository.TicketScanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +79,7 @@ public class AdminConfigService {
     private final BusinessRepository businessRepository;
     private final OrderRepository orderRepository;
     private final TicketScanRepository ticketScanRepository;
+    private final QrScanEventRepository qrScanEventRepository;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
 
@@ -86,6 +88,7 @@ public class AdminConfigService {
         BusinessRepository businessRepository,
         OrderRepository orderRepository,
         TicketScanRepository ticketScanRepository,
+        QrScanEventRepository qrScanEventRepository,
         ObjectMapper objectMapper,
         AuditService auditService
     ) {
@@ -93,6 +96,7 @@ public class AdminConfigService {
         this.businessRepository = businessRepository;
         this.orderRepository = orderRepository;
         this.ticketScanRepository = ticketScanRepository;
+        this.qrScanEventRepository = qrScanEventRepository;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
     }
@@ -183,13 +187,15 @@ public class AdminConfigService {
     }
 
     private AdminConfigDtos.ActionResult clearQrScanLogs() {
-        long count = ticketScanRepository.count();
+        long ticketCount = ticketScanRepository.count();
+        long menuCount = qrScanEventRepository.count();
         ticketScanRepository.deleteAll();
+        qrScanEventRepository.deleteAll();
         return new AdminConfigDtos.ActionResult(
             true,
             "clear-qr-scan-logs",
             "QR scan logs cleared.",
-            Map.of("deletedScans", count)
+            Map.of("deletedTicketScans", ticketCount, "deletedMenuScans", menuCount)
         );
     }
 

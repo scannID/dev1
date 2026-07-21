@@ -1,15 +1,23 @@
 import { Check } from 'lucide-react'
+import type { OrderStatus } from '../api/types'
+import { OrderStatusTracker } from '../OrderStatusTracker'
 import { currency } from '../utils'
 
 export function DoneStep({
   businessName,
   orderId,
   total,
+  orderStatus,
+  trackingLoading,
+  trackingError,
   onOrderMore,
 }: {
   businessName: string
   orderId: string | null
   total: number
+  orderStatus: OrderStatus
+  trackingLoading?: boolean
+  trackingError?: string | null
   onOrderMore: () => void
 }) {
   return (
@@ -23,6 +31,10 @@ export function DoneStep({
         {orderId ? ` (${orderId})` : ''}.
       </p>
       <p className="cm-done-total">{currency(total)}</p>
+
+      <OrderStatusTracker status={orderStatus} loading={trackingLoading} />
+      {trackingError ? <div className="cm-error cm-order-track-error">{trackingError}</div> : null}
+
       <button type="button" className="cm-primary cm-full" onClick={onOrderMore}>
         Order more
       </button>

@@ -16,6 +16,7 @@ import com.scanny.model.enums.PaymentStatus;
 import com.scanny.repository.OrderRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.websocket.RealtimeEventPublisher;
+import com.scanny.dto.CustomerOrderDtos;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,16 @@ public class OrderService {
         this.merchantAccessService = merchantAccessService;
         this.auditService = auditService;
         this.realtimeEventPublisher = realtimeEventPublisher;
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerOrderDtos.TrackingResponse getCustomerOrderTracking(UUID publicId, String phone) {
+        Order order = orderRepository.findWithItemsByPublicId(publicId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+        if (!phonesMatch(order.getCustomerPhone(), phone)) {
+            throw new ApiException(404, "Order was not found.");
+        }
+        return CustomerOrderDtos.TrackingResponse.from(order);
     }
 
     @Transactional(readOnly = true)
@@ -233,6 +244,26 @@ public class OrderService {
 
     private String trimToEmpty(String value) {
         return value != null ? value.trim() : "";
+    }
+
+    private String normalizePhone(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("\\D", "");
+    }
+
+    private boolean phonesMatch(String stored, String provided) {
+        String a = normalizePhone(stored);
+        String b = normalizePhone(provided);
+        if (a.isEmpty() || b.isEmpty()) {
+            return false;
+        }
+        if (a.equals(b)) {
+            return true;
+        }
+        int suffixLen = Math.min(9, Math.min(a.length(), b.length()));
+        return a.regionMatches(a.length() - suffixLen, b, b.length() - suffixLen, suffixLen);
     }
 
     private void autoGenerateReceipt(Order order) {

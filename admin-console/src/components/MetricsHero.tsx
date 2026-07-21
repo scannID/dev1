@@ -72,30 +72,41 @@ export default function MetricsHero() {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    let pollTimer: number | undefined
+
+    const load = async (silent = false) => {
       try {
-        setLoading(true)
+        if (!silent) setLoading(true)
         setError(null)
         const data = await adminApi.analytics.getScansOrders(range)
-        if (!cancelled) {
-          setSeries({
-            ...data,
-            scans: data.scans?.length ? data.scans : EMPTY.scans,
-            orders: data.orders?.length ? data.orders : EMPTY.orders,
-            xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
-            yMax: Math.max(data.yMax || 1, 1),
-          })
-        }
+        if (cancelled) return
+        setSeries({
+          ...data,
+          scans: data.scans?.length ? data.scans : EMPTY.scans,
+          orders: data.orders?.length ? data.orders : EMPTY.orders,
+          xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
+          yMax: Math.max(data.yMax || 1, 1),
+        })
       } catch (err) {
-        if (!cancelled) {
+        if (cancelled) return
+        if (!silent) {
           setError(err instanceof Error ? err.message : 'Failed to load chart')
           setSeries(EMPTY)
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && !silent) setLoading(false)
       }
-    })()
-    return () => { cancelled = true }
+    }
+
+    void load(false)
+    pollTimer = window.setInterval(() => {
+      void load(true)
+    }, 15000)
+
+    return () => {
+      cancelled = true
+      if (pollTimer !== undefined) window.clearInterval(pollTimer)
+    }
   }, [range])
 
   const d = series

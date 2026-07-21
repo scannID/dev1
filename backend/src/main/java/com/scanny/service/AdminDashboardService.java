@@ -3,10 +3,12 @@ package com.scanny.service;
 import com.scanny.dto.admin.AdminDashboardDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.Order;
+import com.scanny.entity.QrScanEvent;
 import com.scanny.entity.TicketScan;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.OrderRepository;
+import com.scanny.repository.QrScanEventRepository;
 import com.scanny.repository.TicketScanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +29,18 @@ public class AdminDashboardService {
     private final BusinessRepository businessRepository;
     private final OrderRepository orderRepository;
     private final TicketScanRepository ticketScanRepository;
+    private final QrScanEventRepository qrScanEventRepository;
 
     public AdminDashboardService(
         BusinessRepository businessRepository,
         OrderRepository orderRepository,
-        TicketScanRepository ticketScanRepository
+        TicketScanRepository ticketScanRepository,
+        QrScanEventRepository qrScanEventRepository
     ) {
         this.businessRepository = businessRepository;
         this.orderRepository = orderRepository;
         this.ticketScanRepository = ticketScanRepository;
+        this.qrScanEventRepository = qrScanEventRepository;
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +48,7 @@ public class AdminDashboardService {
         List<Business> businesses = businessRepository.findAll();
         List<Order> allOrders = orderRepository.findAll();
         List<TicketScan> allScans = ticketScanRepository.findAll();
+        List<QrScanEvent> menuScans = qrScanEventRepository.findAllByOrderByScannedAtDesc();
 
         Instant now = Instant.now();
         Instant startOfToday = now.truncatedTo(ChronoUnit.DAYS);
@@ -69,12 +75,18 @@ public class AdminDashboardService {
                 && !o.getCreatedAt().isAfter(startOfToday))
             .count();
 
-        int qrScansLast24Hours = (int) allScans.stream()
+        int qrScansLast24Hours = (int) (allScans.stream()
             .filter(s -> s.getScannedAt().isAfter(last24Hours))
-            .count();
-        int qrScansPrev24Hours = (int) allScans.stream()
+            .count()
+            + menuScans.stream()
+            .filter(s -> s.getScannedAt().isAfter(last24Hours))
+            .count());
+        int qrScansPrev24Hours = (int) (allScans.stream()
             .filter(s -> s.getScannedAt().isAfter(prev24Hours) && !s.getScannedAt().isAfter(last24Hours))
-            .count();
+            .count()
+            + menuScans.stream()
+            .filter(s -> s.getScannedAt().isAfter(prev24Hours) && !s.getScannedAt().isAfter(last24Hours))
+            .count());
 
         long revenueThisMonth = allOrders.stream()
             .filter(o -> o.getCreatedAt().isAfter(startOfMonth))
@@ -106,7 +118,7 @@ public class AdminDashboardService {
                 "UGX",
                 formatChange(revenueThisMonth, revenuePrevMonth)
             ),
-            buildSparklines(businesses, allOrders, allScans, now)
+            buildSparklines(businesses, allOrders, allScans, menuScans, now)
         );
     }
 
@@ -114,6 +126,7 @@ public class AdminDashboardService {
         List<Business> businesses,
         List<Order> orders,
         List<TicketScan> scans,
+        List<QrScanEvent> menuScans,
         Instant now
     ) {
         List<Integer> merchants = new ArrayList<>(7);
@@ -134,9 +147,12 @@ public class AdminDashboardService {
                 .filter(o -> !o.getCreatedAt().isBefore(dayStart) && o.getCreatedAt().isBefore(dayEnd))
                 .count());
 
-            qrScans.add((int) scans.stream()
+            qrScans.add((int) (scans.stream()
                 .filter(s -> !s.getScannedAt().isBefore(dayStart) && s.getScannedAt().isBefore(dayEnd))
-                .count());
+                .count()
+                + menuScans.stream()
+                .filter(s -> !s.getScannedAt().isBefore(dayStart) && s.getScannedAt().isBefore(dayEnd))
+                .count()));
 
             revenue.add(orders.stream()
                 .filter(o -> !o.getCreatedAt().isBefore(dayStart) && o.getCreatedAt().isBefore(dayEnd))
@@ -202,6 +218,9 @@ public class AdminDashboardService {
 
         Instant last24Hours = Instant.now().minus(24, ChronoUnit.HOURS);
         long scans = ticketScanRepository.findAll().stream()
+            .filter(s -> s.getScannedAt().isAfter(last24Hours))
+            .count()
+            + qrScanEventRepository.findAllByOrderByScannedAtDesc().stream()
             .filter(s -> s.getScannedAt().isAfter(last24Hours))
             .count();
         if (scans > 0) {

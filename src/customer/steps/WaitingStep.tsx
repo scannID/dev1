@@ -1,5 +1,7 @@
 import { Loader2 } from 'lucide-react'
+import type { OrderStatus } from '../../api/types'
 import type { PaymentProvider, PaymentStatus } from '../payments'
+import { OrderStatusTracker } from '../OrderStatusTracker'
 import { currency } from '../utils'
 
 export function WaitingStep({
@@ -9,6 +11,8 @@ export function WaitingStep({
   provider,
   phone,
   status,
+  orderStatus,
+  trackingLoading,
   error,
   onRetry,
   onChangeNumber,
@@ -19,6 +23,8 @@ export function WaitingStep({
   provider: PaymentProvider
   phone: string
   status: PaymentStatus
+  orderStatus?: OrderStatus
+  trackingLoading?: boolean
   error?: string | null
   onRetry: () => void
   onChangeNumber: () => void
@@ -66,6 +72,10 @@ export function WaitingStep({
           Order is placed and awaiting payment confirmation. Keep this screen open — we’ll update when the prompt is
           approved.
         </p>
+      ) : null}
+
+      {orderStatus ? (
+        <OrderStatusTracker status={orderStatus} loading={trackingLoading} />
       ) : null}
 
       <div className="cm-waiting-actions">

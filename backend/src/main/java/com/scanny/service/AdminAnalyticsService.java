@@ -33,6 +33,7 @@ public class AdminAnalyticsService {
     private final RegisteredDeviceRepository registeredDeviceRepository;
     private final DeviceTransactionRepository deviceTransactionRepository;
     private final OrderRepository orderRepository;
+    private final QrScanEventRepository qrScanEventRepository;
 
     public AdminAnalyticsService(
         TicketRepository ticketRepository,
@@ -41,7 +42,8 @@ public class AdminAnalyticsService {
         QuickPaymentTransactionRepository quickPaymentTransactionRepository,
         RegisteredDeviceRepository registeredDeviceRepository,
         DeviceTransactionRepository deviceTransactionRepository,
-        OrderRepository orderRepository
+        OrderRepository orderRepository,
+        QrScanEventRepository qrScanEventRepository
     ) {
         this.ticketRepository = ticketRepository;
         this.ticketScanRepository = ticketScanRepository;
@@ -50,6 +52,7 @@ public class AdminAnalyticsService {
         this.registeredDeviceRepository = registeredDeviceRepository;
         this.deviceTransactionRepository = deviceTransactionRepository;
         this.orderRepository = orderRepository;
+        this.qrScanEventRepository = qrScanEventRepository;
     }
 
     @Transactional(readOnly = true)
@@ -391,20 +394,21 @@ public class AdminAnalyticsService {
     public AdminAnalyticsDtos.ScansOrdersSeries getScansOrders(String range) {
         String normalized = range == null ? "daily" : range.toLowerCase(Locale.ROOT);
         List<TicketScan> scans = ticketScanRepository.findAll();
+        List<QrScanEvent> menuScans = qrScanEventRepository.findAllByOrderByScannedAtDesc();
         List<Order> orders = orderRepository.findAll();
         Instant now = Instant.now();
 
         return switch (normalized) {
-            case "hourly" -> buildHourlySeries(scans, orders, now);
-            case "weekly" -> buildWeeklySeries(scans, orders, now);
-            case "monthly" -> buildMonthlySeries(scans, orders, now);
-            case "yearly" -> buildYearlySeries(scans, orders, now);
-            default -> buildDailySeries(scans, orders, now);
+            case "hourly" -> buildHourlySeries(scans, menuScans, orders, now);
+            case "weekly" -> buildWeeklySeries(scans, menuScans, orders, now);
+            case "monthly" -> buildMonthlySeries(scans, menuScans, orders, now);
+            case "yearly" -> buildYearlySeries(scans, menuScans, orders, now);
+            default -> buildDailySeries(scans, menuScans, orders, now);
         };
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildHourlySeries(
-        List<TicketScan> scans, List<Order> orders, Instant now
+        List<TicketScan> scans, List<QrScanEvent> menuScans, List<Order> orders, Instant now
     ) {
         List<Integer> scanBuckets = new ArrayList<>(24);
         List<Integer> orderBuckets = new ArrayList<>(24);
@@ -414,7 +418,7 @@ public class AdminAnalyticsService {
         for (int i = 0; i < 24; i++) {
             Instant bucketStart = start.plus(i, ChronoUnit.HOURS);
             Instant bucketEnd = bucketStart.plus(1, ChronoUnit.HOURS);
-            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            scanBuckets.add(countScans(scans, menuScans, bucketStart, bucketEnd));
             orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
             int hour = bucketStart.atZone(ZoneOffset.UTC).getHour();
             labels.add(String.format("%d%s", hour % 12 == 0 ? 12 : hour % 12, hour < 12 ? "a" : "p"));
@@ -423,7 +427,7 @@ public class AdminAnalyticsService {
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildDailySeries(
-        List<TicketScan> scans, List<Order> orders, Instant now
+        List<TicketScan> scans, List<QrScanEvent> menuScans, List<Order> orders, Instant now
     ) {
         List<Integer> scanBuckets = new ArrayList<>(28);
         List<Integer> orderBuckets = new ArrayList<>(28);
@@ -435,7 +439,7 @@ public class AdminAnalyticsService {
             LocalDate day = today.minusDays(i);
             Instant bucketStart = day.atStartOfDay().toInstant(ZoneOffset.UTC);
             Instant bucketEnd = day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            scanBuckets.add(countScans(scans, menuScans, bucketStart, bucketEnd));
             orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
             labels.add(dayFmt.format(day));
         }
@@ -443,7 +447,7 @@ public class AdminAnalyticsService {
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildWeeklySeries(
-        List<TicketScan> scans, List<Order> orders, Instant now
+        List<TicketScan> scans, List<QrScanEvent> menuScans, List<Order> orders, Instant now
     ) {
         List<Integer> scanBuckets = new ArrayList<>(16);
         List<Integer> orderBuckets = new ArrayList<>(16);
@@ -455,7 +459,7 @@ public class AdminAnalyticsService {
             LocalDate start = weekStart.minusWeeks(i);
             Instant bucketStart = start.atStartOfDay().toInstant(ZoneOffset.UTC);
             Instant bucketEnd = start.plusWeeks(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            scanBuckets.add(countScans(scans, menuScans, bucketStart, bucketEnd));
             orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
             labels.add("W" + (16 - i));
         }
@@ -463,7 +467,7 @@ public class AdminAnalyticsService {
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildMonthlySeries(
-        List<TicketScan> scans, List<Order> orders, Instant now
+        List<TicketScan> scans, List<QrScanEvent> menuScans, List<Order> orders, Instant now
     ) {
         List<Integer> scanBuckets = new ArrayList<>(12);
         List<Integer> orderBuckets = new ArrayList<>(12);
@@ -475,7 +479,7 @@ public class AdminAnalyticsService {
             YearMonth month = current.minusMonths(i);
             Instant bucketStart = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
             Instant bucketEnd = month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            scanBuckets.add(countScans(scans, menuScans, bucketStart, bucketEnd));
             orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
             labels.add(monthFmt.format(month.atDay(1)));
         }
@@ -483,7 +487,7 @@ public class AdminAnalyticsService {
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildYearlySeries(
-        List<TicketScan> scans, List<Order> orders, Instant now
+        List<TicketScan> scans, List<QrScanEvent> menuScans, List<Order> orders, Instant now
     ) {
         List<Integer> scanBuckets = new ArrayList<>(5);
         List<Integer> orderBuckets = new ArrayList<>(5);
@@ -494,17 +498,21 @@ public class AdminAnalyticsService {
             int year = currentYear - i;
             Instant bucketStart = LocalDate.of(year, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC);
             Instant bucketEnd = LocalDate.of(year + 1, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            scanBuckets.add(countScans(scans, bucketStart, bucketEnd));
+            scanBuckets.add(countScans(scans, menuScans, bucketStart, bucketEnd));
             orderBuckets.add(countOrders(orders, bucketStart, bucketEnd));
             labels.add(String.valueOf(year));
         }
         return series("yearly", scanBuckets, orderBuckets, labels);
     }
 
-    private static int countScans(List<TicketScan> scans, Instant start, Instant end) {
-        return (int) scans.stream()
+    private static int countScans(List<TicketScan> scans, List<QrScanEvent> menuScans, Instant start, Instant end) {
+        long ticketCount = scans.stream()
             .filter(s -> !s.getScannedAt().isBefore(start) && s.getScannedAt().isBefore(end))
             .count();
+        long menuCount = menuScans.stream()
+            .filter(s -> !s.getScannedAt().isBefore(start) && s.getScannedAt().isBefore(end))
+            .count();
+        return (int) (ticketCount + menuCount);
     }
 
     private static int countOrders(List<Order> orders, Instant start, Instant end) {

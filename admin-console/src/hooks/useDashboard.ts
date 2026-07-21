@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../api/services'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import type { DashboardMetrics, ActivityEvent, TopMerchant } from '../api/types'
 
 export function useDashboard() {
@@ -9,9 +10,9 @@ export function useDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       setError(null)
       const [metricsData, activityData, topData] = await Promise.all([
         adminApi.dashboard.getMetrics(),
@@ -23,44 +24,22 @@ export function useDashboard() {
       setTopMerchants(topData)
     } catch (err) {
       console.error('Failed to load dashboard:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
-      setMetrics(null)
-      setRecentActivity([])
-      setTopMerchants([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const [metricsData, activityData, topData] = await Promise.all([
-          adminApi.dashboard.getMetrics(),
-          adminApi.dashboard.getRecentActivity(),
-          adminApi.dashboard.getTopMerchants('month', 'orders', 5),
-        ])
-        if (cancelled) return
-        setMetrics(metricsData)
-        setRecentActivity(activityData)
-        setTopMerchants(topData)
-        setError(null)
-      } catch (err) {
-        if (cancelled) return
-        console.error('Failed to load dashboard:', err)
+      if (!silent) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard')
         setMetrics(null)
         setRecentActivity([])
         setTopMerchants([])
-      } finally {
-        if (!cancelled) setLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadDashboard(false)
+  }, [loadDashboard])
+
+  useAutoRefresh(() => void loadDashboard(true), 15000)
 
   return {
     metrics,
@@ -68,7 +47,7 @@ export function useDashboard() {
     topMerchants,
     loading,
     error,
-    refresh: loadDashboard,
+    refresh: () => loadDashboard(false),
   }
 }
 

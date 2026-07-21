@@ -57,6 +57,18 @@ class SecurityMatrixTest {
     }
 
     @Test
+    void publicOrderTrackIsPublic() throws Exception {
+        mockMvc.perform(get("/api/orders/public/00000000-0000-0000-0000-000000000001")
+                        .param("phone", "700000000"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status == 401 || status == 403) {
+                        throw new AssertionError("Public order track must not require auth, got " + status);
+                    }
+                });
+    }
+
+    @Test
     void publicMenuIsAllowed() throws Exception {
         mockMvc.perform(get("/api/businesses/demo/menu"))
                 .andExpect(result -> {

@@ -22,6 +22,7 @@ export interface Business {
   tableLabel: string
   paymentReference: string
   accent: string
+  logoUrl?: string | null
   customerUrl?: string
   createdAt?: string
   items: CatalogItem[]
@@ -137,6 +138,22 @@ export interface ClearCompletedResponse {
   message: string
 }
 
+/** Public customer order tracking — limited fields from GET /orders/public/{publicId} */
+export interface CustomerOrderTracking {
+  id: string
+  businessName: string
+  items: Array<{ name: string; quantity: number }>
+  total: number
+  status: OrderStatus
+  paymentStatus: PaymentStatus
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface CustomerOrderTrackingResponse {
+  order: CustomerOrderTracking
+}
+
 export interface CartLine extends CatalogItem {
   quantity: number
   lineTotal: number
@@ -165,6 +182,7 @@ export interface MerchantProfile {
   onboardingStep: number
   status: string
   plan: string
+  businessLogoUrl?: string | null
   createdAt: string
 }
 

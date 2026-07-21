@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../api/services'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import type {
   CatalogListResponse,
   ConfigAction,
@@ -88,30 +89,28 @@ export function useQrActivity() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const response = await adminApi.qrActivity.get()
-        if (!cancelled) {
-          setData(response)
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load QR activity')
-          setData(null)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+  const refresh = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      setError(null)
+      setData(await adminApi.qrActivity.get())
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load QR activity')
+        setData(null)
       }
-    })()
-    return () => {
-      cancelled = true
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  return { data, loading, error }
+  useEffect(() => {
+    void refresh(false)
+  }, [refresh])
+
+  useAutoRefresh(() => void refresh(true), 15000)
+
+  return { data, loading, error, refresh: () => refresh(false) }
 }
 
 export function useAuditLog() {
@@ -296,41 +295,26 @@ export function useNotifications() {
     }
   })
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       setError(null)
       setData(await adminApi.notifications.list())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load notifications')
-      setData(null)
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load notifications')
+        setData(null)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const response = await adminApi.notifications.list()
-        if (!cancelled) {
-          setData(response)
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load notifications')
-          setData(null)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    void refresh(false)
+  }, [refresh])
+
+  useAutoRefresh(() => void refresh(true), 15000)
 
   const markAllRead = useCallback(() => {
     const ids = data?.notifications.map((n) => n.id) ?? []
@@ -345,6 +329,6 @@ export function useNotifications() {
   }))
   const unread = notifications.filter((n) => n.unread).length
 
-  return { notifications, unread, loading, error, refresh, markAllRead }
+  return { notifications, unread, loading, error, refresh: () => refresh(false), markAllRead }
 }
 

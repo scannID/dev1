@@ -7,12 +7,14 @@ import com.scanny.entity.CatalogItem;
 import com.scanny.entity.Merchant;
 import com.scanny.entity.Order;
 import com.scanny.entity.OrderLineItem;
+import com.scanny.entity.QrScanEvent;
 import com.scanny.entity.TicketScan;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.MerchantRepository;
 import com.scanny.repository.OrderRepository;
+import com.scanny.repository.QrScanEventRepository;
 import com.scanny.repository.TicketScanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,7 @@ public class AdminPlatformService {
     private final OrderRepository orderRepository;
     private final MerchantRepository merchantRepository;
     private final TicketScanRepository ticketScanRepository;
+    private final QrScanEventRepository qrScanEventRepository;
     private final AuditService auditService;
     private final SystemHealthService systemHealthService;
 
@@ -45,6 +48,7 @@ public class AdminPlatformService {
         OrderRepository orderRepository,
         MerchantRepository merchantRepository,
         TicketScanRepository ticketScanRepository,
+        QrScanEventRepository qrScanEventRepository,
         AuditService auditService,
         SystemHealthService systemHealthService
     ) {
@@ -52,6 +56,7 @@ public class AdminPlatformService {
         this.orderRepository = orderRepository;
         this.merchantRepository = merchantRepository;
         this.ticketScanRepository = ticketScanRepository;
+        this.qrScanEventRepository = qrScanEventRepository;
         this.auditService = auditService;
         this.systemHealthService = systemHealthService;
     }
@@ -174,25 +179,24 @@ public class AdminPlatformService {
     public AdminPlatformDtos.QrActivityResponse getQrActivity() {
         Instant startOfToday = Instant.now().truncatedTo(ChronoUnit.DAYS);
         List<TicketScan> scans = ticketScanRepository.findAll();
+        List<QrScanEvent> menuScans = qrScanEventRepository.findAllByOrderByScannedAtDesc();
         List<Order> orders = orderRepository.findAll();
         List<Business> businesses = businessRepository.findAll();
 
-        long scansToday = scans.stream().filter(s -> s.getScannedAt().isAfter(startOfToday)).count();
-        // Without a dedicated scan log for merchant QR, use today's orders as a scan proxy floor.
-        long orderProxyScans = orders.stream().filter(o -> o.getCreatedAt().isAfter(startOfToday)).count();
-        long totalScansToday = Math.max(scansToday, orderProxyScans);
+        long ticketScansToday = scans.stream().filter(s -> s.getScannedAt().isAfter(startOfToday)).count();
+        long menuScansToday = menuScans.stream().filter(s -> s.getScannedAt().isAfter(startOfToday)).count();
+        long totalScansToday = ticketScansToday + menuScansToday;
 
-        long ordersToday = orderProxyScans;
+        long ordersToday = orders.stream().filter(o -> o.getCreatedAt().isAfter(startOfToday)).count();
         double conversion = totalScansToday > 0 ? (ordersToday * 100.0) / totalScansToday : 0.0;
 
         List<AdminPlatformDtos.HourlyScanPoint> hourly = new ArrayList<>();
         for (int hour = 0; hour < 24; hour++) {
             final int h = hour;
-            int count = (int) orders.stream()
-                .filter(o -> o.getCreatedAt().isAfter(startOfToday))
-                .filter(o -> o.getCreatedAt().atZone(ZoneOffset.UTC).getHour() == h)
+            int count = (int) menuScans.stream()
+                .filter(s -> s.getScannedAt().isAfter(startOfToday))
+                .filter(s -> s.getScannedAt().atZone(ZoneOffset.UTC).getHour() == h)
                 .count();
-            // Blend in ticket scans for the same hour
             count += (int) scans.stream()
                 .filter(s -> s.getScannedAt().isAfter(startOfToday))
                 .filter(s -> s.getScannedAt().atZone(ZoneOffset.UTC).getHour() == h)
@@ -204,16 +208,19 @@ public class AdminPlatformService {
             .filter(o -> o.getBusiness() != null)
             .collect(Collectors.groupingBy(o -> o.getBusiness().getId(), Collectors.counting()));
 
+        Map<String, Long> scansByBusiness = menuScans.stream()
+            .collect(Collectors.groupingBy(QrScanEvent::getBusinessId, Collectors.counting()));
+
         List<AdminPlatformDtos.QrCodeActivity> topCodes = businesses.stream()
             .map(business -> {
                 int orderCount = ordersByBusiness.getOrDefault(business.getId(), 0L).intValue();
-                int estimatedScans = Math.max(orderCount, orderCount * 5);
-                double conv = estimatedScans > 0 ? (orderCount * 100.0) / estimatedScans : 0.0;
+                int scanCount = scansByBusiness.getOrDefault(business.getId(), 0L).intValue();
+                double conv = scanCount > 0 ? (orderCount * 100.0) / scanCount : 0.0;
                 return new AdminPlatformDtos.QrCodeActivity(
                     business.getName(),
                     business.getId(),
                     business.getQrToken(),
-                    estimatedScans,
+                    scanCount,
                     orderCount,
                     String.format("%.1f%%", conv)
                 );

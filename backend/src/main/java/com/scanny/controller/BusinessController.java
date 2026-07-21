@@ -7,6 +7,8 @@ import com.scanny.dto.RequestDtos.CreateOrderRequest;
 import com.scanny.entity.CatalogItem;
 import com.scanny.service.BusinessService;
 import com.scanny.service.OrderService;
+import com.scanny.service.QrScanService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +28,16 @@ public class BusinessController {
 
     private final BusinessService businessService;
     private final OrderService orderService;
+    private final QrScanService qrScanService;
 
-    public BusinessController(BusinessService businessService, OrderService orderService) {
+    public BusinessController(
+            BusinessService businessService,
+            OrderService orderService,
+            QrScanService qrScanService
+    ) {
         this.businessService = businessService;
         this.orderService = orderService;
+        this.qrScanService = qrScanService;
     }
 
     @GetMapping("/businesses")
@@ -44,7 +52,11 @@ public class BusinessController {
     }
 
     @GetMapping("/qr/{qrToken}")
-    public Map<String, BusinessResponse> getByQr(@PathVariable String qrToken) {
+    public Map<String, BusinessResponse> getByQr(
+            @PathVariable String qrToken,
+            HttpServletRequest request
+    ) {
+        qrScanService.recordScanByQrToken(qrToken, request.getHeader("User-Agent"));
         return Map.of("business", businessService.getBusinessByQrToken(qrToken));
     }
 
@@ -56,8 +68,10 @@ public class BusinessController {
     @GetMapping("/businesses/{businessId}/menu")
     public Map<String, Object> getMenu(
             @PathVariable String businessId,
-            @RequestParam(required = false) String qr
+            @RequestParam(required = false) String qr,
+            HttpServletRequest request
     ) {
+        qrScanService.recordMenuScan(businessId, qr, request.getHeader("User-Agent"));
         BusinessResponse business = businessService.getBusinessPublic(businessId);
         List<CatalogItem> availableItems = businessService.getAvailableMenu(businessId, qr);
         return Map.of(
