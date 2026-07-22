@@ -81,7 +81,6 @@ public class CatalogService {
 
         CatalogItem item = new CatalogItem();
         item.setId(generateItemId());
-        item.setBusiness(business);
         item.setName(request.name());
         item.setCategory(category);
         item.setPrice(request.price());
@@ -89,6 +88,7 @@ public class CatalogService {
         item.setAvailable(request.available());
 
         business.addCustomCategory(category);
+        business.addItem(item);
         businessRepository.save(business);
 
         item = catalogItemRepository.save(item);
@@ -151,6 +151,7 @@ public class CatalogService {
     @Transactional
     public void deleteCatalogItem(String businessId, String itemId) {
         CatalogItem item = requireOwnedItem(businessId, itemId);
+        item.getBusiness().getItems().remove(item);
         catalogItemRepository.delete(item);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_DELETED", Map.of("id", itemId));
         auditService.success("CATALOG_ITEM_DELETED", "catalog_item", itemId, Map.of("businessId", businessId));

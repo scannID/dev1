@@ -189,10 +189,19 @@ Ensure-UserWithRole `
   -Password 'Lolo@2026!' `
   -RoleName 'MERCHANT'
 
+Ensure-UserWithRole `
+  -Username 'qtybites@scanny.local' `
+  -Email 'qtybites@scanny.local' `
+  -FirstName 'Qty' `
+  -LastName 'Bites' `
+  -Password 'QtyBites@2026!' `
+  -RoleName 'MERCHANT'
+
 Write-Output 'DONE'
 Write-Output ''
 Write-Output 'Local logins:'
 Write-Output '  Merchant app  (:5173): samantha@scanny.local / Samantha@2026!'
 Write-Output '  Merchant app  (:5173): lolo@scanny.local / Lolo@2026!'
+Write-Output '  Merchant app  (:5173): qtybites@scanny.local / QtyBites@2026!'
 Write-Output '  Merchant app  (:5173): testuser / password'
 Write-Output '  Admin console (:5174): adminuser / Admin@2026!'

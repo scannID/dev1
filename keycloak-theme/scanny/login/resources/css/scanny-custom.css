@@ -28,27 +28,13 @@
 
 body {
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-  background: var(--scanny-bg) !important;
+  background: transparent !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* Background Pattern */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: 
-    linear-gradient(var(--scanny-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--scanny-border) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.3;
-  pointer-events: none;
-  z-index: 0;
 }
 
 /* Main Login Container - Centered */
@@ -123,7 +109,16 @@ body::before {
   width: 100% !important;
   margin: 0 auto !important;
   position: relative !important;
-  z-index: 1 !important;
+  z-index: 3 !important;
+}
+
+.scanny-cursor-field {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
 }
 
 #kc-content-wrapper {

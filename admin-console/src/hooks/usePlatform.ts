@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../api/services'
 import { useAutoRefresh } from '../lib/useAutoRefresh'
+import { useAdminMetricsRealtime } from '../lib/useAdminMetricsRealtime'
 import type {
   CatalogListResponse,
   ConfigAction,
@@ -108,7 +109,8 @@ export function useQrActivity() {
     void refresh(false)
   }, [refresh])
 
-  useAutoRefresh(() => void refresh(true), 15000)
+  useAdminMetricsRealtime(() => refresh(true))
+  useAutoRefresh(() => void refresh(true), 60000)
 
   return { data, loading, error, refresh: () => refresh(false) }
 }

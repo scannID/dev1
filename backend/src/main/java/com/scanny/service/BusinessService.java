@@ -180,9 +180,14 @@ public class BusinessService {
     }
 
     private BusinessResponse toResponse(Business business, boolean includeItems) {
-        String logoUrl = merchantRepository.findById(UUID.fromString(business.getMerchantId()))
-                .map(Merchant::getBusinessLogoUrl)
-                .orElse(null);
+        String logoUrl = null;
+        try {
+            logoUrl = merchantRepository.findById(UUID.fromString(business.getMerchantId()))
+                    .map(Merchant::getBusinessLogoUrl)
+                    .orElse(null);
+        } catch (IllegalArgumentException ignored) {
+            // Demo / legacy merchant ids are not UUIDs.
+        }
         return BusinessResponse.from(
             business,
             scanBaseUrl,

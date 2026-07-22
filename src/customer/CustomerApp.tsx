@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Package, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { businessApi, devicesApi, ordersApi } from '../api/services'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
@@ -22,12 +22,23 @@ import { MenuStep } from './steps/MenuStep'
 import { PayStep } from './steps/PayStep'
 import { WaitingStep } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
+import { ReceiptsPanel } from './ReceiptsPanel'
+import {
+  buildReceipt,
+  getReceiptCount,
+  loadReceipts,
+  saveReceipt,
+  type CustomerReceipt,
+} from './receipts'
 import { useOrderTracking } from './useOrderTracking'
 import { currency, formatUgPhoneHint, getOrCreateDeviceId } from './utils'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import './CustomerApp.css'
 
 const PROGRESS_STEPS: CheckoutStep[] = ['menu', 'cart', 'details', 'pay']
+
+/** In-memory guard so React StrictMode remounts don't fire two scan POSTs before sessionStorage sticks. */
+const recordedScanKeys = new Set<string>()
 
 export default function CustomerApp({
   businessId,
@@ -73,6 +84,9 @@ export default function CustomerApp({
   const [paidTotal, setPaidTotal] = useState(0)
   const [fulfillmentStatus, setFulfillmentStatus] = useState<OrderStatus>('Pending')
   const [showTracking, setShowTracking] = useState(false)
+  const [showReceipts, setShowReceipts] = useState(false)
+  const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
+  const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
 
   const trackOrder = Boolean(orderPublicId) && Boolean(phone.trim())
   const {
@@ -81,17 +95,69 @@ export default function CustomerApp({
     error: trackingError,
   } = useOrderTracking(orderPublicId, phone, trackOrder)
 
+  const cartItems: CartLine[] = useMemo(() => {
+    return Object.entries(cart)
+      .map(([itemId, quantity]) => {
+        const item = items.find((i) => i.id === itemId)
+        return item ? { ...item, quantity } : null
+      })
+      .filter((item): item is CartLine => item !== null)
+  }, [items, cart])
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+
+  const persistPaidReceipt = useCallback(
+    (orderId: string, total: number, items: CartLine[]) => {
+      if (!business || items.length === 0) return
+      const receipt = buildReceipt({
+        orderId,
+        businessId: business.id,
+        businessName: business.name,
+        businessLogoUrl: business.logoUrl,
+        customerName: customerName.trim() || 'Guest',
+        customerPhone: phone.trim(),
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        total,
+        provider,
+      })
+      const next = saveReceipt(receipt)
+      setReceipts(next)
+      setReceiptCount(next.length)
+    },
+    [business, customerName, phone, provider],
+  )
+
   useEffect(() => {
     if (!trackedOrder) return
     setFulfillmentStatus(trackedOrder.status)
     setPaidTotal(trackedOrder.total)
     if (trackedOrder.paymentStatus === 'Paid' && step === 'waiting' && paymentStatus !== 'PAID') {
       setPaymentStatus('PAID')
+      if (placedOrderId) {
+        const itemsForReceipt =
+          cartItems.length > 0
+            ? cartItems
+            : trackedOrder.items.map((item) => ({
+                id: item.name,
+                name: item.name,
+                category: '',
+                price: Math.round(trackedOrder.total / Math.max(trackedOrder.items.length, 1)),
+                description: '',
+                available: true,
+                quantity: item.quantity,
+              }))
+        persistPaidReceipt(placedOrderId, trackedOrder.total, itemsForReceipt)
+      }
       clearCheckoutDraft(businessId)
       setCart({})
       setStep('done')
     }
-  }, [trackedOrder, step, paymentStatus, businessId])
+  }, [trackedOrder, step, paymentStatus, businessId, placedOrderId, cartItems, persistPaidReceipt])
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +180,27 @@ export default function CustomerApp({
     return () => {
       cancelled = true
     }
+  }, [businessId, qrToken])
+
+  // One scan beacon per business/QR open — not tied to menu GET (avoids StrictMode/double-fetch inflation).
+  useEffect(() => {
+    const key = `scanny:scan:${businessId}:${qrToken || ''}`
+    try {
+      if (sessionStorage.getItem(key)) return
+      sessionStorage.setItem(key, String(Date.now()))
+    } catch {
+      // private mode / blocked storage — still attempt once via module guard below
+    }
+    if (recordedScanKeys.has(key)) return
+    recordedScanKeys.add(key)
+    void businessApi.recordScan(businessId, qrToken || undefined).catch(() => {
+      recordedScanKeys.delete(key)
+      try {
+        sessionStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    })
   }, [businessId, qrToken])
 
   const restoredActiveOrder = useRef(false)
@@ -173,18 +260,6 @@ export default function CustomerApp({
     saveNumber,
     step,
   ])
-
-  const cartItems: CartLine[] = useMemo(() => {
-    return Object.entries(cart)
-      .map(([itemId, quantity]) => {
-        const item = items.find((i) => i.id === itemId)
-        return item ? { ...item, quantity } : null
-      })
-      .filter((item): item is CartLine => item !== null)
-  }, [items, cart])
-
-  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
   const addToCart = useCallback((itemId: string) => {
     setCart((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }))
@@ -253,6 +328,7 @@ export default function CustomerApp({
     setPaymentId(payment.paymentId)
     setPaymentStatus(payment.status)
     if (payment.status === 'PAID') {
+      persistPaidReceipt(orderId, amount, cartItems)
       clearCheckoutDraft(businessId)
       setCart({})
       setStep('done')
@@ -365,6 +441,9 @@ export default function CustomerApp({
         if (cancelled) return
         setPaymentStatus(result.status)
         if (result.status === 'PAID') {
+          if (placedOrderId) {
+            persistPaidReceipt(placedOrderId, paidTotal || cartTotal, cartItems)
+          }
           clearCheckoutDraft(businessId)
           setCart({})
           setStep('done')
@@ -382,7 +461,7 @@ export default function CustomerApp({
       cancelled = true
       window.clearInterval(id)
     }
-  }, [step, paymentId, paymentStatus, businessId])
+  }, [step, paymentId, paymentStatus, businessId, placedOrderId, paidTotal, cartTotal, cartItems, persistPaidReceipt])
 
   function orderMore() {
     clearCheckoutDraft(businessId)
@@ -469,8 +548,14 @@ export default function CustomerApp({
         </div>
         <div className="cm-topbar-actions">
           {canCancel ? (
-            <button type="button" className="cm-cancel-btn" onClick={cancelFlow} disabled={submitting}>
-              <X size={16} /> Cancel
+            <button
+              type="button"
+              className="cm-cancel-btn"
+              onClick={cancelFlow}
+              disabled={submitting}
+              aria-label="Cancel"
+            >
+              <X size={16} />
             </button>
           ) : null}
           {orderPublicId ? (
@@ -483,6 +568,15 @@ export default function CustomerApp({
               <Package size={18} />
             </button>
           ) : null}
+          <button
+            type="button"
+            className={`cm-receipt-btn${showReceipts ? ' active' : ''}`}
+            onClick={() => setShowReceipts(true)}
+            aria-label="Your receipts"
+          >
+            <Receipt size={18} />
+            {receiptCount > 0 ? <span className="cm-badge">{receiptCount > 99 ? '99+' : receiptCount}</span> : null}
+          </button>
           {step === 'menu' ? (
             <button
               type="button"
@@ -627,6 +721,12 @@ export default function CustomerApp({
         loading={trackingLoading}
         error={trackingError}
         onClose={() => setShowTracking(false)}
+      />
+
+      <ReceiptsPanel
+        open={showReceipts}
+        receipts={receipts}
+        onClose={() => setShowReceipts(false)}
       />
     </div>
   )

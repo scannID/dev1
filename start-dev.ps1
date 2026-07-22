@@ -176,6 +176,7 @@ if ($Admin) {
         Write-Host 'Starting admin console on :5174...'
         Start-DevWindow -Name 'admin' -Title 'Scanny Admin' -WorkingDirectory $Root -Lines @(
             "`$env:VITE_API_BASE_URL = 'http://$HostIp`:4000/api'"
+            "`$env:VITE_WS_BASE_URL = 'ws://$HostIp`:4000'"
             "`$env:VITE_KEYCLOAK_URL = 'http://localhost:8080'"
             "`$env:VITE_KEYCLOAK_REALM = 'scanny'"
             "`$env:VITE_KEYCLOAK_CLIENT_ID = 'scanny-admin'"

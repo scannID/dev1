@@ -8,9 +8,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface QrScanEventRepository extends JpaRepository<QrScanEvent, Long> {
 
     List<QrScanEvent> findAllByOrderByScannedAtDesc();
+
     Optional<QrScanEvent> findTopByBusinessIdAndQrTokenAndUserAgentOrderByScannedAtDesc(
             String businessId,
             String qrToken,
+            String userAgent
+    );
+
+    Optional<QrScanEvent> findTopByBusinessIdAndUserAgentOrderByScannedAtDesc(
+            String businessId,
             String userAgent
     );
 }

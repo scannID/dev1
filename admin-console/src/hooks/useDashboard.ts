@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../api/services'
 import { useAutoRefresh } from '../lib/useAutoRefresh'
+import { useAdminMetricsRealtime } from '../lib/useAdminMetricsRealtime'
 import type { DashboardMetrics, ActivityEvent, TopMerchant } from '../api/types'
 
 export function useDashboard() {
@@ -39,7 +40,9 @@ export function useDashboard() {
     void loadDashboard(false)
   }, [loadDashboard])
 
-  useAutoRefresh(() => void loadDashboard(true), 15000)
+  // Realtime primary; slow poll as backup if the socket drops.
+  useAdminMetricsRealtime(() => loadDashboard(true))
+  useAutoRefresh(() => void loadDashboard(true), 60000)
 
   return {
     metrics,

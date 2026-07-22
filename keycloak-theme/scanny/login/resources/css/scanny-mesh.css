@@ -1,0 +1,160 @@
+/* Stripe-style fluid mesh gradient — matches merchant landing page */
+
+html {
+  min-height: 100%;
+}
+
+body {
+  background: transparent !important;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 10% 0%, #fce7f3 0%, transparent 55%),
+    radial-gradient(100% 70% at 90% 10%, #e0e7ff 0%, transparent 50%),
+    radial-gradient(90% 60% at 50% 100%, #ffedd5 0%, transparent 55%),
+    linear-gradient(160deg, #faf5ff 0%, #f0f9ff 45%, #fff7ed 100%);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  width: min(58vw, 720px);
+  height: min(58vw, 720px);
+  top: -12%;
+  left: -8%;
+  z-index: -9;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+  background: radial-gradient(circle, #8b5cf6 0%, #a78bfa 35%, transparent 70%);
+  animation: scannyMeshA 22s ease-in-out infinite;
+}
+
+.login-pf-page::before {
+  content: '';
+  position: fixed;
+  width: min(52vw, 640px);
+  height: min(52vw, 640px);
+  top: 8%;
+  right: -10%;
+  z-index: -9;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+  background: radial-gradient(circle, #ec4899 0%, #f472b6 40%, transparent 72%);
+  animation: scannyMeshB 26s ease-in-out infinite;
+}
+
+.login-pf-page::after {
+  content: '';
+  position: fixed;
+  width: min(60vw, 760px);
+  height: min(60vw, 760px);
+  bottom: -18%;
+  left: 18%;
+  z-index: -9;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+  background: radial-gradient(circle, #38bdf8 0%, #7dd3fc 38%, transparent 70%);
+  animation: scannyMeshC 24s ease-in-out infinite;
+}
+
+#kc-container-wrapper::before {
+  content: '';
+  position: fixed;
+  width: min(48vw, 580px);
+  height: min(48vw, 580px);
+  bottom: 10%;
+  right: 5%;
+  z-index: -9;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+  background: radial-gradient(circle, #fdba74 0%, #fed7aa 42%, transparent 72%);
+  animation: scannyMeshD 20s ease-in-out infinite;
+}
+
+#kc-container-wrapper::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -8;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.12) 40%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+}
+
+#kc-container::before {
+  content: '';
+  position: fixed;
+  width: min(40vw, 480px);
+  height: min(40vw, 480px);
+  top: 38%;
+  left: 36%;
+  z-index: -9;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(80px);
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  background: radial-gradient(circle, #c4b5fd 0%, #ddd6fe 45%, transparent 70%);
+  animation: scannyMeshE 28s ease-in-out infinite;
+}
+
+@keyframes scannyMeshA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12%, 18%) scale(1.12); }
+  66% { transform: translate(22%, 6%) scale(0.94); }
+}
+
+@keyframes scannyMeshB {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  40% { transform: translate(-16%, 14%) scale(0.92); }
+  70% { transform: translate(-8%, 22%) scale(1.1); }
+}
+
+@keyframes scannyMeshC {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14%, -18%) scale(1.15); }
+}
+
+@keyframes scannyMeshD {
+  0%, 100% { transform: translate(0, 0) scale(0.96); }
+  35% { transform: translate(-18%, -12%) scale(1.08); }
+  65% { transform: translate(-6%, -22%) scale(1); }
+}
+
+@keyframes scannyMeshE {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-20%, 10%) scale(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after,
+  .login-pf-page::before,
+  .login-pf-page::after,
+  #kc-container-wrapper::before,
+  #kc-container::before {
+    animation: none !important;
+  }
+}

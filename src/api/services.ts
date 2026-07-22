@@ -111,6 +111,12 @@ export const businessApi = {
     const url = `/businesses/${businessId}/menu${qr ? `?qr=${encodeURIComponent(qr)}` : ''}`
     return api.get<MenuResponse>(url)
   },
+
+  /** Record a QR open once (separate from menu GET so remounts don't inflate counts). */
+  recordScan: async (businessId: string, qr?: string): Promise<void> => {
+    const url = `/businesses/${businessId}/scans${qr ? `?qr=${encodeURIComponent(qr)}` : ''}`
+    await api.post(url, {})
+  },
 }
 
 export const catalogApi = {

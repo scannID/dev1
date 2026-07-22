@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { adminApi } from '../api/services'
 import type { ScansOrdersRange, ScansOrdersSeries } from '../api/types'
 import { InlineSpinner } from './LoadingSpinner'
+import { useAdminMetricsRealtime } from '../lib/useAdminMetricsRealtime'
 
 type Range = ScansOrdersRange
 
@@ -109,13 +110,27 @@ export default function MetricsHero() {
     void load(false)
     pollTimer = window.setInterval(() => {
       void load(true)
-    }, 15000)
+    }, 60000)
 
     return () => {
       cancelled = true
       if (pollTimer !== undefined) window.clearInterval(pollTimer)
     }
   }, [range])
+
+  useAdminMetricsRealtime(() => {
+    void adminApi.analytics.getScansOrders(range).then((data) => {
+      setSeries({
+        ...data,
+        scans: data.scans?.length ? data.scans : EMPTY.scans,
+        orders: data.orders?.length ? data.orders : EMPTY.orders,
+        xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
+        yMax: Math.max(data.yMax || 1, 1),
+      })
+    }).catch(() => {
+      /* keep last good series */
+    })
+  })
 
   const d = series
   const n = d.scans.length

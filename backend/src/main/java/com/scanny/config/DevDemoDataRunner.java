@@ -189,7 +189,7 @@ public class DevDemoDataRunner implements ApplicationRunner {
         order.setPaymentReference(business.getPaymentReference());
         order.setBusinessName(business.getName());
         order.setCustomerName(customerName);
-        order.setCustomerPhone("+256700000000");
+        order.setCustomerPhone("+256700000001");
         order.setTotal(total);
         order.setStatus(OrderStatus.Completed);
         order.setPaymentStatus(PaymentStatus.Paid);

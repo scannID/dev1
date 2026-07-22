@@ -1632,7 +1632,15 @@ function Dashboard({
                     {order.items.slice(0, 2).map((item) => (
                       <Badge key={item.id} variant="secondary" className="text-[11px] font-normal">{item.quantity}× {item.name}</Badge>
                     ))}
-                    {order.items.length > 2 && <Badge variant="secondary" className="text-[11px] font-normal">+{order.items.length - 2} more</Badge>}
+                    {order.items.length > 2 && (
+                      <Badge
+                        variant="secondary"
+                        className="order-items-more text-[11px] font-normal"
+                        title="Tap for full order details"
+                      >
+                        +{order.items.length - 2} more
+                      </Badge>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm font-medium font-mono text-foreground">{currency(order.total)}</TableCell>

@@ -56,7 +56,7 @@ export default function MarketingLayout({ slug, onGetStarted }: Props) {
               style={{
                 width: 32,
                 height: 32,
-                background: 'var(--primary)',
+                background: '#0a0a0a',
                 borderRadius: 8,
                 display: 'flex',
                 alignItems: 'center',
@@ -95,19 +95,40 @@ export default function MarketingLayout({ slug, onGetStarted }: Props) {
             <button
               type="button"
               onClick={onGetStarted}
+              className="cta-primary"
               style={{
-                background: 'var(--primary)',
-                color: 'var(--primary-foreground)',
+                background: '#ffffff',
+                color: 'var(--primary)',
                 padding: '8px 18px',
                 borderRadius: 8,
                 fontSize: 14,
                 fontWeight: 600,
-                border: 'none',
+                border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
+              <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               Get started
             </button>
+            <style>{`
+              .cta-primary__arrow {
+                display: block;
+                flex-shrink: 0;
+                animation: ctaArrowNudge 1.1s ease-in-out infinite;
+              }
+              @keyframes ctaArrowNudge {
+                0%, 100% { transform: translateX(0); opacity: 0.85; }
+                50% { transform: translateX(4px); opacity: 1; }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .cta-primary__arrow { animation: none !important; }
+              }
+            `}</style>
           </div>
         </div>
       </header>
@@ -158,13 +179,13 @@ export default function MarketingLayout({ slug, onGetStarted }: Props) {
                 type="button"
                 onClick={onGetStarted}
                 style={{
-                  background: 'var(--primary)',
-                  color: 'var(--primary-foreground)',
+                  background: '#ffffff',
+                  color: 'var(--primary)',
                   padding: '12px 22px',
                   borderRadius: 10,
                   fontSize: 15,
                   fontWeight: 700,
-                  border: 'none',
+                  border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)',
                   cursor: 'pointer',
                 }}
               >

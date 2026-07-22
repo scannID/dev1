@@ -3379,7 +3379,27 @@ button:disabled {
   }
 }
 
+.order-items-more {
+  cursor: pointer;
+  animation: orderItemsMorePulse 1.6s ease-in-out infinite;
+}
 
+@keyframes orderItemsMorePulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+    opacity: 1;
+  }
+}
 
-
-
+@media (prefers-reduced-motion: reduce) {
+  .order-items-more {
+    animation: none;
+  }
+}

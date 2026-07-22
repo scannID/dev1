@@ -52,11 +52,7 @@ public class BusinessController {
     }
 
     @GetMapping("/qr/{qrToken}")
-    public Map<String, BusinessResponse> getByQr(
-            @PathVariable String qrToken,
-            HttpServletRequest request
-    ) {
-        qrScanService.recordScanByQrToken(qrToken, request.getHeader("User-Agent"));
+    public Map<String, BusinessResponse> getByQr(@PathVariable String qrToken) {
         return Map.of("business", businessService.getBusinessByQrToken(qrToken));
     }
 
@@ -68,10 +64,8 @@ public class BusinessController {
     @GetMapping("/businesses/{businessId}/menu")
     public Map<String, Object> getMenu(
             @PathVariable String businessId,
-            @RequestParam(required = false) String qr,
-            HttpServletRequest request
+            @RequestParam(required = false) String qr
     ) {
-        qrScanService.recordMenuScan(businessId, qr, request.getHeader("User-Agent"));
         BusinessResponse business = businessService.getBusinessPublic(businessId);
         List<CatalogItem> availableItems = businessService.getAvailableMenu(businessId, qr);
         return Map.of(
@@ -87,6 +81,26 @@ public class BusinessController {
                         ))
                         .toList()
         );
+    }
+
+    /** Explicit scan beacon — keeps GET /menu free of write side-effects. */
+    @PostMapping("/businesses/{businessId}/scans")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void recordMenuScan(
+            @PathVariable String businessId,
+            @RequestParam(required = false) String qr,
+            HttpServletRequest request
+    ) {
+        qrScanService.recordMenuScan(businessId, qr, request.getHeader("User-Agent"));
+    }
+
+    @PostMapping("/qr/{qrToken}/scans")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void recordQrScan(
+            @PathVariable String qrToken,
+            HttpServletRequest request
+    ) {
+        qrScanService.recordScanByQrToken(qrToken, request.getHeader("User-Agent"));
     }
 
     @GetMapping("/businesses/{businessId}/orders")

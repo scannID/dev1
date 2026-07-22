@@ -65,6 +65,10 @@ public class RealtimeEventPublisher {
         publish("tickets:stats", "TICKET_STATS_UPDATED", null, payload);
     }
 
+    public void publishAdminMetrics(String type, Object payload) {
+        publish("admin:metrics", type, null, payload);
+    }
+
     public void publish(String channel, String type, String businessId, Object payload) {
         try {
             Map<String, Object> envelope = Map.of(

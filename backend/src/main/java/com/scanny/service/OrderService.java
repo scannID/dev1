@@ -138,6 +138,10 @@ public class OrderService {
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
         realtimeEventPublisher.publishOrderEvent(businessId, "ORDER_CREATED", response);
+        realtimeEventPublisher.publishAdminMetrics(
+                "ORDER_CREATED",
+                Map.of("businessId", businessId, "orderId", response.id())
+        );
         return response;
     }
 

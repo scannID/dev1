@@ -33,18 +33,18 @@ const getStyles = (tokens: LandingTokens): Record<string, CSSProperties> => ({
   nav: { background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: 'none', position: 'sticky', top: 0, zIndex: 50, overflow: 'visible' },
   navInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', maxWidth: 1160, margin: '0 auto', height: 60, gap: 16, overflow: 'visible' },
   logo: { display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' },
-  logoMark: { width: 32, height: 32, background: tokens.teal, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logoMark: { width: 32, height: 32, background: '#0a0a0a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   logoText: { color: tokens.text, fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' },
   navLinks: { display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 },
   navLink: { color: tokens.muted, fontSize: 14, textDecoration: 'none' },
-  navCta: { background: tokens.teal, color: 'var(--primary-foreground)', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: 'none' },
+  navCta: { background: '#ffffff', color: tokens.teal, padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', display: 'inline-flex', alignItems: 'center', gap: 8 },
   hero: { background: 'transparent', padding: '100px 48px 100px', position: 'relative', overflow: 'hidden' },
   heroInner: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, alignItems: 'center', maxWidth: '100%' },
   eyebrow: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', color: tokens.tealLt, fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.02em' },
   heroH1: { color: tokens.text, fontSize: 'clamp(30px,4vw,48px)', fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px' },
   heroSub: { color: tokens.muted, fontSize: 'clamp(14px,1.7vw,17px)', lineHeight: 1.6, margin: '0 0 36px', maxWidth: 420 },
   ctaRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  ctaPrimary: { background: tokens.teal, color: 'var(--primary-foreground)', padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', cursor: 'pointer' },
+  ctaPrimary: { background: '#ffffff', color: tokens.teal, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', cursor: 'pointer' },
   ctaSecondary: { background: 'transparent', color: tokens.text, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: `1.5px solid ${tokens.border}`, cursor: 'pointer' },
 })
 
@@ -707,9 +707,11 @@ function CtaSection({ onGetStarted, C }: { onGetStarted: () => void; C: LandingT
         <p style={{ color: C.muted, fontSize: 17, lineHeight: 1.6, margin: '0 0 36px' }}>
           Set up your QR menu in under 5 minutes. No credit card, no installs, no friction.
         </p>
-        <button onClick={onGetStarted} style={{ ...S.ctaPrimary, fontSize: 16, padding: '15px 36px', margin: '0 auto' }}>
+        <button onClick={onGetStarted} style={{ ...S.ctaPrimary, fontSize: 16, padding: '15px 36px', margin: '0 auto' }} className="cta-primary">
+          <svg className="cta-primary__arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           Get started
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <p style={{ color: C.muted, fontSize: 13, margin: '18px 0 0', opacity: 0.7 }}>No credit card required · Set up in 5 minutes</p>
       </div>
@@ -913,7 +915,12 @@ function TopNav({
           ))}
         </ul>
 
-        <button onClick={onGetStarted} style={S.navCta} className="cta-primary">Get started</button>
+        <button onClick={onGetStarted} style={S.navCta} className="cta-primary">
+          <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Get started
+        </button>
       </div>
     </nav>
   )
@@ -935,6 +942,18 @@ export default function LandingPage({
         * { box-sizing: border-box; }
         a:hover { opacity: 0.85; }
         .cta-primary:hover  { filter: brightness(0.95); transform: translateY(-1px); }
+        .cta-primary__arrow {
+          display: block;
+          flex-shrink: 0;
+          animation: ctaArrowNudge 1.1s ease-in-out infinite;
+        }
+        @keyframes ctaArrowNudge {
+          0%, 100% { transform: translateX(0); opacity: 0.85; }
+          50% { transform: translateX(4px); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .cta-primary__arrow { animation: none !important; }
+        }
         .cta-secondary:hover { border-color: ${C.border} !important; }
         @media (max-width: 768px) {
           .hero-grid   { grid-template-columns: 1fr !important; }

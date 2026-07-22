@@ -5,7 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { useMerchants } from '../hooks/useMerchants'
@@ -29,7 +36,7 @@ function currency(amount: number) {
 export default function MerchantsPage() {
   const { merchants, summary, loading, error, refresh } = useMerchants()
   const [query, setQuery] = useState('')
-  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showAddSheet, setShowAddSheet] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -89,7 +96,7 @@ export default function MerchantsPage() {
       })
 
       toast.success('Merchant created successfully! Verification email sent.')
-      setShowAddDialog(false)
+      setShowAddSheet(false)
       resetForm()
       await refresh()
     } catch (err: unknown) {
@@ -156,7 +163,7 @@ export default function MerchantsPage() {
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search merchants…" className="h-8 pl-8 w-56 text-sm" />
             </div>
-            <Button size="sm" className="h-8" onClick={() => setShowAddDialog(true)}><Plus size={13} />Add merchant</Button>
+            <Button size="sm" className="h-8" onClick={() => setShowAddSheet(true)}><Plus size={13} />Add merchant</Button>
           </div>
         </div>
         <div className="admin-table-wrap">
@@ -209,94 +216,116 @@ export default function MerchantsPage() {
         </div>
       </div>
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Merchant</DialogTitle>
-            <DialogDescription>
+      <Sheet
+        open={showAddSheet}
+        onOpenChange={(open) => {
+          setShowAddSheet(open)
+          if (!open) resetForm()
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
+          <SheetHeader className="border-b border-border px-6 py-4">
+            <SheetTitle>Add New Merchant</SheetTitle>
+            <SheetDescription>
               Create a new merchant account. The user will receive an email verification link to set their password.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="businessName">Business Name *</Label>
-              <Input id="businessName" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="businessType">Business Type *</Label>
-              <Select value={formData.businessType} onValueChange={(value) => setFormData({ ...formData, businessType: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RESTAURANT">Restaurant</SelectItem>
-                  <SelectItem value="BAR">Bar</SelectItem>
-                  <SelectItem value="RETAIL">Retail</SelectItem>
-                  <SelectItem value="EVENT">Event</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number *</Label>
-                <Input id="phoneNumber" type="tel" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} required />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Payment Method *</Label>
-              <Select value={formData.paymentType} onValueChange={(value: 'MOBILE_MONEY' | 'BANK_ACCOUNT') => setFormData({ ...formData, paymentType: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
-                  <SelectItem value="BANK_ACCOUNT">Bank Account</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.paymentType === 'MOBILE_MONEY' ? (
+          <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Provider *</Label>
-                  <Select value={formData.mobileProvider} onValueChange={(value) => setFormData({ ...formData, mobileProvider: value })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label htmlFor="businessName">Business Name *</Label>
+                  <Input id="businessName" value={formData.businessName} onChange={(e) => setFormData({ ...formData, businessName: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessType">Business Type *</Label>
+                  <Select value={formData.businessType} onValueChange={(value) => setFormData({ ...formData, businessType: value })}>
+                    <SelectTrigger id="businessType"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MTN">MTN</SelectItem>
-                      <SelectItem value="AIRTEL">Airtel</SelectItem>
+                      <SelectItem value="RESTAURANT">Restaurant</SelectItem>
+                      <SelectItem value="BAR">Bar</SelectItem>
+                      <SelectItem value="RETAIL">Retail</SelectItem>
+                      <SelectItem value="EVENT">Event</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Mobile Number *</Label>
-                  <Input value={formData.mobileNumber} onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })} required />
-                </div>
               </div>
-            ) : (
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Bank Name *</Label>
-                  <Input value={formData.bankName} onChange={(e) => setFormData({ ...formData, bankName: e.target.value })} required />
+                  <Label htmlFor="email">Email *</Label>
+                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Account Number *</Label>
-                  <Input value={formData.bankAccountNumber} onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })} required />
+                  <Label htmlFor="phoneNumber">Phone Number *</Label>
+                  <Input id="phoneNumber" type="tel" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} required />
                 </div>
               </div>
-            )}
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowAddDialog(false); resetForm() }} disabled={submitting}>Cancel</Button>
-              <Button type="submit" disabled={submitting}>{submitting ? 'Creating…' : 'Create Merchant'}</Button>
-            </DialogFooter>
+              {formData.paymentType === 'MOBILE_MONEY' ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Payment Method *</Label>
+                    <Select value={formData.paymentType} onValueChange={(value: 'MOBILE_MONEY' | 'BANK_ACCOUNT') => setFormData({ ...formData, paymentType: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
+                        <SelectItem value="BANK_ACCOUNT">Bank Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Provider *</Label>
+                    <Select value={formData.mobileProvider} onValueChange={(value) => setFormData({ ...formData, mobileProvider: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MTN">MTN</SelectItem>
+                        <SelectItem value="AIRTEL">Airtel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Mobile Number *</Label>
+                    <Input value={formData.mobileNumber} onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })} required />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Payment Method *</Label>
+                    <Select value={formData.paymentType} onValueChange={(value: 'MOBILE_MONEY' | 'BANK_ACCOUNT') => setFormData({ ...formData, paymentType: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MOBILE_MONEY">Mobile Money</SelectItem>
+                        <SelectItem value="BANK_ACCOUNT">Bank Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bank Name *</Label>
+                    <Input value={formData.bankName} onChange={(e) => setFormData({ ...formData, bankName: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Account Number *</Label>
+                    <Input value={formData.bankAccountNumber} onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })} required />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <SheetFooter className="border-t border-border px-6 py-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => { setShowAddSheet(false); resetForm() }} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Creating…' : 'Create Merchant'}
+              </Button>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

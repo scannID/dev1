@@ -1,5 +1,7 @@
 import { Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import MeshGradientBackground from '@/components/MeshGradientBackground'
+import CursorField from '@/components/CursorField'
 
 export default function AdminLogin({
   onLogin,
@@ -12,6 +14,8 @@ export default function AdminLogin({
 }) {
   return (
     <div className="admin-login">
+      <MeshGradientBackground />
+      <CursorField />
       <div className="admin-login-card">
         <div className="admin-login-brand">
           <img src="/qrcode1.png" alt="" className="admin-login-logo" />
