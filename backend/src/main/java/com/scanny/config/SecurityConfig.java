@@ -1,5 +1,7 @@
 package com.scanny.config;
 
+import com.scanny.api.ApiErrorWriter;
+import com.scanny.api.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +30,12 @@ public class SecurityConfig {
 
     @Value("${scanny.cors.allowed-origin-patterns}")
     private String allowedOriginPatterns;
+
+    private final ApiErrorWriter apiErrorWriter;
+
+    public SecurityConfig(ApiErrorWriter apiErrorWriter) {
+        this.apiErrorWriter = apiErrorWriter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -81,7 +89,19 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) ->
+                        apiErrorWriter.write(request, response, ErrorCode.UNAUTHORIZED))
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        apiErrorWriter.write(request, response, ErrorCode.FORBIDDEN))
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationEntryPoint((request, response, authException) ->
+                        apiErrorWriter.write(request, response, ErrorCode.UNAUTHORIZED))
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        apiErrorWriter.write(request, response, ErrorCode.FORBIDDEN))
+            );
 
         return http.build();
     }

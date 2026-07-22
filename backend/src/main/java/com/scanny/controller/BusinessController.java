@@ -2,6 +2,8 @@ package com.scanny.controller;
 
 import com.scanny.dto.BusinessResponse;
 import com.scanny.dto.OrderResponse;
+import com.scanny.dto.OrdersPageResponse;
+import com.scanny.dto.PageDtos;
 import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
 import com.scanny.entity.CatalogItem;
@@ -104,8 +106,30 @@ public class BusinessController {
     }
 
     @GetMapping("/businesses/{businessId}/orders")
-    public Map<String, List<OrderResponse>> listOrders(@PathVariable String businessId) {
-        return Map.of("orders", orderService.listOrders(businessId));
+    public Object listOrders(
+            @PathVariable String businessId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String paymentStatus
+    ) {
+        if (page == null && size == null && search == null && status == null && paymentStatus == null) {
+            List<OrderResponse> orders = orderService.listOrders(businessId);
+            return Map.of(
+                    "orders", orders,
+                    "pagination", PageDtos.PaginationMeta.ofFullList(orders.size())
+            );
+        }
+        int safePage = page != null ? page : 1;
+        int safeSize = size != null ? size : 20;
+        OrdersPageResponse response = orderService.listOrdersPaged(
+                businessId, safePage, safeSize, search, status, paymentStatus
+        );
+        return Map.of(
+                "orders", response.orders(),
+                "pagination", response.pagination()
+        );
     }
 
     @PostMapping("/businesses/{businessId}/orders")

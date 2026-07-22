@@ -24,6 +24,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
+import { Toaster } from '@/components/ui/sonner'
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
 import OrdersPage from './pages/OrdersPage'
@@ -163,6 +164,7 @@ export default function AdminApp({
 
   return (
     <div className="admin-shell">
+      <Toaster />
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-brand">
           <img src="/qrcode1.png" alt="Scanny" className="admin-brand-logo" />

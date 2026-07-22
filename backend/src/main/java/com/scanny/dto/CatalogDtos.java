@@ -52,4 +52,9 @@ public class CatalogDtos {
             );
         }
     }
+
+    public record CatalogItemsPageResponse(
+        List<CatalogItemResponse> items,
+        PageDtos.PaginationMeta pagination
+    ) {}
 }

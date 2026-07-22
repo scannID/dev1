@@ -1,26 +1,28 @@
 package com.scanny.config;
 
+import com.scanny.api.ApiErrorWriter;
+import com.scanny.api.ErrorCode;
 import com.scanny.security.RateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
+    private final ApiErrorWriter apiErrorWriter;
 
-    public RateLimitFilter(RateLimitService rateLimitService) {
+    public RateLimitFilter(RateLimitService rateLimitService, ApiErrorWriter apiErrorWriter) {
         this.rateLimitService = rateLimitService;
+        this.apiErrorWriter = apiErrorWriter;
     }
 
     @Override
@@ -31,10 +33,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String bucket = rateLimitService.resolveBucket(request);
         if (bucket != null && !rateLimitService.tryConsume(bucket, clientKey(request))) {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setHeader("Retry-After", "60");
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Try again shortly.\"}");
+            apiErrorWriter.write(request, response, ErrorCode.RATE_LIMITED);
             return;
         }
         filterChain.doFilter(request, response);

@@ -23,6 +23,8 @@ public class RateLimitService {
     private final int ticketScanPerMin;
     private final int websocketPerMin;
     private final int quickPayCreatePerMin;
+    private final int paymentsInitiatePerMin;
+    private final int paymentsStatusPerMin;
     private final Map<String, WindowCounter> localCounters = new ConcurrentHashMap<>();
 
     public RateLimitService(
@@ -34,7 +36,9 @@ public class RateLimitService {
             @Value("${scanny.rate-limit.devices-per-min:20}") int devicesPerMin,
             @Value("${scanny.rate-limit.ticket-scan-per-min:60}") int ticketScanPerMin,
             @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin,
-            @Value("${scanny.rate-limit.quick-pay-create-per-min:10}") int quickPayCreatePerMin
+            @Value("${scanny.rate-limit.quick-pay-create-per-min:10}") int quickPayCreatePerMin,
+            @Value("${scanny.rate-limit.payments-initiate-per-min:20}") int paymentsInitiatePerMin,
+            @Value("${scanny.rate-limit.payments-status-per-min:60}") int paymentsStatusPerMin
     ) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.enabled = enabled;
@@ -45,6 +49,8 @@ public class RateLimitService {
         this.ticketScanPerMin = ticketScanPerMin;
         this.websocketPerMin = websocketPerMin;
         this.quickPayCreatePerMin = quickPayCreatePerMin;
+        this.paymentsInitiatePerMin = paymentsInitiatePerMin;
+        this.paymentsStatusPerMin = paymentsStatusPerMin;
     }
 
     public String resolveBucket(HttpServletRequest request) {
@@ -61,6 +67,15 @@ public class RateLimitService {
         }
         if ("POST".equalsIgnoreCase(method) && path.equals("/api/quick-payments/public/codes")) {
             return "quick-pay-create:" + quickPayCreatePerMin;
+        }
+        if ("POST".equalsIgnoreCase(method) && path.equals("/api/payments/initiate")) {
+            return "payments-initiate:" + paymentsInitiatePerMin;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.matches("/api/payments/[^/]+/status")) {
+            return "payments-status:" + paymentsStatusPerMin;
+        }
+        if ("POST".equalsIgnoreCase(method) && path.matches("/api/payments/webhooks/[^/]+")) {
+            return "payments-webhook:" + paymentsInitiatePerMin;
         }
         if ("POST".equalsIgnoreCase(method) && path.matches("/api/businesses/[^/]+/orders")) {
             return "orders:" + ordersPerMin;

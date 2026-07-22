@@ -10,6 +10,7 @@ Current Scanny (`scanny.app`) documentation starts here.
 - [Security](SECURITY.md) — authentication, authorization, public APIs, audit events, and operational controls
 - [Real-time behavior](REALTIME.md) — ticket and merchant-order WebSockets, Redis pub/sub, reconnects, and hardening
 - [Containers](CONTAINERS.md) — local Compose, production Compose baseline, CI images, and deployment responsibilities
+- [Runbooks](runbooks/README.md) — restart, restore DB, payment outage
 - [Database migration to Scanny](DATABASE_MIGRATION_SCANIT_TO_SCANNY.md) — updating an existing local database created under the legacy name
 
 ## API references

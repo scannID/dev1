@@ -17,7 +17,7 @@ class RateLimitServiceTest {
         ObjectProvider<StringRedisTemplate> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
 
-        RateLimitService service = new RateLimitService(provider, true, 2, 2, 2, 2, 2, 2, 2);
+        RateLimitService service = new RateLimitService(provider, true, 2, 2, 2, 2, 2, 2, 2, 2, 2);
         assertTrue(service.tryConsume("register:2", "1.1.1.1"));
         assertTrue(service.tryConsume("register:2", "1.1.1.1"));
         assertFalse(service.tryConsume("register:2", "1.1.1.1"));

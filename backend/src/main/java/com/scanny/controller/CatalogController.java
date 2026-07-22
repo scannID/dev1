@@ -34,8 +34,20 @@ public class CatalogController {
     }
 
     @GetMapping
-    public Map<String, List<CatalogDtos.CatalogItemResponse>> getCatalogItems(@PathVariable String businessId) {
-        return Map.of("items", catalogService.getCatalogItems(businessId));
+    public Object getCatalogItems(
+            @PathVariable String businessId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Boolean available
+    ) {
+        if (page == null && size == null && search == null && category == null && available == null) {
+            return Map.of("items", catalogService.getCatalogItems(businessId));
+        }
+        int safePage = page != null ? page : 1;
+        int safeSize = size != null ? size : 20;
+        return catalogService.getCatalogItemsPaged(businessId, safePage, safeSize, search, category, available);
     }
 
     @GetMapping("/{itemId}")

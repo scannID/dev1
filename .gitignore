@@ -51,5 +51,8 @@ backend/.dev/
 backend/cp.txt
 **/cp.txt
 
+# Database backups
+backups/
+
 # OS
 Thumbs.db

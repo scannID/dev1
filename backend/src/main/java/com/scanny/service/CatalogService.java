@@ -1,6 +1,7 @@
 package com.scanny.service;
 
 import com.scanny.dto.CatalogDtos;
+import com.scanny.dto.PageDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.CatalogItem;
 import com.scanny.exception.ApiException;
@@ -9,6 +10,10 @@ import com.scanny.repository.BusinessRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CatalogCategories;
 import com.scanny.websocket.RealtimeEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +48,42 @@ public class CatalogService {
     public List<CatalogDtos.CatalogItemResponse> getCatalogItems(String businessId) {
         Business business = merchantAccessService.requireOwnedBusiness(businessId);
         return business.getItems().stream().map(CatalogDtos.CatalogItemResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CatalogDtos.CatalogItemsPageResponse getCatalogItemsPaged(
+            String businessId,
+            int page,
+            int size,
+            String search,
+            String category,
+            Boolean available
+    ) {
+        merchantAccessService.requireOwnedBusiness(businessId);
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        String normalizedSearch = blankToNull(search);
+        String normalizedCategory = blankToNull(category);
+
+        Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.ASC, "name"));
+        Page<CatalogItem> result = catalogItemRepository.searchByBusiness(
+                businessId,
+                normalizedSearch,
+                normalizedCategory,
+                available,
+                pageable
+        );
+
+        return new CatalogDtos.CatalogItemsPageResponse(
+                result.getContent().stream().map(CatalogDtos.CatalogItemResponse::from).toList(),
+                PageDtos.PaginationMeta.from(result)
+        );
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Transactional(readOnly = true)

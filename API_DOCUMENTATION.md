@@ -555,24 +555,73 @@ PATCH /api/orders/{orderId}
 
 ## Error Handling
 
+All failures return a consistent JSON envelope. The `error` field remains populated for existing clients; `message` mirrors the same human-readable text.
+
 ### HTTP Status Codes
 
 - `200 OK` - Success
 - `201 Created` - Resource created successfully
-- `400 Bad Request` - Invalid request data
-- `401 Unauthorized` - Authentication required or invalid PIN
+- `400 Bad Request` - Invalid request data or validation failure
+- `401 Unauthorized` - Authentication required
+- `403 Forbidden` - Authenticated but not allowed
 - `404 Not Found` - Resource not found
+- `405 Method Not Allowed` - Unsupported HTTP method
+- `409 Conflict` - Conflicts with current state
+- `429 Too Many Requests` - Rate limit exceeded
 - `500 Internal Server Error` - Server error
 
 ### Error Response Format
 
 ```json
 {
-  "error": "Resource not found",
-  "message": "Ticket not found with QR token: xyz",
-  "timestamp": "2026-07-07T09:00:00Z"
+  "success": false,
+  "error": "Order was not found.",
+  "message": "Order was not found.",
+  "code": "ORDER_NOT_FOUND",
+  "status": 404,
+  "path": "/api/orders/abc",
+  "timestamp": "2026-07-22T17:45:00Z",
+  "fieldErrors": []
 }
 ```
+
+### Validation Error Example
+
+```json
+{
+  "success": false,
+  "error": "Email is required",
+  "message": "Email is required",
+  "code": "VALIDATION_FAILED",
+  "status": 400,
+  "path": "/api/auth/merchant/register",
+  "timestamp": "2026-07-22T17:45:00Z",
+  "fieldErrors": [
+    {
+      "field": "email",
+      "rejectedValue": "",
+      "message": "Email is required",
+      "code": "NotBlank"
+    }
+  ]
+}
+```
+
+### Stable Error Codes
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `VALIDATION_FAILED` | 400 | Bean Validation / missing params |
+| `INVALID_REQUEST` | 400 | Bad JSON or invalid input |
+| `UNAUTHORIZED` | 401 | Missing or invalid auth |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `NOT_FOUND` | 404 | Generic missing resource |
+| `ORDER_NOT_FOUND` | 404 | Order missing |
+| `BUSINESS_NOT_FOUND` | 404 | Business missing |
+| `CONFLICT` | 409 | Data conflict |
+| `METHOD_NOT_ALLOWED` | 405 | Wrong HTTP verb |
+| `RATE_LIMITED` | 429 | Rate limit |
+| `INTERNAL_ERROR` | 500 | Unexpected server failure |
 
 ---
 

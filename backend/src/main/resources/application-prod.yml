@@ -35,6 +35,8 @@ scanny:
     allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS}
   rate-limit:
     enabled: true
+  payments:
+    fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:false}
 
 logging:
   level:

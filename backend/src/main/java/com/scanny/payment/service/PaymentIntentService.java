@@ -18,8 +18,10 @@ import com.scanny.repository.QuickPaymentTransactionRepository;
 import com.scanny.service.OrderService;
 import com.scanny.service.TicketPurchaseService;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +56,7 @@ public class PaymentIntentService {
     }
 
     @Transactional
-    public PaymentIntent createIntent(String providerId, PaymentDtos.InitiateRequest request) {
+    public PaymentIntent createIntent(String providerId, PaymentDtos.InitiateRequest request, String idempotencyKey) {
         PaymentIntent intent = new PaymentIntent();
         intent.setId(generatePaymentId());
         intent.setContext(request.context());
@@ -65,9 +67,27 @@ public class PaymentIntentService {
         intent.setCustomerPhone(request.customerPhone().trim());
         intent.setCustomerName(nullToEmpty(request.customerName()));
         intent.setBusinessId(request.businessId());
+        intent.setIdempotencyKey(blankToNull(idempotencyKey));
         intent.setStatus(PaymentIntentStatus.Pending);
         intent.setCreatedAt(Instant.now());
         return paymentIntentRepository.save(intent);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentIntent> findByIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return Optional.empty();
+        }
+        return paymentIntentRepository.findByIdempotencyKey(idempotencyKey.trim());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentIntent> findReusableIntent(PaymentContext context, String referenceId) {
+        return paymentIntentRepository.findTopByContextAndReferenceIdAndStatusInOrderByCreatedAtDesc(
+                context,
+                referenceId,
+                List.of(PaymentIntentStatus.Pending, PaymentIntentStatus.Processing, PaymentIntentStatus.Paid)
+        );
     }
 
     @Transactional
@@ -204,5 +224,13 @@ public class PaymentIntentService {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

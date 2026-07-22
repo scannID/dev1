@@ -1,6 +1,7 @@
 import { getWsBaseUrl } from './lib/realtime'
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
+import { toast } from 'sonner'
 import { ticketsApi } from './api/services'
 import type { TicketStats } from './api/types'
 import { InlineSpinner } from './components/LoadingSpinner'
@@ -886,8 +887,11 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         gateUrl: createdTicket.gateUrl ?? null,
       })
       await loadStats(data.eventName)
+      toast.success('Event ticket QR created successfully')
     } catch (err) {
-      setStatsError(err instanceof Error ? err.message : 'Failed to create ticket')
+      const message = err instanceof Error ? err.message : 'Failed to create ticket'
+      setStatsError(message)
+      toast.error(message)
       throw err
     }
   }
@@ -898,9 +902,12 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       setRevokeMessage(null)
       await ticketsApi.updateStatus(ticketId, 'Cancelled')
       setRevokeMessage('Ticket revoked successfully. This QR is now disabled.')
+      toast.success('Ticket revoked successfully')
       await loadStats(lastCreatedEventName ?? undefined)
     } catch (err) {
-      setRevokeMessage(err instanceof Error ? err.message : 'Failed to revoke ticket')
+      const message = err instanceof Error ? err.message : 'Failed to revoke ticket'
+      setRevokeMessage(message)
+      toast.error(message)
     } finally {
       setRevoking(false)
     }

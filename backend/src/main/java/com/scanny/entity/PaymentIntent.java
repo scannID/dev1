@@ -45,6 +45,9 @@ public class PaymentIntent {
     @Column(name = "provider_reference", nullable = false)
     private String providerReference = "";
 
+    @Column(name = "idempotency_key", length = 128)
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentIntentStatus status = PaymentIntentStatus.Pending;
@@ -148,6 +151,14 @@ public class PaymentIntent {
 
     public void setProviderReference(String providerReference) {
         this.providerReference = providerReference;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 
     public PaymentIntentStatus getStatus() {

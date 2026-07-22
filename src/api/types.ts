@@ -70,6 +70,25 @@ export interface CatalogItemResponse {
 
 export interface CatalogItemsResponse {
   items: CatalogItem[]
+  pagination?: PaginationMeta
+}
+
+export interface PaginationMeta {
+  page: number
+  size: number
+  totalItems: number
+  totalPages: number
+}
+
+export interface PagedResult<T> {
+  items: T[]
+  pagination: PaginationMeta
+}
+
+export interface ListQuery {
+  page?: number
+  size?: number
+  search?: string
 }
 
 export type OrderStatus = 'Pending' | 'Preparing' | 'Ready' | 'Completed' | 'Cancelled'
@@ -136,6 +155,7 @@ export interface OrderResponse {
 
 export interface OrdersResponse {
   orders: Order[]
+  pagination?: PaginationMeta
 }
 
 export interface ClearCompletedResponse {

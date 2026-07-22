@@ -1,6 +1,8 @@
 package com.scanny.service;
 
 import com.scanny.dto.OrderResponse;
+import com.scanny.dto.OrdersPageResponse;
+import com.scanny.dto.PageDtos;
 import com.scanny.dto.ReceiptDtos.GenerateReceiptRequest;
 import com.scanny.dto.ReceiptDtos.ReceiptItem;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
@@ -25,6 +27,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,6 +78,63 @@ public class OrderService {
         return orderRepository.findByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .map(OrderResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrdersPageResponse listOrdersPaged(
+            String businessId,
+            int page,
+            int size,
+            String search,
+            String status,
+            String paymentStatus
+    ) {
+        merchantAccessService.assertOwnsBusinessId(businessId);
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        String normalizedSearch = blankToNull(search);
+        OrderStatus statusFilter = parseOrderStatus(status);
+        PaymentStatus paymentFilter = parsePaymentStatus(paymentStatus);
+
+        Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> result = orderRepository.searchByBusiness(
+                businessId,
+                normalizedSearch,
+                statusFilter,
+                paymentFilter,
+                pageable
+        );
+
+        return new OrdersPageResponse(
+                result.getContent().stream().map(OrderResponse::from).toList(),
+                PageDtos.PaginationMeta.from(result)
+        );
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static OrderStatus parseOrderStatus(String status) {
+        String normalized = blankToNull(status);
+        if (normalized == null) return null;
+        try {
+            return OrderStatus.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(400, "Invalid order status: " + status);
+        }
+    }
+
+    private static PaymentStatus parsePaymentStatus(String paymentStatus) {
+        String normalized = blankToNull(paymentStatus);
+        if (normalized == null) return null;
+        try {
+            return PaymentStatus.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(400, "Invalid payment status: " + paymentStatus);
+        }
     }
 
     @Transactional

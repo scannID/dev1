@@ -1,5 +1,7 @@
 import { useState, FormEvent } from 'react'
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import keycloak from './keycloak'
 
 /* ─── Design tokens ─────────────────────────────────────────────────── */
@@ -111,6 +113,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
       }
 
       setSuccess('Registration successful! Check your email to verify your account and set your password.')
+      toast.success('Merchant account created successfully')
       // Clear form
       setRegBusinessName('')
       setRegEmail('')
@@ -122,7 +125,9 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
         setSuccess('')
       }, 3000)
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
+      const message = err.message || 'Registration failed. Please try again.'
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -169,6 +174,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
       padding: '24px',
       position: 'relative',
     }}>
+      <Toaster />
       {/* Background pattern */}
       <div style={{
         position: 'absolute',

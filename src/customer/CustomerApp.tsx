@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Package, Receipt, ShoppingCart, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import { businessApi, devicesApi, ordersApi } from '../api/services'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
@@ -377,6 +379,7 @@ export default function CustomerApp({
 
       setPlacedOrderId(order.id)
       setPaidTotal(order.total || cartTotal)
+      toast.success('Order placed successfully')
       if (order.publicId) {
         setOrderPublicId(order.publicId)
         saveActiveOrder(businessId, {
@@ -406,7 +409,9 @@ export default function CustomerApp({
 
       await startPaymentForOrder(order.id, order.total || cartTotal)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to place order')
+      const message = err instanceof Error ? err.message : 'Failed to place order'
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -424,7 +429,9 @@ export default function CustomerApp({
       await startPaymentForOrder(placedOrderId, paidTotal || cartTotal)
     } catch (err) {
       setPaymentStatus('FAILED')
-      setError(err instanceof Error ? err.message : 'Failed to retry payment')
+      const message = err instanceof Error ? err.message : 'Failed to retry payment'
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -534,6 +541,7 @@ export default function CustomerApp({
 
   return (
     <div className="cm-page" style={{ ['--cm-accent' as string]: accent }}>
+      <Toaster />
       <header className="cm-topbar">
         <div className="cm-brand">
           {business.logoUrl ? (

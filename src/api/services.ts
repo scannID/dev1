@@ -44,7 +44,35 @@ import type {
   AttendeeTicketView,
   GateScanResponse,
   GateEventResponse,
+  PagedResult,
+  PaginationMeta,
 } from './types'
+
+export type CatalogListParams = {
+  page?: number
+  size?: number
+  search?: string
+  category?: string
+  available?: boolean
+}
+
+export type OrdersListParams = {
+  page?: number
+  size?: number
+  search?: string
+  status?: string
+  paymentStatus?: string
+}
+
+function buildQuery(params: Record<string, string | number | boolean | undefined | null>): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    query.set(key, String(value))
+  }
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
+}
 
 export interface UpdateMerchantProfileRequest {
   businessName?: string
@@ -120,9 +148,29 @@ export const businessApi = {
 }
 
 export const catalogApi = {
+  /** Full catalog (no page params) — used when embedding items on the business. */
   list: async (businessId: string): Promise<CatalogItem[]> => {
     const response = await api.get<CatalogItemsResponse>(`/businesses/${businessId}/catalog`)
     return response.items
+  },
+
+  /** Server-paginated catalog list with optional filters. */
+  listPaged: async (businessId: string, params: CatalogListParams = {}): Promise<PagedResult<CatalogItem>> => {
+    const qs = buildQuery({
+      page: params.page ?? 1,
+      size: params.size ?? 20,
+      search: params.search,
+      category: params.category,
+      available: params.available,
+    })
+    const response = await api.get<CatalogItemsResponse>(`/businesses/${businessId}/catalog${qs}`)
+    const pagination: PaginationMeta = response.pagination ?? {
+      page: params.page ?? 1,
+      size: params.size ?? response.items.length,
+      totalItems: response.items.length,
+      totalPages: 1,
+    }
+    return { items: response.items, pagination }
   },
 
   get: async (businessId: string, itemId: string): Promise<CatalogItem> => {
@@ -173,9 +221,29 @@ export const catalogApi = {
 }
 
 export const ordersApi = {
+  /** Full order list (no page params) — reports, metrics, realtime refresh. */
   list: async (businessId: string): Promise<Order[]> => {
     const response = await api.get<OrdersResponse>(`/businesses/${businessId}/orders`)
     return response.orders
+  },
+
+  /** Server-paginated orders list with optional filters. */
+  listPaged: async (businessId: string, params: OrdersListParams = {}): Promise<PagedResult<Order>> => {
+    const qs = buildQuery({
+      page: params.page ?? 1,
+      size: params.size ?? 20,
+      search: params.search,
+      status: params.status,
+      paymentStatus: params.paymentStatus,
+    })
+    const response = await api.get<OrdersResponse>(`/businesses/${businessId}/orders${qs}`)
+    const pagination: PaginationMeta = response.pagination ?? {
+      page: params.page ?? 1,
+      size: params.size ?? response.orders.length,
+      totalItems: response.orders.length,
+      totalPages: 1,
+    }
+    return { items: response.orders, pagination }
   },
 
   create: async (businessId: string, data: CreateOrderRequest): Promise<Order> => {

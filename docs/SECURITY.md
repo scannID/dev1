@@ -30,8 +30,8 @@ Menu retrieval and customer order creation are public by design. Controls should
 
 - schema and length validation;
 - server-side price calculation from current catalog data;
-- rate limits by suitable dimensions;
-- idempotency or duplicate-order protection where applicable;
+- rate limits by suitable dimensions (including `/api/payments/initiate` and status);
+- payment idempotency: one active intent per `(context, referenceId)`, optional `Idempotency-Key` header;
 - generic errors that do not expose stack traces or account existence;
 - abuse monitoring and correlation IDs.
 

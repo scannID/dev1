@@ -1,5 +1,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 import QRCode from 'qrcode'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPaymentCode } from '../api/types'
 
@@ -52,8 +54,11 @@ export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
       })
       setQrDataUrl(dataUrl)
       setCreated(code)
+      toast.success('Payment QR created successfully')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create payment QR')
+      const message = err instanceof Error ? err.message : 'Could not create payment QR'
+      setError(message)
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -62,6 +67,7 @@ export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
   if (created) {
     return (
       <div className="scanny-page">
+        <Toaster />
         <div className="scanny-page-narrow">
           <button type="button" onClick={onBack} className="scanny-back">← Back to home</button>
           <div className="scanny-card">
@@ -112,6 +118,7 @@ export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
 
   return (
     <div className="scanny-page">
+      <Toaster />
       <div className="scanny-page-narrow">
         <button type="button" onClick={onBack} className="scanny-back">← Back to home</button>
         <div className="scanny-card">

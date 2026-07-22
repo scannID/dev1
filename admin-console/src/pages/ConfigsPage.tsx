@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -77,8 +78,11 @@ export default function ConfigsPage() {
       await updateSection(section, draft[section])
       setSaved(section)
       setTimeout(() => setSaved(null), 2000)
+      toast.success(`${section} settings saved`)
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : `Failed to save ${section}`)
+      const message = err instanceof Error ? err.message : `Failed to save ${section}`
+      setActionMessage(message)
+      toast.error(message)
     }
   }
 
@@ -90,8 +94,11 @@ export default function ConfigsPage() {
       await updateSection('features', next)
       setSaved('features')
       setTimeout(() => setSaved(null), 2000)
+      toast.success(`Feature "${key}" updated`)
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : 'Failed to update feature flag')
+      const message = err instanceof Error ? err.message : 'Failed to update feature flag'
+      setActionMessage(message)
+      toast.error(message)
       refresh()
     }
   }
@@ -102,11 +109,14 @@ export default function ConfigsPage() {
     try {
       const result = await runAction(action)
       setActionMessage(result.message)
+      toast.success(result.message || `Action "${action}" completed`)
       if (action === 'reset-platform') {
         await refresh()
       }
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : `Failed to run ${action}`)
+      const message = err instanceof Error ? err.message : `Failed to run ${action}`
+      setActionMessage(message)
+      toast.error(message)
     }
   }
 

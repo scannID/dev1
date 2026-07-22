@@ -4,7 +4,7 @@ import type { CatalogItem } from '../../api/types'
 import { getCategoryImage } from '../../lib/categoryImages'
 import { currency } from '../utils'
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 20
 
 export function MenuStep({
   items,

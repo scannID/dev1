@@ -11,6 +11,7 @@ import com.scanny.payment.model.PaymentProviderResult;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,13 +32,45 @@ public class PaymentGatewayService {
     }
 
     @Transactional
-    public PaymentDtos.InitiateResponse initiate(PaymentDtos.InitiateRequest request) {
+    public PaymentDtos.InitiateResponse initiate(PaymentDtos.InitiateRequest request, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<PaymentIntent> byKey = paymentIntentService.findByIdempotencyKey(idempotencyKey);
+            if (byKey.isPresent()) {
+                return paymentIntentService.toInitiateResponse(byKey.get());
+            }
+        }
+
+        Optional<PaymentIntent> reusable = paymentIntentService.findReusableIntent(
+                request.context(),
+                request.referenceId()
+        );
+        if (reusable.isPresent()) {
+            return paymentIntentService.toInitiateResponse(reusable.get());
+        }
+
         PaymentProvider provider = registry.resolve(request.provider());
-        PaymentIntent intent = paymentIntentService.createIntent(provider.id(), request);
-        PaymentCommand command = paymentIntentService.toCommand(intent);
-        PaymentProviderResult result = provider.initiate(command);
-        intent = paymentIntentService.applyProviderResult(intent, result);
-        return paymentIntentService.toInitiateResponse(intent);
+        try {
+            PaymentIntent intent = paymentIntentService.createIntent(provider.id(), request, idempotencyKey);
+            PaymentCommand command = paymentIntentService.toCommand(intent);
+            PaymentProviderResult result = provider.initiate(command);
+            intent = paymentIntentService.applyProviderResult(intent, result);
+            return paymentIntentService.toInitiateResponse(intent);
+        } catch (DataIntegrityViolationException ex) {
+            // Concurrent retry hit unique active-reference or idempotency_key — return the winner.
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                return paymentIntentService.findByIdempotencyKey(idempotencyKey)
+                        .map(paymentIntentService::toInitiateResponse)
+                        .orElseThrow(() -> ex);
+            }
+            return paymentIntentService.findReusableIntent(request.context(), request.referenceId())
+                    .map(paymentIntentService::toInitiateResponse)
+                    .orElseThrow(() -> ex);
+        }
+    }
+
+    @Transactional
+    public PaymentDtos.InitiateResponse initiate(PaymentDtos.InitiateRequest request) {
+        return initiate(request, null);
     }
 
     @Transactional
