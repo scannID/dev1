@@ -45,5 +45,11 @@ backend/*.zip
 admin-console/vite.config.d.ts
 admin-console/vite.config.js
 
+# Local generated launchers / classpath dumps
+.dev/
+backend/.dev/
+backend/cp.txt
+**/cp.txt
+
 # OS
 Thumbs.db
