@@ -9,21 +9,41 @@ function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?:
   const max = Math.max(...data)
   const min = Math.min(...data)
   const range = max - min || 1
-  const w = 100, h = 40
-  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * (h - 6) - 3}`)
-  const area = `M${pts.join('L')}L${w},${h}L0,${h}Z`
-  const line = `M${pts.join('L')}`
+  const w = 100
+  const h = 40
+  const points = data.map((v, i): [number, number] => [
+    (i / (data.length - 1)) * w,
+    h - ((v - min) / range) * (h - 8) - 4,
+  ])
+
+  let line = `M${points[0][0]},${points[0][1]}`
+  for (let i = 1; i < points.length; i++) {
+    const mx = (points[i - 1][0] + points[i][0]) / 2
+    line += ` C${mx},${points[i - 1][1]} ${mx},${points[i][1]} ${points[i][0]},${points[i][1]}`
+  }
+  const last = points[points.length - 1]
+  const first = points[0]
+  const area = `${line} L${last[0]},${h} L${first[0]},${h} Z`
   const id = `sg-${color.replace(/[^a-z0-9]/gi, '')}`
+
   return (
     <svg className="admin-sparkline" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${id})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   )
 }

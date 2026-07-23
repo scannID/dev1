@@ -1,6 +1,6 @@
 import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
-import { currency } from '../utils'
+import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 
 export interface CartLine extends CatalogItem {
   quantity: number
@@ -63,9 +63,17 @@ export function CartStep({
             <span className="cm-line-total">{currency(item.price * item.quantity)}</span>
           </div>
         ))}
-        <div className="cm-summary-total">
+        <div className="cm-summary-total cm-summary-row">
           <span>Subtotal</span>
           <strong>{currency(cartTotal)}</strong>
+        </div>
+        <div className="cm-summary-row">
+          <span>Service fee</span>
+          <strong>{currency(SERVICE_FEE_UGX)}</strong>
+        </div>
+        <div className="cm-summary-total">
+          <span>Total</span>
+          <strong>{currency(withServiceFee(cartTotal))}</strong>
         </div>
       </div>
     </div>

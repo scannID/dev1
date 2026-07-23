@@ -33,7 +33,7 @@ import {
   type CustomerReceipt,
 } from './receipts'
 import { useOrderTracking } from './useOrderTracking'
-import { currency, formatUgPhoneHint, getOrCreateDeviceId } from './utils'
+import { currency, formatUgPhoneHint, getOrCreateDeviceId, SERVICE_FEE_UGX, withServiceFee } from './utils'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import './CustomerApp.css'
 
@@ -107,6 +107,7 @@ export default function CustomerApp({
   }, [items, cart])
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const payableTotal = withServiceFee(cartTotal)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
   const persistPaidReceipt = useCallback(
@@ -148,7 +149,13 @@ export default function CustomerApp({
                 id: item.name,
                 name: item.name,
                 category: '',
-                price: Math.round(trackedOrder.total / Math.max(trackedOrder.items.length, 1)),
+                price: Math.round(
+                  Math.max(trackedOrder.total - SERVICE_FEE_UGX, 0) /
+                    Math.max(
+                      trackedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
+                      1,
+                    ),
+                ),
                 description: '',
                 available: true,
                 quantity: item.quantity,
@@ -358,7 +365,7 @@ export default function CustomerApp({
     try {
       // Re-prompt payment for an already-placed order (e.g. after changing number)
       if (placedOrderId) {
-        await startPaymentForOrder(placedOrderId, paidTotal || cartTotal)
+        await startPaymentForOrder(placedOrderId, paidTotal || payableTotal)
         return
       }
 
@@ -378,7 +385,7 @@ export default function CustomerApp({
       })
 
       setPlacedOrderId(order.id)
-      setPaidTotal(order.total || cartTotal)
+      setPaidTotal(order.total || payableTotal)
       toast.success('Order placed successfully')
       if (order.publicId) {
         setOrderPublicId(order.publicId)
@@ -407,7 +414,7 @@ export default function CustomerApp({
         }
       }
 
-      await startPaymentForOrder(order.id, order.total || cartTotal)
+      await startPaymentForOrder(order.id, order.total || payableTotal)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to place order'
       setError(message)
@@ -426,7 +433,7 @@ export default function CustomerApp({
     setError(null)
     setPaymentStatus('PENDING')
     try {
-      await startPaymentForOrder(placedOrderId, paidTotal || cartTotal)
+      await startPaymentForOrder(placedOrderId, paidTotal || payableTotal)
     } catch (err) {
       setPaymentStatus('FAILED')
       const message = err instanceof Error ? err.message : 'Failed to retry payment'
@@ -449,7 +456,7 @@ export default function CustomerApp({
         setPaymentStatus(result.status)
         if (result.status === 'PAID') {
           if (placedOrderId) {
-            persistPaidReceipt(placedOrderId, paidTotal || cartTotal, cartItems)
+            persistPaidReceipt(placedOrderId, paidTotal || payableTotal, cartItems)
           }
           clearCheckoutDraft(businessId)
           setCart({})
@@ -468,7 +475,7 @@ export default function CustomerApp({
       cancelled = true
       window.clearInterval(id)
     }
-  }, [step, paymentId, paymentStatus, businessId, placedOrderId, paidTotal, cartTotal, cartItems, persistPaidReceipt])
+  }, [step, paymentId, paymentStatus, businessId, placedOrderId, paidTotal, payableTotal, cartItems, persistPaidReceipt])
 
   function orderMore() {
     clearCheckoutDraft(businessId)
@@ -534,7 +541,7 @@ export default function CustomerApp({
   const showBottomCart = step === 'cart' && cartCount > 0
   const showBottomDetails = step === 'details'
   const showBottomPay = step === 'pay'
-  const payTotal = paidTotal || cartTotal
+  const payTotal = paidTotal || payableTotal
   const payCount = cartCount || (placedOrderId ? 1 : 0)
   const canCancel =
     step !== 'done' && (step !== 'menu' || cartCount > 0 || Boolean(placedOrderId) || Boolean(paymentId))
@@ -670,7 +677,7 @@ export default function CustomerApp({
         <WaitingStep
           businessName={business.name}
           orderId={placedOrderId}
-          total={paidTotal || cartTotal}
+          total={paidTotal || payableTotal}
           provider={provider}
           phone={phone}
           status={paymentStatus}
@@ -698,15 +705,15 @@ export default function CustomerApp({
       )}
 
       {showBottomMenu && (
-        <BottomBar count={cartCount} total={cartTotal} label="View cart" onAction={() => setStep('cart')} />
+        <BottomBar count={cartCount} total={payableTotal} label="View cart" onAction={() => setStep('cart')} />
       )}
       {showBottomCart && (
-        <BottomBar count={cartCount} total={cartTotal} label="Continue" onAction={goDetails} />
+        <BottomBar count={cartCount} total={payableTotal} label="Continue" onAction={goDetails} />
       )}
       {showBottomDetails && (
         <BottomBar
           count={cartCount}
-          total={cartTotal}
+          total={payableTotal}
           label="Proceed to pay"
           onAction={goPay}
           disabled={cartCount === 0}

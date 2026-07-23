@@ -27,7 +27,7 @@ foreach ($port in $ports) {
                 Stop-Process -Id $pid
             }
         } catch {
-            Write-Host "  :$port — could not stop pid ${pid}: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "  :$port — could not stop pid $($pid): $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 }

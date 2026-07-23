@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, type PointerEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Bell, Eye, Home, ImagePlus, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
@@ -63,45 +63,49 @@ import { buildMetricSeries, buildReportData, dailySeries, type MetricRange } fro
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
 import './App.css'
 
-// Sparkline component with area fill - moved outside render to fix React hooks error
+// Sparkline component with soft area fill and smooth curves
 function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string }) {
   if (data.length === 0) return null
-  
+
   const max = Math.max(...data)
   const min = Math.min(...data)
   const range = max - min || 1
-  
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * 100
+  const n = Math.max(data.length - 1, 1)
+
+  const points = data.map((value, index): [number, number] => {
+    const x = (index / n) * 100
     const y = 100 - ((value - min) / range) * 80 - 10
-    return { x, y }
+    return [x, y]
   })
-  
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ')
-  const areaPath = `${linePath} L 100,100 L 0,100 Z`
-  
-  // Generate gradient ID based on color
-  const gradientId = `gradient-${color.replace('#', '')}`
-  
+
+  let linePath = `M${points[0][0]},${points[0][1]}`
+  for (let i = 1; i < points.length; i++) {
+    const mx = (points[i - 1][0] + points[i][0]) / 2
+    linePath += ` C${mx},${points[i - 1][1]} ${mx},${points[i][1]} ${points[i][0]},${points[i][1]}`
+  }
+  const last = points[points.length - 1]
+  const first = points[0]
+  const areaPath = `${linePath} L${last[0]},100 L${first[0]},100 Z`
+
+  const gradientId = `gradient-${color.replace(/[^a-z0-9]/gi, '')}`
+
   return (
     <svg className="sparkline-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
       <defs>
         <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.5" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.05" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <path
-        d={areaPath}
-        fill={`url(#${gradientId})`}
-      />
+      <path d={areaPath} fill={`url(#${gradientId})`} />
       <path
         d={linePath}
         fill="none"
         stroke={color}
-        strokeWidth="2"
+        strokeWidth="1.15"
         strokeLinecap="round"
         strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
       />
     </svg>
   )
@@ -571,7 +575,7 @@ function App({
                 <Sparkline data={paidSalesTrend} color="#10b981" />
               </div>
             </section>
-            <OverviewPage business={business} orders={businessOrders} darkMode={darkMode} />
+            <OverviewPage business={business} orders={businessOrders} />
           </div>
         )}
 
@@ -807,11 +811,9 @@ function SidebarProfile({
 function OverviewPage({
   business,
   orders,
-  darkMode,
 }: {
   business: Business
   orders: Order[]
-  darkMode: boolean
 }) {
   const openOrders = orders.filter(
     (order) => order.status !== 'Completed' && order.status !== 'Cancelled',
@@ -821,7 +823,7 @@ function OverviewPage({
 
   return (
     <div className="account-layout">
-      <MetricsCard business={business} orders={orders} darkMode={darkMode} />
+      <MetricsCard business={business} orders={orders} />
 
       <section className="account-summary">
         <QrPanel business={business} />
@@ -866,12 +868,51 @@ function OverviewPage({
 function MetricsCard({
   business,
   orders,
-  darkMode,
 }: {
   business: Business
   orders: Order[]
-  darkMode: boolean
 }) {
+  const RANGE_META: { key: MetricRange; label: string; span: string }[] = [
+    { key: 'day', label: 'Daily', span: 'today by hour' },
+    { key: 'week', label: 'Weekly', span: 'last 7 days' },
+    { key: 'month', label: 'Monthly', span: 'last 5 weeks' },
+    { key: 'year', label: 'Yearly', span: 'last 12 months' },
+  ]
+
+  const VW = 600
+  const VH = 220
+  const PL = 40
+  const PR = 10
+  const PT = 16
+  const PB = 28
+  const CW = VW - PL - PR
+  const CH = VH - PT - PB
+
+  const tx = (i: number, n: number) => PL + (i / Math.max(n - 1, 1)) * CW
+  const ty = (v: number, max: number) => PT + CH - (v / Math.max(max, 1)) * CH
+
+  function smooth(pts: [number, number][]) {
+    if (pts.length < 2) return ''
+    let d = `M${pts[0][0]},${pts[0][1]}`
+    for (let i = 1; i < pts.length; i++) {
+      const mx = (pts[i - 1][0] + pts[i][0]) / 2
+      d += ` C${mx},${pts[i - 1][1]} ${mx},${pts[i][1]} ${pts[i][0]},${pts[i][1]}`
+    }
+    return d
+  }
+
+  function areaPath(pts: [number, number][]) {
+    const last = pts[pts.length - 1]
+    const first = pts[0]
+    return `${smooth(pts)} L${last[0]},${VH - PB} L${first[0]},${VH - PB} Z`
+  }
+
+  function fmt(v: number) {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+    return String(v)
+  }
+
   const metricData = useMemo(
     () => ({
       day: buildMetricSeries(orders, 'day'),
@@ -882,115 +923,339 @@ function MetricsCard({
     [orders],
   )
   const [range, setRange] = useState<MetricRange>('week')
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
   const data = metricData[range]
-  const [activeIndex, setActiveIndex] = useState(Math.floor(data.points.length / 2))
-  const activePoint = data.points[Math.min(activeIndex, Math.max(data.points.length - 1, 0))] ?? {
-    label: '—',
-    orders: 0,
-    paid: 0,
-    x: 0,
-    y: 0,
-  }
+  const n = data.points.length
+  const yMax = data.yMax
 
-  function updateActivePoint(event: PointerEvent<SVGSVGElement>) {
-    if (!data.points.length) return
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const cursorX = ((event.clientX - bounds.left) / bounds.width) * 760
-    const nextIndex = data.points.reduce(
-      (closestIndex, point, index) =>
-        Math.abs(point.x - cursorX) < Math.abs(data.points[closestIndex].x - cursorX)
-          ? index
-          : closestIndex,
-      0,
-    )
-    setActiveIndex(nextIndex)
-  }
+  const orderPts = data.points.map((p, i): [number, number] => [tx(i, n), ty(p.orders, yMax)])
+  const paidPts = data.points.map((p, i): [number, number] => [tx(i, n), ty(p.paidCount, yMax)])
+  const orderLine = smooth(orderPts)
+  const orderArea = areaPath(orderPts)
+  const paidLine = smooth(paidPts)
+  const paidArea = areaPath(paidPts)
+  const yTicks = [0.25, 0.5, 0.75, 1].map((f) => Math.round(yMax * f))
+  const xStep = n <= 7 ? 1 : n <= 16 ? 2 : Math.ceil(n / 7)
+  const rangeSpan = RANGE_META.find((r) => r.key === range)?.span ?? ''
 
-  function selectRange(nextRange: MetricRange) {
-    setRange(nextRange)
-    setActiveIndex(Math.floor(metricData[nextRange].points.length / 2))
-  }
+  const indexFromClientX = useCallback(
+    (clientX: number) => {
+      const el = chartRef.current
+      if (!el || n < 1) return null
+      const rect = el.getBoundingClientRect()
+      if (rect.width <= 0) return null
+      const svgX = ((clientX - rect.left) / rect.width) * VW
+      const plotX = Math.min(Math.max(svgX, PL), VW - PR)
+      const t = (plotX - PL) / Math.max(CW, 1)
+      return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))))
+    },
+    [n],
+  )
+
+  const onChartPointer = useCallback(
+    (e: ReactPointerEvent) => {
+      const idx = indexFromClientX(e.clientX)
+      if (idx !== null) setActiveIndex(idx)
+    },
+    [indexFromClientX],
+  )
+
+  const clearActive = useCallback(() => setActiveIndex(null), [])
+
+  const active =
+    activeIndex !== null && activeIndex >= 0 && activeIndex < n
+      ? {
+          i: activeIndex,
+          label: data.points[activeIndex]?.label ?? '—',
+          orders: data.points[activeIndex]?.orders ?? 0,
+          paidCount: data.points[activeIndex]?.paidCount ?? 0,
+          paid: data.points[activeIndex]?.paid ?? 0,
+          x: orderPts[activeIndex]?.[0] ?? PL,
+          orderY: orderPts[activeIndex]?.[1] ?? PT,
+          paidY: paidPts[activeIndex]?.[1] ?? PT,
+        }
+      : null
+
+  const conversion =
+    active && active.orders > 0
+      ? Math.round((active.paidCount / active.orders) * 1000) / 10
+      : active
+        ? 0
+        : null
+
+  const tooltipLeftPct = active ? (active.x / VW) * 100 : 0
+  const tooltipSide = tooltipLeftPct > 62 ? 'right' : 'left'
 
   return (
-    <section className="metrics-card" aria-label="Order activity metrics">
-      <div className="metrics-head">
+    <section
+      aria-label={`${business.name} activity metrics`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        minHeight: 360,
+        background: 'var(--card)',
+        borderRadius: 10,
+        overflow: 'hidden',
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 10,
+          padding: '12px 16px 0',
+        }}
+      >
         <div>
-          <p>Order volume and paid revenue</p>
-          <div className="metric-legend">
-            <span className="new-dot"></span>
-            <strong>Orders</strong>
-            <b>{data.ordersTotal}</b>
-            <span className="resolved-dot"></span>
-            <strong>Paid</strong>
-            <b>{data.paidTotal}</b>
-          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--muted-foreground)',
+            }}
+          >
+            Platform Activity
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>
+            Active Scans &amp; Orders
+          </p>
         </div>
-        <div className="range-tabs" aria-label="Metric range">
-          {(Object.keys(metricData) as MetricRange[]).map((key) => (
+
+        <div style={{ display: 'flex', gap: 2, background: 'var(--muted)', borderRadius: 8, padding: 3 }}>
+          {RANGE_META.map((r) => (
             <button
-              className={range === key ? 'active' : ''}
-              key={key}
+              key={r.key}
               type="button"
-              onClick={() => selectRange(key)}
+              onClick={() => {
+                setRange(r.key)
+                setActiveIndex(null)
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: range === r.key ? 600 : 400,
+                borderRadius: 6,
+                border: 'none',
+                cursor: 'pointer',
+                background: range === r.key ? 'var(--card)' : 'transparent',
+                color: range === r.key ? 'var(--primary)' : 'var(--muted-foreground)',
+                transition: 'all 0.15s',
+                boxShadow: range === r.key ? '0 1px 3px oklch(0 0 0 / 12%)' : 'none',
+              }}
             >
-              {metricData[key].label}
+              {r.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="chart-wrap">
-        <div className="chart-y">
-          {data.yLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '8px 16px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 20, height: 2, borderRadius: 2, background: '#5ac8fa', display: 'inline-block' }} />
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Orders</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#5ac8fa', marginLeft: 2 }}>
+            {fmt(data.ordersTotalRaw)}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {rangeSpan}</span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 20, height: 2, borderRadius: 2, background: '#f07848', display: 'inline-block' }} />
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Paid</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#f07848', marginLeft: 2 }}>
+            {fmt(data.paidCountTotal)}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {currency(data.paidRevenueTotal)}</span>
+        </div>
+      </div>
+
+      <div
+        ref={chartRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: '4px 0 0',
+          position: 'relative',
+          touchAction: 'none',
+          cursor: 'crosshair',
+        }}
+        onPointerMove={onChartPointer}
+        onPointerDown={onChartPointer}
+        onPointerLeave={clearActive}
+        role="img"
+        aria-label="Orders and paid activity over time. Hover or tap a point to see details."
+      >
         <svg
-          className="metrics-chart"
-          viewBox="0 0 760 260"
-          role="img"
-          aria-label={`${business.name} order and paid revenue trend`}
-          onPointerMove={updateActivePoint}
-          onPointerLeave={() => setActiveIndex(Math.floor(data.points.length / 2))}
+          viewBox={`0 0 ${VW} ${VH}`}
+          style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
+          preserveAspectRatio="xMidYMid meet"
         >
           <defs>
-            <linearGradient id="scan-fill" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor={darkMode ? '#98c99a' : '#14b8a6'} stopOpacity={darkMode ? '0.38' : '0.25'} />
-              <stop offset="55%" stopColor={darkMode ? '#d5b181' : '#fb923c'} stopOpacity={darkMode ? '0.28' : '0.18'} />
-              <stop offset="100%" stopColor={darkMode ? '#1f2937' : '#f8fafc'} stopOpacity="0" />
+            <linearGradient id="mh-m-fill-order" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#5ac8fa" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#5ac8fa" stopOpacity="0.02" />
             </linearGradient>
-            <linearGradient id="scan-line" x1="0" x2="1">
-              <stop offset="0%" stopColor={darkMode ? '#d7e8c5' : '#0d9488'} />
-              <stop offset="100%" stopColor={darkMode ? '#84b486' : '#14b8a6'} />
-            </linearGradient>
-            <linearGradient id="order-line" x1="0" x2="1">
-              <stop offset="0%" stopColor={darkMode ? '#d5b181' : '#f97316'} />
-              <stop offset="100%" stopColor={darkMode ? '#e7c899' : '#fb923c'} />
+            <linearGradient id="mh-m-fill-paid" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f07848" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#f07848" stopOpacity="0.02" />
             </linearGradient>
           </defs>
-          <path className="chart-area" d={data.areaPath} />
-          <path className="chart-line primary" d={data.ordersPath} />
-          <path className="chart-line secondary" d={data.paidPath} />
-          <line className="chart-marker" x1={activePoint.x} x2={activePoint.x} y1="20" y2="238" />
-          <circle className="chart-point" cx={activePoint.x} cy={activePoint.y} r="5" />
-          <g className="chart-tooltip">
-            <rect x={Math.min(activePoint.x + 12, 648)} y="42" width="110" height="64" rx="6" />
-            <text x={Math.min(activePoint.x + 26, 662)} y="63">
-              {activePoint.label}
-            </text>
-            <text x={Math.min(activePoint.x + 26, 662)} y="81">
-              {activePoint.orders} orders
-            </text>
-            <text x={Math.min(activePoint.x + 26, 662)} y="97">
-              {currency(activePoint.paid)} paid
-            </text>
-          </g>
+
+          {yTicks.map((v) => {
+            const y = ty(v, yMax)
+            return (
+              <g key={v}>
+                <line
+                  x1={PL}
+                  y1={y}
+                  x2={VW - PR}
+                  y2={y}
+                  stroke="var(--border)"
+                  strokeWidth="1"
+                  strokeDasharray="4 5"
+                />
+                <text
+                  x={PL - 5}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  fontSize="8"
+                  fill="var(--muted-foreground)"
+                  fontFamily="'Outfit Variable', ui-sans-serif, sans-serif"
+                >
+                  {fmt(v)}
+                </text>
+              </g>
+            )
+          })}
+
+          {data.xLabels.map((label, i) => {
+            if (i % xStep !== 0 && i !== data.xLabels.length - 1) return null
+            return (
+              <text
+                key={`${label}-${i}`}
+                x={tx(i, n)}
+                y={VH - 6}
+                textAnchor="middle"
+                fontSize="8"
+                fill="var(--muted-foreground)"
+                fontFamily="'Outfit Variable', ui-sans-serif, sans-serif"
+              >
+                {label}
+              </text>
+            )
+          })}
+
+          <path d={orderArea} fill="url(#mh-m-fill-order)" />
+          <path d={paidArea} fill="url(#mh-m-fill-paid)" />
+          <path d={orderLine} fill="none" stroke="#5ac8fa" strokeWidth="2" strokeLinejoin="round" />
+          <path d={paidLine} fill="none" stroke="#f07848" strokeWidth="1.8" strokeLinejoin="round" />
+
+          {active && (
+            <g pointerEvents="none">
+              <line
+                x1={active.x}
+                y1={PT}
+                x2={active.x}
+                y2={VH - PB}
+                stroke="var(--foreground)"
+                strokeOpacity="0.18"
+                strokeWidth="1"
+                strokeDasharray="3 4"
+              />
+              <circle cx={active.x} cy={active.orderY} r="6" fill="#5ac8fa" opacity="0.18" />
+              <circle cx={active.x} cy={active.orderY} r="3.4" fill="#5ac8fa" stroke="#e8f8ff" strokeWidth="1.2" />
+              <circle cx={active.x} cy={active.paidY} r="5.5" fill="#f07848" opacity="0.18" />
+              <circle cx={active.x} cy={active.paidY} r="3.1" fill="#f07848" stroke="#ffe0c8" strokeWidth="1.2" />
+            </g>
+          )}
         </svg>
-        <div className="chart-x">
-          {data.xLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
+
+        {active && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 10,
+              ...(tooltipSide === 'left'
+                ? { left: `calc(${tooltipLeftPct}% + 10px)` }
+                : { right: `calc(${100 - tooltipLeftPct}% + 10px)` }),
+              zIndex: 2,
+              minWidth: 148,
+              maxWidth: 210,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'color-mix(in oklch, var(--card) 92%, var(--foreground) 8%)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 8px 24px oklch(0 0 0 / 14%)',
+              pointerEvents: 'none',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'var(--muted-foreground)',
+              }}
+            >
+              {RANGE_META.find((r) => r.key === range)?.label ?? 'Period'}
+            </p>
+            <p style={{ margin: '2px 0 8px', fontSize: 13, fontWeight: 650, color: 'var(--foreground)' }}>
+              {active.label}
+            </p>
+            <div style={{ display: 'grid', gap: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#5ac8fa' }} />
+                  Orders
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: '#5ac8fa', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(active.orders)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f07848' }} />
+                  Paid
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: '#f07848', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(active.paidCount)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  paddingTop: 5,
+                  borderTop: '1px solid var(--border)',
+                }}
+              >
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Revenue</span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
+                  {currency(active.paid)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Paid rate</span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
+                  {conversion === null ? '—' : `${conversion}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )

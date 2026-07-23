@@ -1,4 +1,5 @@
 import type { PaymentProvider } from './payments'
+import { SERVICE_FEE_UGX } from './utils'
 
 export interface CustomerReceiptItem {
   name: string
@@ -17,6 +18,7 @@ export interface CustomerReceipt {
   customerPhone: string
   items: CustomerReceiptItem[]
   subtotal: number
+  serviceFee: number
   total: number
   currency: 'UGX'
   paymentMethod: string
@@ -86,6 +88,7 @@ export function buildReceipt(input: {
     lineTotal: item.price * item.quantity,
   }))
   const subtotal = receiptItems.reduce((sum, item) => sum + item.lineTotal, 0)
+  const serviceFee = subtotal > 0 ? SERVICE_FEE_UGX : 0
 
   return {
     id: input.orderId,
@@ -97,7 +100,8 @@ export function buildReceipt(input: {
     customerPhone: input.customerPhone.trim(),
     items: receiptItems,
     subtotal,
-    total: input.total,
+    serviceFee,
+    total: Math.max(input.total, subtotal + serviceFee),
     currency: 'UGX',
     paymentMethod: 'Mobile Money',
     paymentProvider: input.provider,

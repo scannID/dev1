@@ -38,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
+
+    /** Flat service fee (UGX) applied on top of every order subtotal. */
+    public static final int SERVICE_FEE_UGX = 700;
     
     private final BusinessService businessService;
     private final OrderRepository orderRepository;
@@ -179,7 +182,8 @@ public class OrderService {
             throw new ApiException(400, "No available items were found for this order.");
         }
 
-        int total = lines.stream().mapToInt(OrderLineItem::getLineTotal).sum();
+        int subtotal = lines.stream().mapToInt(OrderLineItem::getLineTotal).sum();
+        int total = subtotal + SERVICE_FEE_UGX;
 
         Order order = new Order();
         order.setId("ORD-" + String.valueOf(System.currentTimeMillis()).substring(7));
@@ -364,9 +368,9 @@ public class OrderService {
             "Mobile Money",                                 // paymentMethod
             order.getPaymentReference(),                    // paymentReference
             receiptItems,                                   // items
-            BigDecimal.valueOf(order.getTotal()),           // subtotal
+            BigDecimal.valueOf(Math.max(order.getTotal() - SERVICE_FEE_UGX, 0)), // subtotal
             BigDecimal.ZERO,                                // taxAmount
-            BigDecimal.ZERO,                                // serviceFee
+            BigDecimal.valueOf(SERVICE_FEE_UGX),            // serviceFee
             order.getCustomerNote(),                        // notes
             false,                                          // sendEmail (no email available)
             false                                           // generatePdf

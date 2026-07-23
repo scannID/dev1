@@ -1,5 +1,13 @@
 const DEVICE_KEY = 'scanny-device-id'
 
+/** Flat service fee (UGX) applied on top of every cart/order subtotal. */
+export const SERVICE_FEE_UGX = 700
+
+export function withServiceFee(subtotal: number) {
+  if (subtotal <= 0) return 0
+  return subtotal + SERVICE_FEE_UGX
+}
+
 export function currency(amount: number) {
   return new Intl.NumberFormat('en-UG', {
     style: 'currency',

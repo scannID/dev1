@@ -117,6 +117,12 @@ function ReceiptDetail({
             <span>Subtotal</span>
             <strong>{currency(receipt.subtotal)}</strong>
           </div>
+          {(receipt.serviceFee ?? 0) > 0 ? (
+            <div>
+              <span>Service fee</span>
+              <strong>{currency(receipt.serviceFee)}</strong>
+            </div>
+          ) : null}
           <div className="cm-receipt-grand">
             <span>Total paid</span>
             <strong>{currency(receipt.total)}</strong>

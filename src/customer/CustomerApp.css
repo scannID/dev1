@@ -584,6 +584,20 @@
   font-size: 15px;
 }
 
+.cm-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 2px;
+  font-size: 14px;
+  color: var(--cm-muted);
+}
+
+.cm-summary-row strong {
+  color: var(--cm-text);
+  font-weight: 600;
+}
+
 .cm-field {
   display: grid;
   gap: 6px;

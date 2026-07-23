@@ -6,7 +6,10 @@ export type MetricRange = 'day' | 'week' | 'month' | 'year'
 export interface ChartPoint {
   label: string
   orders: number
+  /** Paid revenue in the bucket (UGX). */
   paid: number
+  /** Count of paid orders in the bucket (for shared-scale charts). */
+  paidCount: number
   x: number
   y: number
 }
@@ -15,6 +18,10 @@ export interface MetricSeries {
   label: string
   ordersTotal: string
   paidTotal: string
+  paidCountTotal: number
+  ordersTotalRaw: number
+  paidRevenueTotal: number
+  yMax: number
   yLabels: string[]
   xLabels: string[]
   points: ChartPoint[]
@@ -143,13 +150,13 @@ function bucketOrders(
 ) {
   return buckets.map((bucket) => {
     const bucketOrders = orders.filter((order) => inRange(order, bucket.start, bucket.end))
-    const paid = bucketOrders
-      .filter((order) => order.paymentStatus === 'Paid')
-      .reduce((sum, order) => sum + order.total, 0)
+    const paidOrders = bucketOrders.filter((order) => order.paymentStatus === 'Paid')
+    const paid = paidOrders.reduce((sum, order) => sum + order.total, 0)
     return {
       label: bucket.label,
       orders: bucketOrders.length,
       paid,
+      paidCount: paidOrders.length,
     }
   })
 }
@@ -208,31 +215,39 @@ export function buildMetricSeries(orders: Order[], range: MetricRange): MetricSe
   const buckets = buildMetricBuckets(range)
   const rows = bucketOrders(orders, buckets)
   const orderValues = rows.map((row) => row.orders)
-  const paidValues = rows.map((row) => row.paid)
+  const paidCountValues = rows.map((row) => row.paidCount)
+  const paidRevenueValues = rows.map((row) => row.paid)
+  const yMax = Math.max(10, Math.ceil(Math.max(...orderValues, ...paidCountValues, 1) * 1.15))
   const orderGeom = buildPaths(orderValues)
-  const paidGeom = buildPaths(paidValues)
+  const paidGeom = buildPaths(paidCountValues)
   const totalOrders = orderValues.reduce((sum, value) => sum + value, 0)
-  const totalPaid = paidValues.reduce((sum, value) => sum + value, 0)
+  const totalPaidRevenue = paidRevenueValues.reduce((sum, value) => sum + value, 0)
+  const totalPaidCount = paidCountValues.reduce((sum, value) => sum + value, 0)
 
   const points: ChartPoint[] = rows.map((row, index) => ({
     label: row.label,
     orders: row.orders,
     paid: row.paid,
+    paidCount: row.paidCount,
     x: orderGeom.points[index]?.x ?? 0,
     y: orderGeom.points[index]?.y ?? 0,
   }))
 
   const labels: Record<MetricRange, string> = {
-    day: '1D',
-    week: '1W',
-    month: '1M',
-    year: '1Y',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    year: 'Year',
   }
 
   return {
     label: labels[range],
     ordersTotal: formatCompact(totalOrders),
-    paidTotal: formatCompact(totalPaid),
+    paidTotal: formatCompact(totalPaidRevenue),
+    paidCountTotal: totalPaidCount,
+    ordersTotalRaw: totalOrders,
+    paidRevenueTotal: totalPaidRevenue,
+    yMax,
     yLabels: orderGeom.yLabels,
     xLabels: rows.map((row) => row.label),
     points,

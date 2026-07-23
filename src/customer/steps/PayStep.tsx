@@ -1,6 +1,6 @@
 import type { Business } from '../../api/types'
 import type { PaymentProvider } from '../payments'
-import { currency } from '../utils'
+import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 import type { CartLine } from './CartStep'
 
 export function PayStep({
@@ -32,11 +32,13 @@ export function PayStep({
   onPhone: (value: string) => void
   onSaveNumber: (value: boolean) => void
 }) {
+  const payableTotal = withServiceFee(cartTotal)
+
   return (
     <div className="cm-step cm-step-enter cm-panel">
       <h2>Pay with mobile money</h2>
       <p className="cm-muted">
-        Pay {currency(cartTotal)} to <strong>{business.name}</strong>
+        Pay {currency(payableTotal)} to <strong>{business.name}</strong>
       </p>
       {business.paymentReference ? <p className="cm-ref">Ref: {business.paymentReference}</p> : null}
 
@@ -49,9 +51,17 @@ export function PayStep({
             <span>{currency(item.price * item.quantity)}</span>
           </div>
         ))}
+        <div>
+          <span>Subtotal</span>
+          <span>{currency(cartTotal)}</span>
+        </div>
+        <div>
+          <span>Service fee</span>
+          <span>{currency(SERVICE_FEE_UGX)}</span>
+        </div>
         <div className="cm-order-strip-total">
           <span>Total</span>
-          <strong>{currency(cartTotal)}</strong>
+          <strong>{currency(payableTotal)}</strong>
         </div>
       </div>
 

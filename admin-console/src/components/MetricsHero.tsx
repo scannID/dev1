@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
 import { adminApi } from '../api/services'
 import type { ScansOrdersRange, ScansOrdersSeries } from '../api/types'
 import { InlineSpinner } from './LoadingSpinner'
@@ -20,6 +20,14 @@ const RANGE_TOTALS: Record<Range, string> = {
   weekly: 'last 16 weeks',
   monthly: 'last 12 months',
   yearly: 'last 5 years',
+}
+
+const RANGE_PERIOD: Record<Range, string> = {
+  hourly: 'Hour',
+  daily: 'Day',
+  weekly: 'Week',
+  monthly: 'Month',
+  yearly: 'Year',
 }
 
 const EMPTY: ScansOrdersSeries = {
@@ -73,15 +81,27 @@ function xStep(n: number) {
   return Math.ceil(n / 7)
 }
 
+function formatPeriodLabel(range: Range, label: string): string {
+  if (range === 'hourly') {
+    const m = label.match(/^(\d+)([ap])$/i)
+    if (m) return `${m[1]}:00 ${m[2].toLowerCase() === 'a' ? 'AM' : 'PM'}`
+  }
+  if (range === 'weekly' && /^W\d+$/i.test(label)) return `Week ${label.slice(1)}`
+  return label
+}
+
 export default function MetricsHero() {
   const [range, setRange] = useState<Range>('hourly')
   const [series, setSeries] = useState<ScansOrdersSeries>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
     let pollTimer: number | undefined
+    setActiveIndex(null)
 
     const load = async (silent = false) => {
       try {
@@ -151,6 +171,47 @@ export default function MetricsHero() {
   const totalScans = d.scans.reduce((a, b) => a + b, 0)
   const totalOrders = d.orders.reduce((a, b) => a + b, 0)
   const rangeLabel = RANGE_TOTALS[range]
+
+  const indexFromClientX = useCallback((clientX: number) => {
+    const el = chartRef.current
+    if (!el || n < 1) return null
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 0) return null
+    const svgX = ((clientX - rect.left) / rect.width) * VW
+    const plotX = Math.min(Math.max(svgX, PL), VW - PR)
+    const t = (plotX - PL) / Math.max(CW, 1)
+    return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))))
+  }, [n])
+
+  const onChartPointer = useCallback((e: ReactPointerEvent) => {
+    const idx = indexFromClientX(e.clientX)
+    if (idx !== null) setActiveIndex(idx)
+  }, [indexFromClientX])
+
+  const clearActive = useCallback(() => setActiveIndex(null), [])
+
+  const active =
+    activeIndex !== null && activeIndex >= 0 && activeIndex < n
+      ? {
+          i: activeIndex,
+          label: formatPeriodLabel(range, d.xLabels[activeIndex] ?? '—'),
+          scans: d.scans[activeIndex] ?? 0,
+          orders: d.orders[activeIndex] ?? 0,
+          x: scanPts[activeIndex]?.[0] ?? PL,
+          scanY: scanPts[activeIndex]?.[1] ?? PT,
+          orderY: orderPts[activeIndex]?.[1] ?? PT,
+        }
+      : null
+
+  const conversion =
+    active && active.scans > 0
+      ? Math.round((active.orders / active.scans) * 1000) / 10
+      : active
+        ? 0
+        : null
+
+  const tooltipLeftPct = active ? (active.x / VW) * 100 : 0
+  const tooltipSide = tooltipLeftPct > 62 ? 'right' : 'left'
 
   return (
     <div style={{
@@ -222,12 +283,26 @@ export default function MetricsHero() {
         {error && <span style={{ fontSize: 11, color: 'var(--destructive)' }}>{error}</span>}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, padding: '4px 0 0' }}>
+      <div
+        ref={chartRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: '4px 0 0',
+          position: 'relative',
+          touchAction: 'none',
+          cursor: 'crosshair',
+        }}
+        onPointerMove={onChartPointer}
+        onPointerDown={onChartPointer}
+        onPointerLeave={clearActive}
+        role="img"
+        aria-label="Active scans and orders over time. Hover or tap a point to see details."
+      >
         <svg
           viewBox={`0 0 ${VW} ${VH}`}
           style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
           preserveAspectRatio="xMidYMid meet"
-          aria-hidden="true"
         >
           <defs>
             <linearGradient id="mh-fill-scan" x1="0" y1="0" x2="0" y2="1">
@@ -284,7 +359,7 @@ export default function MetricsHero() {
           <path d={orderLine} fill="none" stroke="#f07848" strokeWidth="1.8" strokeLinejoin="round" style={{ transition: 'd 0.4s ease' }} />
 
           {scanPeaks.map(i => (
-            <g key={`sp-${i}`} filter="url(#mh-glow-b)">
+            <g key={`sp-${i}`} filter="url(#mh-glow-b)" opacity={active && active.i !== i ? 0.35 : 1}>
               <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="5.5" fill="#5ac8fa" opacity="0.22" />
               <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="3" fill="#5ac8fa" />
               <circle cx={scanPts[i][0]} cy={scanPts[i][1]} r="1.4" fill="#e8f8ff" />
@@ -292,13 +367,106 @@ export default function MetricsHero() {
           ))}
 
           {orderPeaks.map(i => (
-            <g key={`op-${i}`} filter="url(#mh-glow-o)">
+            <g key={`op-${i}`} filter="url(#mh-glow-o)" opacity={active && active.i !== i ? 0.35 : 1}>
               <circle cx={orderPts[i][0]} cy={orderPts[i][1]} r="4.5" fill="#f07848" opacity="0.22" />
               <circle cx={orderPts[i][0]} cy={orderPts[i][1]} r="2.8" fill="#f07848" />
               <circle cx={orderPts[i][0]} cy={orderPts[i][1]} r="1.3" fill="#ffe0c8" />
             </g>
           ))}
+
+          {active && (
+            <g pointerEvents="none">
+              <line
+                x1={active.x}
+                y1={PT}
+                x2={active.x}
+                y2={VH - PB}
+                stroke="var(--foreground)"
+                strokeOpacity="0.18"
+                strokeWidth="1"
+                strokeDasharray="3 4"
+              />
+              <circle cx={active.x} cy={active.scanY} r="6" fill="#5ac8fa" opacity="0.18" />
+              <circle cx={active.x} cy={active.scanY} r="3.4" fill="#5ac8fa" stroke="#e8f8ff" strokeWidth="1.2" />
+              <circle cx={active.x} cy={active.orderY} r="5.5" fill="#f07848" opacity="0.18" />
+              <circle cx={active.x} cy={active.orderY} r="3.1" fill="#f07848" stroke="#ffe0c8" strokeWidth="1.2" />
+            </g>
+          )}
         </svg>
+
+        {active && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 10,
+              ...(tooltipSide === 'left'
+                ? { left: `calc(${tooltipLeftPct}% + 10px)` }
+                : { right: `calc(${100 - tooltipLeftPct}% + 10px)` }),
+              zIndex: 2,
+              minWidth: 148,
+              maxWidth: 200,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'color-mix(in oklch, var(--card) 92%, var(--foreground) 8%)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 8px 24px oklch(0 0 0 / 14%)',
+              pointerEvents: 'none',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <p style={{
+              margin: 0,
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'var(--muted-foreground)',
+            }}>
+              {RANGE_PERIOD[range]}
+            </p>
+            <p style={{
+              margin: '2px 0 8px',
+              fontSize: 13,
+              fontWeight: 650,
+              color: 'var(--foreground)',
+            }}>
+              {active.label}
+            </p>
+            <div style={{ display: 'grid', gap: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#5ac8fa' }} />
+                  Scans
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: '#5ac8fa', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(active.scans)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f07848' }} />
+                  Orders
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: '#f07848', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(active.orders)}
+                </span>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                paddingTop: 5,
+                borderTop: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Conversion</span>
+                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
+                  {conversion === null ? '—' : `${conversion}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
