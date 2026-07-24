@@ -7,6 +7,7 @@ import {
   type CustomerReceipt,
 } from './receipts'
 import { currency } from './utils'
+import { formatRemovedIngredients } from '../lib/catalogCart'
 
 function ReceiptCard({
   receipt,
@@ -103,13 +104,19 @@ function ReceiptDetail({
             <span>Qty</span>
             <span>Amount</span>
           </div>
-          {receipt.items.map((item, index) => (
+          {receipt.items.map((item, index) => {
+            const removed = formatRemovedIngredients(item.removedIngredients)
+            return (
             <div className="cm-receipt-item-row" key={`${item.name}-${index}`}>
-              <span>{item.name}</span>
+              <span>
+                {item.name}
+                {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
+              </span>
               <span>{item.quantity}</span>
               <strong>{currency(item.lineTotal)}</strong>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="cm-receipt-totals">
@@ -130,7 +137,7 @@ function ReceiptDetail({
         </div>
 
         <p className="cm-receipt-footnote">
-          Saved on this device. Works across every Scanny restaurant you visit.
+          Saved on this device only. Other phones won&apos;t see these receipts.
         </p>
       </div>
     </div>
@@ -169,9 +176,7 @@ export function ReceiptsPanel({
             <p className="cm-muted">
               {selected
                 ? selected.businessName
-                : receipts.length === 0
-                  ? 'Paid orders from any restaurant'
-                  : `${receipts.length} saved on this device`}
+                : `${receipts.length} saved on this device`}
             </p>
           </div>
           <button type="button" className="cm-track-close" onClick={onClose} aria-label="Close">
@@ -188,7 +193,7 @@ export function ReceiptsPanel({
             </div>
             <h3>No receipts yet</h3>
             <p className="cm-muted">
-              After you pay at any Scanny restaurant, your receipt appears here automatically — no email needed.
+              After you pay, your receipt is saved on this device so you can open it anytime.
             </p>
           </div>
         ) : (

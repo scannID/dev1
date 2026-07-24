@@ -82,6 +82,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/merchant/**").hasRole("MERCHANT")
                 .requestMatchers("/api/businesses/**").hasRole("MERCHANT")
                 .requestMatchers("/api/catalog/**").hasRole("MERCHANT")
+                .requestMatchers("/api/images/**").hasRole("MERCHANT")
                 .requestMatchers("/api/orders/**").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers("/api/receipts/**").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers("/api/quick-payments/**").hasAnyRole("MERCHANT", "ADMIN")

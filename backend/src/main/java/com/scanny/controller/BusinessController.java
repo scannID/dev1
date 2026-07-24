@@ -6,7 +6,6 @@ import com.scanny.dto.OrdersPageResponse;
 import com.scanny.dto.PageDtos;
 import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
-import com.scanny.entity.CatalogItem;
 import com.scanny.service.BusinessService;
 import com.scanny.service.OrderService;
 import com.scanny.service.QrScanService;
@@ -69,19 +68,11 @@ public class BusinessController {
             @RequestParam(required = false) String qr
     ) {
         BusinessResponse business = businessService.getBusinessPublic(businessId);
-        List<CatalogItem> availableItems = businessService.getAvailableMenu(businessId, qr);
+        List<com.scanny.dto.CatalogDtos.CatalogItemResponse> availableItems =
+                businessService.getAvailableMenuCached(businessId, qr);
         return Map.of(
                 "business", business,
-                "items", availableItems.stream()
-                        .map(item -> Map.of(
-                                "id", item.getId(),
-                                "name", item.getName(),
-                                "category", item.getCategory(),
-                                "price", item.getPrice(),
-                                "description", item.getDescription(),
-                                "available", item.isAvailable()
-                        ))
-                        .toList()
+                "items", availableItems
         );
     }
 

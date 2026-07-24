@@ -1,6 +1,7 @@
 package com.scanny.service;
 
 import com.scanny.dto.BusinessResponse;
+import com.scanny.dto.CatalogDtos;
 import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.entity.Business;
 import com.scanny.entity.CatalogItem;
@@ -8,8 +9,10 @@ import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.BusinessType;
 import com.scanny.repository.BusinessRepository;
+import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.MerchantRepository;
 import com.scanny.security.MerchantAccessService;
+import com.scanny.config.RedisConfig;
 import com.scanny.util.CodeUtils;
 import com.scanny.util.CatalogCategories;
 import java.time.Instant;
@@ -17,6 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BusinessService {
 
     private final BusinessRepository businessRepository;
+    private final CatalogItemRepository catalogItemRepository;
     private final MerchantRepository merchantRepository;
     private final StarterCatalogService starterCatalogService;
     private final MerchantAccessService merchantAccessService;
@@ -31,12 +38,14 @@ public class BusinessService {
 
     public BusinessService(
             BusinessRepository businessRepository,
+            CatalogItemRepository catalogItemRepository,
             MerchantRepository merchantRepository,
             StarterCatalogService starterCatalogService,
             MerchantAccessService merchantAccessService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
     ) {
         this.businessRepository = businessRepository;
+        this.catalogItemRepository = catalogItemRepository;
         this.merchantRepository = merchantRepository;
         this.starterCatalogService = starterCatalogService;
         this.merchantAccessService = merchantAccessService;
@@ -69,6 +78,7 @@ public class BusinessService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisConfig.BUSINESS_QR_CACHE, key = "#qrToken")
     public BusinessResponse getBusinessByQrToken(String qrToken) {
         Business business = businessRepository.findWithItemsByQrToken(qrToken)
                 .orElseThrow(() -> new ApiException(404, "QR code was not found."));
@@ -81,6 +91,13 @@ public class BusinessService {
                 .orElseThrow(() -> new ApiException(404, "Business was not found."));
     }
 
+    /** Lightweight business load without catalog graph. */
+    @Transactional(readOnly = true)
+    public Business requireBusinessLight(String businessId) {
+        return businessRepository.findById(businessId)
+                .orElseThrow(() -> new ApiException(404, "Business was not found."));
+    }
+
     @Transactional(readOnly = true)
     public List<CatalogItem> getAvailableMenu(String businessId, String qrToken) {
         Business business = requireBusiness(businessId);
@@ -88,6 +105,26 @@ public class BusinessService {
             throw new ApiException(403, "QR code does not match this business.");
         }
         return business.getItems().stream().filter(CatalogItem::isAvailable).toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = RedisConfig.MENU_CACHE, key = "#businessId")
+    public List<CatalogDtos.CatalogItemResponse> getAvailableMenuCached(String businessId, String qrToken) {
+        Business business = requireBusinessLight(businessId);
+        if (qrToken != null && !qrToken.isBlank() && !qrToken.equals(business.getQrToken())) {
+            throw new ApiException(403, "QR code does not match this business.");
+        }
+        return catalogItemRepository.findByBusiness_IdAndAvailableTrue(businessId).stream()
+                .map(CatalogDtos.CatalogItemResponse::from)
+                .toList();
+    }
+
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisConfig.MENU_CACHE, key = "#businessId"),
+            @CacheEvict(cacheNames = RedisConfig.BUSINESS_QR_CACHE, allEntries = true)
+    })
+    public void evictMenuCache(String businessId) {
+        // annotation-driven
     }
 
     @Transactional

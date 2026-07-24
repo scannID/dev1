@@ -37,6 +37,9 @@ public class OrderLineItem {
     @Column(name = "line_total", nullable = false)
     private int lineTotal;
 
+    @Column(name = "removed_ingredients_json", nullable = false, columnDefinition = "TEXT DEFAULT '[]'")
+    private String removedIngredientsJson = "[]";
+
     public Long getId() {
         return id;
     }
@@ -91,5 +94,14 @@ public class OrderLineItem {
 
     public void setLineTotal(int lineTotal) {
         this.lineTotal = lineTotal;
+    }
+
+    public String getRemovedIngredientsJson() {
+        return removedIngredientsJson;
+    }
+
+    public void setRemovedIngredientsJson(String removedIngredientsJson) {
+        this.removedIngredientsJson =
+                removedIngredientsJson == null || removedIngredientsJson.isBlank() ? "[]" : removedIngredientsJson;
     }
 }

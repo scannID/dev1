@@ -19,7 +19,6 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class TicketService {
@@ -107,17 +106,11 @@ public class TicketService {
     @Transactional(readOnly = true)
     public List<TicketDtos.TicketEventStats> getTicketStats(String search) {
         String normalizedSearch = search == null ? "" : search.trim().toLowerCase();
-        return ticketRepository.findAll().stream()
-            .filter(Ticket::isAttendeeTicket)
-            .filter(ticket -> normalizedSearch.isEmpty()
-                || (ticket.getEventName() != null && ticket.getEventName().toLowerCase().contains(normalizedSearch)))
-            .collect(Collectors.groupingBy(ticket -> ticket.getEventName() == null ? "Untitled Event" : ticket.getEventName()))
-            .entrySet()
-            .stream()
-            .map(entry -> new TicketDtos.TicketEventStats(
-                entry.getKey(),
-                entry.getValue().size(),
-                entry.getValue().stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Paid).count()
+        return ticketRepository.aggregateAttendeeEventStats(normalizedSearch).stream()
+            .map(row -> new TicketDtos.TicketEventStats(
+                row[0] == null ? "Untitled Event" : String.valueOf(row[0]),
+                row[1] == null ? 0L : ((Number) row[1]).longValue(),
+                row[2] == null ? 0L : ((Number) row[2]).longValue()
             ))
             .sorted(Comparator.comparing(TicketDtos.TicketEventStats::eventName))
             .toList();

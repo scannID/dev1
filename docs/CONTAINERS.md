@@ -37,13 +37,15 @@ Add `-v` only when intentionally deleting local PostgreSQL and Redis data.
 
 `docker-compose.prod.yml` builds and connects:
 
-- Caddy for TLS termination and routing;
-- Spring Boot API;
+- Caddy for TLS termination and routing (round-robin across **three API replicas**);
+- Spring Boot API (`api-1`, `api-2`, `api-3`);
 - merchant/customer web app;
 - admin console;
-- PostgreSQL;
+- PostgreSQL (app DB + separate `keycloak` database via init script);
 - Redis;
-- Keycloak.
+- Keycloak (uses the dedicated `keycloak` database).
+
+Capacity / mixed-load proof: [1000 TPS readiness runbook](runbooks/1000-TPS.md).
 
 Required variables use Compose's `${NAME:?…}` checks so the stack fails early when important values are missing. Review the entire rendered configuration before use:
 

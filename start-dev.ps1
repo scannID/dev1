@@ -144,10 +144,22 @@ if (-not $SkipBackend) {
         Write-Host 'Backend already listening on :4000' -ForegroundColor Yellow
     } else {
         Write-Host 'Starting backend API on :4000 (profile: h2)...'
+        $pexelsKey = $env:PEXELS_API_KEY
+        if (-not $pexelsKey) {
+            $dotenv = Join-Path $Root '.env'
+            if (Test-Path $dotenv) {
+                $line = Get-Content $dotenv | Where-Object { $_ -match '^\s*PEXELS_API_KEY\s*=' } | Select-Object -First 1
+                if ($line) {
+                    $pexelsKey = ($line -replace '^\s*PEXELS_API_KEY\s*=\s*', '').Trim().Trim('"').Trim("'")
+                }
+            }
+        }
+        $pexelsLine = if ($pexelsKey) { "`$env:PEXELS_API_KEY = '$pexelsKey'" } else { "`$env:PEXELS_API_KEY = ''" }
         Start-DevWindow -Name 'backend' -Title 'Scanny Backend' -WorkingDirectory $BackendDir -Lines @(
             "`$env:JAVA_HOME = '$JavaHome'"
             "`$env:Path = `"`$env:JAVA_HOME\bin;$MavenBin;`$env:Path`""
             "`$env:SCAN_BASE_URL = '$ScanBaseUrl'"
+            $pexelsLine
             '.\mvnw.cmd -q -DskipTests spring-boot:run "-Dspring-boot.run.profiles=h2"'
         )
         Wait-HttpReady -Url 'http://localhost:4000/health' -Label 'API :4000/health' -TimeoutSec 240 | Out-Null

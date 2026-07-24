@@ -39,7 +39,8 @@ public final class RequestDtos {
     public record OrderItemRequest(
             String itemId,
             String id,
-            @NotNull Integer quantity
+            @NotNull Integer quantity,
+            List<String> removedIngredients
     ) {
         public String resolvedItemId() {
             if (itemId != null && !itemId.isBlank()) {

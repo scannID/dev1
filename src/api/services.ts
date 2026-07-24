@@ -12,6 +12,7 @@ import type {
   CategoriesResponse,
   CreateCatalogItemRequest,
   UpdateCatalogItemRequest,
+  ImageSearchResponse,
   Order,
   OrderResponse,
   OrdersResponse,
@@ -184,6 +185,9 @@ export const catalogApi = {
       category: data.category,
       price: data.price,
       description: data.description,
+      imageUrl: data.imageUrl ?? null,
+      details: data.details ?? '',
+      ingredients: data.ingredients ?? [],
       available: data.available ?? true,
     })
     return response.item
@@ -373,10 +377,26 @@ export const publicTicketsApi = {
   },
 }
 
+export const imagesApi = {
+  search: async (query: string, perPage = 8): Promise<ImageSearchResponse> => {
+    const params = new URLSearchParams({
+      q: query,
+      perPage: String(perPage),
+    })
+    return api.get<ImageSearchResponse>(`/images/search?${params.toString()}`)
+  },
+
+  importFromUrl: async (url: string): Promise<string> => {
+    const response = await api.post<{ imageUrl: string }>('/images/import', { url })
+    return response.imageUrl
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
   catalog: catalogApi,
+  images: imagesApi,
   orders: ordersApi,
   tickets: ticketsApi,
   devices: devicesApi,

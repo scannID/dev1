@@ -21,4 +21,6 @@ public interface PaymentIntentRepository extends JpaRepository<PaymentIntent, St
             String referenceId,
             Collection<PaymentIntentStatus> statuses
     );
+
+    Optional<PaymentIntent> findByProviderReference(String providerReference);
 }

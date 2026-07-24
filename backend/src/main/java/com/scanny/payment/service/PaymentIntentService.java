@@ -16,6 +16,7 @@ import com.scanny.repository.PaymentIntentRepository;
 import com.scanny.repository.QuickPaymentCodeRepository;
 import com.scanny.repository.QuickPaymentTransactionRepository;
 import com.scanny.service.OrderService;
+import com.scanny.service.OutboxService;
 import com.scanny.service.TicketPurchaseService;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +40,7 @@ public class PaymentIntentService {
     private final QuickPaymentCodeRepository quickPaymentCodeRepository;
     private final ObjectMapper objectMapper;
     private final TicketPurchaseService ticketPurchaseService;
+    private final OutboxService outboxService;
 
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
@@ -46,13 +48,15 @@ public class PaymentIntentService {
             QuickPaymentTransactionRepository quickPaymentTransactionRepository,
             QuickPaymentCodeRepository quickPaymentCodeRepository,
             ObjectMapper objectMapper,
-            TicketPurchaseService ticketPurchaseService) {
+            TicketPurchaseService ticketPurchaseService,
+            OutboxService outboxService) {
         this.paymentIntentRepository = paymentIntentRepository;
         this.orderService = orderService;
         this.quickPaymentTransactionRepository = quickPaymentTransactionRepository;
         this.quickPaymentCodeRepository = quickPaymentCodeRepository;
         this.objectMapper = objectMapper;
         this.ticketPurchaseService = ticketPurchaseService;
+        this.outboxService = outboxService;
     }
 
     @Transactional
@@ -120,7 +124,9 @@ public class PaymentIntentService {
 
         if (newStatus == PaymentIntentStatus.Paid && oldStatus != PaymentIntentStatus.Paid) {
             intent.setCompletedAt(Instant.now());
-            onPaid(intent);
+            PaymentIntent saved = paymentIntentRepository.save(intent);
+            outboxService.enqueuePaymentPaid(saved.getId());
+            return saved;
         } else if ((newStatus == PaymentIntentStatus.Failed || newStatus == PaymentIntentStatus.Cancelled)
                 && oldStatus != newStatus) {
             intent.setFailedAt(Instant.now());
@@ -129,6 +135,12 @@ public class PaymentIntentService {
         }
 
         return paymentIntentRepository.save(intent);
+    }
+
+    /** Runs order / quick-pay / ticket side effects after intent is marked Paid (via outbox). */
+    @Transactional
+    public void applyPaidSideEffects(PaymentIntent intent) {
+        onPaid(intent);
     }
 
     @Transactional(readOnly = true)

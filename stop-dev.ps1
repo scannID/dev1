@@ -12,22 +12,23 @@ Write-Host 'Stopping Scanny dev services...' -ForegroundColor Cyan
 foreach ($port in $ports) {
     $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     if (-not $connections) {
-        Write-Host "  :$port — nothing listening"
+        Write-Host "  :$port - nothing listening"
         continue
     }
 
-    $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
-    foreach ($pid in $pids) {
+    $procIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+    foreach ($procId in $procIds) {
         try {
-            $proc = Get-Process -Id $pid -ErrorAction Stop
-            Write-Host "  :$port — stopping $($proc.ProcessName) (pid $pid)"
+            $proc = Get-Process -Id $procId -ErrorAction Stop
+            Write-Host "  :$port - stopping $($proc.ProcessName) (pid $procId)"
             if ($Force) {
-                Stop-Process -Id $pid -Force
+                Stop-Process -Id $procId -Force
             } else {
-                Stop-Process -Id $pid
+                Stop-Process -Id $procId -Force
             }
         } catch {
-            Write-Host "  :$port — could not stop pid $($pid): $($_.Exception.Message)" -ForegroundColor Yellow
+            $msg = $_.Exception.Message
+            Write-Host "  :$port - could not stop pid ${procId}: $msg" -ForegroundColor Yellow
         }
     }
 }

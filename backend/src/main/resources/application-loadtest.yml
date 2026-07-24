@@ -1,0 +1,21 @@
+# Profile for capacity / k6 runs. Raise per-IP limits so the rate limiter is not the first wall.
+spring:
+  config:
+    activate:
+      on-profile: loadtest
+
+scanny:
+  redis:
+    enabled: ${REDIS_ENABLED:true}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:false}
+    register-per-min: 10000
+    orders-per-min: 10000
+    menu-per-min: 10000
+    menu-scan-per-min: 10000
+    devices-per-min: 10000
+    ticket-scan-per-min: 10000
+    websocket-per-min: 10000
+    quick-pay-create-per-min: 10000
+    payments-initiate-per-min: 10000
+    payments-status-per-min: 10000

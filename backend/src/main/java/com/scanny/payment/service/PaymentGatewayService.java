@@ -21,14 +21,17 @@ public class PaymentGatewayService {
     private final PaymentProviderRegistry registry;
     private final PaymentIntentService paymentIntentService;
     private final PaymentProperties properties;
+    private final com.scanny.repository.PaymentIntentRepository paymentIntentRepository;
 
     public PaymentGatewayService(
             PaymentProviderRegistry registry,
             PaymentIntentService paymentIntentService,
-            PaymentProperties properties) {
+            PaymentProperties properties,
+            com.scanny.repository.PaymentIntentRepository paymentIntentRepository) {
         this.registry = registry;
         this.paymentIntentService = paymentIntentService;
         this.properties = properties;
+        this.paymentIntentRepository = paymentIntentRepository;
     }
 
     @Transactional
@@ -56,7 +59,6 @@ public class PaymentGatewayService {
             intent = paymentIntentService.applyProviderResult(intent, result);
             return paymentIntentService.toInitiateResponse(intent);
         } catch (DataIntegrityViolationException ex) {
-            // Concurrent retry hit unique active-reference or idempotency_key — return the winner.
             if (idempotencyKey != null && !idempotencyKey.isBlank()) {
                 return paymentIntentService.findByIdempotencyKey(idempotencyKey)
                         .map(paymentIntentService::toInitiateResponse)
@@ -103,7 +105,27 @@ public class PaymentGatewayService {
             return Optional.empty();
         }
 
-        // Webhook handlers should include providerReference in metadata for lookup — extend when implementing real providers.
-        throw new ApiException(501, "Webhook handling not wired yet for " + providerId);
+        PaymentProviderResult providerResult = result.get();
+        PaymentIntent intent = resolveIntent(providerResult)
+                .orElseThrow(() -> new ApiException(404, "Payment intent not found for webhook"));
+
+        if (!providerId.equals(intent.getProviderId())) {
+            throw new ApiException(400, "Provider mismatch for payment webhook");
+        }
+
+        intent = paymentIntentService.applyProviderResult(intent, providerResult);
+        return Optional.of(paymentIntentService.toStatusResponse(intent));
+    }
+
+    private Optional<PaymentIntent> resolveIntent(PaymentProviderResult result) {
+        Map<String, String> metadata = result.metadata() != null ? result.metadata() : Map.of();
+        String paymentId = metadata.get("paymentId");
+        if (paymentId != null && !paymentId.isBlank()) {
+            return paymentIntentRepository.findById(paymentId.trim());
+        }
+        if (result.providerReference() != null && !result.providerReference().isBlank()) {
+            return paymentIntentRepository.findByProviderReference(result.providerReference().trim());
+        }
+        return Optional.empty();
     }
 }

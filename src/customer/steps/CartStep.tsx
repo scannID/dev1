@@ -1,9 +1,12 @@
 import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
+import { formatRemovedIngredients } from '../../lib/catalogCart'
 import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 
 export interface CartLine extends CatalogItem {
   quantity: number
+  removedIngredients: string[]
+  lineKey: string
 }
 
 export function CartStep({
@@ -15,8 +18,8 @@ export function CartStep({
 }: {
   cartItems: CartLine[]
   cartTotal: number
-  onUpdateQty: (itemId: string, delta: number) => void
-  onRemove: (itemId: string) => void
+  onUpdateQty: (lineKey: string, delta: number) => void
+  onRemove: (lineKey: string) => void
   onBackToMenu: () => void
 }) {
   if (cartItems.length === 0) {
@@ -37,32 +40,36 @@ export function CartStep({
       <p className="cm-muted">Review quantities before checkout</p>
 
       <div className="cm-summary">
-        {cartItems.map((item) => (
-          <div key={item.id} className="cm-summary-line">
-            <div className="cm-summary-main">
-              <strong>{item.name}</strong>
-              <span className="cm-line-meta">{currency(item.price)} each</span>
-              <div className="cm-qty compact">
-                <button type="button" onClick={() => onUpdateQty(item.id, -1)} aria-label={`Decrease ${item.name}`}>
-                  <Minus size={12} />
-                </button>
-                <span>{item.quantity}</span>
-                <button type="button" onClick={() => onUpdateQty(item.id, 1)} aria-label={`Increase ${item.name}`}>
-                  <Plus size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="cm-remove"
-                  onClick={() => onRemove(item.id)}
-                  aria-label={`Remove ${item.name}`}
-                >
-                  <Trash2 size={14} />
-                </button>
+        {cartItems.map((item) => {
+          const removed = formatRemovedIngredients(item.removedIngredients)
+          return (
+            <div key={item.lineKey} className="cm-summary-line">
+              <div className="cm-summary-main">
+                <strong>{item.name}</strong>
+                {removed ? <span className="cm-line-removed">{removed}</span> : null}
+                <span className="cm-line-meta">{currency(item.price)} each</span>
+                <div className="cm-qty compact">
+                  <button type="button" onClick={() => onUpdateQty(item.lineKey, -1)} aria-label={`Decrease ${item.name}`}>
+                    <Minus size={12} />
+                  </button>
+                  <span>{item.quantity}</span>
+                  <button type="button" onClick={() => onUpdateQty(item.lineKey, 1)} aria-label={`Increase ${item.name}`}>
+                    <Plus size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    className="cm-remove"
+                    onClick={() => onRemove(item.lineKey)}
+                    aria-label={`Remove ${item.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
+              <span className="cm-line-total">{currency(item.price * item.quantity)}</span>
             </div>
-            <span className="cm-line-total">{currency(item.price * item.quantity)}</span>
-          </div>
-        ))}
+          )
+        })}
         <div className="cm-summary-total cm-summary-row">
           <span>Subtotal</span>
           <strong>{currency(cartTotal)}</strong>

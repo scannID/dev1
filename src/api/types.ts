@@ -2,12 +2,20 @@
 
 export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
 
+export interface CatalogIngredient {
+  id: string
+  name: string
+}
+
 export interface CatalogItem {
   id: string
   name: string
   category: string
   price: number
   description: string
+  imageUrl?: string | null
+  details?: string
+  ingredients?: CatalogIngredient[]
   available: boolean
 }
 
@@ -49,6 +57,9 @@ export interface CreateCatalogItemRequest {
   category: string
   price: number
   description: string
+  imageUrl?: string | null
+  details?: string
+  ingredients?: CatalogIngredient[]
   available?: boolean
 }
 
@@ -57,6 +68,9 @@ export interface UpdateCatalogItemRequest {
   category?: string
   price?: number
   description?: string
+  imageUrl?: string | null
+  details?: string
+  ingredients?: CatalogIngredient[]
   available?: boolean
 }
 
@@ -66,6 +80,21 @@ export interface CategoriesResponse {
 
 export interface CatalogItemResponse {
   item: CatalogItem
+}
+
+export interface ImageSearchResult {
+  id: string
+  thumbUrl: string
+  imageUrl: string
+  photographer: string
+  photographerUrl: string
+  alt: string
+}
+
+export interface ImageSearchResponse {
+  query: string
+  results: ImageSearchResult[]
+  configured: boolean
 }
 
 export interface CatalogItemsResponse {
@@ -100,6 +129,7 @@ export interface OrderItem {
   price: number
   quantity: number
   lineTotal: number
+  removedIngredients?: string[]
 }
 
 export interface Customer {
@@ -138,6 +168,7 @@ export interface CreateOrderRequest {
     id?: string
     itemId?: string
     quantity: number
+    removedIngredients?: string[]
   }>
 }
 
@@ -167,7 +198,7 @@ export interface ClearCompletedResponse {
 export interface CustomerOrderTracking {
   id: string
   businessName: string
-  items: Array<{ name: string; quantity: number }>
+  items: Array<{ name: string; quantity: number; removedIngredients?: string[] }>
   total: number
   status: OrderStatus
   paymentStatus: PaymentStatus
@@ -182,6 +213,8 @@ export interface CustomerOrderTrackingResponse {
 export interface CartLine extends CatalogItem {
   quantity: number
   lineTotal: number
+  removedIngredients?: string[]
+  lineKey?: string
 }
 
 export type MerchantBusinessType =

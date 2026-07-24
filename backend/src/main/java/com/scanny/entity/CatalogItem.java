@@ -31,6 +31,15 @@ public class CatalogItem {
     @Column(nullable = false)
     private String description = "";
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
+    @Column(nullable = false, columnDefinition = "TEXT DEFAULT ''")
+    private String details = "";
+
+    @Column(name = "ingredients_json", nullable = false, columnDefinition = "TEXT DEFAULT '[]'")
+    private String ingredientsJson = "[]";
+
     @Column(nullable = false)
     private boolean available = true;
 
@@ -80,6 +89,30 @@ public class CatalogItem {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
+    }
+
+    public String getIngredientsJson() {
+        return ingredientsJson;
+    }
+
+    public void setIngredientsJson(String ingredientsJson) {
+        this.ingredientsJson = ingredientsJson == null || ingredientsJson.isBlank() ? "[]" : ingredientsJson;
     }
 
     public boolean isAvailable() {

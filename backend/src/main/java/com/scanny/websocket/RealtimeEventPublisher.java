@@ -69,7 +69,15 @@ public class RealtimeEventPublisher {
         publish("admin:metrics", type, null, payload);
     }
 
+    /**
+     * Publish once: Redis when available (all replicas fan out via listener),
+     * otherwise local fan-out only. Avoids double delivery on the publishing instance.
+     */
     public void publish(String channel, String type, String businessId, Object payload) {
+        publishDirect(channel, type, businessId, payload);
+    }
+
+    public void publishDirect(String channel, String type, String businessId, Object payload) {
         try {
             Map<String, Object> envelope = Map.of(
                     "type", type,
@@ -81,14 +89,15 @@ public class RealtimeEventPublisher {
                     "payload", payload
             );
             String json = objectMapper.writeValueAsString(envelope);
-            webSocketHandler.fanOutLocal(json);
             if (redisTemplate != null) {
                 try {
                     redisTemplate.convertAndSend(CHANNEL, json);
+                    return;
                 } catch (Exception ex) {
                     log.debug("Redis pub/sub unavailable; local fan-out only", ex);
                 }
             }
+            webSocketHandler.fanOutLocal(json);
         } catch (Exception ex) {
             log.warn("Failed to publish realtime event type={}", type, ex);
         }

@@ -1,3 +1,43 @@
+x-api: &api
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment: &api-env
+    SPRING_PROFILES_ACTIVE: prod
+    SERVER_PORT: 4000
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    HIKARI_MAX_POOL_SIZE: ${HIKARI_MAX_POOL_SIZE:-20}
+    HIKARI_MIN_IDLE: ${HIKARI_MIN_IDLE:-5}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    KEYCLOAK_SERVER_URL: http://keycloak:8080
+    KEYCLOAK_ISSUER_URI: https://auth.scanny.app/realms/${KEYCLOAK_REALM:-scanny}
+    KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-scanny}/protocol/openid-connect/certs
+    KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
+    KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
+    KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+    KEYCLOAK_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-scanny-backend}
+    KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?KEYCLOAK_BACKEND_CLIENT_SECRET is required}
+    SCAN_BASE_URL: https://scanny.app
+    SCANNY_CORS_ORIGIN_PATTERNS: https://scanny.app,https://admin.scanny.app
+  expose:
+    - "4000"
+  networks:
+    - scanny-network
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    keycloak:
+      condition: service_healthy
+
 services:
   caddy:
     image: caddy:2-alpine
@@ -13,7 +53,11 @@ services:
     networks:
       - scanny-network
     depends_on:
-      api:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+      api-3:
         condition: service_healthy
       merchant:
         condition: service_healthy
@@ -22,43 +66,17 @@ services:
       keycloak:
         condition: service_healthy
 
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SERVER_PORT: 4000
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
-      KEYCLOAK_SERVER_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URI: https://auth.scanny.app/realms/${KEYCLOAK_REALM:-scanny}
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-scanny}/protocol/openid-connect/certs
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
-      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-scanny-backend}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?KEYCLOAK_BACKEND_CLIENT_SECRET is required}
-      SCAN_BASE_URL: https://scanny.app
-      SCANNY_CORS_ORIGIN_PATTERNS: https://scanny.app,https://admin.scanny.app
-    expose:
-      - "4000"
-    networks:
-      - scanny-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      keycloak:
-        condition: service_healthy
+  api-1:
+    <<: *api
+    container_name: scanny-api-1
+
+  api-2:
+    <<: *api
+    container_name: scanny-api-2
+
+  api-3:
+    <<: *api
+    container_name: scanny-api-3
 
   merchant:
     build:
@@ -99,8 +117,21 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_buffers=16MB
     volumes:
       - scanny_pg_data:/var/lib/postgresql/data
+      - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
     networks:
       - scanny-network
     healthcheck:
@@ -135,7 +166,7 @@ services:
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
       KC_DB_URL_PORT: 5432
-      KC_DB_URL_DATABASE: ${POSTGRES_DB:?POSTGRES_DB is required}
+      KC_DB_URL_DATABASE: keycloak
       KC_DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       KC_HEALTH_ENABLED: "true"

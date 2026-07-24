@@ -1,5 +1,6 @@
 package com.scanny.payment;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scanny.payment.config.PaymentProperties;
 import com.scanny.payment.provider.AirtelMoneyPaymentProvider;
 import com.scanny.payment.provider.MtnMomoPaymentProvider;
@@ -13,11 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class PaymentProviderRegistryTest {
 
     private final PaymentProperties properties = new PaymentProperties();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private PaymentProviderRegistry registry() {
         properties.setFallbackToStub(true);
         List<PaymentProvider> providers = List.of(
-            new StubPaymentProvider(properties),
+            new StubPaymentProvider(properties, objectMapper),
             new MtnMomoPaymentProvider(properties),
             new AirtelMoneyPaymentProvider(properties)
         );

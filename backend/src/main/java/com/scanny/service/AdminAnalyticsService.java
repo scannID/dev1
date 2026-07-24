@@ -393,10 +393,18 @@ public class AdminAnalyticsService {
     @Transactional(readOnly = true)
     public AdminAnalyticsDtos.ScansOrdersSeries getScansOrders(String range) {
         String normalized = range == null ? "daily" : range.toLowerCase(Locale.ROOT);
-        List<TicketScan> scans = ticketScanRepository.findAll();
-        List<QrScanEvent> menuScans = qrScanEventRepository.findAllByOrderByScannedAtDesc();
-        List<Order> orders = orderRepository.findAll();
         Instant now = Instant.now();
+        Instant lookback = switch (normalized) {
+            case "hourly" -> now.minus(24, ChronoUnit.HOURS);
+            case "weekly" -> now.minus(12, ChronoUnit.WEEKS);
+            case "monthly" -> now.minus(12 * 30L, ChronoUnit.DAYS);
+            case "yearly" -> now.minus(5 * 365L, ChronoUnit.DAYS);
+            default -> now.minus(30, ChronoUnit.DAYS);
+        };
+
+        List<TicketScan> scans = ticketScanRepository.findByScannedAtAfter(lookback);
+        List<QrScanEvent> menuScans = qrScanEventRepository.findByScannedAtAfterOrderByScannedAtDesc(lookback);
+        List<Order> orders = orderRepository.findByCreatedAtAfterOrderByCreatedAtDesc(lookback);
 
         return switch (normalized) {
             case "hourly" -> buildHourlySeries(scans, menuScans, orders, now);

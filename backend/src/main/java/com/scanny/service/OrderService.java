@@ -15,11 +15,14 @@ import com.scanny.entity.OrderLineItem;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
+import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.OrderRepository;
 import com.scanny.security.MerchantAccessService;
-import com.scanny.websocket.RealtimeEventPublisher;
+import com.scanny.util.JsonLists;
 import com.scanny.dto.CustomerOrderDtos;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
@@ -44,25 +47,25 @@ public class OrderService {
     
     private final BusinessService businessService;
     private final OrderRepository orderRepository;
+    private final CatalogItemRepository catalogItemRepository;
     private final ReceiptService receiptService;
     private final MerchantAccessService merchantAccessService;
-    private final AuditService auditService;
-    private final RealtimeEventPublisher realtimeEventPublisher;
+    private final OutboxService outboxService;
 
     public OrderService(
             BusinessService businessService,
             OrderRepository orderRepository,
+            CatalogItemRepository catalogItemRepository,
             ReceiptService receiptService,
             MerchantAccessService merchantAccessService,
-            AuditService auditService,
-            RealtimeEventPublisher realtimeEventPublisher
+            OutboxService outboxService
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
+        this.catalogItemRepository = catalogItemRepository;
         this.receiptService = receiptService;
         this.merchantAccessService = merchantAccessService;
-        this.auditService = auditService;
-        this.realtimeEventPublisher = realtimeEventPublisher;
+        this.outboxService = outboxService;
     }
 
     @Transactional(readOnly = true)
@@ -142,7 +145,7 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(String businessId, CreateOrderRequest request) {
-        Business business = businessService.requireBusiness(businessId);
+        Business business = businessService.requireBusinessLight(businessId);
 
         String customerName = request.customer().name() != null ? request.customer().name().trim() : "";
         if (customerName.isBlank()) {
@@ -152,6 +155,19 @@ public class OrderService {
             throw new ApiException(400, "At least one order item is required.");
         }
 
+        Set<String> requestedIds = request.items().stream()
+                .map(OrderItemRequest::resolvedItemId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+        if (requestedIds.isEmpty()) {
+            throw new ApiException(400, "No available items were found for this order.");
+        }
+
+        Map<String, CatalogItem> itemsById = catalogItemRepository
+                .findByBusinessIdAndIdIn(businessId, requestedIds)
+                .stream()
+                .collect(Collectors.toMap(CatalogItem::getId, item -> item, (a, b) -> a));
+
         List<OrderLineItem> lines = new ArrayList<>();
         for (OrderItemRequest lineRequest : request.items()) {
             String itemId = lineRequest.resolvedItemId();
@@ -159,15 +175,18 @@ public class OrderService {
                 continue;
             }
 
-            CatalogItem item = business.getItems().stream()
-                    .filter(entry -> entry.getId().equals(itemId))
-                    .findFirst()
-                    .orElse(null);
-
+            CatalogItem item = itemsById.get(itemId);
             int quantity = lineRequest.quantity() != null ? lineRequest.quantity() : 1;
             if (item == null || !item.isAvailable() || quantity <= 0) {
                 continue;
             }
+
+            List<String> allowedNames = JsonLists.readIngredients(item.getIngredientsJson()).stream()
+                    .map(ingredient -> ingredient.name())
+                    .toList();
+            List<String> removed = JsonLists.normalizeStringList(lineRequest.removedIngredients()).stream()
+                    .filter(allowedNames::contains)
+                    .toList();
 
             OrderLineItem line = new OrderLineItem();
             line.setItemId(item.getId());
@@ -175,6 +194,7 @@ public class OrderService {
             line.setPrice(item.getPrice());
             line.setQuantity(quantity);
             line.setLineTotal(item.getPrice() * quantity);
+            line.setRemovedIngredientsJson(JsonLists.writeStringList(removed));
             lines.add(line);
         }
 
@@ -186,7 +206,7 @@ public class OrderService {
         int total = subtotal + SERVICE_FEE_UGX;
 
         Order order = new Order();
-        order.setId("ORD-" + String.valueOf(System.currentTimeMillis()).substring(7));
+        order.setId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         order.setPublicId(UUID.randomUUID());
         order.setBusiness(business);
         order.setMerchantId(business.getMerchantId());
@@ -204,9 +224,11 @@ public class OrderService {
         lines.forEach(order::addItem);
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
-        realtimeEventPublisher.publishOrderEvent(businessId, "ORDER_CREATED", response);
-        realtimeEventPublisher.publishAdminMetrics(
+        outboxService.enqueueRealtime("orders:" + businessId, "ORDER_CREATED", businessId, response);
+        outboxService.enqueueRealtime(
+                "admin:metrics",
                 "ORDER_CREATED",
+                businessId,
                 Map.of("businessId", businessId, "orderId", response.id())
         );
         return response;
@@ -225,8 +247,8 @@ public class OrderService {
         order.setUpdatedAt(Instant.now());
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
-        realtimeEventPublisher.publishOrderEvent(order.getBusiness().getId(), "ORDER_UPDATED", response);
-        auditService.success("ORDER_UPDATE", "order", order.getId(), Map.of(
+        outboxService.enqueueRealtime("orders:" + order.getBusiness().getId(), "ORDER_UPDATED", order.getBusiness().getId(), response);
+        outboxService.enqueueAudit("ORDER_UPDATE", "order", order.getId(), Map.of(
                 "status", String.valueOf(order.getStatus()),
                 "paymentStatus", String.valueOf(order.getPaymentStatus())
         ));
@@ -241,8 +263,13 @@ public class OrderService {
         order.setUpdatedAt(Instant.now());
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
-        realtimeEventPublisher.publishOrderEvent(order.getBusiness().getId(), "ORDER_STATUS_UPDATED", response);
-        auditService.success("ORDER_STATUS_UPDATE", "order", order.getId(), Map.of("status", status.name()));
+        outboxService.enqueueRealtime(
+                "orders:" + order.getBusiness().getId(),
+                "ORDER_STATUS_UPDATED",
+                order.getBusiness().getId(),
+                response
+        );
+        outboxService.enqueueAudit("ORDER_STATUS_UPDATE", "order", order.getId(), Map.of("status", status.name()));
         return response;
     }
 
@@ -268,17 +295,30 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
-            try {
-                autoGenerateReceipt(savedOrder);
-            } catch (Exception e) {
-                logger.error("Failed to auto-generate receipt for order {}", order.getId(), e);
-            }
+            outboxService.enqueueReceipt(savedOrder.getId());
         }
 
         OrderResponse response = OrderResponse.from(savedOrder);
-        realtimeEventPublisher.publishOrderEvent(savedOrder.getBusiness().getId(), "ORDER_PAYMENT_UPDATED", response);
-        auditService.success("ORDER_PAYMENT_UPDATE", "order", savedOrder.getId(), Map.of("paymentStatus", paymentStatus.name()));
+        outboxService.enqueueRealtime(
+                "orders:" + savedOrder.getBusiness().getId(),
+                "ORDER_PAYMENT_UPDATED",
+                savedOrder.getBusiness().getId(),
+                response
+        );
+        outboxService.enqueueAudit(
+                "ORDER_PAYMENT_UPDATE",
+                "order",
+                savedOrder.getId(),
+                Map.of("paymentStatus", paymentStatus.name())
+        );
         return response;
+    }
+
+    @Transactional
+    public void generateReceiptForOrderId(String orderId) {
+        Order order = orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+        autoGenerateReceipt(order);
     }
 
     @Transactional
@@ -292,8 +332,13 @@ public class OrderService {
 
         if (!toDelete.isEmpty()) {
             orderRepository.deleteAll(toDelete);
-            realtimeEventPublisher.publishOrderEvent(businessId, "ORDERS_CLEARED", Map.of("deleted", toDelete.size()));
-            auditService.success("ORDERS_CLEARED", "business", businessId, Map.of("deleted", toDelete.size()));
+            outboxService.enqueueRealtime(
+                    "orders:" + businessId,
+                    "ORDERS_CLEARED",
+                    businessId,
+                    Map.of("deleted", toDelete.size())
+            );
+            outboxService.enqueueAudit("ORDERS_CLEARED", "business", businessId, Map.of("deleted", toDelete.size()));
         }
 
         return toDelete.size();

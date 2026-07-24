@@ -17,8 +17,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import CategoryField from './components/CategoryField'
+import { CatalogItemImageField } from './components/CatalogItemImageField'
+import { IngredientsEditor } from './components/IngredientsEditor'
 import { PaginationBar } from './components/PaginationBar'
 import { businessCategories } from './lib/catalogCategories'
+import { getCategoryImage } from './lib/categoryImages'
+import { formatRemovedIngredients } from './lib/catalogCart'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -280,6 +284,9 @@ function App({
     category: string
     price: number
     description: string
+    imageUrl?: string | null
+    details?: string
+    ingredients?: CatalogItem['ingredients']
     available: boolean
   }) {
     if (!business.id) return
@@ -305,6 +312,9 @@ function App({
         category: data.category,
         price: data.price,
         description: data.description,
+        imageUrl: data.imageUrl,
+        details: data.details,
+        ingredients: data.ingredients,
         available: data.available,
       })
       await refreshBusiness(business.id)
@@ -433,7 +443,26 @@ function App({
     )
   }
 
-  if (!business.id) return null
+  if (!business.id) {
+    return (
+      <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 24 }}>
+        <div style={{ maxWidth: 420, textAlign: 'center', display: 'grid', gap: 12 }}>
+          <h1 style={{ margin: 0, fontSize: 22 }}>Couldn’t load your business</h1>
+          <p style={{ margin: 0, color: 'var(--muted-foreground, #6b7280)' }}>
+            {sessionError || 'Your session loaded, but no business data came back. Try again or sign in again.'}
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button type="button" onClick={() => void refreshBusinesses()}>
+              Retry
+            </Button>
+            <Button type="button" variant="outline" onClick={handleLogout}>
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="company-shell">
@@ -614,17 +643,22 @@ function App({
 
         {/* Add item — Sheet drawer (accessible from overview & catalog) */}
         <Sheet open={showAddItem} onOpenChange={setShowAddItem}>
-          <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
-            <SheetHeader className="border-b border-border px-6 py-4">
+          <SheetContent
+            side="right"
+            className="inset-0 h-dvh w-screen max-w-none sm:max-w-none data-[side=right]:w-screen data-[side=right]:sm:max-w-none flex flex-col gap-0 p-0 border-0"
+          >
+            <SheetHeader className="border-b border-border px-6 py-4 shrink-0">
               <SheetTitle className="">Add item</SheetTitle>
-              <SheetDescription className="">Add a new item to {business.name || 'your catalog'}.</SheetDescription>
+              <SheetDescription className="">Build a menu item with photo, details, and ingredients.</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto">
-              <AddItemForm
-                business={business}
-                onCreateItem={handleCreateCatalogItem}
-                onAddCategory={handleAddCategory}
-              />
+              <div className="mx-auto w-full max-w-3xl">
+                <AddItemForm
+                  business={business}
+                  onCreateItem={handleCreateCatalogItem}
+                  onAddCategory={handleAddCategory}
+                />
+              </div>
             </div>
           </SheetContent>
         </Sheet>
@@ -1329,6 +1363,9 @@ function AddItemForm({
     category: string
     price: number
     description: string
+    imageUrl?: string | null
+    details?: string
+    ingredients?: CatalogItem['ingredients']
     available: boolean
   }) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
@@ -1338,6 +1375,9 @@ function AddItemForm({
     category: '',
     price: '',
     description: '',
+    imageUrl: null as string | null,
+    details: '',
+    ingredients: [] as NonNullable<CatalogItem['ingredients']>,
     available: true,
   }
   const [item, setItem] = useState(emptyItem)
@@ -1363,6 +1403,9 @@ function AddItemForm({
         category,
         price,
         description: item.description.trim() || 'No description added yet.',
+        imageUrl: item.imageUrl,
+        details: item.details.trim(),
+        ingredients: item.ingredients,
         available: item.available,
       })
       setItem(emptyItem)
@@ -1379,16 +1422,25 @@ function AddItemForm({
 
   return (
     <form className="flex flex-col gap-4 px-6 py-5" noValidate onSubmit={submitItem}>
+      <CatalogItemImageField
+        imageUrl={item.imageUrl}
+        category={item.category}
+        name={item.name}
+        disabled={saving}
+        onChange={(imageUrl) => setItem({ ...item, imageUrl })}
+      />
+
       <div className="grid gap-1.5">
         <Label htmlFor="add-item-name">Item name</Label>
         <Input
           id="add-item-name"
+          type="text"
           required
           aria-invalid={isItemNameMissing}
           className={isItemNameMissing ? 'border-destructive' : undefined}
           value={item.name}
           onChange={(event) => setItem({ ...item, name: event.target.value })}
-          placeholder="Burger, cocktail, uniform..."
+          placeholder="Big Burger Combo"
         />
         {isItemNameMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
       </div>
@@ -1423,15 +1475,34 @@ function AddItemForm({
       </div>
 
       <div className="grid gap-1.5">
-        <Label htmlFor="add-item-description">Description</Label>
+        <Label htmlFor="add-item-description">Short description</Label>
         <Textarea
           id="add-item-description"
-          rows={3}
+          className=""
+          rows={2}
           value={item.description}
           onChange={(event) => setItem({ ...item, description: event.target.value })}
-          placeholder="Size, flavor, seat type, pickup details..."
+          placeholder="Shown on the card — e.g. Burger + fries + soda"
         />
       </div>
+
+      <div className="grid gap-1.5">
+        <Label htmlFor="add-item-details">Combo details</Label>
+        <Textarea
+          id="add-item-details"
+          className=""
+          rows={4}
+          value={item.details}
+          onChange={(event) => setItem({ ...item, details: event.target.value })}
+          placeholder="Full details customers see when they expand the item…"
+        />
+      </div>
+
+      <IngredientsEditor
+        value={item.ingredients}
+        disabled={saving}
+        onChange={(ingredients) => setItem({ ...item, ingredients })}
+      />
 
       <div className="flex items-center gap-2">
         <input
@@ -1469,6 +1540,9 @@ function CatalogPage({
     category: string
     price: number
     description: string
+    imageUrl?: string | null
+    details?: string
+    ingredients?: CatalogItem['ingredients']
     available: boolean
   }) => Promise<void> | void
   onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
@@ -1613,168 +1687,185 @@ function CatalogPage({
         </div>
       </section>
 
-      {/* Table card */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search items…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 text-sm"
-              aria-label="Search catalog items"
-            />
-          </div>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by category">
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent className="">
-              <SelectItem className="" value="all">All categories</SelectItem>
-              {categories.map((cat) => <SelectItem className="" key={cat} value={cat}>{cat}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="h-8 w-[130px] text-sm" aria-label="Filter by status">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent className="">
-              <SelectItem className="" value="all">All statuses</SelectItem>
-              <SelectItem className="" value="available">Available</SelectItem>
-              <SelectItem className="" value="hidden">Hidden</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground ml-auto">
-            {totalItems} of {business.items.length} items
-          </span>
-          {isFiltered && (
-            <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs">
-              Clear filters
-            </Button>
-          )}
-          <Button size="sm" className="h-8" onClick={onAddItem}>
-            <Plus className="size-3.5" />
-            Add item
-          </Button>
-        </div>
-
-        {/* Table */}
-        <Table className={undefined}>
-          <TableHeader className={undefined}>
-            <TableRow className="hover:bg-transparent border-b border-border">
-              <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase w-[40%]">Name</TableHead>
-              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Category</TableHead>
-              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Price</TableHead>
-              <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
-              <TableHead className="pr-5 text-right text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="">
-            {listLoading ? (
-              <TableRow className="">
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                  Loading catalog…
-                </TableCell>
-              </TableRow>
-            ) : listError ? (
-              <TableRow className="">
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-destructive">
-                  {listError}
-                </TableCell>
-              </TableRow>
-            ) : pageItems.length === 0 ? (
-              <TableRow className="">
-                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                  No items match your search.{' '}
-                  <button type="button" className="text-primary underline" onClick={resetFilters}>Clear filters</button>
-                </TableCell>
-              </TableRow>
-            ) : (
-              pageItems.map((entry) => (
-                <TableRow key={entry.id} className="border-b border-border hover:bg-muted/40 cursor-default">
-                  <TableCell className="pl-5 py-3">
-                    <p className="text-sm font-medium text-foreground">{entry.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.description}</p>
-                  </TableCell>
-                  <TableCell className="text-sm text-foreground">{entry.category}</TableCell>
-                  <TableCell className="text-sm font-medium text-foreground font-mono">{currency(entry.price)}</TableCell>
-                  <TableCell className={undefined}>
-                    <Badge variant="secondary" className={entry.available
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-muted text-muted-foreground'
-                    }>
-                      {entry.available ? 'Available' : 'Hidden'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="pr-5 text-right">
-                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => startEdit(entry)}>
-                      <Pencil className="size-3" />
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+        {/* Catalog grid */}
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search items…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 pl-8 text-sm"
+                aria-label="Search catalog items"
+              />
+            </div>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger className="h-8 w-[150px] text-sm" aria-label="Filter by category">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent className="">
+                <SelectItem className="" value="all">All categories</SelectItem>
+                {categories.map((cat) => <SelectItem className="" key={cat} value={cat}>{cat}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="h-8 w-[130px] text-sm" aria-label="Filter by status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent className="">
+                <SelectItem className="" value="all">All statuses</SelectItem>
+                <SelectItem className="" value="available">Available</SelectItem>
+                <SelectItem className="" value="hidden">Hidden</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {totalItems} of {business.items.length} items
+            </span>
+            {isFiltered && (
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs">
+                Clear filters
+              </Button>
             )}
-          </TableBody>
-        </Table>
+            <Button size="sm" className="h-8" onClick={onAddItem}>
+              <Plus className="size-3.5" />
+              Add item
+            </Button>
+          </div>
 
-        {/* Pagination */}
-        <div className="border-t border-border px-5 py-3">
-          <PaginationBar pagination={pagination} hideWhenEmpty={false} />
+          <div className="p-4">
+            {listLoading ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">Loading catalog…</p>
+            ) : listError ? (
+              <p className="py-10 text-center text-sm text-destructive">{listError}</p>
+            ) : pageItems.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No items match your search.{' '}
+                <button type="button" className="text-primary underline" onClick={resetFilters}>Clear filters</button>
+              </p>
+            ) : (
+              <div className="catalog-item-grid">
+                {pageItems.map((entry) => {
+                  const thumb = entry.imageUrl || getCategoryImage(entry.category)
+                  const ingredientCount = entry.ingredients?.length ?? 0
+                  return (
+                    <article key={entry.id} className="catalog-item-card">
+                      <button type="button" className="catalog-item-card-media" onClick={() => startEdit(entry)}>
+                        <img src={thumb} alt="" />
+                        {!entry.available ? <span className="catalog-item-card-ribbon">Hidden</span> : null}
+                      </button>
+                      <div className="catalog-item-card-body">
+                        <div className="catalog-item-card-top">
+                          <h3>{entry.name}</h3>
+                          <Badge variant="secondary" className="shrink-0">{entry.category}</Badge>
+                        </div>
+                        {entry.description ? <p className="catalog-item-card-desc">{entry.description}</p> : null}
+                        <div className="catalog-item-card-meta">
+                          <strong>{currency(entry.price)}</strong>
+                          {ingredientCount > 0 ? (
+                            <span className="text-xs text-muted-foreground">{ingredientCount} ingredients</span>
+                          ) : null}
+                        </div>
+                        <div className="catalog-item-card-actions">
+                          <Badge
+                            variant="secondary"
+                            className={entry.available
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-muted text-muted-foreground'}
+                          >
+                            {entry.available ? 'Available' : 'Hidden'}
+                          </Badge>
+                          <Button variant="outline" size="sm" className="h-7 text-xs ml-auto" onClick={() => startEdit(entry)}>
+                            <Pencil className="size-3" />
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          <div className="border-t border-border px-5 py-3">
+            <PaginationBar pagination={pagination} hideWhenEmpty={false} />
+          </div>
         </div>
-      </div>
 
-      {/* Edit item — Sheet drawer */}
-      <Sheet open={!!editingId} onOpenChange={(open) => { if (!open) cancelEdit() }}>
-        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
-          <SheetHeader className="border-b border-border px-6 py-4">
-            <SheetTitle className={undefined}>Edit item</SheetTitle>
-            <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <div className="flex flex-col gap-4">
-              <div className="grid gap-1.5">
-                <Label className="" htmlFor="edit-name">Name</Label>
-                <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
-              </div>
-              <div className="grid gap-1.5">
-                <CategoryField
-                  id="edit-category"
-                  categories={categories}
-                  value={editDraft.category ?? ''}
-                  onChange={(category) => setEditDraft({ ...editDraft, category })}
-                  onAddCategory={onAddCategory}
+        {/* Edit item — Sheet drawer */}
+        <Sheet open={!!editingId} onOpenChange={(open) => { if (!open) cancelEdit() }}>
+          <SheetContent
+            side="right"
+            className="inset-0 h-dvh w-screen max-w-none sm:max-w-none data-[side=right]:w-screen data-[side=right]:sm:max-w-none flex flex-col gap-0 p-0 border-0"
+          >
+            <SheetHeader className="border-b border-border px-6 py-4 shrink-0">
+              <SheetTitle className={undefined}>Edit item</SheetTitle>
+              <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="mx-auto w-full max-w-3xl flex flex-col gap-4">
+                <CatalogItemImageField
+                  imageUrl={editDraft.imageUrl}
+                  category={editDraft.category}
+                  name={editDraft.name}
                   disabled={saving}
+                  onChange={(imageUrl) => setEditDraft({ ...editDraft, imageUrl: imageUrl ?? '' })}
                 />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="" htmlFor="edit-price">Price (UGX)</Label>
-                <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="" htmlFor="edit-description">Description</Label>
-                <Textarea className="" id="edit-description" rows={3} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
-              </div>
-              <div className="flex items-center gap-2">
-                <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
-                <Label htmlFor="edit-available" className="cursor-pointer font-normal">Available to customers</Label>
+                <div className="grid gap-1.5">
+                  <Label className="" htmlFor="edit-name">Name</Label>
+                  <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
+                </div>
+                <div className="grid gap-1.5">
+                  <CategoryField
+                    id="edit-category"
+                    categories={categories}
+                    value={editDraft.category ?? ''}
+                    onChange={(category) => setEditDraft({ ...editDraft, category })}
+                    onAddCategory={onAddCategory}
+                    disabled={saving}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="" htmlFor="edit-price">Price (UGX)</Label>
+                  <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="" htmlFor="edit-description">Short description</Label>
+                  <Textarea className="" id="edit-description" rows={2} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="" htmlFor="edit-details">Combo details</Label>
+                  <Textarea className="" id="edit-details" rows={4} value={editDraft.details ?? ''} onChange={(e) => setEditDraft({ ...editDraft, details: e.target.value })} />
+                </div>
+                <IngredientsEditor
+                  id="edit-ingredients"
+                  value={editDraft.ingredients ?? []}
+                  disabled={saving}
+                  onChange={(ingredients) => setEditDraft({ ...editDraft, ingredients })}
+                />
+                <div className="flex items-center gap-2">
+                  <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
+                  <Label htmlFor="edit-available" className="cursor-pointer font-normal">Available to customers</Label>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="border-t border-border px-6 py-4 flex items-center gap-2">
-            <Button className="flex-1" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
-            <Button className="" variant="outline" onClick={cancelEdit} disabled={saving}>Cancel</Button>
-            <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item" disabled={saving}>
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
-    </section>
-  )
+            <div className="border-t border-border px-6 py-4 flex items-center gap-2 shrink-0">
+              <div className="mx-auto w-full max-w-3xl flex items-center gap-2">
+                <Button className="flex-1" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
+                <Button className="" variant="outline" onClick={cancelEdit} disabled={saving}>Cancel</Button>
+                <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item" disabled={saving}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </section>
+    )
 }
 
 function OrderActionMenu({ onViewDetails }: { onViewDetails: () => void }) {
@@ -2100,12 +2191,18 @@ function Dashboard({
                 <div>
                   <p className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase mb-2">Items</p>
                   <ul className="space-y-2">
-                    {detailOrder.items.map((item) => (
-                      <li key={item.id} className="flex items-center justify-between gap-3">
-                        <span className="text-sm text-foreground">{item.quantity} × {item.name}</span>
-                        <span className="text-sm font-medium font-mono text-foreground">{currency(item.lineTotal)}</span>
+                    {detailOrder.items.map((item) => {
+                      const removed = formatRemovedIngredients(item.removedIngredients)
+                      return (
+                      <li key={`${item.id}-${removed}`} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-sm text-foreground">{item.quantity} × {item.name}</span>
+                          {removed ? <p className="text-xs text-muted-foreground mt-0.5">{removed}</p> : null}
+                        </div>
+                        <span className="text-sm font-medium font-mono text-foreground shrink-0">{currency(item.lineTotal)}</span>
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 </div>
 

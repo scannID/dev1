@@ -19,6 +19,7 @@ public class RateLimitService {
     private final int registerPerMin;
     private final int ordersPerMin;
     private final int menuPerMin;
+    private final int menuScanPerMin;
     private final int devicesPerMin;
     private final int ticketScanPerMin;
     private final int websocketPerMin;
@@ -33,6 +34,7 @@ public class RateLimitService {
             @Value("${scanny.rate-limit.register-per-min:5}") int registerPerMin,
             @Value("${scanny.rate-limit.orders-per-min:30}") int ordersPerMin,
             @Value("${scanny.rate-limit.menu-per-min:120}") int menuPerMin,
+            @Value("${scanny.rate-limit.menu-scan-per-min:120}") int menuScanPerMin,
             @Value("${scanny.rate-limit.devices-per-min:20}") int devicesPerMin,
             @Value("${scanny.rate-limit.ticket-scan-per-min:60}") int ticketScanPerMin,
             @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin,
@@ -45,6 +47,7 @@ public class RateLimitService {
         this.registerPerMin = registerPerMin;
         this.ordersPerMin = ordersPerMin;
         this.menuPerMin = menuPerMin;
+        this.menuScanPerMin = menuScanPerMin;
         this.devicesPerMin = devicesPerMin;
         this.ticketScanPerMin = ticketScanPerMin;
         this.websocketPerMin = websocketPerMin;
@@ -79,6 +82,10 @@ public class RateLimitService {
         }
         if ("POST".equalsIgnoreCase(method) && path.matches("/api/businesses/[^/]+/orders")) {
             return "orders:" + ordersPerMin;
+        }
+        if ("POST".equalsIgnoreCase(method) && (
+                path.matches("/api/businesses/[^/]+/scans") || path.matches("/api/qr/[^/]+/scans"))) {
+            return "menu-scan:" + menuScanPerMin;
         }
         if ("GET".equalsIgnoreCase(method) && (path.matches("/api/businesses/[^/]+/menu")
                 || path.startsWith("/api/menu/")

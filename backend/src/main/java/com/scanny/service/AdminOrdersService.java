@@ -15,6 +15,8 @@ import java.util.List;
 @Service
 public class AdminOrdersService {
 
+    private static final int LOOKBACK_DAYS = 90;
+
     private final OrderRepository orderRepository;
 
     public AdminOrdersService(OrderRepository orderRepository) {
@@ -30,24 +32,22 @@ public class AdminOrdersService {
         String paymentStatus,
         String merchantId
     ) {
-        List<Order> allOrders = orderRepository.findAll();
+        Instant cutoff = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
+        List<Order> recentOrders = orderRepository.findByCreatedAtAfterOrderByCreatedAtDesc(cutoff);
 
-        // Apply filters
-        List<Order> filteredOrders = allOrders.stream()
+        List<Order> filteredOrders = recentOrders.stream()
             .filter(o -> search == null || search.isEmpty() ||
                 o.getId().toLowerCase().contains(search.toLowerCase()) ||
-                o.getBusinessName().toLowerCase().contains(search.toLowerCase()) ||
-                o.getCustomerName().toLowerCase().contains(search.toLowerCase()))
+                (o.getBusinessName() != null && o.getBusinessName().toLowerCase().contains(search.toLowerCase())) ||
+                (o.getCustomerName() != null && o.getCustomerName().toLowerCase().contains(search.toLowerCase())))
             .filter(o -> status == null || status.isEmpty() ||
                 o.getStatus().name().equalsIgnoreCase(status))
             .filter(o -> paymentStatus == null || paymentStatus.isEmpty() ||
                 o.getPaymentStatus().name().equalsIgnoreCase(paymentStatus))
             .filter(o -> merchantId == null || merchantId.isEmpty() ||
                 o.getMerchantId().equals(merchantId))
-            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
             .toList();
 
-        // Calculate pagination
         int total = filteredOrders.size();
         int totalPages = (int) Math.ceil((double) total / limit);
         int start = (page - 1) * limit;
@@ -58,25 +58,15 @@ public class AdminOrdersService {
             Math.min(end, total)
         );
 
-        // Build order list items
         List<AdminOrderDtos.OrderListItem> orderItems = paginatedOrders.stream()
             .map(AdminOrderDtos.OrderListItem::from)
             .toList();
 
-        // Calculate summary
         Instant startOfToday = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        long ordersToday = allOrders.stream()
-            .filter(o -> o.getCreatedAt().isAfter(startOfToday))
-            .count();
-        long completed = allOrders.stream()
-            .filter(o -> o.getStatus() == OrderStatus.Completed)
-            .count();
-        long pending = allOrders.stream()
-            .filter(o -> o.getStatus() == OrderStatus.Pending || o.getStatus() == OrderStatus.Preparing)
-            .count();
-        long cancelled = allOrders.stream()
-            .filter(o -> o.getStatus() == OrderStatus.Cancelled)
-            .count();
+        long ordersToday = orderRepository.countByCreatedAtAfter(startOfToday);
+        long completed = orderRepository.countByStatus(OrderStatus.Completed);
+        long pending = orderRepository.countByStatusIn(List.of(OrderStatus.Pending, OrderStatus.Preparing));
+        long cancelled = orderRepository.countByStatus(OrderStatus.Cancelled);
 
         AdminOrderDtos.PaginationInfo pagination = new AdminOrderDtos.PaginationInfo(
             page,

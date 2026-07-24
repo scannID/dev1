@@ -4,6 +4,7 @@ import com.scanny.entity.Order;
 import com.scanny.entity.OrderLineItem;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
+import com.scanny.util.JsonLists;
 import java.time.Instant;
 import java.util.List;
 
@@ -12,9 +13,13 @@ public final class CustomerOrderDtos {
     private CustomerOrderDtos() {
     }
 
-    public record TrackingLineItem(String name, int quantity) {
+    public record TrackingLineItem(String name, int quantity, List<String> removedIngredients) {
         static TrackingLineItem from(OrderLineItem line) {
-            return new TrackingLineItem(line.getName(), line.getQuantity());
+            return new TrackingLineItem(
+                    line.getName(),
+                    line.getQuantity(),
+                    JsonLists.readStringList(line.getRemovedIngredientsJson())
+            );
         }
     }
 

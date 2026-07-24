@@ -12,6 +12,8 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+  cache:
+    type: simple
   data:
     redis:
       host: localhost
@@ -27,6 +29,8 @@ keycloak:
 
 scanny:
   scan-base-url: http://localhost:5173
+  redis:
+    enabled: false
   cors:
     allowed-origin-patterns: http://localhost:*
   rate-limit:

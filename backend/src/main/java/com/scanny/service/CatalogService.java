@@ -9,6 +9,8 @@ import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CatalogCategories;
+import com.scanny.util.CatalogImageUrls;
+import com.scanny.util.JsonLists;
 import com.scanny.websocket.RealtimeEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,19 +31,22 @@ public class CatalogService {
     private final MerchantAccessService merchantAccessService;
     private final AuditService auditService;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final BusinessService businessService;
 
     public CatalogService(
             CatalogItemRepository catalogItemRepository,
             BusinessRepository businessRepository,
             MerchantAccessService merchantAccessService,
             AuditService auditService,
-            RealtimeEventPublisher realtimeEventPublisher
+            RealtimeEventPublisher realtimeEventPublisher,
+            BusinessService businessService
     ) {
         this.catalogItemRepository = catalogItemRepository;
         this.businessRepository = businessRepository;
         this.merchantAccessService = merchantAccessService;
         this.auditService = auditService;
         this.realtimeEventPublisher = realtimeEventPublisher;
+        this.businessService = businessService;
     }
 
     @Transactional(readOnly = true)
@@ -126,6 +131,9 @@ public class CatalogService {
         item.setCategory(category);
         item.setPrice(request.price());
         item.setDescription(request.description() != null ? request.description() : "");
+        item.setImageUrl(CatalogImageUrls.normalizeOptional(request.imageUrl()));
+        item.setDetails(request.details() != null ? request.details().trim() : "");
+        item.setIngredientsJson(JsonLists.writeIngredients(request.ingredients()));
         item.setAvailable(request.available());
 
         business.addCustomCategory(category);
@@ -133,6 +141,7 @@ public class CatalogService {
         businessRepository.save(business);
 
         item = catalogItemRepository.save(item);
+        businessService.evictMenuCache(businessId);
         CatalogDtos.CatalogItemResponse response = CatalogDtos.CatalogItemResponse.from(item);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_CREATED", response);
         auditService.success("CATALOG_ITEM_CREATED", "catalog_item", item.getId(), Map.of("businessId", businessId));
@@ -165,11 +174,21 @@ public class CatalogService {
         if (request.description() != null) {
             item.setDescription(request.description());
         }
+        if (request.imageUrl() != null) {
+            item.setImageUrl(CatalogImageUrls.normalizeOptional(request.imageUrl()));
+        }
+        if (request.details() != null) {
+            item.setDetails(request.details().trim());
+        }
+        if (request.ingredients() != null) {
+            item.setIngredientsJson(JsonLists.writeIngredients(request.ingredients()));
+        }
         if (request.available() != null) {
             item.setAvailable(request.available());
         }
 
         item = catalogItemRepository.save(item);
+        businessService.evictMenuCache(businessId);
         CatalogDtos.CatalogItemResponse response = CatalogDtos.CatalogItemResponse.from(item);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_UPDATED", response);
         return response;
@@ -184,6 +203,7 @@ public class CatalogService {
         CatalogItem item = requireOwnedItem(businessId, itemId);
         item.setAvailable(request.available());
         item = catalogItemRepository.save(item);
+        businessService.evictMenuCache(businessId);
         CatalogDtos.CatalogItemResponse response = CatalogDtos.CatalogItemResponse.from(item);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_AVAILABILITY_UPDATED", response);
         return response;
@@ -194,6 +214,7 @@ public class CatalogService {
         CatalogItem item = requireOwnedItem(businessId, itemId);
         item.getBusiness().getItems().remove(item);
         catalogItemRepository.delete(item);
+        businessService.evictMenuCache(businessId);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_DELETED", Map.of("id", itemId));
         auditService.success("CATALOG_ITEM_DELETED", "catalog_item", itemId, Map.of("businessId", businessId));
     }

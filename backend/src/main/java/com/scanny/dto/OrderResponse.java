@@ -5,6 +5,7 @@ import com.scanny.entity.Order;
 import com.scanny.entity.OrderLineItem;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
+import com.scanny.util.JsonLists;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -54,14 +55,22 @@ public record OrderResponse(
 record CustomerResponse(String name, String phone, String location, String note) {
 }
 
-record OrderLineResponse(String id, String name, int price, int quantity, int lineTotal) {
+record OrderLineResponse(
+        String id,
+        String name,
+        int price,
+        int quantity,
+        int lineTotal,
+        List<String> removedIngredients
+) {
     static OrderLineResponse from(OrderLineItem line) {
         return new OrderLineResponse(
                 line.getItemId(),
                 line.getName(),
                 line.getPrice(),
                 line.getQuantity(),
-                line.getLineTotal()
+                line.getLineTotal(),
+                JsonLists.readStringList(line.getRemovedIngredientsJson())
         );
     }
 }

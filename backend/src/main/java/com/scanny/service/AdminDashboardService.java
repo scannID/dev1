@@ -3,13 +3,12 @@ package com.scanny.service;
 import com.scanny.dto.admin.AdminDashboardDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.Order;
-import com.scanny.entity.QrScanEvent;
-import com.scanny.entity.TicketScan;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.OrderRepository;
 import com.scanny.repository.QrScanEventRepository;
 import com.scanny.repository.TicketScanRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,11 +44,6 @@ public class AdminDashboardService {
 
     @Transactional(readOnly = true)
     public AdminDashboardDtos.DashboardMetrics getDashboardMetrics() {
-        List<Business> businesses = businessRepository.findAll();
-        List<Order> allOrders = orderRepository.findAll();
-        List<TicketScan> allScans = ticketScanRepository.findAll();
-        List<QrScanEvent> menuScans = qrScanEventRepository.findAllByOrderByScannedAtDesc();
-
         Instant now = Instant.now();
         Instant startOfToday = now.truncatedTo(ChronoUnit.DAYS);
         Instant oneWeekAgo = now.minus(7, ChronoUnit.DAYS);
@@ -59,45 +53,25 @@ public class AdminDashboardService {
         Instant startOfMonth = now.truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS);
         Instant prevMonthStart = startOfMonth.minus(30, ChronoUnit.DAYS);
 
-        int totalMerchants = businesses.size();
-        int merchantsThisWeek = (int) businesses.stream()
-            .filter(b -> b.getCreatedAt().isAfter(oneWeekAgo))
-            .count();
-        int merchantsPrevWeek = (int) businesses.stream()
-            .filter(b -> b.getCreatedAt().isAfter(twoWeeksAgo) && !b.getCreatedAt().isAfter(oneWeekAgo))
-            .count();
+        int totalMerchants = (int) businessRepository.count();
+        int merchantsThisWeek = (int) businessRepository.countByCreatedAtAfter(oneWeekAgo);
+        int merchantsPrevWeek = (int) businessRepository.countByCreatedAtGreaterThanEqualAndCreatedAtBefore(
+                twoWeeksAgo, oneWeekAgo);
 
-        int ordersToday = (int) allOrders.stream()
-            .filter(o -> o.getCreatedAt().isAfter(startOfToday))
-            .count();
-        int ordersYesterday = (int) allOrders.stream()
-            .filter(o -> o.getCreatedAt().isAfter(startOfToday.minus(1, ChronoUnit.DAYS))
-                && !o.getCreatedAt().isAfter(startOfToday))
-            .count();
+        int ordersToday = (int) orderRepository.countByCreatedAtAfter(startOfToday);
+        int ordersYesterday = (int) orderRepository.countByCreatedAtGreaterThanEqualAndCreatedAtBefore(
+                startOfToday.minus(1, ChronoUnit.DAYS), startOfToday);
 
-        int qrScansLast24Hours = (int) (allScans.stream()
-            .filter(s -> s.getScannedAt().isAfter(last24Hours))
-            .count()
-            + menuScans.stream()
-            .filter(s -> s.getScannedAt().isAfter(last24Hours))
-            .count());
-        int qrScansPrev24Hours = (int) (allScans.stream()
-            .filter(s -> s.getScannedAt().isAfter(prev24Hours) && !s.getScannedAt().isAfter(last24Hours))
-            .count()
-            + menuScans.stream()
-            .filter(s -> s.getScannedAt().isAfter(prev24Hours) && !s.getScannedAt().isAfter(last24Hours))
-            .count());
+        int qrScansLast24Hours = (int) (
+                ticketScanRepository.countByScannedAtAfter(last24Hours)
+                        + qrScanEventRepository.countByScannedAtAfter(last24Hours));
+        int qrScansPrev24Hours = (int) (
+                ticketScanRepository.countByScannedAtGreaterThanEqualAndScannedAtBefore(prev24Hours, last24Hours)
+                        + qrScanEventRepository.countByScannedAtGreaterThanEqualAndScannedAtBefore(prev24Hours, last24Hours));
 
-        long revenueThisMonth = allOrders.stream()
-            .filter(o -> o.getCreatedAt().isAfter(startOfMonth))
-            .filter(o -> o.getStatus() == OrderStatus.Completed)
-            .mapToLong(Order::getTotal)
-            .sum();
-        long revenuePrevMonth = allOrders.stream()
-            .filter(o -> o.getCreatedAt().isAfter(prevMonthStart) && !o.getCreatedAt().isAfter(startOfMonth))
-            .filter(o -> o.getStatus() == OrderStatus.Completed)
-            .mapToLong(Order::getTotal)
-            .sum();
+        long revenueThisMonth = orderRepository.sumTotalByCreatedAtAfterAndStatus(startOfMonth, OrderStatus.Completed);
+        long revenuePrevMonth = orderRepository.sumTotalByCreatedAtBetweenAndStatus(
+                prevMonthStart, startOfMonth, OrderStatus.Completed);
 
         return new AdminDashboardDtos.DashboardMetrics(
             new AdminDashboardDtos.MerchantMetrics(
@@ -118,17 +92,11 @@ public class AdminDashboardService {
                 "UGX",
                 formatChange(revenueThisMonth, revenuePrevMonth)
             ),
-            buildSparklines(businesses, allOrders, allScans, menuScans, now)
+            buildSparklines(now)
         );
     }
 
-    private AdminDashboardDtos.SparklineMetrics buildSparklines(
-        List<Business> businesses,
-        List<Order> orders,
-        List<TicketScan> scans,
-        List<QrScanEvent> menuScans,
-        Instant now
-    ) {
+    private AdminDashboardDtos.SparklineMetrics buildSparklines(Instant now) {
         List<Integer> merchants = new ArrayList<>(7);
         List<Integer> ordersToday = new ArrayList<>(7);
         List<Integer> qrScans = new ArrayList<>(7);
@@ -139,26 +107,12 @@ public class AdminDashboardService {
             Instant dayStart = day.atStartOfDay().toInstant(ZoneOffset.UTC);
             Instant dayEnd = day.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
 
-            merchants.add((int) businesses.stream()
-                .filter(b -> !b.getCreatedAt().isAfter(dayEnd))
-                .count());
-
-            ordersToday.add((int) orders.stream()
-                .filter(o -> !o.getCreatedAt().isBefore(dayStart) && o.getCreatedAt().isBefore(dayEnd))
-                .count());
-
-            qrScans.add((int) (scans.stream()
-                .filter(s -> !s.getScannedAt().isBefore(dayStart) && s.getScannedAt().isBefore(dayEnd))
-                .count()
-                + menuScans.stream()
-                .filter(s -> !s.getScannedAt().isBefore(dayStart) && s.getScannedAt().isBefore(dayEnd))
-                .count()));
-
-            revenue.add(orders.stream()
-                .filter(o -> !o.getCreatedAt().isBefore(dayStart) && o.getCreatedAt().isBefore(dayEnd))
-                .filter(o -> o.getStatus() == OrderStatus.Completed)
-                .mapToLong(Order::getTotal)
-                .sum());
+            merchants.add((int) businessRepository.countCreatedOnOrBefore(dayEnd));
+            ordersToday.add((int) orderRepository.countByCreatedAtGreaterThanEqualAndCreatedAtBefore(dayStart, dayEnd));
+            qrScans.add((int) (
+                    ticketScanRepository.countBetween(dayStart, dayEnd)
+                            + qrScanEventRepository.countBetween(dayStart, dayEnd)));
+            revenue.add(orderRepository.sumTotalByCreatedAtBetweenAndStatus(dayStart, dayEnd, OrderStatus.Completed));
         }
 
         return new AdminDashboardDtos.SparklineMetrics(merchants, ordersToday, qrScans, revenue);
@@ -178,11 +132,8 @@ public class AdminDashboardService {
         List<AdminDashboardDtos.ActivityEvent> events = new ArrayList<>();
 
         Instant oneDayAgo = Instant.now().minus(24, ChronoUnit.HOURS);
-        List<Business> recentMerchants = businessRepository.findAll().stream()
-            .filter(b -> b.getCreatedAt().isAfter(oneDayAgo))
-            .sorted(Comparator.comparing(Business::getCreatedAt).reversed())
-            .limit(5)
-            .toList();
+        List<Business> recentMerchants = businessRepository.findByCreatedAtAfterOrderByCreatedAtDesc(
+                oneDayAgo, PageRequest.of(0, 5));
 
         for (Business business : recentMerchants) {
             events.add(new AdminDashboardDtos.ActivityEvent(
@@ -196,20 +147,13 @@ public class AdminDashboardService {
         }
 
         Instant startOfToday = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        List<Order> todayOrders = orderRepository.findAll().stream()
-            .filter(o -> o.getCreatedAt().isAfter(startOfToday))
-            .toList();
-
-        if (!todayOrders.isEmpty()) {
-            long merchantsWithOrders = todayOrders.stream()
-                .map(Order::getMerchantId)
-                .distinct()
-                .count();
-
+        long ordersToday = orderRepository.countByCreatedAtAfter(startOfToday);
+        if (ordersToday > 0) {
+            long merchantsWithOrders = orderRepository.countDistinctMerchantsWithOrdersSince(startOfToday);
             events.add(new AdminDashboardDtos.ActivityEvent(
                 "evt-orders-today",
                 "orders_milestone",
-                todayOrders.size() + " orders placed",
+                ordersToday + " orders placed",
                 "across " + merchantsWithOrders + " merchants · today",
                 Instant.now().toString(),
                 "orders"
@@ -217,12 +161,8 @@ public class AdminDashboardService {
         }
 
         Instant last24Hours = Instant.now().minus(24, ChronoUnit.HOURS);
-        long scans = ticketScanRepository.findAll().stream()
-            .filter(s -> s.getScannedAt().isAfter(last24Hours))
-            .count()
-            + qrScanEventRepository.findAllByOrderByScannedAtDesc().stream()
-            .filter(s -> s.getScannedAt().isAfter(last24Hours))
-            .count();
+        long scans = ticketScanRepository.countByScannedAtAfter(last24Hours)
+                + qrScanEventRepository.countByScannedAtAfter(last24Hours);
         if (scans > 0) {
             events.add(new AdminDashboardDtos.ActivityEvent(
                 "evt-scans-24h",
@@ -248,10 +188,7 @@ public class AdminDashboardService {
             default -> Instant.now().minus(30, ChronoUnit.DAYS);
         };
 
-        List<Order> ordersInPeriod = orderRepository.findAll().stream()
-            .filter(o -> o.getCreatedAt().isAfter(cutoffDate))
-            .filter(o -> o.getStatus() != OrderStatus.Cancelled)
-            .toList();
+        List<Order> ordersInPeriod = orderRepository.findByCreatedAtAfterAndStatusNot(cutoffDate, OrderStatus.Cancelled);
 
         Map<String, List<Order>> ordersByMerchant = ordersInPeriod.stream()
             .collect(Collectors.groupingBy(Order::getMerchantId));

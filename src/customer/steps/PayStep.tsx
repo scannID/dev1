@@ -1,4 +1,5 @@
 import type { Business } from '../../api/types'
+import { formatRemovedIngredients } from '../../lib/catalogCart'
 import type { PaymentProvider } from '../payments'
 import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 import type { CartLine } from './CartStep'
@@ -43,14 +44,18 @@ export function PayStep({
       {business.paymentReference ? <p className="cm-ref">Ref: {business.paymentReference}</p> : null}
 
       <div className="cm-order-strip">
-        {cartItems.map((item) => (
-          <div key={item.id}>
+        {cartItems.map((item) => {
+          const removed = formatRemovedIngredients(item.removedIngredients)
+          return (
+          <div key={item.lineKey}>
             <span>
               {item.quantity}× {item.name}
+              {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
             </span>
             <span>{currency(item.price * item.quantity)}</span>
           </div>
-        ))}
+          )
+        })}
         <div>
           <span>Subtotal</span>
           <span>{currency(cartTotal)}</span>

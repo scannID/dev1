@@ -2,6 +2,8 @@
 
 Short operational guides. Keep them current when hosting changes.
 
+- [1000 TPS readiness](1000-TPS.md) — mixed load test, pass/fail gates, replica kill
+
 ## 1. Stack down / restart
 
 ### Symptoms
@@ -25,7 +27,7 @@ Or from repo root:
 cd /opt/scanny   # or your deploy path
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml logs -f --tail=200 api
+docker compose -f docker-compose.prod.yml logs -f --tail=200 api-1 api-2 api-3
 ```
 
 ### Checks after restart

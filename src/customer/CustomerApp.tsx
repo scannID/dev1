@@ -26,6 +26,11 @@ import { WaitingStep } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
 import {
+  cartLineKey,
+  normalizeRemovedIngredients,
+  parseCartLineKey,
+} from '../lib/catalogCart'
+import {
   buildReceipt,
   getReceiptCount,
   loadReceipts,
@@ -99,9 +104,17 @@ export default function CustomerApp({
 
   const cartItems: CartLine[] = useMemo(() => {
     return Object.entries(cart)
-      .map(([itemId, quantity]) => {
+      .map(([lineKey, quantity]) => {
+        const { itemId, removedIngredients } = parseCartLineKey(lineKey)
         const item = items.find((i) => i.id === itemId)
-        return item ? { ...item, quantity } : null
+        return item
+          ? {
+              ...item,
+              quantity,
+              removedIngredients,
+              lineKey,
+            }
+          : null
       })
       .filter((item): item is CartLine => item !== null)
   }, [items, cart])
@@ -124,6 +137,7 @@ export default function CustomerApp({
           name: item.name,
           quantity: item.quantity,
           price: item.price,
+          removedIngredients: item.removedIngredients,
         })),
         total,
         provider,
@@ -145,20 +159,22 @@ export default function CustomerApp({
         const itemsForReceipt =
           cartItems.length > 0
             ? cartItems
-            : trackedOrder.items.map((item) => ({
+            : trackedOrder.items.map((item, index) => ({
                 id: item.name,
                 name: item.name,
                 category: '',
                 price: Math.round(
                   Math.max(trackedOrder.total - SERVICE_FEE_UGX, 0) /
                     Math.max(
-                      trackedOrder.items.reduce((sum, item) => sum + item.quantity, 0),
+                      trackedOrder.items.reduce((sum, entry) => sum + entry.quantity, 0),
                       1,
                     ),
                 ),
                 description: '',
                 available: true,
                 quantity: item.quantity,
+                removedIngredients: item.removedIngredients ?? [],
+                lineKey: `${item.name}-${index}`,
               }))
         persistPaidReceipt(placedOrderId, trackedOrder.total, itemsForReceipt)
       }
@@ -270,24 +286,25 @@ export default function CustomerApp({
     step,
   ])
 
-  const addToCart = useCallback((itemId: string) => {
-    setCart((prev) => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }))
+  const addToCart = useCallback((itemId: string, removedIngredients?: string[]) => {
+    const key = cartLineKey(itemId, normalizeRemovedIngredients(removedIngredients))
+    setCart((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
   }, [])
 
-  const updateQuantity = useCallback((itemId: string, delta: number) => {
+  const updateQuantity = useCallback((lineKey: string, delta: number) => {
     setCart((prev) => {
-      const nextQty = (prev[itemId] || 0) + delta
+      const nextQty = (prev[lineKey] || 0) + delta
       if (nextQty <= 0) {
-        const { [itemId]: _, ...rest } = prev
+        const { [lineKey]: _, ...rest } = prev
         return rest
       }
-      return { ...prev, [itemId]: nextQty }
+      return { ...prev, [lineKey]: nextQty }
     })
   }, [])
 
-  const removeItem = useCallback((itemId: string) => {
+  const removeItem = useCallback((lineKey: string) => {
     setCart((prev) => {
-      const { [itemId]: _, ...rest } = prev
+      const { [lineKey]: _, ...rest } = prev
       return rest
     })
   }, [])
@@ -381,6 +398,7 @@ export default function CustomerApp({
         items: cartItems.map((item) => ({
           id: item.id,
           quantity: item.quantity,
+          removedIngredients: item.removedIngredients,
         })),
       })
 
@@ -583,15 +601,17 @@ export default function CustomerApp({
               <Package size={18} />
             </button>
           ) : null}
-          <button
-            type="button"
-            className={`cm-receipt-btn${showReceipts ? ' active' : ''}`}
-            onClick={() => setShowReceipts(true)}
-            aria-label="Your receipts"
-          >
-            <Receipt size={18} />
-            {receiptCount > 0 ? <span className="cm-badge">{receiptCount > 99 ? '99+' : receiptCount}</span> : null}
-          </button>
+          {receiptCount > 0 ? (
+            <button
+              type="button"
+              className={`cm-receipt-btn${showReceipts ? ' active' : ''}`}
+              onClick={() => setShowReceipts(true)}
+              aria-label={`${receiptCount} receipts on this device`}
+            >
+              <Receipt size={18} />
+              <span className="cm-badge">{receiptCount > 99 ? '99+' : receiptCount}</span>
+            </button>
+          ) : null}
           {step === 'menu' ? (
             <button
               type="button"

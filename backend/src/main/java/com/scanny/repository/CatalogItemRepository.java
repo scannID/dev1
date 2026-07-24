@@ -1,6 +1,8 @@
 package com.scanny.repository;
 
 import com.scanny.entity.CatalogItem;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,4 +30,16 @@ public interface CatalogItemRepository extends JpaRepository<CatalogItem, String
             @Param("available") Boolean available,
             Pageable pageable
     );
+
+    @Query("""
+            SELECT c FROM CatalogItem c
+            WHERE c.business.id = :businessId
+              AND c.id IN :ids
+            """)
+    List<CatalogItem> findByBusinessIdAndIdIn(
+            @Param("businessId") String businessId,
+            @Param("ids") Collection<String> ids
+    );
+
+    List<CatalogItem> findByBusiness_IdAndAvailableTrue(String businessId);
 }

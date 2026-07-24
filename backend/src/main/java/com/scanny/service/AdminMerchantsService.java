@@ -60,19 +60,21 @@ public class AdminMerchantsService {
             Math.min(end, total)
         );
 
-        // Get orders for all businesses
-        List<Order> allOrders = orderRepository.findAll();
-        Map<String, List<Order>> ordersByMerchant = allOrders.stream()
-            .filter(o -> o.getStatus() == OrderStatus.Completed)
-            .collect(Collectors.groupingBy(Order::getMerchantId));
+        // Aggregate completed-order stats without loading every order row
+        Map<String, long[]> statsByMerchant = orderRepository.aggregateCompletedByMerchant(OrderStatus.Completed)
+            .stream()
+            .collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> new long[]{((Number) row[1]).longValue(), ((Number) row[2]).longValue()}
+            ));
 
         // Build merchant list items
         List<AdminMerchantDtos.MerchantListItem> merchantItems = paginatedBusinesses.stream()
             .map(business -> {
-                List<Order> merchantOrders = ordersByMerchant.getOrDefault(business.getId(), List.of());
-                int orderCount = merchantOrders.size();
-                long revenue = merchantOrders.stream().mapToLong(Order::getTotal).sum();
-                return AdminMerchantDtos.MerchantListItem.from(business, orderCount, revenue);
+                long[] stats = statsByMerchant.getOrDefault(
+                        business.getMerchantId(),
+                        statsByMerchant.getOrDefault(business.getId(), new long[]{0, 0}));
+                return AdminMerchantDtos.MerchantListItem.from(business, (int) stats[0], stats[1]);
             })
             .toList();
 

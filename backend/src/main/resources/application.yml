@@ -58,21 +58,24 @@ scanny:
     enabled: ${REDIS_ENABLED:false}
   cors:
     allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*.*:*,http://10.*.*.*:*}
-    rate-limit:
-      enabled: ${RATE_LIMIT_ENABLED:true}
-      register-per-min: ${RATE_LIMIT_REGISTER_PER_MIN:5}
-      orders-per-min: ${RATE_LIMIT_ORDERS_PER_MIN:30}
-      menu-per-min: ${RATE_LIMIT_MENU_PER_MIN:120}
-      devices-per-min: ${RATE_LIMIT_DEVICES_PER_MIN:20}
-      ticket-scan-per-min: ${RATE_LIMIT_TICKET_SCAN_PER_MIN:60}
-      websocket-per-min: ${RATE_LIMIT_WEBSOCKET_PER_MIN:30}
-      quick-pay-create-per-min: ${RATE_LIMIT_QUICK_PAY_CREATE_PER_MIN:10}
-      payments-initiate-per-min: ${RATE_LIMIT_PAYMENTS_INITIATE_PER_MIN:20}
-      payments-status-per-min: ${RATE_LIMIT_PAYMENTS_STATUS_PER_MIN:60}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    register-per-min: ${RATE_LIMIT_REGISTER_PER_MIN:5}
+    orders-per-min: ${RATE_LIMIT_ORDERS_PER_MIN:30}
+    menu-per-min: ${RATE_LIMIT_MENU_PER_MIN:120}
+    menu-scan-per-min: ${RATE_LIMIT_MENU_SCAN_PER_MIN:120}
+    devices-per-min: ${RATE_LIMIT_DEVICES_PER_MIN:20}
+    ticket-scan-per-min: ${RATE_LIMIT_TICKET_SCAN_PER_MIN:60}
+    websocket-per-min: ${RATE_LIMIT_WEBSOCKET_PER_MIN:30}
+    quick-pay-create-per-min: ${RATE_LIMIT_QUICK_PAY_CREATE_PER_MIN:10}
+    payments-initiate-per-min: ${RATE_LIMIT_PAYMENTS_INITIATE_PER_MIN:20}
+    payments-status-per-min: ${RATE_LIMIT_PAYMENTS_STATUS_PER_MIN:60}
   websocket:
     auth-timeout-ms: ${WS_AUTH_TIMEOUT_MS:5000}
   mail:
     from: ${MAIL_FROM:noreply@scanny.app}
+  pexels:
+    api-key: ${PEXELS_API_KEY:}
   payments:
     default-provider: stub
     fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:true}

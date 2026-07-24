@@ -1,6 +1,7 @@
 package com.scanny.dto;
 
 import com.scanny.entity.CatalogItem;
+import com.scanny.util.JsonLists;
 import java.util.List;
 
 public class CatalogDtos {
@@ -10,6 +11,9 @@ public class CatalogDtos {
         String category,
         int price,
         String description,
+        String imageUrl,
+        String details,
+        List<CatalogIngredient> ingredients,
         boolean available
     ) {}
 
@@ -18,6 +22,9 @@ public class CatalogDtos {
         String category,
         Integer price,
         String description,
+        String imageUrl,
+        String details,
+        List<CatalogIngredient> ingredients,
         Boolean available
     ) {}
 
@@ -39,6 +46,9 @@ public class CatalogDtos {
         String category,
         int price,
         String description,
+        String imageUrl,
+        String details,
+        List<CatalogIngredient> ingredients,
         boolean available
     ) {
         public static CatalogItemResponse from(CatalogItem item) {
@@ -48,6 +58,9 @@ public class CatalogDtos {
                 item.getCategory(),
                 item.getPrice(),
                 item.getDescription(),
+                item.getImageUrl(),
+                item.getDetails() == null ? "" : item.getDetails(),
+                JsonLists.readIngredients(item.getIngredientsJson()),
                 item.isAvailable()
             );
         }

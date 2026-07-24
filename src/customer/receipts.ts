@@ -6,6 +6,7 @@ export interface CustomerReceiptItem {
   quantity: number
   unitPrice: number
   lineTotal: number
+  removedIngredients?: string[]
 }
 
 export interface CustomerReceipt {
@@ -76,7 +77,7 @@ export function buildReceipt(input: {
   businessLogoUrl?: string | null
   customerName: string
   customerPhone: string
-  items: Array<{ name: string; quantity: number; price: number }>
+  items: Array<{ name: string; quantity: number; price: number; removedIngredients?: string[] }>
   total: number
   provider: PaymentProvider
   paymentReference?: string | null
@@ -86,6 +87,7 @@ export function buildReceipt(input: {
     quantity: item.quantity,
     unitPrice: item.price,
     lineTotal: item.price * item.quantity,
+    removedIngredients: item.removedIngredients,
   }))
   const subtotal = receiptItems.reduce((sum, item) => sum + item.lineTotal, 0)
   const serviceFee = subtotal > 0 ? SERVICE_FEE_UGX : 0

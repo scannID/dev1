@@ -16,6 +16,7 @@ import com.scanny.payment.PaymentProviderRegistry;
 import com.scanny.payment.config.PaymentProperties;
 import com.scanny.payment.model.PaymentCommand;
 import com.scanny.payment.model.PaymentProviderResult;
+import com.scanny.repository.PaymentIntentRepository;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,12 +36,14 @@ class PaymentGatewayServiceIdempotencyTest {
     private PaymentProperties properties;
     @Mock
     private PaymentProvider provider;
+    @Mock
+    private PaymentIntentRepository paymentIntentRepository;
 
     private PaymentGatewayService service;
 
     @BeforeEach
     void setUp() {
-        service = new PaymentGatewayService(registry, paymentIntentService, properties);
+        service = new PaymentGatewayService(registry, paymentIntentService, properties, paymentIntentRepository);
     }
 
     @Test
