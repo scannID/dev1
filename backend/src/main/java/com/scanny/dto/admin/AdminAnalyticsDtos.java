@@ -111,7 +111,10 @@ public class AdminAnalyticsDtos {
         int failedPayments,
         long avgOrderValue,
         String currency,
-        RevenueGrowth growth
+        RevenueGrowth growth,
+        long merchantGmv,
+        long platformFees,
+        long psoFees
     ) {}
 
     public record RevenueOverview(

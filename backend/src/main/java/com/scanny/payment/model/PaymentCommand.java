@@ -13,5 +13,12 @@ public record PaymentCommand(
     String customerName,
     String businessId,
     String description,
-    Instant createdAt
+    Instant createdAt,
+    int subtotal,
+    int serviceFee,
+    int psoFee,
+    int platformFee,
+    int merchantPayout,
+    String merchantMomoDestination,
+    String scannyFeeDestination
 ) {}

@@ -2,6 +2,7 @@ package com.scanny.config;
 
 import com.scanny.api.ApiErrorWriter;
 import com.scanny.api.ErrorCode;
+import com.scanny.security.ClientIpResolver;
 import com.scanny.security.RateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,10 +20,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
     private final ApiErrorWriter apiErrorWriter;
+    private final ClientIpResolver clientIpResolver;
 
-    public RateLimitFilter(RateLimitService rateLimitService, ApiErrorWriter apiErrorWriter) {
+    public RateLimitFilter(
+            RateLimitService rateLimitService,
+            ApiErrorWriter apiErrorWriter,
+            ClientIpResolver clientIpResolver
+    ) {
         this.rateLimitService = rateLimitService;
         this.apiErrorWriter = apiErrorWriter;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Override
@@ -32,19 +39,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String bucket = rateLimitService.resolveBucket(request);
-        if (bucket != null && !rateLimitService.tryConsume(bucket, clientKey(request))) {
+        if (bucket != null && !rateLimitService.tryConsume(bucket, clientIpResolver.resolve(request))) {
             response.setHeader("Retry-After", "60");
             apiErrorWriter.write(request, response, ErrorCode.RATE_LIMITED);
             return;
         }
         filterChain.doFilter(request, response);
-    }
-
-    private String clientKey(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
     }
 }

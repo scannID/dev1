@@ -2,6 +2,7 @@ package com.scanny.service;
 
 import com.scanny.entity.AuditEvent;
 import com.scanny.repository.AuditEventRepository;
+import com.scanny.security.ClientIpResolver;
 import com.scanny.security.MerchantAccessService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class AuditServiceTest {
         when(access.actorEmail()).thenReturn("merchant@scanny.app");
         when(access.correlationId()).thenReturn("corr-1");
 
-        AuditService service = new AuditService(repo, access, new ObjectMapper());
+        AuditService service = new AuditService(repo, access, new ClientIpResolver(false, ""), new ObjectMapper());
         service.success("ORDER_STATUS_UPDATE", "order", "ORD-1", Map.of("status", "Ready"));
 
         ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);

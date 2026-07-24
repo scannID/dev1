@@ -16,6 +16,8 @@ public class RateLimitService {
 
     private final StringRedisTemplate redisTemplate;
     private final boolean enabled;
+    /** When true and Redis is configured, Redis errors deny the request instead of falling back locally. */
+    private final boolean failClosed;
     private final int registerPerMin;
     private final int ordersPerMin;
     private final int menuPerMin;
@@ -31,6 +33,7 @@ public class RateLimitService {
     public RateLimitService(
             ObjectProvider<StringRedisTemplate> redisTemplateProvider,
             @Value("${scanny.rate-limit.enabled:true}") boolean enabled,
+            @Value("${scanny.rate-limit.fail-closed:false}") boolean failClosed,
             @Value("${scanny.rate-limit.register-per-min:5}") int registerPerMin,
             @Value("${scanny.rate-limit.orders-per-min:30}") int ordersPerMin,
             @Value("${scanny.rate-limit.menu-per-min:120}") int menuPerMin,
@@ -44,6 +47,7 @@ public class RateLimitService {
     ) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.enabled = enabled;
+        this.failClosed = failClosed;
         this.registerPerMin = registerPerMin;
         this.ordersPerMin = ordersPerMin;
         this.menuPerMin = menuPerMin;
@@ -116,7 +120,10 @@ public class RateLimitService {
                     redisTemplate.expire(key, Duration.ofMinutes(1));
                 }
                 return count == null || count <= limit;
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                if (failClosed) {
+                    return false;
+                }
                 // fall through to local counter
             }
         }

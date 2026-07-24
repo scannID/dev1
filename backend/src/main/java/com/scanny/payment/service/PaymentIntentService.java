@@ -10,14 +10,18 @@ import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TransactionStatus;
 import com.scanny.payment.PaymentContext;
 import com.scanny.payment.PaymentIntentStatus;
+import com.scanny.payment.config.PaymentProperties;
+import com.scanny.payment.model.FeeSplit;
 import com.scanny.payment.model.PaymentCommand;
 import com.scanny.payment.model.PaymentProviderResult;
 import com.scanny.repository.PaymentIntentRepository;
 import com.scanny.repository.QuickPaymentCodeRepository;
 import com.scanny.repository.QuickPaymentTransactionRepository;
+import com.scanny.service.FeeService;
 import com.scanny.service.OrderService;
 import com.scanny.service.OutboxService;
 import com.scanny.service.TicketPurchaseService;
+import com.scanny.entity.Order;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -41,6 +45,8 @@ public class PaymentIntentService {
     private final ObjectMapper objectMapper;
     private final TicketPurchaseService ticketPurchaseService;
     private final OutboxService outboxService;
+    private final FeeService feeService;
+    private final PaymentProperties paymentProperties;
 
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
@@ -49,7 +55,9 @@ public class PaymentIntentService {
             QuickPaymentCodeRepository quickPaymentCodeRepository,
             ObjectMapper objectMapper,
             TicketPurchaseService ticketPurchaseService,
-            OutboxService outboxService) {
+            OutboxService outboxService,
+            FeeService feeService,
+            PaymentProperties paymentProperties) {
         this.paymentIntentRepository = paymentIntentRepository;
         this.orderService = orderService;
         this.quickPaymentTransactionRepository = quickPaymentTransactionRepository;
@@ -57,6 +65,8 @@ public class PaymentIntentService {
         this.objectMapper = objectMapper;
         this.ticketPurchaseService = ticketPurchaseService;
         this.outboxService = outboxService;
+        this.feeService = feeService;
+        this.paymentProperties = paymentProperties;
     }
 
     @Transactional
@@ -74,7 +84,33 @@ public class PaymentIntentService {
         intent.setIdempotencyKey(blankToNull(idempotencyKey));
         intent.setStatus(PaymentIntentStatus.Pending);
         intent.setCreatedAt(Instant.now());
+        intent.setScannyFeeDestination(nullToEmpty(paymentProperties.getScannyFeeDestination()));
+        applyFeeSplit(intent, request);
         return paymentIntentRepository.save(intent);
+    }
+
+    private void applyFeeSplit(PaymentIntent intent, PaymentDtos.InitiateRequest request) {
+        if (request.context() == PaymentContext.ORDER) {
+            Order order = orderService.requireOrderForPayment(request.referenceId());
+            intent.setAmount(order.getTotal());
+            intent.setSubtotal(order.getSubtotal());
+            intent.setServiceFee(order.getServiceFee());
+            intent.setPsoFee(order.getPsoFee());
+            intent.setPlatformFee(order.getPlatformFee());
+            intent.setMerchantPayout(order.getMerchantPayout());
+            intent.setMerchantMomoDestination(order.getMerchantMomoDestination());
+            intent.setBusinessId(order.getBusiness().getId());
+            return;
+        }
+        // Non-order contexts: treat full amount as merchant payout until those flows get fee rules.
+        int amount = Math.max(request.amount(), 0);
+        FeeSplit fees = feeService.split(amount, 0);
+        intent.setSubtotal(fees.subtotal());
+        intent.setServiceFee(0);
+        intent.setPsoFee(0);
+        intent.setPlatformFee(0);
+        intent.setMerchantPayout(amount);
+        intent.setMerchantMomoDestination("");
     }
 
     @Transactional(readOnly = true)
@@ -160,7 +196,14 @@ public class PaymentIntentService {
             intent.getCustomerName(),
             intent.getBusinessId(),
             null,
-            intent.getCreatedAt()
+            intent.getCreatedAt(),
+            intent.getSubtotal(),
+            intent.getServiceFee(),
+            intent.getPsoFee(),
+            intent.getPlatformFee(),
+            intent.getMerchantPayout(),
+            intent.getMerchantMomoDestination(),
+            intent.getScannyFeeDestination()
         );
     }
 

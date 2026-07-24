@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { LoadingSpinner } from './components/LoadingSpinner'
+import { BookLoader } from './components/BookLoader'
 import CategoryField from './components/CategoryField'
 import { CatalogItemImageField } from './components/CatalogItemImageField'
 import { IngredientsEditor } from './components/IngredientsEditor'
@@ -147,6 +147,13 @@ function currency(amount) {
   }).format(amount)
 }
 
+/** What the merchant receives on MoMo (subtotal). Falls back to total for legacy orders. */
+function merchantPayoutOf(order: { merchantPayout?: number; subtotal?: number; total: number }) {
+  if (typeof order.merchantPayout === 'number' && order.merchantPayout > 0) return order.merchantPayout
+  if (typeof order.subtotal === 'number' && order.subtotal > 0) return order.subtotal
+  return order.total
+}
+
 function customerUrl(business: Business) {
   if (business.customerUrl) return business.customerUrl
   if (!business.id || !business.qrToken) return SCAN_BASE_URL
@@ -203,7 +210,7 @@ function App({
         (dayOrders) =>
           dayOrders
             .filter((order) => order.paymentStatus === 'Paid')
-            .reduce((sum, order) => sum + order.total, 0),
+            .reduce((sum, order) => sum + (order.merchantPayout ?? order.subtotal ?? order.total), 0),
       ),
     [orders, business.id],
   )
@@ -277,7 +284,7 @@ function App({
   ).length
   const paidTotal = businessOrders
     .filter((order) => order.paymentStatus === 'Paid')
-    .reduce((sum, _order) => sum + _order.total, 0)
+    .reduce((sum, _order) => sum + merchantPayoutOf(_order), 0)
   const availableItems = (business.items ?? []).filter((item) => item.available).length
 
   async function handleCreateCatalogItem(data: {
@@ -441,7 +448,7 @@ function App({
   if (sessionLoading) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-        <LoadingSpinner label="Loading merchant portal…" />
+        <BookLoader label="Opening your portal…" />
       </main>
     )
   }
@@ -741,7 +748,7 @@ function NotificationsPanel({ businessName, orders }: { businessName: string; or
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{order.id} · {order.customer.name}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>
-                  {order.status} · {order.paymentStatus} · {currency(order.total)}
+                  {order.status} · {order.paymentStatus} · {currency(merchantPayoutOf(order))}
                 </p>
               </div>
               <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flexShrink: 0 }}>
@@ -2193,7 +2200,7 @@ function Dashboard({
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm font-medium font-mono text-foreground">{currency(order.total)}</TableCell>
+                <TableCell className="text-sm font-medium font-mono text-foreground">{currency(merchantPayoutOf(order))}</TableCell>
                 <TableCell className={undefined}><StatusBadge status={order.status} /></TableCell>
                 <TableCell className={undefined}><PaymentBadge status={order.paymentStatus} /></TableCell>
                 <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
@@ -2314,8 +2321,18 @@ function Dashboard({
                     </Select>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <span className="text-sm font-semibold text-foreground">Total</span>
-                    <span className="text-sm font-bold font-mono text-foreground">{currency(detailOrder.total)}</span>
+                    <span className="text-sm text-muted-foreground">Customer paid</span>
+                    <span className="text-sm font-mono text-foreground">{currency(detailOrder.total)}</span>
+                  </div>
+                  {(detailOrder.serviceFee ?? 0) > 0 ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Service fee</span>
+                      <span className="text-sm font-mono text-muted-foreground">{currency(detailOrder.serviceFee ?? 0)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-foreground">You receive (MoMo)</span>
+                    <span className="text-sm font-bold font-mono text-foreground">{currency(merchantPayoutOf(detailOrder))}</span>
                   </div>
                 </div>
               </div>

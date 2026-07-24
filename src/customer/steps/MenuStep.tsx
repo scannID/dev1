@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Minus, Search, ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { getCategoryImage } from '../../lib/categoryImages'
@@ -44,6 +44,14 @@ export function MenuStep({
   const [sheetItemId, setSheetItemId] = useState<string | null>(null)
   const [removedByItem, setRemovedByItem] = useState<Record<string, string[]>>({})
   const [spotlightTab, setSpotlightTab] = useState<'offers' | 'popular'>('offers')
+  const menuSectionRef = useRef<HTMLElement>(null)
+
+  function goToPage(nextPage: number) {
+    setPage(nextPage)
+    requestAnimationFrame(() => {
+      menuSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   const categories = useMemo(
     () => ['all', ...new Set(items.map((item) => item.category))],
@@ -231,6 +239,7 @@ export function MenuStep({
       ) : null}
 
       <section
+        ref={menuSectionRef}
         className={`cm-menu-section${showSpotlight ? ' cm-menu-section--after-offers' : ''}`}
         aria-label="Menu"
       >
@@ -352,7 +361,7 @@ export function MenuStep({
             type="button"
             className="cm-pager-btn"
             disabled={currentPage <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => goToPage(Math.max(1, currentPage - 1))}
             aria-label="Previous page"
           >
             <ChevronLeft size={16} />
@@ -364,7 +373,7 @@ export function MenuStep({
             type="button"
             className="cm-pager-btn"
             disabled={currentPage >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
             aria-label="Next page"
           >
             <ChevronRight size={16} />

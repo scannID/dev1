@@ -154,6 +154,14 @@ export interface Order {
   customer: Customer
   items: OrderItem[]
   total: number
+  /** Item lines only — credited to merchant MoMo. */
+  subtotal?: number
+  serviceFee?: number
+  psoFee?: number
+  platformFee?: number
+  /** Same as subtotal; what merchant receives on MoMo. */
+  merchantPayout?: number
+  merchantMomoDestination?: string
   paymentStatus: PaymentStatus
   status: OrderStatus
   createdAt: string
@@ -204,6 +212,9 @@ export interface CustomerOrderTracking {
   businessName: string
   items: Array<{ name: string; quantity: number; removedIngredients?: string[] }>
   total: number
+  subtotal?: number
+  serviceFee?: number
+  merchantPayout?: number
   status: OrderStatus
   paymentStatus: PaymentStatus
   createdAt: string
@@ -570,5 +581,11 @@ export interface PaymentProviderInfo {
 export interface PaymentProvidersResponse {
   providers: PaymentProviderInfo[]
   defaultProvider: string
+}
+
+export interface FeeConfig {
+  serviceFeeUgx: number
+  psoPercent: number
+  currency: string
 }
 

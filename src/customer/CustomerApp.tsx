@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { businessApi, devicesApi, ordersApi } from '../api/services'
+import { businessApi, devicesApi, feesApi, ordersApi } from '../api/services'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
@@ -35,7 +35,7 @@ import {
   type CustomerReceipt,
 } from './receipts'
 import { useOrderTracking } from './useOrderTracking'
-import { currency, formatUgPhoneHint, getOrCreateDeviceId, SERVICE_FEE_UGX, withServiceFee } from './utils'
+import { currency, formatUgPhoneHint, getOrCreateDeviceId, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from './utils'
 import { UtensilLoader } from './UtensilLoader'
 import './CustomerApp.css'
 
@@ -60,6 +60,7 @@ export default function CustomerApp({
   const [estimatedWaitMinutes, setEstimatedWaitMinutes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [serviceFeeUgx, setServiceFeeUgx] = useState(DEFAULT_SERVICE_FEE_UGX)
 
   const [cart, setCart] = useState<Record<string, number>>(draft?.cart ?? {})
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -120,7 +121,7 @@ export default function CustomerApp({
   }, [items, cart])
 
   const cartTotal = cartItems.reduce((sum, item) => sum + effectivePrice(item) * item.quantity, 0)
-  const payableTotal = withServiceFee(cartTotal)
+  const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
   const persistPaidReceipt = useCallback(
@@ -142,12 +143,13 @@ export default function CustomerApp({
         })),
         total,
         provider,
+        serviceFeeUgx,
       })
       const next = saveReceipt(receipt)
       setReceipts(next)
       setReceiptCount(next.length)
     },
-    [business, customerName, phone, provider],
+    [business, customerName, phone, provider, serviceFeeUgx],
   )
 
   useEffect(() => {
@@ -165,7 +167,7 @@ export default function CustomerApp({
                 name: item.name,
                 category: '',
                 price: Math.round(
-                  Math.max(trackedOrder.total - SERVICE_FEE_UGX, 0) /
+                  Math.max(trackedOrder.total - (trackedOrder.serviceFee ?? serviceFeeUgx), 0) /
                     Math.max(
                       trackedOrder.items.reduce((sum, entry) => sum + entry.quantity, 0),
                       1,
@@ -183,7 +185,24 @@ export default function CustomerApp({
       setCart({})
       setStep('done')
     }
-  }, [trackedOrder, step, paymentStatus, businessId, placedOrderId, cartItems, persistPaidReceipt])
+  }, [trackedOrder, step, paymentStatus, businessId, placedOrderId, cartItems, persistPaidReceipt, serviceFeeUgx])
+
+  useEffect(() => {
+    let cancelled = false
+    feesApi
+      .get()
+      .then((fees) => {
+        if (!cancelled && typeof fees.serviceFeeUgx === 'number') {
+          setServiceFeeUgx(fees.serviceFeeUgx)
+        }
+      })
+      .catch(() => {
+        /* keep DEFAULT_SERVICE_FEE_UGX */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -723,6 +742,7 @@ export default function CustomerApp({
         <CartStep
           cartItems={cartItems}
           cartTotal={cartTotal}
+          serviceFeeUgx={serviceFeeUgx}
           onUpdateQty={updateQuantity}
           onRemove={removeItem}
           onBackToMenu={() => setStep('menu')}
@@ -754,6 +774,7 @@ export default function CustomerApp({
           business={business}
           cartItems={cartItems}
           cartTotal={cartTotal}
+          serviceFeeUgx={serviceFeeUgx}
           provider={provider}
           phone={phone}
           saveNumber={saveNumber}

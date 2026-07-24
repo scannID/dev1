@@ -1,11 +1,14 @@
 const DEVICE_KEY = 'scanny-device-id'
 
-/** Flat service fee (UGX) applied on top of every cart/order subtotal. */
-export const SERVICE_FEE_UGX = 700
+/** Fallback when `/api/fees` has not loaded yet. Backend is source of truth. */
+export const DEFAULT_SERVICE_FEE_UGX = 700
 
-export function withServiceFee(subtotal: number) {
+/** @deprecated Prefer fee from `/api/fees`. Kept as fallback for receipts/boot. */
+export const SERVICE_FEE_UGX = DEFAULT_SERVICE_FEE_UGX
+
+export function withServiceFee(subtotal: number, serviceFeeUgx: number = DEFAULT_SERVICE_FEE_UGX) {
   if (subtotal <= 0) return 0
-  return subtotal + SERVICE_FEE_UGX
+  return subtotal + Math.max(0, serviceFeeUgx)
 }
 
 export function currency(amount: number) {
@@ -50,4 +53,3 @@ export function formatUgPhoneHint(value: string) {
   const digits = value.replace(/[^\d+]/g, '')
   return digits
 }
-

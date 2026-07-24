@@ -41,10 +41,11 @@ public class MtnMomoPaymentProvider implements PaymentProvider {
     @Override
     public PaymentProviderResult initiate(PaymentCommand command) {
         ensureConfigured();
-        // TODO: POST {config.apiUrl}/collection/v1_0/requesttopay
-        // Use config.apiKey, config.subscriptionKey, config.callbackUrl
-        // Map command.customerPhone(), command.amount(), command.currency()
-        // Return Processing with provider transaction id as providerReference
+        // TODO: POST split-settlement collection:
+        //  - merchant MoMo (command.merchantMomoDestination) gets command.merchantPayout (subtotal)
+        //  - Scanny (command.scannyFeeDestination) gets command.platformFee
+        //  - PSO keeps command.psoFee from the service fee
+        // Map command.customerPhone(), command.amount() (gross), command.currency()
         throw new ApiException(501, "MTN MoMo initiate() not implemented — plug in the MTN API client here.");
     }
 

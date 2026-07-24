@@ -31,6 +31,27 @@ public class PaymentIntent {
     private int amount;
 
     @Column(nullable = false)
+    private int subtotal;
+
+    @Column(name = "service_fee", nullable = false)
+    private int serviceFee;
+
+    @Column(name = "pso_fee", nullable = false)
+    private int psoFee;
+
+    @Column(name = "platform_fee", nullable = false)
+    private int platformFee;
+
+    @Column(name = "merchant_payout", nullable = false)
+    private int merchantPayout;
+
+    @Column(name = "merchant_momo_destination", nullable = false)
+    private String merchantMomoDestination = "";
+
+    @Column(name = "scanny_fee_destination", nullable = false)
+    private String scannyFeeDestination = "";
+
+    @Column(nullable = false)
     private String currency = "UGX";
 
     @Column(name = "customer_phone", nullable = false)
@@ -111,6 +132,62 @@ public class PaymentIntent {
 
     public void setAmount(int amount) {
         this.amount = amount;
+    }
+
+    public int getSubtotal() {
+        return subtotal;
+    }
+
+    public void setSubtotal(int subtotal) {
+        this.subtotal = subtotal;
+    }
+
+    public int getServiceFee() {
+        return serviceFee;
+    }
+
+    public void setServiceFee(int serviceFee) {
+        this.serviceFee = serviceFee;
+    }
+
+    public int getPsoFee() {
+        return psoFee;
+    }
+
+    public void setPsoFee(int psoFee) {
+        this.psoFee = psoFee;
+    }
+
+    public int getPlatformFee() {
+        return platformFee;
+    }
+
+    public void setPlatformFee(int platformFee) {
+        this.platformFee = platformFee;
+    }
+
+    public int getMerchantPayout() {
+        return merchantPayout;
+    }
+
+    public void setMerchantPayout(int merchantPayout) {
+        this.merchantPayout = merchantPayout;
+    }
+
+    public String getMerchantMomoDestination() {
+        return merchantMomoDestination;
+    }
+
+    public void setMerchantMomoDestination(String merchantMomoDestination) {
+        this.merchantMomoDestination = merchantMomoDestination != null ? merchantMomoDestination : "";
+    }
+
+    public String getScannyFeeDestination() {
+        return scannyFeeDestination;
+    }
+
+    public void setScannyFeeDestination(String scannyFeeDestination) {
+        this.scannyFeeDestination = scannyFeeDestination != null ? scannyFeeDestination : "";
     }
 
     public String getCurrency() {

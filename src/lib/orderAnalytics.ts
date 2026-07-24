@@ -73,6 +73,13 @@ function inRange(order: Order, start: Date | null, end: Date | null) {
   return true
 }
 
+/** Merchant MoMo credit (subtotal). Legacy orders fall back to total. */
+function merchantPayoutOf(order: Order) {
+  if (typeof order.merchantPayout === 'number' && order.merchantPayout > 0) return order.merchantPayout
+  if (typeof order.subtotal === 'number' && order.subtotal > 0) return order.subtotal
+  return order.total
+}
+
 export function filterOrdersByRange(orders: Order[], range: TimeRange): Order[] {
   const now = new Date()
   const today = startOfDay(now)
@@ -151,7 +158,7 @@ function bucketOrders(
   return buckets.map((bucket) => {
     const bucketOrders = orders.filter((order) => inRange(order, bucket.start, bucket.end))
     const paidOrders = bucketOrders.filter((order) => order.paymentStatus === 'Paid')
-    const paid = paidOrders.reduce((sum, order) => sum + order.total, 0)
+    const paid = paidOrders.reduce((sum, order) => sum + merchantPayoutOf(order), 0)
     return {
       label: bucket.label,
       orders: bucketOrders.length,
@@ -260,14 +267,14 @@ export function buildMetricSeries(orders: Order[], range: MetricRange): MetricSe
 export function buildReportData(orders: Order[], range: TimeRange): ReportData {
   const filtered = filterOrdersByRange(orders, range)
   const paidOrders = filtered.filter((order) => order.paymentStatus === 'Paid')
-  const totalRevenue = paidOrders.reduce((sum, order) => sum + order.total, 0)
+  const totalRevenue = paidOrders.reduce((sum, order) => sum + merchantPayoutOf(order), 0)
   const totalOrders = filtered.length
   const completedOrders = filtered.filter((order) => order.status === 'Completed').length
 
   const trendDays = range === 'today' ? 7 : range === 'week' ? 7 : range === 'month' ? 7 : 7
   const revenueTrend = dailySeries(
     filtered,
-    (dayOrders) => dayOrders.filter((order) => order.paymentStatus === 'Paid').reduce((sum, order) => sum + order.total, 0),
+    (dayOrders) => dayOrders.filter((order) => order.paymentStatus === 'Paid').reduce((sum, order) => sum + merchantPayoutOf(order), 0),
     trendDays,
   )
   const ordersTrend = dailySeries(filtered, (dayOrders) => dayOrders.length, trendDays)
@@ -275,7 +282,7 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
     filtered,
     (dayOrders) => {
       if (!dayOrders.length) return 0
-      return dayOrders.reduce((sum, order) => sum + order.total, 0) / dayOrders.length
+      return dayOrders.reduce((sum, order) => sum + merchantPayoutOf(order), 0) / dayOrders.length
     },
     trendDays,
   )
@@ -307,7 +314,7 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
   const paymentBreakdown = Object.fromEntries(
     PAYMENT_KEYS.map((key) => [
       key,
-      filtered.filter((order) => order.paymentStatus === key).reduce((sum, order) => sum + order.total, 0),
+      filtered.filter((order) => order.paymentStatus === key).reduce((sum, order) => sum + merchantPayoutOf(order), 0),
     ]),
   ) as Record<PaymentStatus, number>
 
@@ -324,7 +331,7 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
           id: order.id,
           customer: order.customer.name,
           items: order.items.map((item) => `${item.quantity}x ${item.name}`),
-          total: order.total,
+          total: merchantPayoutOf(order),
         })),
     ]),
   ) as Record<OrderStatus, ReportOrderRow[]>

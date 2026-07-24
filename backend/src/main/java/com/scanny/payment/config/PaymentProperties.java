@@ -7,6 +7,8 @@ public class PaymentProperties {
 
     private String defaultProvider = "stub";
     private boolean fallbackToStub = false;
+    /** Scanny account/wallet that receives serviceFee - psoFee after split settlement. */
+    private String scannyFeeDestination = "";
 
     private Stub stub = new Stub();
     private ProviderConfig mtnMomo = new ProviderConfig();
@@ -26,6 +28,14 @@ public class PaymentProperties {
 
     public void setFallbackToStub(boolean fallbackToStub) {
         this.fallbackToStub = fallbackToStub;
+    }
+
+    public String getScannyFeeDestination() {
+        return scannyFeeDestination;
+    }
+
+    public void setScannyFeeDestination(String scannyFeeDestination) {
+        this.scannyFeeDestination = scannyFeeDestination != null ? scannyFeeDestination : "";
     }
 
     public Stub getStub() {

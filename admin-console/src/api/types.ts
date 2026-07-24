@@ -156,6 +156,9 @@ export interface RevenueOverview {
       failedPayments: number
       avgOrderValue: number
     }
+    merchantGmv: number
+    platformFees: number
+    psoFees: number
   }
   monthly: Array<{ month: string; revenue: number; transactions: number }>
   paymentMethods: Array<{ method: string; percentage: number; amount: number }>

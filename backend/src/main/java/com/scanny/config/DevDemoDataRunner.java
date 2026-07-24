@@ -190,6 +190,15 @@ public class DevDemoDataRunner implements ApplicationRunner {
         order.setBusinessName(business.getName());
         order.setCustomerName(customerName);
         order.setCustomerPhone("+256700000001");
+        int serviceFee = 700;
+        int subtotal = Math.max(total - serviceFee, 0);
+        int psoFee = (int) Math.round(serviceFee * 0.30);
+        order.setSubtotal(subtotal);
+        order.setServiceFee(serviceFee);
+        order.setPsoFee(psoFee);
+        order.setPlatformFee(serviceFee - psoFee);
+        order.setMerchantPayout(subtotal);
+        order.setMerchantMomoDestination("");
         order.setTotal(total);
         order.setStatus(OrderStatus.Completed);
         order.setPaymentStatus(PaymentStatus.Paid);

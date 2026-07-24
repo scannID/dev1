@@ -39,6 +39,7 @@ import type {
   PaymentInitiateRequest,
   PaymentInitiateResponse,
   PaymentStatusResponse,
+  PaymentProvidersResponse,
   TicketPurchaseRequest,
   TicketPurchaseResponse,
   TicketEventInfo,
@@ -47,6 +48,7 @@ import type {
   GateEventResponse,
   PagedResult,
   PaginationMeta,
+  FeeConfig,
 } from './types'
 
 export type CatalogListParams = {
@@ -356,6 +358,12 @@ export const paymentsApi = {
   },
 }
 
+export const feesApi = {
+  get: async (): Promise<FeeConfig> => {
+    return api.get<FeeConfig>('/fees')
+  },
+}
+
 export const publicTicketsApi = {
   getEvent: async (masterQrToken: string): Promise<TicketEventInfo> => {
     return api.get<TicketEventInfo>(`/tickets/public/event/${encodeURIComponent(masterQrToken)}`)
@@ -403,6 +411,7 @@ export const scannyApi = {
   devices: devicesApi,
   quickPayments: quickPaymentsApi,
   payments: paymentsApi,
+  fees: feesApi,
   publicTickets: publicTicketsApi,
 }
 

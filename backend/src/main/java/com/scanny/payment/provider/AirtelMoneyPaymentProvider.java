@@ -39,7 +39,7 @@ public class AirtelMoneyPaymentProvider implements PaymentProvider {
     @Override
     public PaymentProviderResult initiate(PaymentCommand command) {
         ensureConfigured();
-        // TODO: call Airtel collection API with command + config credentials
+        // TODO: split settlement — merchant MoMo gets merchantPayout; Scanny gets platformFee; PSO takes psoFee
         throw new ApiException(501, "Airtel Money initiate() not implemented — plug in the Airtel API client here.");
     }
 

@@ -15,7 +15,10 @@ import com.scanny.entity.OrderLineItem;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
+import com.scanny.entity.Merchant;
+import com.scanny.payment.model.FeeSplit;
 import com.scanny.repository.CatalogItemRepository;
+import com.scanny.repository.MerchantRepository;
 import com.scanny.repository.OrderRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CatalogPricing;
@@ -44,15 +47,14 @@ public class OrderService {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
 
-    /** Flat service fee (UGX) applied on top of every order subtotal. */
-    public static final int SERVICE_FEE_UGX = 700;
-    
     private final BusinessService businessService;
     private final OrderRepository orderRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final ReceiptService receiptService;
     private final MerchantAccessService merchantAccessService;
     private final OutboxService outboxService;
+    private final FeeService feeService;
+    private final MerchantRepository merchantRepository;
 
     public OrderService(
             BusinessService businessService,
@@ -60,7 +62,9 @@ public class OrderService {
             CatalogItemRepository catalogItemRepository,
             ReceiptService receiptService,
             MerchantAccessService merchantAccessService,
-            OutboxService outboxService
+            OutboxService outboxService,
+            FeeService feeService,
+            MerchantRepository merchantRepository
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -68,6 +72,8 @@ public class OrderService {
         this.receiptService = receiptService;
         this.merchantAccessService = merchantAccessService;
         this.outboxService = outboxService;
+        this.feeService = feeService;
+        this.merchantRepository = merchantRepository;
     }
 
     @Transactional(readOnly = true)
@@ -214,7 +220,8 @@ public class OrderService {
         }
 
         int subtotal = lines.stream().mapToInt(OrderLineItem::getLineTotal).sum();
-        int total = subtotal + SERVICE_FEE_UGX;
+        FeeSplit fees = feeService.split(subtotal);
+        String merchantMomo = resolveMerchantMomo(business.getMerchantId());
 
         Order order = new Order();
         order.setId("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
@@ -228,7 +235,13 @@ public class OrderService {
         order.setCustomerPhone(trimToEmpty(request.customer().phone()));
         order.setCustomerLocation(trimToEmpty(request.customer().location()));
         order.setCustomerNote(trimToEmpty(request.customer().note()));
-        order.setTotal(total);
+        order.setSubtotal(fees.subtotal());
+        order.setServiceFee(fees.serviceFee());
+        order.setPsoFee(fees.psoFee());
+        order.setPlatformFee(fees.platformFee());
+        order.setMerchantPayout(fees.merchantPayout());
+        order.setMerchantMomoDestination(merchantMomo);
+        order.setTotal(fees.grossCharged());
         order.setStatus(OrderStatus.Pending);
         order.setPaymentStatus(PaymentStatus.Unpaid);
         order.setCreatedAt(Instant.now());
@@ -369,6 +382,33 @@ public class OrderService {
         return order;
     }
 
+    @Transactional(readOnly = true)
+    public Order requireOrderForPayment(String orderId) {
+        return orderRepository.findWithItemsById(orderId)
+                .or(() -> {
+                    try {
+                        return orderRepository.findWithItemsByPublicId(UUID.fromString(orderId));
+                    } catch (IllegalArgumentException ex) {
+                        return java.util.Optional.empty();
+                    }
+                })
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+    }
+
+    private String resolveMerchantMomo(String merchantId) {
+        if (merchantId == null || merchantId.isBlank()) {
+            return "";
+        }
+        try {
+            return merchantRepository.findById(UUID.fromString(merchantId))
+                    .map(Merchant::getPaymentNumber)
+                    .filter(n -> n != null && !n.isBlank())
+                    .orElse("");
+        } catch (IllegalArgumentException ex) {
+            return "";
+        }
+    }
+
     private String trimToEmpty(String value) {
         return value != null ? value.trim() : "";
     }
@@ -424,9 +464,13 @@ public class OrderService {
             "Mobile Money",                                 // paymentMethod
             order.getPaymentReference(),                    // paymentReference
             receiptItems,                                   // items
-            BigDecimal.valueOf(Math.max(order.getTotal() - SERVICE_FEE_UGX, 0)), // subtotal
+            BigDecimal.valueOf(order.getSubtotal() > 0
+                    ? order.getSubtotal()
+                    : Math.max(order.getTotal() - order.getServiceFee(), 0)), // subtotal
             BigDecimal.ZERO,                                // taxAmount
-            BigDecimal.valueOf(SERVICE_FEE_UGX),            // serviceFee
+            BigDecimal.valueOf(order.getServiceFee() > 0
+                    ? order.getServiceFee()
+                    : feeService.serviceFeeUgx()),            // serviceFee
             order.getCustomerNote(),                        // notes
             false,                                          // sendEmail (no email available)
             false                                           // generatePdf

@@ -33,9 +33,15 @@ keycloak:
 spring.security.oauth2.resourceserver.jwt:
   jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
 
+server:
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:framework}
+
 scanny.jwt:
   accepted-issuers: ${KEYCLOAK_ISSUER_URI}
   allow-lan-issuers: false
+  # Keycloak puts client id in azp; aud is often "account". Bind both in prod.
+  accepted-audiences: ${SCANNY_JWT_ACCEPTED_AUDIENCES:account}
+  accepted-azp: ${SCANNY_JWT_ACCEPTED_AZP:scanny-client,scanny-admin}
 
 scanny:
   scan-base-url: ${SCAN_BASE_URL}
@@ -43,8 +49,16 @@ scanny:
     enabled: true
   cors:
     allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS}
+    allow-wildcard-patterns: ${SCANNY_CORS_ALLOW_WILDCARDS:false}
+  client-ip:
+    trust-forwarded-headers: ${SCANNY_TRUST_FORWARDED_HEADERS:true}
+    trusted-proxies: ${SCANNY_TRUSTED_PROXIES:10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32}
+  security:
+    headers:
+      hsts-enabled: ${SCANNY_HSTS_ENABLED:true}
   rate-limit:
     enabled: true
+    fail-closed: ${RATE_LIMIT_FAIL_CLOSED:true}
   outbox:
     poll-ms: 500
   payments:

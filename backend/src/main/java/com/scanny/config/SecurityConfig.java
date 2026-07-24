@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -31,6 +33,15 @@ public class SecurityConfig {
     @Value("${scanny.cors.allowed-origin-patterns}")
     private String allowedOriginPatterns;
 
+    @Value("${scanny.security.headers.hsts-enabled:false}")
+    private boolean hstsEnabled;
+
+    @Value("${scanny.security.headers.hsts-max-age-seconds:31536000}")
+    private long hstsMaxAgeSeconds;
+
+    @Value("${scanny.security.headers.content-security-policy:default-src 'none'; frame-ancestors 'none'; base-uri 'none'}")
+    private String contentSecurityPolicy;
+
     private final ApiErrorWriter apiErrorWriter;
 
     public SecurityConfig(ApiErrorWriter apiErrorWriter) {
@@ -47,6 +58,25 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
+            .headers(headers -> {
+                headers.contentTypeOptions(Customizer.withDefaults());
+                headers.frameOptions(frame -> frame.deny());
+                headers.referrerPolicy(referrer ->
+                        referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+                headers.permissionsPolicy(permissions ->
+                        permissions.policy("camera=(), microphone=(), geolocation=(), payment=()"));
+                if (contentSecurityPolicy != null && !contentSecurityPolicy.isBlank()) {
+                    headers.contentSecurityPolicy(csp -> csp.policyDirectives(contentSecurityPolicy));
+                }
+                if (hstsEnabled) {
+                    headers.httpStrictTransportSecurity(hsts -> hsts
+                            .includeSubDomains(true)
+                            .preload(true)
+                            .maxAgeInSeconds(hstsMaxAgeSeconds));
+                } else {
+                    headers.httpStrictTransportSecurity(hsts -> hsts.disable());
+                }
+            })
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/health", "/api/health", "/actuator/health", "/actuator/health/**").permitAll()
@@ -69,6 +99,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/quick-payments/codes/qr/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/quick-payments/codes/qr/*/pay").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payments/providers").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/fees").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/payments/initiate").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payments/*/status").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/**").permitAll()

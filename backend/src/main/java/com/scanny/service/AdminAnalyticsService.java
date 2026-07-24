@@ -221,7 +221,10 @@ public class AdminAnalyticsService {
             current.failed,
             current.avgOrderValue(),
             "UGX",
-            growth
+            growth,
+            current.merchantGmv,
+            current.platformFees,
+            current.psoFees
         );
 
         List<AdminAnalyticsDtos.MonthlyRevenue> monthly = buildMonthlyRevenue(
@@ -235,7 +238,14 @@ public class AdminAnalyticsService {
         return new AdminAnalyticsDtos.RevenueOverview(currentMonth, monthly, paymentMethods);
     }
 
-    private record PeriodTotals(long revenue, int transactions, int failed) {
+    private record PeriodTotals(
+            long revenue,
+            int transactions,
+            int failed,
+            long merchantGmv,
+            long platformFees,
+            long psoFees
+    ) {
         long avgOrderValue() {
             return transactions > 0 ? revenue / transactions : 0;
         }
@@ -276,15 +286,18 @@ public class AdminAnalyticsService {
             .filter(t -> t.getStatus() == TransactionStatus.Failed)
             .count();
 
-        long orderRevenue = orders.stream()
+        List<Order> paidOrders = orders.stream()
             .filter(o -> inRange(o.getCreatedAt(), start, end))
             .filter(this::isPaidOrder)
-            .mapToLong(Order::getTotal)
+            .toList();
+
+        long orderRevenue = paidOrders.stream().mapToLong(Order::getTotal).sum();
+        long merchantGmv = paidOrders.stream()
+            .mapToLong(o -> o.getMerchantPayout() > 0 ? o.getMerchantPayout() : Math.max(o.getTotal() - o.getServiceFee(), 0))
             .sum();
-        int orderCount = (int) orders.stream()
-            .filter(o -> inRange(o.getCreatedAt(), start, end))
-            .filter(this::isPaidOrder)
-            .count();
+        long platformFees = paidOrders.stream().mapToLong(Order::getPlatformFee).sum();
+        long psoFees = paidOrders.stream().mapToLong(Order::getPsoFee).sum();
+        int orderCount = paidOrders.size();
         int orderFailed = (int) orders.stream()
             .filter(o -> inRange(o.getCreatedAt(), start, end))
             .filter(o -> o.getPaymentStatus() == PaymentStatus.Unpaid
@@ -294,7 +307,10 @@ public class AdminAnalyticsService {
         return new PeriodTotals(
             qpRevenue + deviceRevenue + orderRevenue,
             qpCount + deviceCount + orderCount,
-            qpFailed + deviceFailed + orderFailed
+            qpFailed + deviceFailed + orderFailed,
+            merchantGmv + qpRevenue + deviceRevenue,
+            platformFees,
+            psoFees
         );
     }
 

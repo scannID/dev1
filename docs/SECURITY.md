@@ -47,7 +47,7 @@ Do not place bearer tokens in URLs when an authenticated first message or a supp
 
 Redis backs distributed rate limits, cache entries, and pub/sub. Use namespaced keys with explicit TTLs and do not store secrets or durable business state there. Production Redis must require authentication, use encrypted transport where supported, and be reachable only from trusted application networks.
 
-Security-sensitive rate limiting needs an explicit failure policy. An outage must not silently turn an enforced protection into unlimited access.
+Security-sensitive rate limiting needs an explicit failure policy. Production sets `scanny.rate-limit.fail-closed=true` so a Redis outage denies limited requests instead of silently opening unlimited access.
 
 ## Audit trail
 
@@ -57,7 +57,11 @@ Audit records should be append-only to normal application roles, exclude secrets
 
 ## Browser and network security
 
-Production requires HTTPS for all public origins and `wss://` for WebSockets. Configure exact CORS and WebSocket origins; localhost and wildcard development patterns are not production defaults. Add security headers at the application or edge, including a tested Content Security Policy.
+Production requires HTTPS for all public origins and `wss://` for WebSockets. Configure exact CORS origins (`SCANNY_CORS_ORIGIN_PATTERNS`); localhost and wildcard development patterns are rejected by `ProdCorsGuard` unless `scanny.cors.allow-wildcard-patterns=true`. The API emits security headers (nosniff, frame deny, Referrer-Policy, Permissions-Policy, API CSP, and HSTS when enabled).
+
+JWT validation covers issuer, signature, lifetime, and in production also audience (`aud`, default `account`) and authorized party (`azp`, Keycloak client ids such as `scanny-client` / `scanny-admin`).
+
+Client IP for rate limits and audit uses `request.getRemoteAddr()` by default. `X-Forwarded-For` is honored only when `scanny.client-ip.trust-forwarded-headers=true` **and** the immediate peer is in `scanny.client-ip.trusted-proxies`. Production rate limiting uses Redis with `fail-closed` so a Redis outage does not silently remove limits.
 
 Keycloak redirect URIs and web origins must be exact production values. Rotate all local defaults before deployment and use a secret manager for database, Keycloak, mail, Redis, and integration credentials.
 

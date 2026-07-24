@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scanny.entity.AuditEvent;
 import com.scanny.repository.AuditEventRepository;
+import com.scanny.security.ClientIpResolver;
 import com.scanny.security.MerchantAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -25,15 +26,18 @@ public class AuditService {
 
     private final AuditEventRepository auditEventRepository;
     private final MerchantAccessService merchantAccessService;
+    private final ClientIpResolver clientIpResolver;
     private final ObjectMapper objectMapper;
 
     public AuditService(
             AuditEventRepository auditEventRepository,
             MerchantAccessService merchantAccessService,
+            ClientIpResolver clientIpResolver,
             ObjectMapper objectMapper
     ) {
         this.auditEventRepository = auditEventRepository;
         this.merchantAccessService = merchantAccessService;
+        this.clientIpResolver = clientIpResolver;
         this.objectMapper = objectMapper;
     }
 
@@ -85,11 +89,8 @@ public class AuditService {
                 return null;
             }
             HttpServletRequest request = attrs.getRequest();
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                return forwarded.split(",")[0].trim();
-            }
-            return request.getRemoteAddr();
+            String ip = clientIpResolver.resolve(request);
+            return "unknown".equals(ip) ? null : ip;
         } catch (Exception ex) {
             return null;
         }

@@ -13,4 +13,13 @@ public record PaymentProviderResult(
     public PaymentProviderResult(PaymentIntentStatus status, String providerReference, String customerMessage) {
         this(status, providerReference, customerMessage, null, Map.of());
     }
+
+    public PaymentProviderResult(
+            PaymentIntentStatus status,
+            String providerReference,
+            String customerMessage,
+            Map<String, String> metadata
+    ) {
+        this(status, providerReference, customerMessage, null, metadata != null ? metadata : Map.of());
+    }
 }

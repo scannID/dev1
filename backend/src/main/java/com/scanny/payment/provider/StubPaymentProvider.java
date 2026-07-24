@@ -49,11 +49,34 @@ public class StubPaymentProvider implements PaymentProvider {
 
     @Override
     public PaymentProviderResult initiate(PaymentCommand command) {
+        log.info(
+            "Stub split settlement paymentId={} gross={} merchantMoMo={} subtotal={} psoFee={} platformFee={} scannyDest={}",
+            command.paymentIntentId(),
+            command.amount(),
+            command.merchantMomoDestination(),
+            command.merchantPayout(),
+            command.psoFee(),
+            command.platformFee(),
+            command.scannyFeeDestination()
+        );
         return new PaymentProviderResult(
             PaymentIntentStatus.Processing,
             "STUB-" + command.paymentIntentId(),
-            "Approve the mobile money prompt on your phone. We will confirm once payment is received."
+            "Approve the mobile money prompt on your phone. We will confirm once payment is received.",
+            Map.of(
+                "settlement", "split",
+                "merchantPayout", String.valueOf(command.merchantPayout()),
+                "merchantMomoDestination", nullToEmpty(command.merchantMomoDestination()),
+                "serviceFee", String.valueOf(command.serviceFee()),
+                "psoFee", String.valueOf(command.psoFee()),
+                "platformFee", String.valueOf(command.platformFee()),
+                "scannyFeeDestination", nullToEmpty(command.scannyFeeDestination())
+            )
         );
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     @Override

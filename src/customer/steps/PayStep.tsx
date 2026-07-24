@@ -2,13 +2,14 @@ import type { Business } from '../../api/types'
 import { formatRemovedIngredients } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
-import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
 import type { CartLine } from './CartStep'
 
 export function PayStep({
   business,
   cartItems,
   cartTotal,
+  serviceFeeUgx = DEFAULT_SERVICE_FEE_UGX,
   provider,
   phone,
   saveNumber,
@@ -23,6 +24,7 @@ export function PayStep({
   business: Business
   cartItems: CartLine[]
   cartTotal: number
+  serviceFeeUgx?: number
   provider: PaymentProvider
   phone: string
   saveNumber: boolean
@@ -34,7 +36,7 @@ export function PayStep({
   onPhone: (value: string) => void
   onSaveNumber: (value: boolean) => void
 }) {
-  const payableTotal = withServiceFee(cartTotal)
+  const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
 
   return (
     <div className="cm-step cm-step-enter cm-panel">
@@ -63,7 +65,7 @@ export function PayStep({
         </div>
         <div>
           <span>Service fee</span>
-          <span>{currency(SERVICE_FEE_UGX)}</span>
+          <span>{currency(serviceFeeUgx)}</span>
         </div>
         <div className="cm-order-strip-total">
           <span>Total</span>

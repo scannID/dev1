@@ -599,6 +599,7 @@ html.cm-app body {
 .cm-menu-section {
   margin-top: 4px;
   padding-top: 4px;
+  scroll-margin-top: 72px;
 }
 
 .cm-menu-section--after-offers {

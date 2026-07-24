@@ -1,5 +1,5 @@
 import type { PaymentProvider } from './payments'
-import { SERVICE_FEE_UGX } from './utils'
+import { DEFAULT_SERVICE_FEE_UGX } from './utils'
 
 export interface CustomerReceiptItem {
   itemId?: string
@@ -88,6 +88,7 @@ export function buildReceipt(input: {
   total: number
   provider: PaymentProvider
   paymentReference?: string | null
+  serviceFeeUgx?: number
 }): CustomerReceipt {
   const receiptItems: CustomerReceiptItem[] = input.items.map((item) => ({
     itemId: item.itemId,
@@ -98,7 +99,8 @@ export function buildReceipt(input: {
     removedIngredients: item.removedIngredients,
   }))
   const subtotal = receiptItems.reduce((sum, item) => sum + item.lineTotal, 0)
-  const serviceFee = subtotal > 0 ? SERVICE_FEE_UGX : 0
+  const fee = input.serviceFeeUgx ?? DEFAULT_SERVICE_FEE_UGX
+  const serviceFee = subtotal > 0 ? fee : 0
 
   return {
     id: input.orderId,

@@ -2,7 +2,7 @@ import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { formatRemovedIngredients } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
-import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
 
 export interface CartLine extends CatalogItem {
   quantity: number
@@ -13,12 +13,14 @@ export interface CartLine extends CatalogItem {
 export function CartStep({
   cartItems,
   cartTotal,
+  serviceFeeUgx = DEFAULT_SERVICE_FEE_UGX,
   onUpdateQty,
   onRemove,
   onBackToMenu,
 }: {
   cartItems: CartLine[]
   cartTotal: number
+  serviceFeeUgx?: number
   onUpdateQty: (lineKey: string, delta: number) => void
   onRemove: (lineKey: string) => void
   onBackToMenu: () => void
@@ -78,11 +80,11 @@ export function CartStep({
         </div>
         <div className="cm-summary-row">
           <span>Service fee</span>
-          <strong>{currency(SERVICE_FEE_UGX)}</strong>
+          <strong>{currency(serviceFeeUgx)}</strong>
         </div>
         <div className="cm-summary-total">
           <span>Total</span>
-          <strong>{currency(withServiceFee(cartTotal))}</strong>
+          <strong>{currency(withServiceFee(cartTotal, serviceFeeUgx))}</strong>
         </div>
       </div>
     </div>

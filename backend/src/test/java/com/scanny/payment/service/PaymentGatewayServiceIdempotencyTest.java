@@ -88,7 +88,10 @@ class PaymentGatewayServiceIdempotencyTest {
         when(provider.id()).thenReturn("stub");
         when(paymentIntentService.createIntent(eq("stub"), any(), eq("key-2"))).thenReturn(created);
         when(paymentIntentService.toCommand(created)).thenReturn(
-                new PaymentCommand(created.getId(), PaymentContext.ORDER, "ORD-1", 1000, "UGX", "0700", "", null, null, Instant.now())
+                new PaymentCommand(
+                        created.getId(), PaymentContext.ORDER, "ORD-1", 1000, "UGX", "0700", "", null, null, Instant.now(),
+                        300, 700, 210, 490, 300, "+256700000000", "SCANNY-FEE"
+                )
         );
         when(provider.initiate(any())).thenReturn(
                 new PaymentProviderResult(PaymentIntentStatus.Processing, "PRV-1", "Approve on phone")

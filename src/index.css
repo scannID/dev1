@@ -490,6 +490,222 @@ body {
   font: inherit;
 }
 
+/* ── Book loader (merchant portal boot) ──── */
+.book-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.35rem;
+  --book-size: 132px;
+}
+
+.book-loader-stage {
+  position: relative;
+  width: var(--book-size);
+  height: calc(var(--book-size) * 0.78);
+  perspective: 900px;
+  display: grid;
+  place-items: center;
+}
+
+.book-loader-book {
+  position: relative;
+  width: 72%;
+  height: 88%;
+  transform-style: preserve-3d;
+  transform: rotateX(14deg) rotateY(-8deg);
+  animation: book-loader-breathe 4.8s ease-in-out infinite;
+}
+
+.book-loader-cover,
+.book-loader-page,
+.book-loader-spine {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px 6px 6px 2px;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.book-loader-cover-left {
+  right: 50%;
+  left: 0;
+  border-radius: 6px 2px 2px 6px;
+  background:
+    linear-gradient(110deg, oklch(0.42 0.09 150) 0%, oklch(0.52 0.13 150) 55%, oklch(0.48 0.11 148) 100%);
+  box-shadow: inset -6px 0 10px rgb(0 0 0 / 0.18);
+  transform: rotateY(0deg);
+  z-index: 1;
+}
+
+.book-loader-cover-right {
+  left: 50%;
+  right: 0;
+  background:
+    linear-gradient(250deg, oklch(0.42 0.09 150) 0%, oklch(0.52 0.13 150) 55%, oklch(0.48 0.11 148) 100%);
+  box-shadow: inset 6px 0 10px rgb(0 0 0 / 0.18);
+  transform: rotateY(0deg);
+  z-index: 2;
+}
+
+.book-loader-spine {
+  left: calc(50% - 3px);
+  width: 6px;
+  right: auto;
+  border-radius: 1px;
+  background: linear-gradient(180deg, oklch(0.34 0.07 150), oklch(0.28 0.05 150));
+  box-shadow: 0 0 4px rgb(0 0 0 / 0.25);
+  z-index: 6;
+}
+
+.book-loader-page {
+  left: 50%;
+  right: 0;
+  background:
+    linear-gradient(90deg, oklch(0.93 0.02 90) 0%, oklch(0.98 0.012 90) 12%, oklch(0.99 0.008 90) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.04),
+    -2px 0 6px rgb(0 0 0 / 0.06);
+  z-index: 3;
+}
+
+.book-loader-page::before {
+  content: "";
+  position: absolute;
+  top: 18%;
+  left: 18%;
+  right: 16%;
+  height: 42%;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 9px,
+      oklch(0.82 0.02 90 / 0.55) 9px 10px
+    );
+  opacity: 0.55;
+  border-radius: 1px;
+}
+
+.book-loader-page-1 {
+  animation: book-loader-turn 3.6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: 0s;
+  z-index: 5;
+}
+
+.book-loader-page-2 {
+  animation: book-loader-turn 3.6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: 0.9s;
+  z-index: 4;
+}
+
+.book-loader-page-3 {
+  animation: book-loader-turn 3.6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: 1.8s;
+  z-index: 3;
+}
+
+.book-loader-page-4 {
+  animation: book-loader-turn 3.6s cubic-bezier(0.45, 0.05, 0.25, 1) infinite;
+  animation-delay: 2.7s;
+  z-index: 2;
+  opacity: 0.92;
+}
+
+.book-loader-shadow {
+  position: absolute;
+  bottom: 4%;
+  left: 12%;
+  right: 12%;
+  height: 12%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.16), transparent 70%);
+  filter: blur(4px);
+  animation: book-loader-shadow 4.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.book-loader-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--muted-foreground, oklch(0.50 0.018 145));
+  animation: book-loader-fade 3.6s ease-in-out infinite;
+}
+
+@keyframes book-loader-turn {
+  0% {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+  28% {
+    transform: rotateY(-168deg);
+    opacity: 1;
+  }
+  36%,
+  100% {
+    transform: rotateY(-180deg);
+    opacity: 0;
+  }
+}
+
+@keyframes book-loader-breathe {
+  0%,
+  100% {
+    transform: rotateX(14deg) rotateY(-8deg) translateY(0);
+  }
+  50% {
+    transform: rotateX(12deg) rotateY(-6deg) translateY(-3px);
+  }
+}
+
+@keyframes book-loader-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleX(0.92);
+    opacity: 0.5;
+  }
+}
+
+@keyframes book-loader-fade {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-loader-book,
+  .book-loader-page,
+  .book-loader-shadow,
+  .book-loader-label {
+    animation: none;
+  }
+
+  .book-loader-page-1 {
+    transform: rotateY(-42deg);
+    opacity: 1;
+  }
+
+  .book-loader-page-2 {
+    transform: rotateY(-18deg);
+    opacity: 0.9;
+  }
+
+  .book-loader-page-3,
+  .book-loader-page-4 {
+    opacity: 0.75;
+  }
+}
+
 /* ── Loading spinner ─────────────────────── */
 @keyframes scanny-spin {
   to { transform: rotate(360deg); }

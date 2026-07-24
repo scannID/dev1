@@ -39,7 +39,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:4000}
-  forward-headers-strategy: framework
+  # Only rewrite remote addr from X-Forwarded-* behind a trusted proxy (see prod profile).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 management:
   endpoints:
@@ -58,8 +59,19 @@ scanny:
     enabled: ${REDIS_ENABLED:false}
   cors:
     allowed-origin-patterns: ${SCANNY_CORS_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*,http://192.168.*.*:*,http://10.*.*.*:*}
+    allow-wildcard-patterns: ${SCANNY_CORS_ALLOW_WILDCARDS:true}
+  client-ip:
+    # Default: ignore spoofable X-Forwarded-For. Enable only behind trusted proxies.
+    trust-forwarded-headers: ${SCANNY_TRUST_FORWARDED_HEADERS:false}
+    trusted-proxies: ${SCANNY_TRUSTED_PROXIES:}
+  security:
+    headers:
+      hsts-enabled: ${SCANNY_HSTS_ENABLED:false}
+      hsts-max-age-seconds: ${SCANNY_HSTS_MAX_AGE_SECONDS:31536000}
+      content-security-policy: ${SCANNY_CSP:default-src 'none'; frame-ancestors 'none'; base-uri 'none'}
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
+    fail-closed: ${RATE_LIMIT_FAIL_CLOSED:false}
     register-per-min: ${RATE_LIMIT_REGISTER_PER_MIN:5}
     orders-per-min: ${RATE_LIMIT_ORDERS_PER_MIN:30}
     menu-per-min: ${RATE_LIMIT_MENU_PER_MIN:120}
@@ -76,9 +88,15 @@ scanny:
     from: ${MAIL_FROM:noreply@scanny.app}
   pexels:
     api-key: ${PEXELS_API_KEY:}
+  fees:
+    # Placeholder service fee; PSO % of this fee, remainder to Scanny. Merchant gets subtotal only.
+    service-fee-ugx: ${SCANNY_SERVICE_FEE_UGX:700}
+    pso-percent: ${SCANNY_PSO_PERCENT:0.30}
   payments:
     default-provider: stub
     fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:true}
+    # Scanny fee wallet / collection account reference (provider-specific).
+    scanny-fee-destination: ${SCANNY_FEE_DESTINATION:}
     stub:
       auto-complete-seconds: ${PAYMENTS_STUB_AUTO_COMPLETE_SECONDS:0}
     mtn-momo:
@@ -109,6 +127,9 @@ keycloak:
 # Regex default lives in JwtConfig @Value — avoid ':' inside ${...:default} placeholders.
 scanny.jwt:
   accepted-issuers: ${SCANNY_JWT_ACCEPTED_ISSUERS:http://localhost:8080/realms/scanny,http://127.0.0.1:8080/realms/scanny}
+  # Empty = skip. Set in prod (azp = Keycloak client ids that may call the API).
+  accepted-audiences: ${SCANNY_JWT_ACCEPTED_AUDIENCES:}
+  accepted-azp: ${SCANNY_JWT_ACCEPTED_AZP:}
 
 spring.security.oauth2.resourceserver.jwt:
   jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/scanny/protocol/openid-connect/certs}

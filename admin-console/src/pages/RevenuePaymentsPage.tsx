@@ -40,6 +40,9 @@ export default function RevenuePaymentsPage() {
       <div className="admin-metric-grid">
         {[
           { label: 'Total Revenue (MTD)', value: currency(current?.revenue ?? 0), delta: current?.growth.revenue ?? 0 },
+          { label: 'Merchant GMV (MoMo)', value: currency(current?.merchantGmv ?? 0), delta: current?.growth.revenue ?? 0 },
+          { label: 'Scanny fees', value: currency(current?.platformFees ?? 0), delta: current?.growth.revenue ?? 0 },
+          { label: 'PSO fees', value: currency(current?.psoFees ?? 0), delta: current?.growth.revenue ?? 0 },
           { label: 'Transactions (MTD)', value: String(current?.transactions ?? 0), delta: current?.growth.transactions ?? 0 },
           { label: 'Failed Payments', value: String(current?.failedPayments ?? 0), delta: current?.growth.failedPayments ?? 0 },
           { label: 'Avg Order Value', value: currency(current?.avgOrderValue ?? 0), delta: current?.growth.avgOrderValue ?? 0 },
