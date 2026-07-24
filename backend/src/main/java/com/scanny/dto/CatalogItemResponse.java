@@ -15,7 +15,8 @@ public record CatalogItemResponse(
         String imageUrl,
         String details,
         List<CatalogIngredient> ingredients,
-        boolean available
+        boolean available,
+        int discountPercent
 ) {
     public static CatalogItemResponse from(CatalogItem item) {
         return new CatalogItemResponse(
@@ -27,7 +28,8 @@ public record CatalogItemResponse(
                 item.getImageUrl(),
                 item.getDetails() == null ? "" : item.getDetails(),
                 JsonLists.readIngredients(item.getIngredientsJson()),
-                item.isAvailable()
+                item.isAvailable(),
+                item.getDiscountPercent()
         );
     }
 }

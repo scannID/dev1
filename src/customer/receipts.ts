@@ -2,6 +2,7 @@ import type { PaymentProvider } from './payments'
 import { SERVICE_FEE_UGX } from './utils'
 
 export interface CustomerReceiptItem {
+  itemId?: string
   name: string
   quantity: number
   unitPrice: number
@@ -77,12 +78,19 @@ export function buildReceipt(input: {
   businessLogoUrl?: string | null
   customerName: string
   customerPhone: string
-  items: Array<{ name: string; quantity: number; price: number; removedIngredients?: string[] }>
+  items: Array<{
+    itemId?: string
+    name: string
+    quantity: number
+    price: number
+    removedIngredients?: string[]
+  }>
   total: number
   provider: PaymentProvider
   paymentReference?: string | null
 }): CustomerReceipt {
   const receiptItems: CustomerReceiptItem[] = input.items.map((item) => ({
+    itemId: item.itemId,
     name: item.name,
     quantity: item.quantity,
     unitPrice: item.price,

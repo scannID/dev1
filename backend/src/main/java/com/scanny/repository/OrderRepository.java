@@ -95,4 +95,30 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             WHERE o.status IN :statuses
             """)
     long countByStatusIn(@Param("statuses") List<OrderStatus> statuses);
+
+    @Query("""
+            SELECT COUNT(o) FROM Order o
+            WHERE o.business.id = :businessId
+              AND o.status IN :statuses
+            """)
+    long countByBusinessIdAndStatusIn(
+            @Param("businessId") String businessId,
+            @Param("statuses") List<OrderStatus> statuses
+    );
+
+    @Query("""
+            SELECT li.itemId, SUM(li.quantity)
+            FROM OrderLineItem li
+            WHERE li.order.business.id = :businessId
+              AND li.order.status <> :cancelled
+              AND li.order.createdAt >= :since
+            GROUP BY li.itemId
+            ORDER BY SUM(li.quantity) DESC
+            """)
+    List<Object[]> findPopularItemCounts(
+            @Param("businessId") String businessId,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("since") Instant since,
+            Pageable pageable
+    );
 }

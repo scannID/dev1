@@ -17,6 +17,8 @@ export interface CatalogItem {
   details?: string
   ingredients?: CatalogIngredient[]
   available: boolean
+  /** Knock-off percent from list price (0 = no discount). */
+  discountPercent?: number
 }
 
 export interface Business {
@@ -61,6 +63,7 @@ export interface CreateCatalogItemRequest {
   details?: string
   ingredients?: CatalogIngredient[]
   available?: boolean
+  discountPercent?: number
 }
 
 export interface UpdateCatalogItemRequest {
@@ -72,6 +75,7 @@ export interface UpdateCatalogItemRequest {
   details?: string
   ingredients?: CatalogIngredient[]
   available?: boolean
+  discountPercent?: number
 }
 
 export interface CategoriesResponse {
@@ -204,6 +208,7 @@ export interface CustomerOrderTracking {
   paymentStatus: PaymentStatus
   createdAt: string
   updatedAt?: string
+  estimatedWaitMinutes?: number | null
 }
 
 export interface CustomerOrderTrackingResponse {
@@ -285,6 +290,8 @@ export interface QrCodeResponse {
 export interface MenuResponse {
   business: Business
   items: CatalogItem[]
+  popular?: CatalogItem[]
+  estimatedWaitMinutes?: number
 }
 
 export interface CreateTicketRequest {

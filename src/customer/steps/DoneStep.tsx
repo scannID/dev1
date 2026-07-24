@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
-import type { OrderStatus } from '../api/types'
+import type { OrderStatus } from '../../api/types'
+import { formatWaitRange } from '../../lib/waitEstimate'
 import { OrderStatusTracker } from '../OrderStatusTracker'
 import { currency } from '../utils'
 
@@ -8,6 +9,7 @@ export function DoneStep({
   orderId,
   total,
   orderStatus,
+  estimatedWaitMinutes,
   trackingLoading,
   trackingError,
   onOrderMore,
@@ -16,10 +18,16 @@ export function DoneStep({
   orderId: string | null
   total: number
   orderStatus: OrderStatus
+  estimatedWaitMinutes?: number | null
   trackingLoading?: boolean
   trackingError?: string | null
   onOrderMore: () => void
 }) {
+  const waitLabel =
+    orderStatus === 'Pending' || orderStatus === 'Preparing'
+      ? formatWaitRange(estimatedWaitMinutes)
+      : null
+
   return (
     <div className="cm-step cm-step-enter cm-panel cm-done">
       <div className="cm-done-icon">
@@ -31,6 +39,13 @@ export function DoneStep({
         {orderId ? ` (${orderId})` : ''}.
       </p>
       <p className="cm-done-total">{currency(total)}</p>
+
+      {waitLabel ? (
+        <div className="cm-wait-estimate" role="status">
+          <span>Est. ready in</span>
+          <strong>{waitLabel}</strong>
+        </div>
+      ) : null}
 
       <OrderStatusTracker status={orderStatus} loading={trackingLoading} />
       {trackingError ? <div className="cm-error cm-order-track-error">{trackingError}</div> : null}

@@ -28,6 +28,10 @@ public class CatalogItem {
     @Column(nullable = false)
     private int price;
 
+    /** Knock-off percent from list price (0 = no discount). */
+    @Column(name = "discount_percent", nullable = false)
+    private int discountPercent = 0;
+
     @Column(nullable = false)
     private String description = "";
 
@@ -81,6 +85,14 @@ public class CatalogItem {
 
     public void setPrice(int price) {
         this.price = price;
+    }
+
+    public int getDiscountPercent() {
+        return discountPercent;
+    }
+
+    public void setDiscountPercent(int discountPercent) {
+        this.discountPercent = discountPercent;
     }
 
     public String getDescription() {

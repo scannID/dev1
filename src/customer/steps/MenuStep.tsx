@@ -3,12 +3,28 @@ import { Plus, Minus, Search, ChevronLeft, ChevronRight, Check, X } from 'lucide
 import type { CatalogItem } from '../../api/types'
 import { getCategoryImage } from '../../lib/categoryImages'
 import { cartLineKey, normalizeRemovedIngredients } from '../../lib/catalogCart'
+import { discountPercentOf, effectivePrice, isOnOffer } from '../../lib/catalogPricing'
 import { currency } from '../utils'
 
 const PAGE_SIZE = 20
 
+function PriceBlock({ item, className }: { item: CatalogItem; className?: string }) {
+  const off = discountPercentOf(item)
+  const sale = effectivePrice(item)
+  if (off <= 0) {
+    return <strong className={className}>{currency(item.price)}</strong>
+  }
+  return (
+    <strong className={`cm-price-sale${className ? ` ${className}` : ''}`}>
+      <span className="cm-price-now">{currency(sale)}</span>
+      <span className="cm-price-was">{currency(item.price)}</span>
+    </strong>
+  )
+}
+
 export function MenuStep({
   items,
+  popularItems = [],
   cart,
   selectedCategory,
   onCategory,
@@ -16,6 +32,7 @@ export function MenuStep({
   onUpdateQty,
 }: {
   items: CatalogItem[]
+  popularItems?: CatalogItem[]
   cart: Record<string, number>
   selectedCategory: string
   onCategory: (category: string) => void
@@ -26,11 +43,40 @@ export function MenuStep({
   const [page, setPage] = useState(1)
   const [sheetItemId, setSheetItemId] = useState<string | null>(null)
   const [removedByItem, setRemovedByItem] = useState<Record<string, string[]>>({})
+  const [spotlightTab, setSpotlightTab] = useState<'offers' | 'popular'>('offers')
 
   const categories = useMemo(
     () => ['all', ...new Set(items.map((item) => item.category))],
     [items],
   )
+
+  const offers = useMemo(
+    () => items.filter((item) => isOnOffer(item)),
+    [items],
+  )
+
+  const popular = useMemo(() => {
+    const offerIds = new Set(offers.map((item) => item.id))
+    return popularItems.filter((item) => item.available && !offerIds.has(item.id))
+  }, [popularItems, offers])
+
+  const hasOffers = offers.length > 0
+  const hasPopular = popular.length > 0
+  const showSpotlight = hasOffers || hasPopular
+  const activeSpotlight: 'offers' | 'popular' =
+    spotlightTab === 'offers' && hasOffers
+      ? 'offers'
+      : spotlightTab === 'popular' && hasPopular
+        ? 'popular'
+        : hasOffers
+          ? 'offers'
+          : 'popular'
+  const spotlightItems = activeSpotlight === 'offers' ? offers : popular
+
+  useEffect(() => {
+    if (spotlightTab === 'offers' && !hasOffers && hasPopular) setSpotlightTab('popular')
+    if (spotlightTab === 'popular' && !hasPopular && hasOffers) setSpotlightTab('offers')
+  }, [spotlightTab, hasOffers, hasPopular])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -105,44 +151,135 @@ export function MenuStep({
 
   return (
     <div className="cm-step cm-step-enter">
-      <div className="cm-search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search menu…"
-          aria-label="Search menu"
-          autoComplete="off"
-        />
-      </div>
+      {showSpotlight ? (
+        <section className="cm-offers" aria-label="Featured items">
+          {hasOffers && hasPopular ? (
+            <div className="cm-spotlight-tabs" role="tablist" aria-label="Offers and popular">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSpotlight === 'offers'}
+                className={activeSpotlight === 'offers' ? 'active' : ''}
+                onClick={() => setSpotlightTab('offers')}
+              >
+                Offers
+                <span>{offers.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSpotlight === 'popular'}
+                className={activeSpotlight === 'popular' ? 'active' : ''}
+                onClick={() => setSpotlightTab('popular')}
+              >
+                Popular
+                <span>{popular.length}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="cm-offers-head">
+              <h2>{activeSpotlight === 'offers' ? 'Offers' : 'Popular'}</h2>
+              <p>{activeSpotlight === 'offers' ? 'Limited deals — tap to add' : 'What people order most'}</p>
+            </div>
+          )}
 
-      <div className="cm-cats" role="tablist" aria-label="Categories">
-        {categories.map((category) => (
-          <button
-            key={category}
-            type="button"
-            role="tab"
-            aria-selected={selectedCategory === category}
-            className={selectedCategory === category ? 'active' : ''}
-            onClick={() => selectCategory(category)}
-          >
-            <img
-              src={getCategoryImage(category)}
-              alt=""
-              className="cm-cat-icon"
-              aria-hidden="true"
+          <div className="cm-offers-rail" key={activeSpotlight}>
+            {spotlightItems.map((item, index) => {
+              const thumb = item.imageUrl || getCategoryImage(item.category)
+              const off = discountPercentOf(item)
+              const sale = effectivePrice(item)
+              const isOfferTab = activeSpotlight === 'offers'
+              return (
+                <article
+                  key={item.id}
+                  className={`cm-offer-card${isOfferTab ? '' : ' cm-popular-card'}`}
+                  style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
+                >
+                  <button
+                    type="button"
+                    className="cm-offer-card-hit"
+                    onClick={() => setSheetItemId(item.id)}
+                    aria-label={
+                      isOfferTab ? `${item.name}, ${off}% off` : `Popular: ${item.name}`
+                    }
+                  >
+                    <img src={thumb} alt="" className="cm-offer-card-img" />
+                    <span className={`cm-offer-ribbon${isOfferTab ? '' : ' cm-popular-ribbon'}`}>
+                      {isOfferTab ? `${off}% OFF` : 'Popular'}
+                    </span>
+                    <div className="cm-offer-card-scrub">
+                      <h3>{item.name}</h3>
+                      <div className="cm-offer-prices">
+                        <span className="cm-offer-now">{currency(sale)}</span>
+                        {off > 0 ? <span className="cm-offer-was">{currency(item.price)}</span> : null}
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="cm-offer-add"
+                    onClick={() => quickAdd(item)}
+                    aria-label={`Add ${item.name}`}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section
+        className={`cm-menu-section${showSpotlight ? ' cm-menu-section--after-offers' : ''}`}
+        aria-label="Menu"
+      >
+        <div className="cm-menu-toolbar">
+          <div className="cm-menu-toolbar-title">
+            <h2>Menu</h2>
+            <p>Browse &amp; add items</p>
+          </div>
+          <label className="cm-search">
+            <Search size={15} aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search…"
+              aria-label="Search menu"
+              autoComplete="off"
             />
-            {category === 'all' ? 'All' : category}
-          </button>
-        ))}
-      </div>
+          </label>
+        </div>
+
+        <div className="cm-cats" role="tablist" aria-label="Categories">
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              role="tab"
+              aria-selected={selectedCategory === category}
+              className={selectedCategory === category ? 'active' : ''}
+              onClick={() => selectCategory(category)}
+            >
+              <img
+                src={getCategoryImage(category)}
+                alt=""
+                className="cm-cat-icon"
+                aria-hidden="true"
+              />
+              {category === 'all' ? 'All' : category}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <div className="cm-menu-grid">
         {pageItems.map((item) => {
           const qty = itemQty(item.id)
           const thumb = item.imageUrl || getCategoryImage(item.category)
           const hasCustom = (item.ingredients ?? []).length > 0
+          const off = discountPercentOf(item)
 
           return (
             <article key={item.id} className="cm-menu-card">
@@ -154,11 +291,12 @@ export function MenuStep({
               >
                 <div className="cm-menu-card-media">
                   <img src={thumb} alt="" className="cm-menu-card-img" />
+                  {off > 0 ? <span className="cm-menu-card-badge">{off}% OFF</span> : null}
                 </div>
                 <div className="cm-menu-card-copy">
                   <h3>{item.name}</h3>
                   {item.description ? <p>{item.description}</p> : <p className="cm-menu-card-spacer">&nbsp;</p>}
-                  <strong>{currency(item.price)}</strong>
+                  <PriceBlock item={item} />
                 </div>
               </button>
 
@@ -278,6 +416,8 @@ function ItemDetailSheet({
   const thumb = item.imageUrl || getCategoryImage(item.category)
   const ingredients = item.ingredients ?? []
   const details = item.details || item.description
+  const sale = effectivePrice(item)
+  const off = discountPercentOf(item)
 
   return (
     <div className="cm-track-overlay" role="dialog" aria-modal="true" aria-label={item.name}>
@@ -288,7 +428,17 @@ function ItemDetailSheet({
           <div>
             <p className="cm-item-sheet-cat">{item.category}</p>
             <h2>{item.name}</h2>
-            <p className="cm-item-sheet-price">{currency(item.price)}</p>
+            <p className="cm-item-sheet-price">
+              {off > 0 ? (
+                <>
+                  <span className="cm-price-now">{currency(sale)}</span>
+                  <span className="cm-price-was">{currency(item.price)}</span>
+                  <span className="cm-item-sheet-off">{off}% off</span>
+                </>
+              ) : (
+                currency(item.price)
+              )}
+            </p>
           </div>
           <button type="button" className="cm-track-close" onClick={onClose} aria-label="Close">
             <X size={18} />
@@ -333,7 +483,7 @@ function ItemDetailSheet({
         <div className="cm-item-sheet-actions">
           {cartQty === 0 ? (
             <button type="button" className="cm-add sheet" onClick={onAdd}>
-              <Plus size={16} /> Add to cart · {currency(item.price)}
+              <Plus size={16} /> Add to cart · {currency(sale)}
             </button>
           ) : (
             <div className="cm-item-sheet-qty-row">

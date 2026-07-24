@@ -23,6 +23,7 @@ import { PaginationBar } from './components/PaginationBar'
 import { businessCategories } from './lib/catalogCategories'
 import { getCategoryImage } from './lib/categoryImages'
 import { formatRemovedIngredients } from './lib/catalogCart'
+import { discountPercentOf, effectivePrice } from './lib/catalogPricing'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -288,6 +289,7 @@ function App({
     details?: string
     ingredients?: CatalogItem['ingredients']
     available: boolean
+    discountPercent?: number
   }) {
     if (!business.id) return
     setActionError(null)
@@ -316,6 +318,7 @@ function App({
         details: data.details,
         ingredients: data.ingredients,
         available: data.available,
+        discountPercent: data.discountPercent,
       })
       await refreshBusiness(business.id)
       toast.success('Item updated successfully')
@@ -1367,6 +1370,7 @@ function AddItemForm({
     details?: string
     ingredients?: CatalogItem['ingredients']
     available: boolean
+    discountPercent?: number
   }) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
 }) {
@@ -1374,6 +1378,7 @@ function AddItemForm({
     name: '',
     category: '',
     price: '',
+    discountPercent: '0',
     description: '',
     imageUrl: null as string | null,
     details: '',
@@ -1391,6 +1396,7 @@ function AddItemForm({
     const name = item.name.trim()
     const category = item.category.trim()
     const price = Number(item.price)
+    const discountPercent = Math.max(0, Math.min(100, Math.round(Number(item.discountPercent) || 0)))
 
     setSubmitted(true)
 
@@ -1407,6 +1413,7 @@ function AddItemForm({
         details: item.details.trim(),
         ingredients: item.ingredients,
         available: item.available,
+        discountPercent,
       })
       setItem(emptyItem)
       setSubmitted(false)
@@ -1419,6 +1426,8 @@ function AddItemForm({
   const isCategoryMissing = submitted && !item.category.trim()
   const price = Number(item.price)
   const isPriceMissing = submitted && (!Number.isFinite(price) || price <= 0)
+  const discountPercent = Math.max(0, Math.min(100, Math.round(Number(item.discountPercent) || 0)))
+  const salePrice = Number.isFinite(price) && price > 0 ? effectivePrice(price, discountPercent) : null
 
   return (
     <form className="flex flex-col gap-4 px-6 py-5" noValidate onSubmit={submitItem}>
@@ -1472,6 +1481,26 @@ function AddItemForm({
           placeholder="18000"
         />
         {isPriceMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+      </div>
+
+      <div className="grid gap-1.5">
+        <Label htmlFor="add-item-discount">Discount (%)</Label>
+        <Input
+          id="add-item-discount"
+          min="0"
+          max="100"
+          type="number"
+          value={item.discountPercent}
+          onChange={(event) => setItem({ ...item, discountPercent: event.target.value })}
+          placeholder="0"
+        />
+        {discountPercent > 0 && salePrice != null ? (
+          <p className="text-xs text-muted-foreground">
+            Now <strong className="text-foreground">{currency(salePrice)}</strong>
+            {' '}
+            <span className="line-through">{currency(price)}</span>
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-1.5">
@@ -1544,6 +1573,7 @@ function CatalogPage({
     details?: string
     ingredients?: CatalogItem['ingredients']
     available: boolean
+    discountPercent?: number
   }) => Promise<void> | void
   onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
   onDeleteItem: (itemId: string) => Promise<void> | void
@@ -1632,6 +1662,7 @@ function CatalogPage({
       await onUpdateItem(editingId, {
         ...editDraft,
         price: Number(editDraft.price) || 0,
+        discountPercent: Math.max(0, Math.min(100, Math.round(Number(editDraft.discountPercent) || 0))),
       })
       cancelEdit()
       setReloadToken((n) => n + 1)
@@ -1750,11 +1781,16 @@ function CatalogPage({
                 {pageItems.map((entry) => {
                   const thumb = entry.imageUrl || getCategoryImage(entry.category)
                   const ingredientCount = entry.ingredients?.length ?? 0
+                  const off = discountPercentOf(entry)
+                  const sale = effectivePrice(entry)
                   return (
                     <article key={entry.id} className="catalog-item-card">
                       <button type="button" className="catalog-item-card-media" onClick={() => startEdit(entry)}>
                         <img src={thumb} alt="" />
                         {!entry.available ? <span className="catalog-item-card-ribbon">Hidden</span> : null}
+                        {entry.available && off > 0 ? (
+                          <span className="catalog-item-card-ribbon catalog-item-card-ribbon-offer">{off}% OFF</span>
+                        ) : null}
                       </button>
                       <div className="catalog-item-card-body">
                         <div className="catalog-item-card-top">
@@ -1763,7 +1799,16 @@ function CatalogPage({
                         </div>
                         {entry.description ? <p className="catalog-item-card-desc">{entry.description}</p> : null}
                         <div className="catalog-item-card-meta">
-                          <strong>{currency(entry.price)}</strong>
+                          {off > 0 ? (
+                            <strong>
+                              {currency(sale)}{' '}
+                              <span className="text-xs font-normal text-muted-foreground line-through">
+                                {currency(entry.price)}
+                              </span>
+                            </strong>
+                          ) : (
+                            <strong>{currency(entry.price)}</strong>
+                          )}
                           {ingredientCount > 0 ? (
                             <span className="text-xs text-muted-foreground">{ingredientCount} ingredients</span>
                           ) : null}
@@ -1832,6 +1877,28 @@ function CatalogPage({
                 <div className="grid gap-1.5">
                   <Label className="" htmlFor="edit-price">Price (UGX)</Label>
                   <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="" htmlFor="edit-discount">Discount (%)</Label>
+                  <Input
+                    className=""
+                    id="edit-discount"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editDraft.discountPercent ?? 0}
+                    onChange={(e) => setEditDraft({
+                      ...editDraft,
+                      discountPercent: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))),
+                    })}
+                  />
+                  {discountPercentOf(editDraft) > 0 && Number(editDraft.price) > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Now <strong className="text-foreground">{currency(effectivePrice(Number(editDraft.price) || 0, discountPercentOf(editDraft)))}</strong>
+                      {' '}
+                      <span className="line-through">{currency(Number(editDraft.price) || 0)}</span>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="" htmlFor="edit-description">Short description</Label>

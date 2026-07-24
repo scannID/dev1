@@ -70,9 +70,14 @@ public class BusinessController {
         BusinessResponse business = businessService.getBusinessPublic(businessId);
         List<com.scanny.dto.CatalogDtos.CatalogItemResponse> availableItems =
                 businessService.getAvailableMenuCached(businessId, qr);
+        List<com.scanny.dto.CatalogDtos.CatalogItemResponse> popular =
+                businessService.getPopularMenuItems(businessId, 8);
+        int estimatedWaitMinutes = businessService.estimateWaitMinutes(businessId);
         return Map.of(
                 "business", business,
-                "items", availableItems
+                "items", availableItems,
+                "popular", popular,
+                "estimatedWaitMinutes", estimatedWaitMinutes
         );
     }
 

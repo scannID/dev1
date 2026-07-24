@@ -25,11 +25,8 @@ import { PayStep } from './steps/PayStep'
 import { WaitingStep } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
-import {
-  cartLineKey,
-  normalizeRemovedIngredients,
-  parseCartLineKey,
-} from '../lib/catalogCart'
+import { cartLineKey, normalizeRemovedIngredients, parseCartLineKey } from '../lib/catalogCart'
+import { effectivePrice } from '../lib/catalogPricing'
 import {
   buildReceipt,
   getReceiptCount,
@@ -39,7 +36,7 @@ import {
 } from './receipts'
 import { useOrderTracking } from './useOrderTracking'
 import { currency, formatUgPhoneHint, getOrCreateDeviceId, SERVICE_FEE_UGX, withServiceFee } from './utils'
-import { LoadingSpinner } from '../components/LoadingSpinner'
+import { UtensilLoader } from './UtensilLoader'
 import './CustomerApp.css'
 
 const PROGRESS_STEPS: CheckoutStep[] = ['menu', 'cart', 'details', 'pay']
@@ -59,6 +56,8 @@ export default function CustomerApp({
 
   const [business, setBusiness] = useState<Business | null>(null)
   const [items, setItems] = useState<CatalogItem[]>([])
+  const [popularItems, setPopularItems] = useState<CatalogItem[]>([])
+  const [estimatedWaitMinutes, setEstimatedWaitMinutes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -74,6 +73,7 @@ export default function CustomerApp({
   const [customerLocation, setCustomerLocation] = useState(draft?.customerLocation ?? '')
   const [customerNote, setCustomerNote] = useState(draft?.customerNote ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const [provider, setProvider] = useState<PaymentProvider>(draft?.provider ?? 'MTN')
   const [phone, setPhone] = useState(draft?.phone ?? '')
@@ -119,7 +119,7 @@ export default function CustomerApp({
       .filter((item): item is CartLine => item !== null)
   }, [items, cart])
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + effectivePrice(item) * item.quantity, 0)
   const payableTotal = withServiceFee(cartTotal)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
@@ -134,9 +134,10 @@ export default function CustomerApp({
         customerName: customerName.trim() || 'Guest',
         customerPhone: phone.trim(),
         items: items.map((item) => ({
+          itemId: item.id,
           name: item.name,
           quantity: item.quantity,
-          price: item.price,
+          price: effectivePrice(item),
           removedIngredients: item.removedIngredients,
         })),
         total,
@@ -194,6 +195,10 @@ export default function CustomerApp({
         if (cancelled) return
         setBusiness(menu.business)
         setItems(menu.items ?? [])
+        setPopularItems(menu.popular ?? [])
+        setEstimatedWaitMinutes(
+          typeof menu.estimatedWaitMinutes === 'number' ? menu.estimatedWaitMinutes : null,
+        )
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Failed to load menu')
@@ -309,6 +314,48 @@ export default function CustomerApp({
     })
   }, [])
 
+  const reorderFromReceipt = useCallback(
+    (receipt: CustomerReceipt) => {
+      if (!business || receipt.businessId !== business.id) {
+        toast.error('This receipt is from another place')
+        return
+      }
+      const next: Record<string, number> = {}
+      let added = 0
+      let skipped = 0
+      for (const line of receipt.items) {
+        let catalogId = line.itemId
+        if (!catalogId) {
+          const match = items.find(
+            (item) => item.available && item.name.toLowerCase() === line.name.toLowerCase(),
+          )
+          catalogId = match?.id
+        }
+        const catalog = catalogId ? items.find((item) => item.id === catalogId && item.available) : undefined
+        if (!catalog) {
+          skipped += 1
+          continue
+        }
+        const key = cartLineKey(catalog.id, line.removedIngredients)
+        next[key] = (next[key] || 0) + Math.max(1, line.quantity)
+        added += 1
+      }
+      if (added === 0) {
+        toast.error('None of these items are on the menu right now')
+        return
+      }
+      setCart(next)
+      setShowReceipts(false)
+      setStep('cart')
+      toast.success(
+        skipped > 0
+          ? `Added ${added} item${added === 1 ? '' : 's'} (${skipped} unavailable)`
+          : `Added ${added} item${added === 1 ? '' : 's'} to cart`,
+      )
+    },
+    [business, items],
+  )
+
   function goBack() {
     if (step === 'waiting') {
       setStep('pay')
@@ -321,6 +368,7 @@ export default function CustomerApp({
 
   function goDetails() {
     setNameError(null)
+    setLocationError(null)
     if (cartCount === 0) {
       setStep('menu')
       return
@@ -329,18 +377,34 @@ export default function CustomerApp({
   }
 
   function goPay() {
+    let valid = true
     if (!customerName.trim()) {
       setNameError('Enter your name to continue')
-      return
+      valid = false
+    } else {
+      setNameError(null)
     }
-    setNameError(null)
+    if (!customerLocation.trim()) {
+      const label = (business?.tableLabel || 'Table / location').toLowerCase()
+      setLocationError(`Enter your ${label} to continue`)
+      valid = false
+    } else {
+      setLocationError(null)
+    }
+    if (!valid) return
     setStep('pay')
   }
 
   function validatePhone(value: string) {
-    const digits = value.replace(/\D/g, '')
+    const trimmed = value.trim()
+    if (!trimmed) return 'Enter your mobile money number'
+    const digits = trimmed.replace(/\D/g, '')
+    // UG local 07XXXXXXXX (10) or +2567XXXXXXXX (12) or 2567XXXXXXXX (12)
+    if (digits.length === 10 && /^0[67]\d{8}$/.test(digits)) return null
+    if (digits.length === 12 && /^256[67]\d{8}$/.test(digits)) return null
+    if (digits.length === 9 && /^[67]\d{8}$/.test(digits)) return null
     if (digits.length < 9) return 'Enter a valid mobile money number'
-    return null
+    return 'Use a valid UG number (07… or +256…)'
   }
 
   async function startPaymentForOrder(orderId: string, amount: number) {
@@ -365,14 +429,22 @@ export default function CustomerApp({
 
   async function submitPayment() {
     if (!business) return
+    if (!customerName.trim() || !customerLocation.trim()) {
+      if (!customerName.trim()) setNameError('Enter your name to continue')
+      if (!customerLocation.trim()) {
+        const label = (business.tableLabel || 'Table / location').toLowerCase()
+        setLocationError(`Enter your ${label} to continue`)
+      }
+      setStep('details')
+      return
+    }
     const phoneIssue = validatePhone(phone)
     if (phoneIssue) {
       setPhoneError(phoneIssue)
       return
     }
-    if (!customerName.trim()) {
-      setStep('details')
-      setNameError('Enter your name to continue')
+    if (!provider) {
+      setError('Choose MTN or Airtel to continue')
       return
     }
 
@@ -392,7 +464,7 @@ export default function CustomerApp({
         customer: {
           name: customerName.trim(),
           phone: phone.trim(),
-          location: customerLocation.trim() || undefined,
+          location: customerLocation.trim(),
           note: customerNote.trim() || undefined,
         },
         items: cartItems.map((item) => ({
@@ -519,6 +591,7 @@ export default function CustomerApp({
     setCustomerLocation('')
     setCustomerNote('')
     setNameError(null)
+    setLocationError(null)
     setProvider('MTN')
     setPhone(savedDevice?.primaryPhone ?? '')
     setSaveNumber(!deviceKnown)
@@ -537,9 +610,8 @@ export default function CustomerApp({
 
   if (loading) {
     return (
-      <div className="cm-page cm-centered">
-        <ScannyMark />
-        <LoadingSpinner label="Loading menu…" />
+      <div className="cm-page cm-centered cm-boot">
+        <UtensilLoader />
       </div>
     )
   }
@@ -638,6 +710,7 @@ export default function CustomerApp({
       {step === 'menu' && (
         <MenuStep
           items={items}
+          popularItems={popularItems}
           cart={cart}
           selectedCategory={selectedCategory}
           onCategory={setSelectedCategory}
@@ -663,11 +736,15 @@ export default function CustomerApp({
           customerLocation={customerLocation}
           customerNote={customerNote}
           nameError={nameError}
+          locationError={locationError}
           onName={(v) => {
             setCustomerName(v)
             if (nameError) setNameError(null)
           }}
-          onLocation={setCustomerLocation}
+          onLocation={(v) => {
+            setCustomerLocation(v)
+            if (locationError) setLocationError(null)
+          }}
           onNote={setCustomerNote}
         />
       )}
@@ -702,6 +779,9 @@ export default function CustomerApp({
           phone={phone}
           status={paymentStatus}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
+          estimatedWaitMinutes={
+            trackedOrder?.estimatedWaitMinutes ?? estimatedWaitMinutes ?? undefined
+          }
           trackingLoading={trackingLoading}
           error={error}
           onRetry={() => void retryPayment()}
@@ -718,6 +798,9 @@ export default function CustomerApp({
           orderId={placedOrderId}
           total={paidTotal}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
+          estimatedWaitMinutes={
+            trackedOrder?.estimatedWaitMinutes ?? estimatedWaitMinutes ?? undefined
+          }
           trackingLoading={trackingLoading}
           trackingError={trackingError}
           onOrderMore={orderMore}
@@ -761,6 +844,8 @@ export default function CustomerApp({
       <ReceiptsPanel
         open={showReceipts}
         receipts={receipts}
+        currentBusinessId={business.id}
+        onReorder={reorderFromReceipt}
         onClose={() => setShowReceipts(false)}
       />
     </div>

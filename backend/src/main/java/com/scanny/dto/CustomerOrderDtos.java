@@ -31,9 +31,14 @@ public final class CustomerOrderDtos {
             OrderStatus status,
             PaymentStatus paymentStatus,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            Integer estimatedWaitMinutes
     ) {
         public static TrackingResponse from(Order order) {
+            return from(order, null);
+        }
+
+        public static TrackingResponse from(Order order, Integer estimatedWaitMinutes) {
             return new TrackingResponse(
                     order.getId(),
                     order.getBusinessName(),
@@ -42,7 +47,8 @@ public final class CustomerOrderDtos {
                     order.getStatus(),
                     order.getPaymentStatus(),
                     order.getCreatedAt(),
-                    order.getUpdatedAt()
+                    order.getUpdatedAt(),
+                    estimatedWaitMinutes
             );
         }
     }

@@ -1034,6 +1034,10 @@ button:disabled {
   font-weight: 600;
 }
 
+.catalog-item-card-ribbon-offer {
+  background: #e86a17;
+}
+
 .catalog-item-card-body {
   display: grid;
   gap: 8px;

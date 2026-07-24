@@ -14,7 +14,8 @@ public class CatalogDtos {
         String imageUrl,
         String details,
         List<CatalogIngredient> ingredients,
-        boolean available
+        boolean available,
+        Integer discountPercent
     ) {}
 
     public record UpdateCatalogItemRequest(
@@ -25,7 +26,8 @@ public class CatalogDtos {
         String imageUrl,
         String details,
         List<CatalogIngredient> ingredients,
-        Boolean available
+        Boolean available,
+        Integer discountPercent
     ) {}
 
     public record UpdateAvailabilityRequest(
@@ -49,7 +51,8 @@ public class CatalogDtos {
         String imageUrl,
         String details,
         List<CatalogIngredient> ingredients,
-        boolean available
+        boolean available,
+        int discountPercent
     ) {
         public static CatalogItemResponse from(CatalogItem item) {
             return new CatalogItemResponse(
@@ -61,7 +64,8 @@ public class CatalogDtos {
                 item.getImageUrl(),
                 item.getDetails() == null ? "" : item.getDetails(),
                 JsonLists.readIngredients(item.getIngredientsJson()),
-                item.isAvailable()
+                item.isAvailable(),
+                item.getDiscountPercent()
             );
         }
     }

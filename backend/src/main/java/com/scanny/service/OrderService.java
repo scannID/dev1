@@ -18,7 +18,9 @@ import com.scanny.model.enums.PaymentStatus;
 import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.OrderRepository;
 import com.scanny.security.MerchantAccessService;
+import com.scanny.util.CatalogPricing;
 import com.scanny.util.JsonLists;
+import com.scanny.util.WaitEstimate;
 import com.scanny.dto.CustomerOrderDtos;
 import java.util.Map;
 import java.util.Set;
@@ -75,7 +77,15 @@ public class OrderService {
         if (!phonesMatch(order.getCustomerPhone(), phone)) {
             throw new ApiException(404, "Order was not found.");
         }
-        return CustomerOrderDtos.TrackingResponse.from(order);
+        Integer waitMinutes = null;
+        if (order.getStatus() == OrderStatus.Pending || order.getStatus() == OrderStatus.Preparing) {
+            long open = orderRepository.countByBusinessIdAndStatusIn(
+                    order.getBusiness().getId(),
+                    List.of(OrderStatus.Pending, OrderStatus.Preparing)
+            );
+            waitMinutes = WaitEstimate.estimateMinutes(open);
+        }
+        return CustomerOrderDtos.TrackingResponse.from(order, waitMinutes);
     }
 
     @Transactional(readOnly = true)
@@ -191,9 +201,10 @@ public class OrderService {
             OrderLineItem line = new OrderLineItem();
             line.setItemId(item.getId());
             line.setName(item.getName());
-            line.setPrice(item.getPrice());
+            int unitPrice = CatalogPricing.effectivePrice(item.getPrice(), item.getDiscountPercent());
+            line.setPrice(unitPrice);
             line.setQuantity(quantity);
-            line.setLineTotal(item.getPrice() * quantity);
+            line.setLineTotal(unitPrice * quantity);
             line.setRemovedIngredientsJson(JsonLists.writeStringList(removed));
             lines.add(line);
         }

@@ -1,6 +1,7 @@
 import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { formatRemovedIngredients } from '../../lib/catalogCart'
+import { effectivePrice } from '../../lib/catalogPricing'
 import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 
 export interface CartLine extends CatalogItem {
@@ -42,12 +43,13 @@ export function CartStep({
       <div className="cm-summary">
         {cartItems.map((item) => {
           const removed = formatRemovedIngredients(item.removedIngredients)
+          const unit = effectivePrice(item)
           return (
             <div key={item.lineKey} className="cm-summary-line">
               <div className="cm-summary-main">
                 <strong>{item.name}</strong>
                 {removed ? <span className="cm-line-removed">{removed}</span> : null}
-                <span className="cm-line-meta">{currency(item.price)} each</span>
+                <span className="cm-line-meta">{currency(unit)} each</span>
                 <div className="cm-qty compact">
                   <button type="button" onClick={() => onUpdateQty(item.lineKey, -1)} aria-label={`Decrease ${item.name}`}>
                     <Minus size={12} />
@@ -66,7 +68,7 @@ export function CartStep({
                   </button>
                 </div>
               </div>
-              <span className="cm-line-total">{currency(item.price * item.quantity)}</span>
+              <span className="cm-line-total">{currency(unit * item.quantity)}</span>
             </div>
           )
         })}

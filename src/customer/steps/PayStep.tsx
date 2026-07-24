@@ -1,5 +1,6 @@
 import type { Business } from '../../api/types'
 import { formatRemovedIngredients } from '../../lib/catalogCart'
+import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
 import { currency, SERVICE_FEE_UGX, withServiceFee } from '../utils'
 import type { CartLine } from './CartStep'
@@ -52,7 +53,7 @@ export function PayStep({
               {item.quantity}× {item.name}
               {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
             </span>
-            <span>{currency(item.price * item.quantity)}</span>
+            <span>{currency(effectivePrice(item) * item.quantity)}</span>
           </div>
           )
         })}
@@ -107,6 +108,8 @@ export function PayStep({
           placeholder="07XX XXX XXX or +256…"
           inputMode="tel"
           autoComplete="tel"
+          required
+          aria-required="true"
           aria-invalid={Boolean(phoneError)}
           disabled={submitting}
         />

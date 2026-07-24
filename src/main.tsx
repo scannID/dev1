@@ -71,6 +71,14 @@ const gateToken = resolveGateRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
 
 if (customerRoute) {
+  document.documentElement.classList.add('cm-app')
+  const viewport = document.querySelector('meta[name="viewport"]')
+  if (viewport) {
+    viewport.setAttribute(
+      'content',
+      'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover',
+    )
+  }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />

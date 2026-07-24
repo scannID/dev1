@@ -15,23 +15,36 @@ import com.scanny.security.MerchantAccessService;
 import com.scanny.config.RedisConfig;
 import com.scanny.util.CodeUtils;
 import com.scanny.util.CatalogCategories;
+import com.scanny.util.WaitEstimate;
+import com.scanny.model.enums.OrderStatus;
+import com.scanny.repository.OrderRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BusinessService {
 
+    private static final int POPULAR_LIMIT = 8;
+    private static final int POPULAR_LOOKBACK_DAYS = 30;
+
     private final BusinessRepository businessRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final MerchantRepository merchantRepository;
+    private final OrderRepository orderRepository;
     private final StarterCatalogService starterCatalogService;
     private final MerchantAccessService merchantAccessService;
     private final String scanBaseUrl;
@@ -40,6 +53,7 @@ public class BusinessService {
             BusinessRepository businessRepository,
             CatalogItemRepository catalogItemRepository,
             MerchantRepository merchantRepository,
+            OrderRepository orderRepository,
             StarterCatalogService starterCatalogService,
             MerchantAccessService merchantAccessService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
@@ -47,6 +61,7 @@ public class BusinessService {
         this.businessRepository = businessRepository;
         this.catalogItemRepository = catalogItemRepository;
         this.merchantRepository = merchantRepository;
+        this.orderRepository = orderRepository;
         this.starterCatalogService = starterCatalogService;
         this.merchantAccessService = merchantAccessService;
         this.scanBaseUrl = scanBaseUrl;
@@ -117,6 +132,57 @@ public class BusinessService {
         return catalogItemRepository.findByBusiness_IdAndAvailableTrue(businessId).stream()
                 .map(CatalogDtos.CatalogItemResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogDtos.CatalogItemResponse> getPopularMenuItems(String businessId, int limit) {
+        requireBusinessLight(businessId);
+        Instant since = Instant.now().minus(POPULAR_LOOKBACK_DAYS, ChronoUnit.DAYS);
+        int safeLimit = Math.min(Math.max(limit, 1), POPULAR_LIMIT);
+        List<Object[]> rows = orderRepository.findPopularItemCounts(
+                businessId,
+                OrderStatus.Cancelled,
+                since,
+                PageRequest.of(0, safeLimit * 2)
+        );
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> orderedIds = rows.stream()
+                .map(row -> (String) row[0])
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (orderedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, CatalogItem> byId = catalogItemRepository.findByBusinessIdAndIdIn(businessId, orderedIds).stream()
+                .filter(CatalogItem::isAvailable)
+                .collect(Collectors.toMap(CatalogItem::getId, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+
+        List<CatalogDtos.CatalogItemResponse> popular = new ArrayList<>();
+        for (String id : orderedIds) {
+            CatalogItem item = byId.get(id);
+            if (item != null) {
+                popular.add(CatalogDtos.CatalogItemResponse.from(item));
+                if (popular.size() >= safeLimit) {
+                    break;
+                }
+            }
+        }
+        return popular;
+    }
+
+    @Transactional(readOnly = true)
+    public int estimateWaitMinutes(String businessId) {
+        requireBusinessLight(businessId);
+        long open = orderRepository.countByBusinessIdAndStatusIn(
+                businessId,
+                List.of(OrderStatus.Pending, OrderStatus.Preparing)
+        );
+        return WaitEstimate.estimateMinutes(open);
     }
 
     @Caching(evict = {

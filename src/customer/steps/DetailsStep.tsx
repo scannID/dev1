@@ -6,6 +6,7 @@ export function DetailsStep({
   customerLocation,
   customerNote,
   nameError,
+  locationError,
   onName,
   onLocation,
   onNote,
@@ -15,10 +16,13 @@ export function DetailsStep({
   customerLocation: string
   customerNote: string
   nameError?: string | null
+  locationError?: string | null
   onName: (value: string) => void
   onLocation: (value: string) => void
   onNote: (value: string) => void
 }) {
+  const locationLabel = business.tableLabel || 'Table / location'
+
   return (
     <div className="cm-step cm-step-enter cm-panel">
       <h2>Your details</h2>
@@ -31,18 +35,24 @@ export function DetailsStep({
           onChange={(e) => onName(e.target.value)}
           placeholder="e.g. Jane"
           autoComplete="name"
+          required
+          aria-required="true"
           aria-invalid={Boolean(nameError)}
         />
         {nameError ? <span className="cm-field-error">{nameError}</span> : null}
       </label>
 
       <label className="cm-field">
-        {business.tableLabel || 'Table / location'}
+        {locationLabel}
         <input
           value={customerLocation}
           onChange={(e) => onLocation(e.target.value)}
           placeholder="Table 4, counter…"
+          required
+          aria-required="true"
+          aria-invalid={Boolean(locationError)}
         />
+        {locationError ? <span className="cm-field-error">{locationError}</span> : null}
       </label>
 
       <label className="cm-field">

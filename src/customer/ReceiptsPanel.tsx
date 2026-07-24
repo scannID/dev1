@@ -1,4 +1,4 @@
-import { ArrowLeft, Receipt, X } from 'lucide-react'
+import { ArrowLeft, Receipt, RotateCcw, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { ScannyMark } from './ScannyMark'
 import {
@@ -46,10 +46,14 @@ function ReceiptCard({
 
 function ReceiptDetail({
   receipt,
+  canReorder,
   onBack,
+  onReorder,
 }: {
   receipt: CustomerReceipt
+  canReorder: boolean
   onBack: () => void
+  onReorder?: (receipt: CustomerReceipt) => void
 }) {
   return (
     <div className="cm-receipt-detail">
@@ -107,14 +111,14 @@ function ReceiptDetail({
           {receipt.items.map((item, index) => {
             const removed = formatRemovedIngredients(item.removedIngredients)
             return (
-            <div className="cm-receipt-item-row" key={`${item.name}-${index}`}>
-              <span>
-                {item.name}
-                {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
-              </span>
-              <span>{item.quantity}</span>
-              <strong>{currency(item.lineTotal)}</strong>
-            </div>
+              <div className="cm-receipt-item-row" key={`${item.name}-${index}`}>
+                <span>
+                  {item.name}
+                  {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
+                </span>
+                <span>{item.quantity}</span>
+                <strong>{currency(item.lineTotal)}</strong>
+              </div>
             )
           })}
         </div>
@@ -136,6 +140,16 @@ function ReceiptDetail({
           </div>
         </div>
 
+        {canReorder && onReorder ? (
+          <button
+            type="button"
+            className="cm-primary cm-full cm-receipt-reorder"
+            onClick={() => onReorder(receipt)}
+          >
+            <RotateCcw size={16} /> Order again
+          </button>
+        ) : null}
+
         <p className="cm-receipt-footnote">
           Saved on this device only. Other phones won&apos;t see these receipts.
         </p>
@@ -147,10 +161,14 @@ function ReceiptDetail({
 export function ReceiptsPanel({
   open,
   receipts,
+  currentBusinessId,
+  onReorder,
   onClose,
 }: {
   open: boolean
   receipts: CustomerReceipt[]
+  currentBusinessId?: string
+  onReorder?: (receipt: CustomerReceipt) => void
   onClose: () => void
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -185,7 +203,12 @@ export function ReceiptsPanel({
         </div>
 
         {selected ? (
-          <ReceiptDetail receipt={selected} onBack={() => setSelectedId(null)} />
+          <ReceiptDetail
+            receipt={selected}
+            canReorder={Boolean(currentBusinessId && selected.businessId === currentBusinessId && onReorder)}
+            onBack={() => setSelectedId(null)}
+            onReorder={onReorder}
+          />
         ) : receipts.length === 0 ? (
           <div className="cm-receipts-empty">
             <div className="cm-receipts-empty-icon">
@@ -199,7 +222,11 @@ export function ReceiptsPanel({
         ) : (
           <div className="cm-receipts-list">
             {receipts.map((receipt) => (
-              <ReceiptCard key={receipt.id} receipt={receipt} onOpen={() => setSelectedId(receipt.id)} />
+              <ReceiptCard
+                key={receipt.id}
+                receipt={receipt}
+                onOpen={() => setSelectedId(receipt.id)}
+              />
             ))}
           </div>
         )}

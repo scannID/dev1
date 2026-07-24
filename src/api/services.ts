@@ -189,6 +189,7 @@ export const catalogApi = {
       details: data.details ?? '',
       ingredients: data.ingredients ?? [],
       available: data.available ?? true,
+      discountPercent: data.discountPercent ?? 0,
     })
     return response.item
   },

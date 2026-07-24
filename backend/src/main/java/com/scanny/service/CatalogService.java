@@ -10,6 +10,7 @@ import com.scanny.repository.BusinessRepository;
 import com.scanny.security.MerchantAccessService;
 import com.scanny.util.CatalogCategories;
 import com.scanny.util.CatalogImageUrls;
+import com.scanny.util.CatalogPricing;
 import com.scanny.util.JsonLists;
 import com.scanny.websocket.RealtimeEventPublisher;
 import org.springframework.data.domain.Page;
@@ -130,6 +131,7 @@ public class CatalogService {
         item.setName(request.name());
         item.setCategory(category);
         item.setPrice(request.price());
+        item.setDiscountPercent(requireDiscountPercent(request.discountPercent()));
         item.setDescription(request.description() != null ? request.description() : "");
         item.setImageUrl(CatalogImageUrls.normalizeOptional(request.imageUrl()));
         item.setDetails(request.details() != null ? request.details().trim() : "");
@@ -170,6 +172,9 @@ public class CatalogService {
         }
         if (request.price() != null) {
             item.setPrice(request.price());
+        }
+        if (request.discountPercent() != null) {
+            item.setDiscountPercent(requireDiscountPercent(request.discountPercent()));
         }
         if (request.description() != null) {
             item.setDescription(request.description());
@@ -227,6 +232,14 @@ public class CatalogService {
             throw new ApiException(403, "Catalog item does not belong to business: " + businessId);
         }
         return item;
+    }
+
+    private static int requireDiscountPercent(Integer discountPercent) {
+        try {
+            return CatalogPricing.clampDiscountPercent(discountPercent);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(400, ex.getMessage());
+        }
     }
 
     private String generateItemId() {
