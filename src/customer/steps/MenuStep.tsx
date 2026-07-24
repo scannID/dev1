@@ -295,7 +295,7 @@ export function MenuStep({
                 </div>
                 <div className="cm-menu-card-copy">
                   <h3>{item.name}</h3>
-                  {item.description ? <p>{item.description}</p> : <p className="cm-menu-card-spacer">&nbsp;</p>}
+                  <p>{item.description?.trim() || '\u00a0'}</p>
                   <PriceBlock item={item} />
                 </div>
               </button>

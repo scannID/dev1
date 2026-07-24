@@ -322,10 +322,6 @@ html.cm-app body {
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
 }
 
-.cm-popular-card {
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
-}
-
 .cm-receipt-reorder {
   margin-top: 14px;
   display: inline-flex;
@@ -421,16 +417,24 @@ html.cm-app body {
   display: none;
 }
 
-.cm-offer-card {
+.cm-offer-card,
+.cm-popular-card {
   position: relative;
   flex: 0 0 min(68vw, 240px);
   height: 148px;
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
   scroll-snap-align: start;
   background: #1a1a1a;
   box-shadow: 0 14px 28px color-mix(in srgb, var(--cm-orange) 18%, transparent);
   animation: cm-offer-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  isolation: isolate;
+  clip-path: inset(0 round 20px);
+  -webkit-clip-path: inset(0 round 20px);
+}
+
+.cm-popular-card {
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
 }
 
 @keyframes cm-offer-in {
@@ -450,6 +454,8 @@ html.cm-app body {
   height: 100%;
   padding: 0;
   border: none;
+  border-radius: 20px;
+  overflow: hidden;
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -466,6 +472,7 @@ html.cm-app body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 20px;
 }
 
 .cm-offer-ribbon {
@@ -501,6 +508,7 @@ html.cm-app body {
   inset: auto 0 0;
   z-index: 1;
   padding: 36px 14px 14px;
+  border-radius: 0 0 20px 20px;
   background: linear-gradient(to top, rgba(12, 12, 12, 0.92) 0%, rgba(12, 12, 12, 0.55) 55%, transparent 100%);
 }
 
@@ -737,6 +745,7 @@ html.cm-app body {
   gap: 14px;
   padding: 12px 16px 16px;
   align-items: stretch;
+  grid-auto-rows: 1fr;
 }
 
 @media (min-width: 720px) {
@@ -749,6 +758,7 @@ html.cm-app body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: var(--cm-card);
   border: 1px solid var(--cm-border);
   border-radius: 18px;
@@ -765,8 +775,9 @@ html.cm-app body {
 .cm-menu-card-hit {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -779,23 +790,27 @@ html.cm-app body {
 .cm-menu-card-media {
   position: relative;
   overflow: hidden;
+  flex: 0 0 auto;
+  width: 100%;
 }
 
 .cm-menu-card-img {
   width: 100%;
   aspect-ratio: 1 / 1;
+  height: auto;
   object-fit: cover;
   display: block;
   background: color-mix(in srgb, var(--cm-orange) 8%, var(--cm-card));
 }
 
 .cm-menu-card-copy {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 6px;
-  flex: 1;
+  flex: 1 1 auto;
   padding: 12px 12px 0;
   min-height: 0;
+  width: 100%;
 }
 
 .cm-menu-card-copy h3 {
@@ -808,7 +823,8 @@ html.cm-app body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.25em * 2);
+  height: calc(1.25em * 2);
+  max-height: calc(1.25em * 2);
 }
 
 .cm-menu-card-copy p {
@@ -820,27 +836,45 @@ html.cm-app body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.35em * 2);
+  height: calc(1.35em * 2);
+  max-height: calc(1.35em * 2);
 }
 
 .cm-menu-card-spacer {
   visibility: hidden;
 }
 
-.cm-menu-card-copy strong {
+.cm-menu-card-copy > strong,
+.cm-menu-card-copy .cm-price-sale {
   margin-top: auto;
+  align-self: start;
+  width: 100%;
+  min-height: 2.5em;
   font-size: 13px;
   font-weight: 700;
   color: var(--cm-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.cm-menu-card-copy .cm-price-was {
+  display: block;
+  line-height: 1.2;
 }
 
 .cm-menu-card-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  margin-top: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
   min-height: 48px;
-  padding: 10px 12px 12px;
+  height: 48px;
+  padding: 8px 12px 12px;
+  box-sizing: content-box;
 }
 
 .cm-add.compact {
