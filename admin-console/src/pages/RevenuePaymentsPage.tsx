@@ -1,6 +1,8 @@
 import { TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useRevenue } from '../hooks/usePlatform'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -25,6 +27,7 @@ function pct(value: number) {
 export default function RevenuePaymentsPage() {
   const { overview, transactions, loading, error } = useRevenue()
   const monthly = overview?.monthly ?? []
+  const txPagination = usePagination(transactions, { initialPageSize: 20 })
   const maxRev = Math.max(...monthly.map((m) => m.revenue), 1)
   const current = overview?.currentMonth
 
@@ -134,9 +137,9 @@ export default function RevenuePaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {transactions.length === 0 ? (
+              {txPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No transactions yet.'}</td></tr>
-              ) : transactions.map((t) => (
+              ) : txPagination.pageItems.map((t) => (
                 <tr key={t.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, fontWeight: 500 }}>{t.id}</td>
                   <td style={{ padding: '10px 16px' }}>{t.merchant}</td>
@@ -151,6 +154,7 @@ export default function RevenuePaymentsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={txPagination} hideWhenEmpty={false} />
       </div>
     </>
   )

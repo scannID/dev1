@@ -155,14 +155,23 @@ if (customerRoute) {
 
     useEffect(() => {
       function handleKeyPress(e: KeyboardEvent) {
-        if (e.key === 'd' || e.key === 'D') {
-          if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-          setDarkMode((prev: boolean) => {
-            const newMode = !prev
-            persistDarkMode(newMode)
-            return newMode
-          })
+        if (e.key !== 'd' && e.key !== 'D') return
+        if (e.metaKey || e.ctrlKey || e.altKey) return
+        const target = e.target
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          (target instanceof HTMLElement && target.isContentEditable)
+        ) {
+          return
         }
+        e.preventDefault()
+        setDarkMode((prev: boolean) => {
+          const newMode = !prev
+          persistDarkMode(newMode)
+          return newMode
+        })
       }
       window.addEventListener('keydown', handleKeyPress)
       return () => window.removeEventListener('keydown', handleKeyPress)

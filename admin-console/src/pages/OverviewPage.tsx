@@ -2,6 +2,8 @@ import { ArrowUpRight, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useDashboard } from '../hooks/useDashboard'
 
 function Sparkline({ data, color = 'var(--primary)' }: { data: number[]; color?: string }) {
@@ -64,6 +66,8 @@ function activityIcon(type: string) {
 
 export default function OverviewPage() {
   const { metrics, recentActivity, topMerchants, loading, error } = useDashboard()
+  const merchantsPagination = usePagination(topMerchants, { initialPageSize: 20 })
+  const activityPagination = usePagination(recentActivity, { initialPageSize: 20 })
 
   const displayMetrics = metrics
     ? [
@@ -158,7 +162,7 @@ export default function OverviewPage() {
             <div><h3>Platform Activity</h3><p>Latest events across the system</p></div>
           </div>
           <ul className="admin-activity-list">
-            {recentActivity.length === 0 ? (
+            {activityPagination.pageItems.length === 0 ? (
               <li>
                 <div className="admin-activity-body">
                   <strong>No recent activity</strong>
@@ -166,7 +170,7 @@ export default function OverviewPage() {
                 </div>
               </li>
             ) : (
-              recentActivity.slice(0, 7).map((a) => {
+              activityPagination.pageItems.map((a) => {
                 const visual = activityIcon(a.type)
                 return (
                   <li key={a.id}>
@@ -183,6 +187,7 @@ export default function OverviewPage() {
               })
             )}
           </ul>
+          <PaginationBar pagination={activityPagination} hideWhenEmpty={false} />
         </div>
       </div>
 
@@ -203,12 +208,12 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {topMerchants.length === 0 ? (
+              {merchantsPagination.pageItems.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ padding: '16px 20px', color: 'var(--muted-foreground)' }}>No merchant order activity yet.</td>
                 </tr>
               ) : (
-                topMerchants.map((m) => (
+                merchantsPagination.pageItems.map((m) => (
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '10px 20px', fontWeight: 500, color: 'var(--foreground)' }}>{m.name}</td>
                     <td style={{ padding: '10px 20px', color: 'var(--muted-foreground)' }}>{m.type}</td>
@@ -225,6 +230,7 @@ export default function OverviewPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={merchantsPagination} hideWhenEmpty={false} />
       </div>
     </>
   )

@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useSystemHealth } from '../hooks/usePlatform'
 
 const S_STATUS: Record<string, string> = {
@@ -13,6 +15,9 @@ export default function SystemHealthPage() {
   const { data, loading, error } = useSystemHealth()
   const services = data?.services ?? []
   const overall = data?.overall
+  const servicesPagination = usePagination(services, { initialPageSize: 20 })
+  const incidents = services.filter((s) => s.status !== 'operational')
+  const incidentsPagination = usePagination(incidents, { initialPageSize: 20 })
 
   return (
     <>
@@ -49,9 +54,9 @@ export default function SystemHealthPage() {
               </tr>
             </thead>
             <tbody>
-              {services.length === 0 ? (
+              {servicesPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No service data.'}</td></tr>
-              ) : services.map((s) => (
+              ) : servicesPagination.pageItems.map((s) => (
                 <tr key={s.name} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 500, color: 'var(--foreground)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -68,12 +73,13 @@ export default function SystemHealthPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={servicesPagination} hideWhenEmpty={false} />
       </div>
 
       <div className="admin-card">
         <div className="admin-card-header"><div><h3>Incidents</h3><p>Derived from current service health</p></div></div>
         <ul className="admin-activity-list">
-          {services.filter((s) => s.status !== 'operational').length === 0 ? (
+          {incidentsPagination.totalItems === 0 ? (
             <li>
               <div className="admin-activity-icon" style={{ background: 'oklch(0.95 0.015 145)' }}>
                 <CheckCircle size={14} style={{ color: '#16a34a' }} />
@@ -84,7 +90,7 @@ export default function SystemHealthPage() {
               </div>
             </li>
           ) : (
-            services.filter((s) => s.status !== 'operational').map((s) => (
+            incidentsPagination.pageItems.map((s) => (
               <li key={s.name}>
                 <div className="admin-activity-icon" style={{ background: 'oklch(0.96 0.02 30)' }}>
                   <AlertTriangle size={14} style={{ color: 'var(--destructive)' }} />
@@ -97,6 +103,9 @@ export default function SystemHealthPage() {
             ))
           )}
         </ul>
+        {incidentsPagination.totalItems > 0 ? (
+          <PaginationBar pagination={incidentsPagination} />
+        ) : null}
       </div>
     </>
   )

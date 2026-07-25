@@ -13,6 +13,7 @@ import {
   Settings,
   ShoppingCart,
   Sun,
+  Ticket,
   Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import { Toaster } from '@/components/ui/sonner'
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
 import OrdersPage from './pages/OrdersPage'
+import TicketingPage from './pages/TicketingPage'
 import UsersPage from './pages/UsersPage'
 import RevenuePaymentsPage from './pages/RevenuePaymentsPage'
 import QRActivityPage from './pages/QRActivityPage'
@@ -36,10 +38,12 @@ import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import { InlineSpinner } from './components/LoadingSpinner'
+import { PaginationBar } from './components/PaginationBar'
+import { usePagination } from './hooks/usePagination'
 import { useNotifications, useSystemHealth } from './hooks/usePlatform'
 
 type View =
-  | 'overview' | 'merchants' | 'orders'
+  | 'overview' | 'merchants' | 'orders' | 'ticketing'
   | 'users' | 'revenue' | 'qr-activity' | 'reports'
   | 'system' | 'audit' | 'configs'
 
@@ -55,6 +59,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   overview: { eyebrow: 'Admin · Platform', title: 'Overview' },
   merchants: { eyebrow: 'Admin · Platform', title: 'Merchants' },
   orders: { eyebrow: 'Admin · Platform', title: 'All Orders' },
+  ticketing: { eyebrow: 'Admin · Platform', title: 'Ticketing' },
   users: { eyebrow: 'Admin · Platform', title: 'Users' },
   revenue: { eyebrow: 'Admin · Finance', title: 'Revenue & Payments' },
   'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
@@ -107,9 +112,32 @@ export default function AdminApp({
   } = useNotifications()
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark-mode', darkMode)
+    document.documentElement.classList.toggle('dark', darkMode)
     document.body.classList.toggle('dark-mode', darkMode)
+    document.body.classList.toggle('dark', darkMode)
     localStorage.setItem('scanny-dark-mode', JSON.stringify(darkMode))
   }, [darkMode])
+
+  useEffect(() => {
+    function handleKeyPress(e: KeyboardEvent) {
+      if (e.key !== 'd' && e.key !== 'D') return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return
+      }
+      e.preventDefault()
+      setDarkMode((prev: boolean) => !prev)
+    }
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [])
 
   const openIncidents = health?.overall?.openIncidents ?? 0
 
@@ -127,6 +155,7 @@ export default function AdminApp({
           { id: 'overview' as const, label: 'Overview', icon: LayoutGrid },
           { id: 'merchants' as const, label: 'Merchants', icon: Building2 },
           { id: 'orders' as const, label: 'All Orders', icon: ShoppingCart },
+          { id: 'ticketing' as const, label: 'Ticketing', icon: Ticket },
           { id: 'users' as const, label: 'Users', icon: Users },
         ],
       },
@@ -252,6 +281,7 @@ export default function AdminApp({
           {view === 'overview' && <OverviewPage />}
           {view === 'merchants' && <MerchantsPage />}
           {view === 'orders' && <OrdersPage />}
+          {view === 'ticketing' && <TicketingPage />}
           {view === 'users' && <UsersPage />}
           {view === 'revenue' && <RevenuePaymentsPage />}
           {view === 'qr-activity' && <QRActivityPage />}
@@ -304,6 +334,8 @@ function AdminNotificationsPanel({
   error: string | null
   onMarkAllRead: () => void
 }) {
+  const pagination = usePagination(notifications, { initialPageSize: 20 })
+
   return (
     <div>
       <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -348,7 +380,7 @@ function AdminNotificationsPanel({
             No notifications yet.
           </p>
         )}
-        {notifications.map((n) => (
+        {pagination.pageItems.map((n) => (
           <div
             key={n.id}
             style={{
@@ -391,6 +423,7 @@ function AdminNotificationsPanel({
             </div>
           </div>
         ))}
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
     </div>
   )

@@ -71,6 +71,21 @@ public class AuditService {
         return auditEventRepository.findAllByOrderByOccurredAtDesc(PageRequest.of(safePage, safeSize));
     }
 
+    @Transactional(readOnly = true)
+    public long countSince(Instant since) {
+        return auditEventRepository.countByOccurredAtGreaterThanEqual(since);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByActionPrefix(String prefix) {
+        return auditEventRepository.countByActionStartingWith(prefix);
+    }
+
+    @Transactional(readOnly = true)
+    public long countSystemEvents() {
+        return auditEventRepository.countSystemEvents();
+    }
+
     private String sanitizeMetadata(Map<String, ?> metadata) {
         if (metadata == null || metadata.isEmpty()) {
             return null;

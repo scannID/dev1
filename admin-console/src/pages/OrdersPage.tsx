@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
 import { useOrders } from '../hooks/useOrders'
+import { useServerPagination } from '../hooks/useServerPagination'
 
 const S_STATUS: Record<string, string> = {
   Completed: 'bg-muted text-muted-foreground',
@@ -27,8 +29,22 @@ function currency(amount: number) {
 }
 
 export default function OrdersPage() {
-  const { orders, summary, loading, error } = useOrders()
   const [q, setQ] = useState('')
+  const [totalItems, setTotalItems] = useState(0)
+  const pagination = useServerPagination({
+    totalItems,
+    initialPageSize: 20,
+    resetKey: q,
+  })
+  const { orders, summary, pagination: apiPagination, loading, error } = useOrders({
+    page: pagination.page,
+    limit: pagination.pageSize,
+    search: q,
+  })
+
+  useEffect(() => {
+    setTotalItems(apiPagination?.total ?? 0)
+  }, [apiPagination?.total])
 
   const displayOrders = orders.map((o) => ({
     id: o.id,
@@ -40,10 +56,6 @@ export default function OrdersPage() {
     status: String(o.status),
     time: new Date(o.createdAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
   }))
-
-  const filtered = displayOrders.filter((o) =>
-    [o.id, o.merchant, o.customer].join(' ').toLowerCase().includes(q.toLowerCase())
-  )
 
   return (
     <>
@@ -90,14 +102,14 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {displayOrders.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
                     {loading ? <InlineSpinner label="Loading…" /> : 'No orders found.'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((o) => (
+                displayOrders.map((o) => (
                   <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}
@@ -116,6 +128,7 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
     </>
   )

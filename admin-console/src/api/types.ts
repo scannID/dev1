@@ -258,6 +258,12 @@ export interface AuditListResponse {
     adminActions: number
     systemEvents: number
   }
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
 }
 
 export interface RevenueTransaction {
@@ -281,6 +287,29 @@ export interface TicketEventStats {
   eventName: string
   totalTickets: number
   purchasedTickets: number
+}
+
+export interface AdminTicket {
+  id: string
+  qrToken: string
+  ticketType: string
+  eventName: string
+  eventDate: string
+  holderName: string
+  holderPhone: string
+  holderEmail: string
+  price: number
+  currency: string
+  status: string
+  usageLimit: number
+  usageCount: number
+  paymentStatus: string
+  issuedBy?: string
+  metadata?: string
+  createdAt: string
+  redeemedAt?: string
+  canBeUsed: boolean
+  qrCodeUrl: string
 }
 
 export type ConfigSection =

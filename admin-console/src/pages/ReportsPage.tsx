@@ -3,6 +3,8 @@ import { API_BASE_URL } from '../api/client'
 import { adminApi } from '../api/services'
 import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 
 function currency(amount: number) {
   return new Intl.NumberFormat('en-UG', {
@@ -123,7 +125,12 @@ export default function ReportsPage() {
     return ticketStats.filter((row) => row.eventName.toLowerCase().includes(query))
   }, [ticketSearch, ticketStats])
 
+  const ticketPagination = usePagination(filteredTicketStats, {
+    initialPageSize: 20,
+    resetKey: ticketSearch,
+  })
   const monthly = revenue?.monthly ?? []
+  const monthlyPagination = usePagination(monthly, { initialPageSize: 20 })
   const maxOrders = Math.max(...monthly.map((m) => m.transactions), 1)
   const growth = revenue?.currentMonth.growth
 
@@ -170,15 +177,16 @@ export default function ReportsPage() {
             {ticketError && !ticketLoading && <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>{ticketError}</p>}
             {!ticketLoading && !ticketError && (
               <div style={{ display: 'grid', gap: 8 }}>
-                {filteredTicketStats.slice(0, 8).map((row) => (
+                {ticketPagination.pageItems.map((row) => (
                   <div key={row.eventName} style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
                     <span style={{ fontSize: 13, color: 'var(--foreground)' }}>{row.eventName}</span>
                     <strong style={{ fontSize: 13, color: 'var(--primary)' }}>{row.purchasedTickets}/{row.totalTickets}</strong>
                   </div>
                 ))}
-                {filteredTicketStats.length === 0 && (
+                {ticketPagination.totalItems === 0 && (
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--muted-foreground)' }}>No ticket events found.</p>
                 )}
+                <PaginationBar pagination={ticketPagination} hideWhenEmpty={false} />
               </div>
             )}
           </div>
@@ -239,9 +247,9 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {monthly.length === 0 ? (
+              {monthlyPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={3} style={{ padding: 16, color: 'var(--muted-foreground)' }}>No monthly breakdown yet.</td></tr>
-              ) : monthly.map((w) => (
+              ) : monthlyPagination.pageItems.map((w) => (
                 <tr key={w.month} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 600 }}>{w.month}</td>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>{w.transactions.toLocaleString()}</td>
@@ -251,6 +259,7 @@ export default function ReportsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={monthlyPagination} hideWhenEmpty={false} />
       </div>
     </>
   )

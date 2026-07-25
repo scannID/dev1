@@ -1,11 +1,23 @@
+import { useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
 import { useAuditLog } from '../hooks/usePlatform'
+import { useServerPagination } from '../hooks/useServerPagination'
 
 export default function AuditLogPage() {
-  const { data, loading, error } = useAuditLog()
+  const [totalItems, setTotalItems] = useState(0)
+  const pagination = useServerPagination({
+    totalItems,
+    initialPageSize: 20,
+  })
+  const { data, loading, error } = useAuditLog(pagination.page, pagination.pageSize)
   const events = data?.events ?? []
   const summary = data?.summary
+
+  useEffect(() => {
+    setTotalItems(data?.pagination?.total ?? 0)
+  }, [data?.pagination?.total])
 
   return (
     <>
@@ -30,7 +42,12 @@ export default function AuditLogPage() {
       </div>
 
       <div className="admin-card">
-        <div className="admin-card-header"><div><h3>Audit Log</h3><p>Derived platform actions</p></div></div>
+        <div className="admin-card-header">
+          <div>
+            <h3>Audit Log</h3>
+            <p>Derived platform actions</p>
+          </div>
+        </div>
         <div className="admin-table-wrap">
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
@@ -50,13 +67,20 @@ export default function AuditLogPage() {
                   <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.target}</td>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{log.ip}</td>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    {new Date(log.timestamp).toLocaleString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
     </>
   )

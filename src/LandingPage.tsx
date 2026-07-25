@@ -708,10 +708,10 @@ function CtaSection({ onGetStarted, C }: { onGetStarted: () => void; C: LandingT
           Set up your QR menu in under 5 minutes. No credit card, no installs, no friction.
         </p>
         <button onClick={onGetStarted} style={{ ...S.ctaPrimary, fontSize: 16, padding: '15px 36px', margin: '0 auto' }} className="cta-primary">
+          <span className="cta-primary__label">Get started</span>
           <svg className="cta-primary__arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Get started
         </button>
         <p style={{ color: C.muted, fontSize: 13, margin: '18px 0 0', opacity: 0.7 }}>No credit card required · Set up in 5 minutes</p>
       </div>
@@ -719,61 +719,7 @@ function CtaSection({ onGetStarted, C }: { onGetStarted: () => void; C: LandingT
   )
 }
 
-/* ─── Top nav with hover info ────────────────────────────────────────── */
-const navItems = [
-  {
-    label: 'Ordering',
-    href: '#how',
-    title: 'QR customer ordering',
-    body: 'Guests scan your code, browse the live menu, and place orders from their phone — no app install.',
-    points: ['Unique QR per business', 'Works on any smartphone', 'Orders sync instantly'],
-  },
-  {
-    label: 'Dashboard',
-    href: '#how',
-    title: 'Live merchant dashboard',
-    body: 'See every open order in one place. Update status, track payments, and clear completed tickets fast.',
-    points: ['Real-time order feed', 'Status in one tap', 'Open / paid summaries'],
-  },
-  {
-    label: 'Catalog',
-    href: '#how',
-    title: 'Menu & catalog control',
-    body: 'Add meals, drinks, or services with prices. Toggle availability and push changes live to customers.',
-    points: ['Instant price updates', 'Hide sold-out items', 'Built for any business type'],
-  },
-  {
-    label: 'Payments',
-    href: '#how',
-    title: 'Payment tracking',
-    body: 'Mark orders Paid or Unpaid, spot what is awaiting payment, and keep sales totals in view.',
-    points: ['Paid vs unpaid at a glance', 'Mobile money friendly', 'Clear revenue snapshot'],
-  },
-]
-
-function NavHoverLink({
-  item,
-}: {
-  item: (typeof navItems)[number]
-}) {
-  return (
-    <li className="scanny-nav-item">
-      <a href={item.href} className="scanny-nav-link">
-        {item.label}
-      </a>
-      <div className="scanny-nav-panel" role="tooltip">
-        <p className="scanny-nav-panel__title">{item.title}</p>
-        <p className="scanny-nav-panel__body">{item.body}</p>
-        <ul className="scanny-nav-panel__list">
-          {item.points.map(p => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-      </div>
-    </li>
-  )
-}
-
+/* ─── Top nav ────────────────────────────────────────────────────────── */
 function TopNav({
   onGetStarted,
   onCreateEventTicket,
@@ -786,109 +732,12 @@ function TopNav({
   return (
     <nav style={S.nav}>
       <style>{`
-        .scanny-nav-links {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          list-style: none;
-          margin: 0;
-          padding: 0;
-          flex: 1;
-          justify-content: center;
-        }
-        .scanny-nav-item {
-          position: relative;
-        }
-        .scanny-nav-link {
-          display: inline-flex;
-          align-items: center;
-          padding: 8px 12px;
-          border-radius: 8px;
-          color: var(--muted-foreground);
-          font-size: 14px;
-          font-weight: 500;
-          text-decoration: none;
-          white-space: nowrap;
-        }
-        .scanny-nav-link:hover,
-        .scanny-nav-item:focus-within .scanny-nav-link {
-          color: var(--foreground);
-          background: color-mix(in srgb, var(--foreground) 6%, transparent);
-        }
-        .scanny-nav-panel {
-          position: absolute;
-          top: calc(100% + 10px);
-          left: 50%;
-          transform: translateX(-50%) translateY(6px);
-          width: min(280px, 70vw);
-          padding: 14px 16px;
-          border-radius: 14px;
-          background: rgba(255,255,255,0.92);
-          border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.15s ease, transform 0.15s ease;
-          z-index: 60;
-        }
-        .scanny-nav-panel::before {
-          content: '';
-          position: absolute;
-          top: -6px;
-          left: 50%;
-          width: 12px;
-          height: 12px;
-          transform: translateX(-50%) rotate(45deg);
-          background: rgba(255,255,255,0.92);
-          border-left: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
-          border-top: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
-        }
-        .scanny-nav-item:hover .scanny-nav-panel,
-        .scanny-nav-item:focus-within .scanny-nav-panel {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-          pointer-events: auto;
-        }
-        .scanny-nav-panel__title {
-          margin: 0 0 6px;
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--foreground);
-        }
-        .scanny-nav-panel__body {
-          margin: 0 0 10px;
-          font-size: 12px;
-          line-height: 1.45;
-          color: var(--muted-foreground);
-        }
-        .scanny-nav-panel__list {
-          margin: 0;
-          padding: 0;
-          list-style: none;
-          display: grid;
-          gap: 6px;
-        }
-        .scanny-nav-panel__list li {
-          position: relative;
-          padding-left: 14px;
-          font-size: 12px;
-          color: var(--foreground);
-        }
-        .scanny-nav-panel__list li::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 7px;
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--primary);
-        }
         .scanny-nav-actions {
           display: flex;
           align-items: center;
           gap: 8px;
           flex-shrink: 0;
+          margin-left: auto;
         }
         .scanny-nav-event {
           background: transparent;
@@ -902,12 +751,41 @@ function TopNav({
           border: 1px solid color-mix(in srgb, var(--foreground) 16%, transparent);
           white-space: nowrap;
           font-family: inherit;
+          display: inline-flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 8px;
         }
         .scanny-nav-event:hover {
           background: color-mix(in srgb, var(--foreground) 5%, transparent);
         }
-        @media (max-width: 860px) {
-          .scanny-nav-links { display: none; }
+        .scanny-nav-event__ticket {
+          display: inline-flex;
+          flex-shrink: 0;
+          order: 1;
+          position: relative;
+          z-index: 1;
+          color: #ea580c;
+          transform-origin: center;
+          animation: scannyTicketFloat 1.8s ease-in-out infinite;
+        }
+        .scanny-nav-event__label {
+          order: 0;
+        }
+        .scanny-nav-event:hover .scanny-nav-event__ticket {
+          animation: scannyTicketPop 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+        }
+        @keyframes scannyTicketFloat {
+          0%, 100% { transform: translateY(0) rotate(-6deg); }
+          50% { transform: translateY(-2px) rotate(4deg); }
+        }
+        @keyframes scannyTicketPop {
+          0% { transform: translateY(0) rotate(-6deg) scale(1); }
+          45% { transform: translateY(-3px) rotate(10deg) scale(1.12); }
+          100% { transform: translateY(0) rotate(-4deg) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .scanny-nav-event__ticket { animation: none !important; }
         }
       `}</style>
       <div style={S.navInner}>
@@ -926,21 +804,27 @@ function TopNav({
           <span style={S.logoText}>Scanny</span>
         </a>
 
-        <ul className="scanny-nav-links">
-          {navItems.map(item => (
-            <NavHoverLink key={item.label} item={item} />
-          ))}
-        </ul>
-
         <div className="scanny-nav-actions">
           <button type="button" onClick={onCreateEventTicket} className="scanny-nav-event">
-            Create event ticket
+            <span className="scanny-nav-event__label">Create event ticket</span>
+            <span className="scanny-nav-event__ticket" aria-hidden>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M2.5 4.25C2.5 3.56 3.06 3 3.75 3H12.25C12.94 3 13.5 3.56 13.5 4.25V6.1a1.35 1.35 0 0 0 0 2.55v1.85c0 .69-.56 1.25-1.25 1.25H3.75C3.06 11.75 2.5 11.19 2.5 10.5V8.65a1.35 1.35 0 0 0 0-2.55V4.25Z"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinejoin="round"
+                />
+                <path d="M9.75 3.35v8.05" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeDasharray="1.6 1.7" />
+                <path d="M4.5 5.5h3M4.5 7.5h2.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </span>
           </button>
           <button onClick={onGetStarted} style={S.navCta} className="cta-primary">
+            <span className="cta-primary__label">Get started</span>
             <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Get started
           </button>
         </div>
       </div>
@@ -965,15 +849,27 @@ export default function LandingPage({
       <style>{`
         * { box-sizing: border-box; }
         a:hover { opacity: 0.85; }
+        .cta-primary {
+          display: inline-flex !important;
+          flex-direction: row;
+          align-items: center;
+          gap: 8px;
+        }
         .cta-primary:hover  { filter: brightness(0.95); transform: translateY(-1px); }
         .cta-primary__arrow {
           display: block;
           flex-shrink: 0;
+          order: 1;
+          position: relative;
+          z-index: 1;
           animation: ctaArrowNudge 1.1s ease-in-out infinite;
+        }
+        .cta-primary__label {
+          order: 0;
         }
         @keyframes ctaArrowNudge {
           0%, 100% { transform: translateX(0); opacity: 0.85; }
-          50% { transform: translateX(4px); opacity: 1; }
+          50% { transform: translateX(3px); opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
           .cta-primary__arrow { animation: none !important; }
@@ -998,8 +894,8 @@ export default function LandingPage({
               One scan.<br />
               <span style={{ color: C.tealLt }}>Total control.</span>
             </h1>
-            <p style={S.heroSub}>
-              Customers order from their phone. You run every order from one live dashboard.
+            <p style={{ ...S.heroSub, fontWeight: 600 }}>
+              Gone are the days.
             </p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }} className="hero-visual">

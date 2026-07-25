@@ -21,6 +21,7 @@ import type {
   RevenueTransaction,
   ReportsOverview,
   TicketEventStats,
+  AdminTicket,
   AllConfigsResponse,
   ConfigSection,
   ConfigSectionResponse,
@@ -153,8 +154,11 @@ export const qrActivityApi = {
 }
 
 export const auditApi = {
-  list: async (): Promise<AuditListResponse> => {
-    return api.get<AuditListResponse>('/admin/audit')
+  list: async (params?: { page?: number; limit?: number }): Promise<AuditListResponse> => {
+    const query = new URLSearchParams()
+    query.set('page', String(params?.page ?? 1))
+    query.set('limit', String(params?.limit ?? 20))
+    return api.get<AuditListResponse>(`/admin/audit?${query.toString()}`)
   },
 }
 
@@ -178,6 +182,15 @@ export const ticketsApi = {
   getStats: async (search?: string): Promise<TicketEventStats[]> => {
     const suffix = search ? `?search=${encodeURIComponent(search)}` : ''
     return api.get<TicketEventStats[]>(`/tickets/stats${suffix}`)
+  },
+
+  list: async (eventName?: string): Promise<AdminTicket[]> => {
+    const suffix = eventName ? `?eventName=${encodeURIComponent(eventName)}` : ''
+    return api.get<AdminTicket[]>(`/tickets${suffix}`)
+  },
+
+  getAnalytics: async (): Promise<TicketAnalytics> => {
+    return api.get<TicketAnalytics>('/admin/analytics/tickets')
   },
 }
 

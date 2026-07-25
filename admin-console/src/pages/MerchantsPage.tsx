@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Search, Plus, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,9 @@ import {
 } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
 import { useMerchants } from '../hooks/useMerchants'
+import { useServerPagination } from '../hooks/useServerPagination'
 import { adminApi } from '../api/services'
 
 const STATUS_STYLE: Record<string, string> = {
@@ -34,8 +36,18 @@ function currency(amount: number) {
 }
 
 export default function MerchantsPage() {
-  const { merchants, summary, loading, error, refresh } = useMerchants()
   const [query, setQuery] = useState('')
+  const [totalItems, setTotalItems] = useState(0)
+  const pagination = useServerPagination({
+    totalItems,
+    initialPageSize: 20,
+    resetKey: query,
+  })
+  const { merchants, summary, pagination: apiPagination, loading, error, refresh } = useMerchants({
+    page: pagination.page,
+    limit: pagination.pageSize,
+    search: query,
+  })
   const [showAddSheet, setShowAddSheet] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -51,6 +63,10 @@ export default function MerchantsPage() {
     bankAccountNumber: '',
     termsAccepted: true,
   })
+
+  useEffect(() => {
+    setTotalItems(apiPagination?.total ?? 0)
+  }, [apiPagination?.total])
 
   const resetForm = () => {
     setFormData({
@@ -118,14 +134,10 @@ export default function MerchantsPage() {
     joined: new Date(m.joinedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
   }))
 
-  const filtered = displayMerchants.filter((m) =>
-    [m.name, m.owner, m.type, m.id].join(' ').toLowerCase().includes(query.toLowerCase())
-  )
-
-  const totalMerchants = summary?.total ?? displayMerchants.length
-  const activeMerchants = summary?.active ?? displayMerchants.filter((m) => m.status === 'active').length
-  const pendingMerchants = summary?.pending ?? displayMerchants.filter((m) => m.status === 'pending').length
-  const suspendedMerchants = summary?.suspended ?? displayMerchants.filter((m) => m.status === 'suspended').length
+  const totalMerchants = summary?.total ?? (apiPagination?.total ?? displayMerchants.length)
+  const activeMerchants = summary?.active ?? 0
+  const pendingMerchants = summary?.pending ?? 0
+  const suspendedMerchants = summary?.suspended ?? 0
 
   return (
     <>
@@ -157,7 +169,7 @@ export default function MerchantsPage() {
 
       <div className="admin-card">
         <div className="admin-card-header">
-          <div><h3>All Merchants</h3><p>{filtered.length} of {displayMerchants.length} shown</p></div>
+          <div><h3>All Merchants</h3><p>{apiPagination?.total ?? displayMerchants.length} merchants</p></div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
@@ -176,14 +188,14 @@ export default function MerchantsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {displayMerchants.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
                     {loading ? <InlineSpinner label="Loading…" /> : 'No merchants found.'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((m) => (
+                displayMerchants.map((m) => (
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.1s', cursor: 'pointer' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}
@@ -214,6 +226,7 @@ export default function MerchantsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
 
       <Sheet

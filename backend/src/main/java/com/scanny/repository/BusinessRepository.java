@@ -38,6 +38,11 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
 
     List<Business> findByCreatedAtAfterOrderByCreatedAtDesc(Instant cutoff, Pageable pageable);
 
+    List<Business> findByCreatedAtGreaterThanEqual(Instant cutoff);
+
     @Query("SELECT COUNT(b) FROM Business b WHERE b.createdAt <= :dayEnd")
     long countCreatedOnOrBefore(@Param("dayEnd") Instant dayEnd);
+
+    @Query("SELECT b FROM Business b WHERE b.merchantId IN :merchantIds OR b.id IN :merchantIds")
+    List<Business> findByMerchantIdInOrIdIn(@Param("merchantIds") List<String> merchantIds);
 }

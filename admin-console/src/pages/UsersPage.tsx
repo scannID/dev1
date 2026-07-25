@@ -1,5 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useUsers } from '../hooks/usePlatform'
 
 const ROLE_STYLE: Record<string, string> = {
@@ -18,6 +20,7 @@ export default function UsersPage() {
   const { data, loading, error } = useUsers()
   const users = data?.users ?? []
   const summary = data?.summary
+  const pagination = usePagination(users, { initialPageSize: 20 })
 
   return (
     <>
@@ -56,9 +59,9 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.length === 0 ? (
+              {pagination.pageItems.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No users found.'}</td></tr>
-              ) : users.map((u) => {
+              ) : pagination.pageItems.map((u) => {
                 const status = (u.status || 'active').toLowerCase()
                 return (
                   <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -80,6 +83,7 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
     </>
   )

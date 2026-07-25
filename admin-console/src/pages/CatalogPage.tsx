@@ -1,5 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useCatalog } from '../hooks/usePlatform'
 
 function currency(amount: number) {
@@ -14,6 +16,7 @@ export default function CatalogPage() {
   const { data, loading, error } = useCatalog()
   const items = data?.items ?? []
   const summary = data?.summary
+  const pagination = usePagination(items, { initialPageSize: 20 })
 
   return (
     <>
@@ -56,9 +59,9 @@ export default function CatalogPage() {
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 ? (
+              {pagination.pageItems.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No catalog items yet.'}</td></tr>
-              ) : items.map((item) => (
+              ) : pagination.pageItems.map((item) => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 500 }}>{item.name}</td>
                   <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{item.merchant}</td>
@@ -75,6 +78,7 @@ export default function CatalogPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={pagination} hideWhenEmpty={false} />
       </div>
     </>
   )

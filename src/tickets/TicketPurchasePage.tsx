@@ -1,15 +1,29 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Smartphone } from 'lucide-react'
 import { publicTicketsApi, paymentsApi } from '../api/services'
 import type { TicketEventInfo, TicketPurchaseResponse } from '../api/types'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { ScannyMark } from '../customer/ScannyMark'
-import '../customer/CustomerApp.css'
+import './TicketCustomer.css'
 
 type Props = { masterQrToken: string }
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
+}
+
+function formatEventDate(iso: string | null) {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return null
+  }
 }
 
 export default function TicketPurchasePage({ masterQrToken }: Props) {
@@ -26,8 +40,12 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [waiting, setWaiting] = useState(false)
 
   useEffect(() => {
-    document.documentElement.classList.add('cm-app')
-    return () => document.documentElement.classList.remove('cm-app')
+    document.documentElement.classList.add('tk-app')
+    document.body.classList.add('tk-app')
+    return () => {
+      document.documentElement.classList.remove('tk-app')
+      document.body.classList.remove('tk-app')
+    }
   }, [])
 
   useEffect(() => {
@@ -105,10 +123,11 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   }
 
   const selected = event?.ticketClasses.find((c) => c.name === ticketClass)
+  const dateLabel = formatEventDate(event?.eventDate ?? null)
 
   if (loading) {
     return (
-      <div className="cm-page cm-centered cm-boot">
+      <div className="tk-shell tk-centered">
         <LoadingSpinner fullPage label="Loading event…" />
       </div>
     )
@@ -116,10 +135,13 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
 
   if (error && !event) {
     return (
-      <div className="cm-page">
-        <div className="cm-step cm-panel" style={{ margin: 16 }}>
+      <div className="tk-shell tk-centered">
+        <div className="tk-panel tk-empty tk-enter">
+          <p className="tk-hero-kicker">Scanny</p>
           <h2>Event unavailable</h2>
-          <p className="cm-error" role="alert">{error}</p>
+          <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
+            {error}
+          </p>
         </div>
       </div>
     )
@@ -129,145 +151,158 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
 
   if (waiting && purchase) {
     return (
-      <div className="cm-page">
-        <header className="cm-topbar">
-          <div className="cm-brand">
+      <div className="tk-shell">
+        <header className="tk-topbar">
+          <div className="tk-brand">
             <ScannyMark size={28} />
             <div>
               <strong>Scanny</strong>
-              <span className="cm-muted" style={{ display: 'block', fontSize: 12 }}>Event ticket</span>
+              <span>Event ticket</span>
             </div>
           </div>
         </header>
-        <div className="cm-step cm-step-enter cm-panel cm-done" style={{ margin: 16 }}>
-          <div className="cm-done-icon" style={{ animation: 'none', background: 'var(--cm-teal-soft)', color: 'var(--cm-orange)' }}>
-            <Check size={28} />
+        <main className="tk-main">
+          <div className="tk-panel tk-wait tk-enter">
+            <div className="tk-wait-ring" aria-hidden>
+              <Smartphone size={28} color="var(--tk-gold-bright)" strokeWidth={1.75} />
+            </div>
+            <h2>Approve on your phone</h2>
+            <p>
+              Check your phone for the <strong>{provider}</strong> prompt for{' '}
+              <strong>{event.eventName}</strong>.
+            </p>
+            <p>
+              Once paid, your ticket opens here and we email <strong>{holderEmail}</strong>.
+            </p>
+            <p className="tk-ref">Payment ref: {purchase.paymentId}</p>
           </div>
-          <h2>Approve payment</h2>
-          <p className="cm-muted">
-            Check your phone for the {provider} prompt for <strong>{event.eventName}</strong>.
-          </p>
-          <p className="cm-muted" style={{ marginTop: 8 }}>
-            Once paid, your ticket opens here and we email <strong>{holderEmail}</strong>.
-          </p>
-          <p className="cm-ref" style={{ marginTop: 16 }}>Payment ref: {purchase.paymentId}</p>
-        </div>
+        </main>
       </div>
     )
   }
 
   return (
-    <div className="cm-page">
-      <header className="cm-topbar">
-        <div className="cm-brand">
+    <div className="tk-shell">
+      <header className="tk-topbar">
+        <div className="tk-brand">
           <ScannyMark size={28} />
           <div>
             <strong>Scanny</strong>
-            <span className="cm-muted" style={{ display: 'block', fontSize: 12 }}>Buy ticket</span>
+            <span>Event ticket</span>
           </div>
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="cm-step cm-step-enter cm-panel" style={{ margin: 16 }}>
-        <h2>{event.eventName}</h2>
-        <p className="cm-muted">
-          {event.eventDate ? new Date(event.eventDate).toLocaleDateString() : 'Event ticket'} · pay with mobile money
-        </p>
+      <main className="tk-main">
+        <header className="tk-hero tk-enter">
+          <p className="tk-hero-kicker">Get your ticket</p>
+          <h1>{event.eventName}</h1>
+          <p className="tk-hero-meta">
+            {[dateLabel, 'Pay with mobile money'].filter(Boolean).join(' · ')}
+          </p>
+        </header>
 
-        <div className="cm-order-strip">
-          <div>
-            <span>Ticket</span>
-            <span>{ticketClass || '—'}</span>
+        <form onSubmit={handleSubmit} className="tk-panel tk-enter">
+          <p className="tk-section-label">Ticket class</p>
+          <div className="tk-class-grid" role="radiogroup" aria-label="Ticket class">
+            {event.ticketClasses.map((c) => {
+              const active = c.name === ticketClass
+              return (
+                <button
+                  key={c.name}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`tk-class-card${active ? ' is-selected' : ''}`}
+                  onClick={() => setTicketClass(c.name)}
+                  disabled={submitting}
+                >
+                  <strong>{c.name}</strong>
+                  <span>{money(c.price, event.currency)}</span>
+                </button>
+              )
+            })}
           </div>
-          <div className="cm-order-strip-total">
-            <span>Total</span>
-            <strong>{money(selected?.price ?? 0, event.currency)}</strong>
+
+          <div className="tk-fields">
+            <label className="tk-field">
+              Your name
+              <input
+                value={holderName}
+                onChange={(e) => setHolderName(e.target.value)}
+                placeholder="e.g. Jane"
+                autoComplete="name"
+                required
+                disabled={submitting}
+              />
+            </label>
+
+            <label className="tk-field">
+              Email
+              <input
+                type="email"
+                value={holderEmail}
+                onChange={(e) => setHolderEmail(e.target.value)}
+                placeholder="you@email.com"
+                autoComplete="email"
+                required
+                disabled={submitting}
+              />
+              <p className="tk-hint">
+                Ticket is emailed here after payment — one purchase per email for this event.
+              </p>
+            </label>
+
+            <label className="tk-field">
+              Mobile money number
+              <input
+                value={holderPhone}
+                onChange={(e) => setHolderPhone(e.target.value)}
+                placeholder="+256…"
+                autoComplete="tel"
+                required
+                disabled={submitting}
+              />
+            </label>
           </div>
-        </div>
 
-        <label className="cm-field">
-          Ticket class
-          <select
-            value={ticketClass}
-            onChange={(e) => setTicketClass(e.target.value)}
-            required
-            disabled={submitting}
-          >
-            {event.ticketClasses.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name} — {money(c.price, event.currency)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <p className="tk-section-label" style={{ marginTop: 16 }}>
+            Pay with
+          </p>
+          <div className="tk-providers" role="group" aria-label="Payment provider">
+            <button
+              type="button"
+              className={`tk-provider${provider === 'MTN' ? ' is-active' : ''}`}
+              onClick={() => setProvider('MTN')}
+              disabled={submitting}
+              aria-label="MTN MoMo"
+              aria-pressed={provider === 'MTN'}
+            >
+              <img src="/mtn.png" alt="" />
+            </button>
+            <button
+              type="button"
+              className={`tk-provider${provider === 'Airtel' ? ' is-active' : ''}`}
+              onClick={() => setProvider('Airtel')}
+              disabled={submitting}
+              aria-label="Airtel Money"
+              aria-pressed={provider === 'Airtel'}
+            >
+              <img src="/airtel.png" alt="" className="tk-provider-airtel" />
+            </button>
+          </div>
 
-        <label className="cm-field">
-          Your name
-          <input
-            value={holderName}
-            onChange={(e) => setHolderName(e.target.value)}
-            placeholder="e.g. Jane"
-            autoComplete="name"
-            required
-            disabled={submitting}
-          />
-        </label>
+          {error ? (
+            <div className="tk-error" role="alert">
+              {error}
+            </div>
+          ) : null}
 
-        <label className="cm-field">
-          Email
-          <input
-            type="email"
-            value={holderEmail}
-            onChange={(e) => setHolderEmail(e.target.value)}
-            placeholder="you@email.com"
-            autoComplete="email"
-            required
-            disabled={submitting}
-          />
-          <span className="cm-optional" style={{ fontWeight: 500 }}>
-            Your ticket is emailed here after payment — one purchase per email for this event.
-          </span>
-        </label>
-
-        <label className="cm-field">
-          Mobile money number
-          <input
-            value={holderPhone}
-            onChange={(e) => setHolderPhone(e.target.value)}
-            placeholder="+256…"
-            autoComplete="tel"
-            required
-            disabled={submitting}
-          />
-        </label>
-
-        <div className="cm-providers" role="group" aria-label="Payment provider">
-          <button
-            type="button"
-            className={provider === 'MTN' ? 'active' : ''}
-            onClick={() => setProvider('MTN')}
-            disabled={submitting}
-            aria-label="MTN MoMo"
-          >
-            <img src="/mtn.png" alt="MTN" className="cm-provider-logo" />
+          <button type="submit" className="tk-cta" disabled={submitting || !ticketClass}>
+            {submitting ? 'Starting…' : `Pay ${money(selected?.price ?? 0, event.currency)}`}
           </button>
-          <button
-            type="button"
-            className={provider === 'Airtel' ? 'active' : ''}
-            onClick={() => setProvider('Airtel')}
-            disabled={submitting}
-            aria-label="Airtel Money"
-          >
-            <img src="/airtel.png" alt="Airtel" className="cm-provider-logo cm-provider-logo-airtel" />
-          </button>
-        </div>
-
-        {error ? <div className="cm-error" role="alert">{error}</div> : null}
-
-        <button type="submit" className="cm-primary cm-full" disabled={submitting}>
-          {submitting ? 'Starting…' : `Pay ${money(selected?.price ?? 0, event.currency)}`}
-        </button>
-      </form>
+        </form>
+      </main>
     </div>
   )
 }

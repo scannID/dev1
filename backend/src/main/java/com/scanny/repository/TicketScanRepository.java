@@ -21,6 +21,9 @@ public interface TicketScanRepository extends JpaRepository<TicketScan, Long> {
 
     List<TicketScan> findByScannedAtAfter(Instant cutoff);
 
+    @Query("SELECT s.scannedAt FROM TicketScan s WHERE s.scannedAt >= :cutoff")
+    List<Instant> findScannedAtsAfter(@Param("cutoff") Instant cutoff);
+
     @Query("""
             SELECT COUNT(s) FROM TicketScan s
             WHERE s.scannedAt >= :start AND s.scannedAt < :end

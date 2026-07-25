@@ -4,25 +4,36 @@ import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { ticketsApi, publicTicketsApi } from './api/services'
 import type { TicketStats } from './api/types'
-/* ─── Tokens ────────────────────────────────────────────────────────── */
+import { bindThemeHotkey } from './lib/theme'
+/* ─── Theme tokens (follow app light / dark via CSS vars) ───────────── */
 const G = {
-  bg: '#050505',
-  panel: '#121212',
-  card: '#161616',
-  cardAlt: '#1a1a1a',
-  border: 'rgba(201, 168, 108, 0.22)',
-  borderSoft: 'rgba(255,255,255,0.08)',
+  bg: 'var(--background)',
+  panel: 'var(--card)',
+  card: 'var(--card)',
+  cardAlt: 'var(--muted)',
+  border: 'var(--border)',
+  borderSoft: 'var(--border)',
+  gold: 'var(--primary)',
+  goldBright: 'var(--primary)',
+  goldDim: 'var(--muted-foreground)',
+  goldText: 'var(--muted-foreground)',
+  white: 'var(--foreground)',
+  muted: 'var(--muted-foreground)',
+  danger: 'var(--destructive)',
+  primaryFg: 'var(--primary-foreground)',
+  accentSoft: 'color-mix(in srgb, var(--primary) 14%, transparent)',
+  borderIdle: 'color-mix(in srgb, var(--foreground) 12%, transparent)',
+  surfaceIdle: 'color-mix(in srgb, var(--foreground) 4%, transparent)',
+  inputBg: 'var(--background)',
+}
+
+/* Fixed palette for the Gold ticket visual only */
+const GOLD_VISUAL = {
   gold: '#c9a86c',
   goldBright: '#e0c48a',
   goldDim: '#9a7f4f',
-  goldText: '#b8965a',
-  white: '#f5f5f5',
-  muted: '#8a8a8a',
-  danger: '#f87171',
 }
 
-const PREVIEW_IMG =
-  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80'
 const MASTER_IMG =
   'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80'
 const HOST_AVATAR =
@@ -49,6 +60,7 @@ export type EventTicketVisual = {
   date: string
   time?: string
   location?: string
+  host?: string
   paymentDetails: string
   template: TemplateId
   ticketClasses: TicketClass[]
@@ -84,6 +96,25 @@ function fmtTime(t: string) {
   const ampm = h >= 12 ? 'PM' : 'AM'
   const hour = ((h + 11) % 12) + 1
   return `${String(hour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')} ${ampm}`
+}
+
+/** Phone can't open localhost — rewrite API scan URLs to the LAN scan base. */
+function rewriteScanUrl(url: string) {
+  if (!url) return url
+  try {
+    const parsed = new URL(url)
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return url
+    const configured = String(import.meta.env.VITE_SCAN_BASE_URL || '').replace(/\/$/, '')
+    const origin =
+      configured && !/localhost|127\.0\.0\.1/i.test(configured)
+        ? configured
+        : typeof window !== 'undefined'
+          ? window.location.origin
+          : 'http://localhost:5173'
+    return `${origin}${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return url
+  }
 }
 
 function uid() {
@@ -258,10 +289,10 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
     <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif", background: '#0c0a06', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.55)', border: '1px solid rgba(201,168,108,0.45)' }}>
       <div style={{ padding: '22px 24px 16px', background: 'linear-gradient(135deg,#1a160c,#0c0a06)', borderBottom: '1px solid rgba(201,168,108,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: G.gold }}>Scanny · Gold Reserve</p>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD_VISUAL.gold }}>Scanny · Gold Reserve</p>
           <h2 style={{ margin: 0, color: '#f8f1e3', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{d.eventName || 'Event Name'}</h2>
         </div>
-        <span style={{ background: 'rgba(201,168,108,0.18)', border: '1px solid rgba(201,168,108,0.5)', color: G.goldBright, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
+        <span style={{ background: 'rgba(201,168,108,0.18)', border: '1px solid rgba(201,168,108,0.5)', color: GOLD_VISUAL.goldBright, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
       </div>
       <div style={{ padding: '18px 24px', display: 'grid', gridTemplateColumns: '1fr 130px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 14 }}>
@@ -272,7 +303,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
             ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
-              <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: G.goldDim }}>{label}</p>
+              <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD_VISUAL.goldDim }}>{label}</p>
               <p style={{ margin: 0, fontSize: label === 'Fee' ? 19 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f5efe3', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
           ))}
@@ -281,13 +312,13 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
           {qr ? (
             <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: '2px solid rgba(201,168,108,0.4)' }} />
           ) : (
-            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#15120c', border: '2px dashed rgba(201,168,108,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: G.gold, fontWeight: 600 }}>QR code</div>
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#15120c', border: '2px dashed rgba(201,168,108,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: GOLD_VISUAL.gold, fontWeight: 600 }}>QR code</div>
           )}
-          <p style={{ margin: 0, fontSize: 9, color: G.goldDim, textAlign: 'center' }}>Paid receipt</p>
+          <p style={{ margin: 0, fontSize: 9, color: GOLD_VISUAL.goldDim, textAlign: 'center' }}>Paid receipt</p>
         </div>
       </div>
       <div style={{ background: '#15120c', borderTop: '1px solid rgba(201,168,108,0.2)', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: G.gold, fontWeight: 700 }}>scanny.app · Gold Reserve</span>
+        <span style={{ fontSize: 10, color: GOLD_VISUAL.gold, fontWeight: 700 }}>scanny.app · Gold Reserve</span>
         <span style={{ fontSize: 10, color: '#6b5a3e' }}>Non-transferable</span>
       </div>
     </div>
@@ -309,10 +340,10 @@ function fieldStyle(hasError?: boolean): CSSProperties {
     borderRadius: 10,
     fontSize: 14,
     fontFamily: 'inherit',
-    background: '#0e0e0e',
+    background: G.inputBg,
     color: G.white,
     outline: 'none',
-    border: `1px solid ${hasError ? G.danger : 'rgba(255,255,255,0.1)'}`,
+    border: `1px solid ${hasError ? G.danger : G.border}`,
   }
 }
 
@@ -342,7 +373,7 @@ function Stepper({
             style={{
               position: 'relative',
               paddingBottom: 10,
-              color: on || done ? G.goldBright : '#5a5a5a',
+              color: on || done ? G.goldBright : G.muted,
               fontSize: 13,
               fontWeight: on ? 700 : 500,
               letterSpacing: '0.02em',
@@ -366,157 +397,6 @@ function Stepper({
           </div>
         )
       })}
-    </div>
-  )
-}
-
-/* ─── Live design preview (step 2 stub ticket) ──────────────────────── */
-function LiveTicketStub({
-  eventName,
-  date,
-  time,
-  location,
-}: {
-  eventName: string
-  date: string
-  time: string
-  location: string
-}) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        maxWidth: 340,
-        margin: '0 auto',
-        background: '#111',
-        borderRadius: 18,
-        overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
-      }}
-    >
-      <div style={{ position: 'relative', height: 120 }}>
-        <img src={PREVIEW_IMG} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        <span
-          style={{
-            position: 'absolute',
-            top: 14,
-            left: 14,
-            background: 'rgba(201,168,108,0.92)',
-            color: '#111',
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            padding: '5px 10px',
-            borderRadius: 999,
-          }}
-        >
-          ADMISSION
-        </span>
-      </div>
-      <div style={{ padding: '14px 16px 6px' }}>
-        <h3
-          style={{
-            margin: '0 0 8px',
-            color: G.white,
-            fontSize: 18,
-            fontWeight: 800,
-            letterSpacing: '-0.02em',
-            lineHeight: 1.15,
-            textTransform: 'uppercase',
-          }}
-        >
-          {eventName.trim() || 'GALA DEGUSTATION 2024'}
-        </h3>
-        <p style={{ margin: '0 0 16px', color: '#b0b0b0', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span aria-hidden>📍</span>
-          {location.trim() || 'Lumina Grand Hall, NYC'}
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>DATE</p>
-            <p style={{ margin: '4px 0 0', color: G.white, fontSize: 14, fontWeight: 600 }}>{fmtDateShort(date)}</p>
-          </div>
-          <div>
-            <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>TIME</p>
-            <p style={{ margin: '4px 0 0', color: G.white, fontSize: 14, fontWeight: 600 }}>{fmtTime(time)}</p>
-          </div>
-        </div>
-      </div>
-      <div style={{ position: 'relative', marginTop: 8 }}>
-        <div style={{ position: 'absolute', left: -10, top: -10, width: 20, height: 20, borderRadius: '50%', background: G.bg }} />
-        <div style={{ position: 'absolute', right: -10, top: -10, width: 20, height: 20, borderRadius: '50%', background: G.bg }} />
-        <div style={{ borderTop: '1px dashed rgba(255,255,255,0.12)', margin: '0 18px' }} />
-        <div style={{ padding: '16px 18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: '100%',
-              height: 48,
-              borderRadius: 4,
-              background:
-                'repeating-linear-gradient(90deg, #f5f5f5 0 2px, #111 2px 4px, #f5f5f5 4px 7px, #111 7px 8px)',
-            }}
-          />
-          <span style={{ fontSize: 11, color: '#777', letterSpacing: '0.12em', fontFamily: 'monospace' }}>SCN-{shortId().toUpperCase()}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ─── Template picker (step 2) ──────────────────────────────────────── */
-const TEMPLATES: {
-  id: TemplateId
-  label: string
-  desc: string
-  thumb: 'classic' | 'festival' | 'minimal' | 'gold'
-}[] = [
-  { id: 'classic', label: 'Classic Culinary', desc: 'Timeless and elegant.', thumb: 'classic' },
-  { id: 'festival', label: 'Modern Festival', desc: 'Vibrant and energetic.', thumb: 'festival' },
-  { id: 'minimal', label: 'Minimalist Noir', desc: 'Sophisticated simplicity.', thumb: 'minimal' },
-  { id: 'gold', label: 'Gold Reserve', desc: 'Premium VIP experience.', thumb: 'gold' },
-]
-
-function TemplateThumb({ kind }: { kind: TemplateId }) {
-  const base: CSSProperties = {
-        height: 56,
-        borderRadius: 8,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#0d0d0d',
-    position: 'relative',
-    overflow: 'hidden',
-  }
-  if (kind === 'classic') {
-    return (
-      <div style={base}>
-        <div style={{ position: 'absolute', inset: 10, border: '1px solid rgba(201,168,108,0.35)', borderRadius: 6 }} />
-        <div style={{ position: 'absolute', left: 18, top: 22, width: 40, height: 3, background: 'rgba(255,255,255,0.25)', borderRadius: 2 }} />
-        <div style={{ position: 'absolute', left: 18, top: 32, width: 28, height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
-        <div style={{ position: 'absolute', right: 18, top: 24, width: 18, height: 18, borderRadius: '50%', border: '1px solid rgba(201,168,108,0.5)' }} />
-      </div>
-    )
-  }
-  if (kind === 'festival') {
-    return (
-      <div style={{ ...base, background: 'linear-gradient(135deg,#1a1024,#0d0d0d)' }}>
-        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 28, height: 28, borderRadius: '50%', border: '2px solid #c084fc' }} />
-        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, height: 4, borderRadius: 2, background: 'linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)' }} />
-      </div>
-    )
-  }
-  if (kind === 'minimal') {
-    return (
-      <div style={{ ...base, width: 54, margin: '0 auto' }}>
-        <div style={{ position: 'absolute', inset: 8, border: '1px solid rgba(255,255,255,0.2)', borderRadius: 4 }} />
-        <div style={{ position: 'absolute', left: 14, top: 18, width: 26, height: 2, background: 'rgba(255,255,255,0.35)' }} />
-        <div style={{ position: 'absolute', left: 14, top: 26, width: 18, height: 2, background: 'rgba(255,255,255,0.2)' }} />
-      </div>
-    )
-  }
-  return (
-    <div style={{ ...base, background: 'linear-gradient(135deg,#1a160c,#0d0d0d)' }}>
-      <div style={{ position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', border: `1.5px solid ${G.gold}`, display: 'grid', placeItems: 'center', color: G.gold, fontSize: 12 }}>★</div>
-      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, height: 2, background: 'rgba(201,168,108,0.4)' }} />
     </div>
   )
 }
@@ -548,7 +428,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
           type="button"
           onClick={addClass}
           style={{
-            background: 'rgba(201,168,108,0.12)',
+            background: G.accentSoft,
             border: `1px solid ${G.border}`,
             color: G.goldBright,
             fontSize: 11,
@@ -611,7 +491,7 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
           type="button"
           onClick={addTable}
           style={{
-            background: 'rgba(201,168,108,0.12)',
+            background: G.accentSoft,
             border: `1px solid ${G.border}`,
             color: G.goldBright,
             fontSize: 12,
@@ -717,8 +597,8 @@ function TicketOutput({
     gap: 12,
     padding: '14px 16px',
     borderRadius: 12,
-    background: '#1c1c1c',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: G.card,
+    border: `1px solid ${G.border}`,
     color: G.white,
     fontSize: 14,
     fontWeight: 600,
@@ -808,7 +688,7 @@ function TicketOutput({
             height: 44,
             borderRadius: '50%',
             margin: '0 auto 14px',
-            background: 'rgba(201,168,108,0.15)',
+            background: G.accentSoft,
             border: `1.5px solid ${G.gold}`,
             display: 'grid',
             placeItems: 'center',
@@ -824,7 +704,7 @@ function TicketOutput({
       </div>
 
       {revokeMessage && (
-        <div className="no-print" style={{ maxWidth: 1100, margin: '0 auto 16px', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: 13 }}>
+        <div className="no-print" style={{ maxWidth: 1100, margin: '0 auto 16px', padding: '12px 14px', borderRadius: 10, border: `1px solid ${G.border}`, background: G.surfaceIdle, fontSize: 13 }}>
           {revokeMessage}
         </div>
       )}
@@ -845,7 +725,7 @@ function TicketOutput({
             background: G.card,
             borderRadius: 20,
             overflow: 'hidden',
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: `1px solid ${G.border}`,
             boxShadow: '0 20px 50px rgba(0,0,0,0.45)',
           }}
         >
@@ -872,7 +752,7 @@ function TicketOutput({
           <div style={{ padding: '22px 24px 18px' }}>
             <p style={{ margin: '0 0 6px', color: G.goldText, fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>EVENT NAME</p>
             <h2 style={{ margin: '0 0 18px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{data.eventName}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 16, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start', marginBottom: 20 }}>
               <div style={{ display: 'grid', gap: 14 }}>
                 <div>
                   <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>DATE</p>
@@ -893,36 +773,53 @@ function TicketOutput({
                   <p style={{ margin: '4px 0 0', fontWeight: 600, fontFamily: 'monospace', fontSize: 13 }}>#{data.ticketId}</p>
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#fff',
-                  borderRadius: 12,
-                  padding: 10,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                  minWidth: 120,
-                }}
-              >
-                {qr ? (
-                  <img
-                    src={qr}
-                    alt="QR"
-                    width={100}
-                    height={100}
-                    style={{ width: 100, height: 100, display: 'none', background: '#fff' }}
-                  />
-                ) : null}
-                <span style={{ color: '#111', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em' }}>SCAN FOR ENTRY</span>
-              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 10,
+                padding: '18px 16px 8px',
+                borderRadius: 16,
+                background: '#fff',
+                border: `1px solid ${G.border}`,
+              }}
+            >
+              {qr ? (
+                <img
+                  src={qr}
+                  alt="Scan for entry QR"
+                  width={180}
+                  height={180}
+                  style={{ width: 180, height: 180, display: 'block', background: '#fff' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 180,
+                    height: 180,
+                    borderRadius: 8,
+                    border: '2px dashed #d1d5db',
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: '#9ca3af',
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  QR code
+                </div>
+              )}
+              <span style={{ color: '#111', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em' }}>SCAN FOR ENTRY</span>
             </div>
           </div>
           <div
             style={{
               margin: '0 24px 20px',
               paddingTop: 14,
-              borderTop: '1px dashed rgba(255,255,255,0.14)',
+              borderTop: `1px dashed ${G.border}`,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -931,7 +828,7 @@ function TicketOutput({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <img src={HOST_AVATAR} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-              <span style={{ fontSize: 13, color: '#d1d5db' }}>Host: Scanny Events</span>
+              <span style={{ fontSize: 13, color: G.muted }}>Host: {data.host?.trim() || 'Scanny Events'}</span>
             </div>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: G.goldBright, fontSize: 12, fontWeight: 700 }}>
               <span aria-hidden>✓</span> Verified Event
@@ -944,7 +841,7 @@ function TicketOutput({
             style={{
               background: G.card,
               borderRadius: 18,
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: `1px solid ${G.border}`,
               padding: 18,
               display: 'grid',
               gap: 12,
@@ -972,8 +869,8 @@ function TicketOutput({
                 padding: '15px 16px',
                 borderRadius: 12,
                 border: 'none',
-                background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
-                color: '#111',
+                background: `linear-gradient(135deg, ${G.gold}, color-mix(in srgb, var(--primary) 75%, white))`,
+                color: G.primaryFg,
                 fontSize: 13,
                 fontWeight: 800,
                 letterSpacing: '0.06em',
@@ -1041,16 +938,46 @@ function TicketOutput({
   )
 }
 
-/* ─── Form (steps 1–2) ──────────────────────────────────────────────── */
+/* ─── Form ──────────────────────────────────────────────────────────── */
+type PaymentMethod = 'MOBILE_MONEY' | 'BANK_ACCOUNT'
+
+const UG_BANKS = [
+  'Stanbic Bank',
+  'Absa Bank',
+  'Centenary Bank',
+  'Equity Bank',
+  'dfcu Bank',
+  'Orient Bank',
+  'Bank of Africa',
+  'Cairo Bank',
+  'Housing Finance Bank',
+  'Other',
+] as const
+
 type FormState = {
   eventName: string
   date: string
   time: string
   location: string
-  paymentDetails: string
+  host: string
+  paymentMethod: PaymentMethod | ''
+  mobileProvider: 'MTN' | 'Airtel'
+  mobileNumber: string
+  bankName: string
+  bankAccountNumber: string
   template: TemplateId
   ticketClasses: TicketClass[]
   tables: TableOption[]
+}
+
+function formatPaymentDetails(form: FormState): string {
+  if (form.paymentMethod === 'MOBILE_MONEY') {
+    return `${form.mobileProvider} · ${form.mobileNumber.trim()}`
+  }
+  if (form.paymentMethod === 'BANK_ACCOUNT') {
+    return `${form.bankName.trim()} · ${form.bankAccountNumber.trim()}`
+  }
+  return ''
 }
 
 function TicketForm({
@@ -1060,13 +987,17 @@ function TicketForm({
   onGenerate: (d: TicketData) => Promise<void>
   onBack: () => void
 }) {
-  const [step, setStep] = useState<1 | 2>(1)
   const [form, setForm] = useState<FormState>({
     eventName: '',
     date: '',
     time: '19:00',
     location: '',
-    paymentDetails: '',
+    host: '',
+    paymentMethod: '',
+    mobileProvider: 'MTN',
+    mobileNumber: '',
+    bankName: '',
+    bankAccountNumber: '',
     template: 'classic',
     ticketClasses: DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
     tables: [],
@@ -1075,6 +1006,7 @@ function TicketForm({
   const [touched, setTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showExtras, setShowExtras] = useState(false)
+  const [step, setStep] = useState<1 | 2>(1)
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -1085,14 +1017,22 @@ function TicketForm({
     if (!form.eventName.trim()) e.eventName = 'Event name is required'
     if (!form.date) e.date = 'Event date is required'
     if (!form.location.trim()) e.location = 'Location is required'
-    if (!form.paymentDetails.trim()) e.paymentDetails = 'Add a payment number or bank account'
+    if (!form.host.trim()) e.host = 'Host name is required'
+    if (!form.paymentMethod) e.paymentMethod = 'Choose Mobile Money or Bank'
+    if (form.paymentMethod === 'MOBILE_MONEY') {
+      if (!form.mobileNumber.trim()) e.mobileNumber = 'Enter the mobile money number'
+    }
+    if (form.paymentMethod === 'BANK_ACCOUNT') {
+      if (!form.bankName.trim()) e.bankName = 'Choose a bank'
+      if (!form.bankAccountNumber.trim()) e.bankAccountNumber = 'Enter the account number'
+    }
     if (form.ticketClasses.length === 0) e.ticketClasses = 'Add at least one ticket class'
     if (form.ticketClasses.some((c) => !c.name.trim())) e.ticketClasses = 'All classes need a name'
     if (form.ticketClasses.some((c) => !c.fee || isNaN(Number(c.fee)))) e.ticketClasses = 'All classes need a valid fee'
     return e
   }
 
-  function goToDesign() {
+  function goToGenerate() {
     setTouched(true)
     const errs = validate()
     if (Object.keys(errs).length) {
@@ -1119,7 +1059,8 @@ function TicketForm({
         date: form.date,
         time: form.time,
         location: form.location,
-        paymentDetails: form.paymentDetails,
+        host: form.host.trim(),
+        paymentDetails: formatPaymentDetails(form),
         template: form.template,
         ticketClasses: form.ticketClasses,
         tables: form.tables,
@@ -1131,18 +1072,18 @@ function TicketForm({
     }
   }
 
-  const steps =
-    step === 1
-      ? [
-          { id: 'details', label: 'Details' },
-          { id: 'template', label: 'Template' },
-          { id: 'review', label: 'Review' },
-        ]
-      : [
-          { id: 'details', label: 'Details' },
-          { id: 'design', label: 'Design' },
-          { id: 'review', label: 'Review' },
-        ]
+  const choiceBtn = (active: boolean): CSSProperties => ({
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: `1.5px solid ${active ? G.gold : G.borderIdle}`,
+    background: active ? G.accentSoft : G.surfaceIdle,
+    color: active ? G.goldBright : G.white,
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textAlign: 'left' as const,
+  })
 
   return (
     <div
@@ -1160,18 +1101,7 @@ function TicketForm({
       }}
     >
       <style>{`
-        
         * { box-sizing: border-box; }
-        .event-design-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-          gap: 20px;
-          align-items: start;
-        }
-        @media (max-width: 960px) {
-          .event-design-grid { grid-template-columns: 1fr !important; }
-          .design-footer { flex-direction: column; align-items: stretch !important; }
-        }
       `}</style>
 
       <div style={{ maxWidth: 860, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1194,346 +1124,304 @@ function TicketForm({
           >
             ← {step === 2 ? 'Back to Details' : 'Back'}
           </button>
-          {step === 2 ? (
-            <p style={{ margin: 0, color: G.muted, fontSize: 13 }}>Step 2: Choose a visual identity for your event entry.</p>
-          ) : (
-            <span />
-          )}
+          <span />
         </div>
 
         <div style={{ flexShrink: 0 }}>
-          <Stepper steps={steps} active={step - 1} />
+          <Stepper
+            steps={[
+              { id: 'details', label: 'Details' },
+              { id: 'generate', label: 'Generate' },
+            ]}
+            active={step - 1}
+          />
         </div>
 
         {step === 1 ? (
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            <h1 style={{ margin: '0 0 4px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', flexShrink: 0 }}>Event Essentials</h1>
-            <p style={{ margin: '0 0 14px', color: G.goldText, fontSize: 13, lineHeight: 1.4, flexShrink: 0 }}>
-              Define the core parameters of your event experience.
-            </p>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', flexShrink: 0 }}>Event Essentials</h1>
+          <p style={{ margin: '0 0 14px', color: G.goldText, fontSize: 13, lineHeight: 1.4, flexShrink: 0 }}>
+            Define the core parameters of your event experience.
+          </p>
 
-            <div style={{ display: 'grid', gap: 12, flex: 1, minHeight: 0, alignContent: 'start' }}>
+          <div style={{ display: 'grid', gap: 12, flex: 1, minHeight: 0, alignContent: 'start' }}>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <FieldLabel>Event Name</FieldLabel>
+              <input
+                style={fieldStyle(Boolean(touched && errors.eventName))}
+                type="text"
+                placeholder="e.g., Midnight Gala Tasting"
+                value={form.eventName}
+                onChange={(e) => set('eventName', e.target.value)}
+              />
+              {touched && errors.eventName && <span style={{ color: G.danger, fontSize: 12 }}>{errors.eventName}</span>}
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <label style={{ display: 'grid', gap: 5 }}>
-                <FieldLabel>Event Name</FieldLabel>
+                <FieldLabel>Date</FieldLabel>
                 <input
-                  style={fieldStyle(Boolean(touched && errors.eventName))}
-                  type="text"
-                  placeholder="e.g., Midnight Gala Tasting"
-                  value={form.eventName}
-                  onChange={(e) => set('eventName', e.target.value)}
+                  style={fieldStyle(Boolean(touched && errors.date))}
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
                 />
-                {touched && errors.eventName && <span style={{ color: G.danger, fontSize: 12 }}>{errors.eventName}</span>}
+                {touched && errors.date && <span style={{ color: G.danger, fontSize: 12 }}>{errors.date}</span>}
               </label>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                <label style={{ display: 'grid', gap: 5 }}>
-                  <FieldLabel>Date</FieldLabel>
-                  <input
-                    style={{ ...fieldStyle(Boolean(touched && errors.date)), colorScheme: 'dark' }}
-                    type="date"
-                    value={form.date}
-                    onChange={(e) => set('date', e.target.value)}
-                  />
-                  {touched && errors.date && <span style={{ color: G.danger, fontSize: 12 }}>{errors.date}</span>}
-                </label>
-                <label style={{ display: 'grid', gap: 5 }}>
-                  <FieldLabel>Time</FieldLabel>
-                  <input
-                    style={{ ...fieldStyle(), colorScheme: 'dark' }}
-                    type="time"
-                    value={form.time}
-                    onChange={(e) => set('time', e.target.value)}
-                  />
-                </label>
-                <label style={{ display: 'grid', gap: 5 }}>
-                  <FieldLabel>Location</FieldLabel>
-                  <input
-                    style={fieldStyle(Boolean(touched && errors.location))}
-                    type="text"
-                    placeholder="Venue or Address"
-                    value={form.location}
-                    onChange={(e) => set('location', e.target.value)}
-                  />
-                  {touched && errors.location && <span style={{ color: G.danger, fontSize: 12 }}>{errors.location}</span>}
-                </label>
-              </div>
-
-              <div
-                style={{
-                  background: G.card,
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 14,
-                  padding: 14,
-                  display: 'grid',
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Payment Details</h3>
-                  <span style={{ display: 'flex', gap: 10, color: G.gold, fontSize: 14 }}>
-                    <span aria-hidden>💳</span>
-                    <span aria-hidden>🏛</span>
-                  </span>
-                </div>
-
-                <label style={{ display: 'grid', gap: 5 }}>
-                  <FieldLabel>Payment details</FieldLabel>
-                  <input
-                    style={fieldStyle(Boolean(touched && errors.paymentDetails))}
-                    type="text"
-                    placeholder="MTN / Airtel / Bank account"
-                    value={form.paymentDetails}
-                    onChange={(e) => set('paymentDetails', e.target.value)}
-                  />
-                  {touched && errors.paymentDetails && <span style={{ color: G.danger, fontSize: 12 }}>{errors.paymentDetails}</span>}
-                </label>
-
-                <ClassesEditor classes={form.ticketClasses} onChange={(v) => set('ticketClasses', v)} />
-                {touched && errors.ticketClasses && <span style={{ color: G.danger, fontSize: 12 }}>{errors.ticketClasses}</span>}
-
-                <button
-                  type="button"
-                  onClick={() => setShowExtras((v) => !v)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: G.goldDim,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    padding: 0,
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {showExtras ? 'Hide table options' : 'Show table options'}
-                </button>
-                {showExtras ? <TablesEditor tables={form.tables} onChange={(v) => set('tables', v)} /> : null}
-              </div>
-
-              <button
-                type="button"
-                onClick={goToDesign}
-                style={{
-                  background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
-                  color: '#111',
-                  border: 'none',
-                  borderRadius: 12,
-                  padding: '12px 16px',
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  marginTop: 'auto',
-                }}
-              >
-                Continue to Template
-              </button>
+              <label style={{ display: 'grid', gap: 5 }}>
+                <FieldLabel>Time</FieldLabel>
+                <input
+                  style={fieldStyle()}
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => set('time', e.target.value)}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: 5 }}>
+                <FieldLabel>Location</FieldLabel>
+                <input
+                  style={fieldStyle(Boolean(touched && errors.location))}
+                  type="text"
+                  placeholder="Venue or Address"
+                  value={form.location}
+                  onChange={(e) => set('location', e.target.value)}
+                />
+                {touched && errors.location && <span style={{ color: G.danger, fontSize: 12 }}>{errors.location}</span>}
+              </label>
             </div>
-          </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div className="event-design-grid" style={{ flex: 1, minHeight: 0 }}>
-              <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 10,
-                  }}
-                >
-                  {TEMPLATES.map((t) => {
-                    const selected = form.template === t.id
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => set('template', t.id)}
-                        style={{
-                          position: 'relative',
-                          textAlign: 'left',
-                          padding: 14,
-                          borderRadius: 16,
-                          border: `1.5px solid ${selected ? G.gold : 'rgba(255,255,255,0.08)'}`,
-                          background: selected ? 'rgba(201,168,108,0.08)' : G.card,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          color: G.white,
-                        }}
-                      >
-                        {selected ? (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              top: 12,
-                              right: 12,
-                              width: 22,
-                              height: 22,
-                              borderRadius: '50%',
-                              background: G.gold,
-                              color: '#111',
-                              display: 'grid',
-                              placeItems: 'center',
-                              fontSize: 12,
-                              fontWeight: 900,
-                            }}
-                          >
-                            ✓
-                          </span>
-                        ) : null}
-                        <TemplateThumb kind={t.id} />
-                        <p style={{ margin: '12px 0 4px', fontSize: 15, fontWeight: 700, color: selected ? G.goldBright : G.white }}>{t.label}</p>
-                        <p style={{ margin: 0, fontSize: 12, color: G.muted }}>{t.desc}</p>
-                      </button>
-                    )
-                  })}
-                </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 16,
-                    padding: 18,
-                    borderRadius: 16,
-                    background: G.card,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        background: 'rgba(201,168,108,0.12)',
-                        border: `1px solid ${G.border}`,
-                        display: 'grid',
-                        placeItems: 'center',
-                        color: G.gold,
-                        fontSize: 18,
-                      }}
-                    >
-                      ⤴
-                    </div>
-                    <div>
-                      <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>Custom Branding</p>
-                      <p style={{ margin: 0, color: G.muted, fontSize: 13, lineHeight: 1.4 }}>
-                        Upload your own logo and primary brand colors to apply across all assets.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toast.message('Custom branding coming soon')}
-                    style={{
-                      flexShrink: 0,
-                      padding: '10px 16px',
-                      borderRadius: 10,
-                      border: `1px solid ${G.border}`,
-                      background: 'rgba(201,168,108,0.1)',
-                      color: G.goldBright,
-                      fontWeight: 700,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    Configure
-                  </button>
-                </div>
-              </div>
-
-              <aside
-                style={{
-                  background: G.card,
-                  borderRadius: 18,
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  padding: 18,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <p style={{ margin: 0, color: G.goldText, fontSize: 11, fontWeight: 800, letterSpacing: '0.12em' }}>LIVE PREVIEW</p>
-                  <span style={{ fontSize: 11, color: G.muted, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399' }} />
-                    Auto-updating
-                  </span>
-                </div>
-                <LiveTicketStub eventName={form.eventName} date={form.date} time={form.time} location={form.location} />
-              </aside>
-            </div>
+            <label style={{ display: 'grid', gap: 5 }}>
+              <FieldLabel>Host</FieldLabel>
+              <input
+                style={fieldStyle(Boolean(touched && errors.host))}
+                type="text"
+                placeholder="e.g., Scanny Events"
+                value={form.host}
+                onChange={(e) => set('host', e.target.value)}
+              />
+              {touched && errors.host && <span style={{ color: G.danger, fontSize: 12 }}>{errors.host}</span>}
+            </label>
 
             <div
-              className="design-footer"
               style={{
-                marginTop: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 16,
-                paddingTop: 12,
-                borderTop: '1px solid rgba(255,255,255,0.08)',
-                flexShrink: 0,
+                background: G.card,
+                border: `1px solid ${G.border}`,
+                borderRadius: 14,
+                padding: 14,
+                display: 'grid',
+                gap: 12,
               }}
             >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Payment Details</h3>
+                <span style={{ display: 'flex', gap: 10, color: G.gold, fontSize: 14 }}>
+                  <span aria-hidden>💳</span>
+                  <span aria-hidden>🏛</span>
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gap: 5 }}>
+                <FieldLabel>How should guests pay?</FieldLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button
+                    type="button"
+                    style={choiceBtn(form.paymentMethod === 'MOBILE_MONEY')}
+                    onClick={() => set('paymentMethod', 'MOBILE_MONEY')}
+                  >
+                    Mobile Money
+                  </button>
+                  <button
+                    type="button"
+                    style={choiceBtn(form.paymentMethod === 'BANK_ACCOUNT')}
+                    onClick={() => set('paymentMethod', 'BANK_ACCOUNT')}
+                  >
+                    Bank
+                  </button>
+                </div>
+                {touched && errors.paymentMethod && (
+                  <span style={{ color: G.danger, fontSize: 12 }}>{errors.paymentMethod}</span>
+                )}
+              </div>
+
+              {form.paymentMethod === 'MOBILE_MONEY' ? (
+                <>
+                  <div style={{ display: 'grid', gap: 5 }}>
+                    <FieldLabel>Provider</FieldLabel>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <button
+                        type="button"
+                        style={choiceBtn(form.mobileProvider === 'MTN')}
+                        onClick={() => set('mobileProvider', 'MTN')}
+                      >
+                        MTN
+                      </button>
+                      <button
+                        type="button"
+                        style={choiceBtn(form.mobileProvider === 'Airtel')}
+                        onClick={() => set('mobileProvider', 'Airtel')}
+                      >
+                        Airtel
+                      </button>
+                    </div>
+                  </div>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <FieldLabel>Mobile money number</FieldLabel>
+                    <input
+                      style={fieldStyle(Boolean(touched && errors.mobileNumber))}
+                      type="tel"
+                      placeholder="07XX XXX XXX"
+                      value={form.mobileNumber}
+                      onChange={(e) => set('mobileNumber', e.target.value)}
+                    />
+                    {touched && errors.mobileNumber && (
+                      <span style={{ color: G.danger, fontSize: 12 }}>{errors.mobileNumber}</span>
+                    )}
+                  </label>
+                </>
+              ) : null}
+
+              {form.paymentMethod === 'BANK_ACCOUNT' ? (
+                <>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <FieldLabel>Bank</FieldLabel>
+                    <select
+                      style={fieldStyle(Boolean(touched && errors.bankName))}
+                      value={form.bankName}
+                      onChange={(e) => set('bankName', e.target.value)}
+                    >
+                      <option value="">Select bank</option>
+                      {UG_BANKS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                    {touched && errors.bankName && (
+                      <span style={{ color: G.danger, fontSize: 12 }}>{errors.bankName}</span>
+                    )}
+                  </label>
+                  <label style={{ display: 'grid', gap: 5 }}>
+                    <FieldLabel>Account number</FieldLabel>
+                    <input
+                      style={fieldStyle(Boolean(touched && errors.bankAccountNumber))}
+                      type="text"
+                      placeholder="Enter account number"
+                      value={form.bankAccountNumber}
+                      onChange={(e) => set('bankAccountNumber', e.target.value)}
+                    />
+                    {touched && errors.bankAccountNumber && (
+                      <span style={{ color: G.danger, fontSize: 12 }}>{errors.bankAccountNumber}</span>
+                    )}
+                  </label>
+                </>
+              ) : null}
+
+              <ClassesEditor classes={form.ticketClasses} onChange={(v) => set('ticketClasses', v)} />
+              {touched && errors.ticketClasses && <span style={{ color: G.danger, fontSize: 12 }}>{errors.ticketClasses}</span>}
+
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setShowExtras((v) => !v)}
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: G.muted,
-                  fontSize: 14,
+                  color: G.goldDim,
+                  fontSize: 12,
+                  fontWeight: 600,
                   cursor: 'pointer',
+                  textAlign: 'left',
+                  padding: 0,
                   fontFamily: 'inherit',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
                 }}
               >
-                ← Back to Details
+                {showExtras ? 'Hide table options' : 'Show table options'}
               </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <button
-                  type="button"
-                  onClick={() => toast.success('Draft saved locally')}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: G.muted,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  Save as Draft
-                </button>
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => void handleGenerate()}
-                  style={{
-                    background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
-                    color: '#111',
-                    border: 'none',
-                    borderRadius: 14,
-                    padding: '14px 22px',
-                    fontSize: 15,
-                    fontWeight: 800,
-                    cursor: submitting ? 'wait' : 'pointer',
-                    opacity: submitting ? 0.8 : 1,
-                    fontFamily: 'inherit',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  {submitting ? 'Generating…' : '🚀 Generate Ticket'}
-                </button>
-              </div>
+              {showExtras ? <TablesEditor tables={form.tables} onChange={(v) => set('tables', v)} /> : null}
             </div>
+
+            <button
+              type="button"
+              onClick={goToGenerate}
+              style={{
+                background: `linear-gradient(135deg, ${G.gold}, color-mix(in srgb, var(--primary) 75%, white))`,
+                color: G.primaryFg,
+                border: 'none',
+                borderRadius: 12,
+                padding: '12px 16px',
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                marginTop: 'auto',
+              }}
+            >
+              Continue
+            </button>
           </div>
+        </div>
+        ) : (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Ready to generate</h1>
+          <p style={{ margin: '0 0 14px', color: G.goldText, fontSize: 13, lineHeight: 1.4 }}>
+            Confirm the details, then create the master receipt QR for this event.
+          </p>
+
+          <div
+            style={{
+              background: G.card,
+              border: `1px solid ${G.border}`,
+              borderRadius: 14,
+              padding: 18,
+              display: 'grid',
+              gap: 14,
+              marginBottom: 16,
+            }}
+          >
+            {[
+              ['Event', form.eventName],
+              ['Host', form.host],
+              ['When', `${fmtDate(form.date)} · ${fmtTime(form.time)}`],
+              ['Where', form.location],
+              ['Pay to', formatPaymentDetails(form) || '—'],
+              [
+                'Classes',
+                form.ticketClasses.map((c) => `${c.name} (${currency(c.fee)})`).join(' · ') || '—',
+              ],
+            ].map(([label, value]) => (
+              <div key={String(label)} style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: G.goldDim, textTransform: 'uppercase' }}>
+                  {label}
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: G.white }}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => void handleGenerate()}
+            style={{
+                background: `linear-gradient(135deg, ${G.gold}, color-mix(in srgb, var(--primary) 75%, white))`,
+                color: G.primaryFg,
+              border: 'none',
+              borderRadius: 12,
+              padding: '14px 18px',
+              fontSize: 15,
+              fontWeight: 800,
+              cursor: submitting ? 'wait' : 'pointer',
+              opacity: submitting ? 0.8 : 1,
+              fontFamily: 'inherit',
+              marginTop: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            {submitting ? 'Generating…' : 'Generate receipt QR code'}
+          </button>
+        </div>
         )}
       </div>
     </div>
@@ -1548,6 +1436,8 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [revoking, setRevoking] = useState(false)
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null)
   const [lastCreatedEventName, setLastCreatedEventName] = useState<string | null>(null)
+
+  useEffect(() => bindThemeHotkey(), [])
 
   async function loadStats(search?: string) {
     try {
@@ -1597,12 +1487,14 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           payTo: data.paymentDetails,
           location: data.location,
           time: data.time,
+          host: data.host,
           ticketClasses: data.ticketClasses,
           tables: data.tables,
         }),
       })
 
-      const url = await QRCode.toDataURL(createdTicket.qrCodeUrl, {
+      const purchaseLink = rewriteScanUrl(createdTicket.qrCodeUrl)
+      const url = await QRCode.toDataURL(purchaseLink, {
         color: { dark: '#0d1612', light: '#ffffff' },
         margin: 1,
         width: 280,
@@ -1613,7 +1505,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       setTicket({
         ...data,
         ticketId: createdTicket.id,
-        purchaseUrl: createdTicket.qrCodeUrl,
+        purchaseUrl: purchaseLink,
       })
       await loadStats(data.eventName)
       toast.success('Event ticket QR created successfully')

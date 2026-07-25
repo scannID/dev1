@@ -9,10 +9,6 @@ export type UseServerPaginationOptions = {
   resetKey?: string | number
 }
 
-/**
- * Pagination controls driven by server `totalItems` (does not slice locally).
- * Pair with an API fetch that uses `page` + `pageSize`.
- */
 export function useServerPagination(
   options: UseServerPaginationOptions,
 ): Omit<PaginationResult<never>, 'pageItems'> & { pageItems: undefined } {

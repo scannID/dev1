@@ -115,7 +115,9 @@ function Sparkline({ data, color = '#10b981' }: { data: number[]; color?: string
     </svg>
   )
 }
-const SCAN_BASE_URL = import.meta.env.VITE_SCAN_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
+const SCAN_BASE_URL =
+  import.meta.env.VITE_SCAN_BASE_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
 const REQUIRED_FIELD_MESSAGE = 'Please fill out this field.'
 
 type CatalogItem = ApiCatalogItem
@@ -154,10 +156,26 @@ function merchantPayoutOf(order: { merchantPayout?: number; subtotal?: number; t
   return order.total
 }
 
+/** Prefer LAN scan base so phone QRs work even if merchant UI is open on localhost. */
+function scanOrigin() {
+  const configured = String(import.meta.env.VITE_SCAN_BASE_URL || '').replace(/\/$/, '')
+  if (configured && !/localhost|127\.0\.0\.1/i.test(configured)) return configured
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname
+    if (host !== 'localhost' && host !== '127.0.0.1') return window.location.origin
+  }
+  return configured || SCAN_BASE_URL
+}
+
 function customerUrl(business: Business) {
-  if (business.customerUrl) return business.customerUrl
-  if (!business.id || !business.qrToken) return SCAN_BASE_URL
-  return `${SCAN_BASE_URL}/b/${business.id}?qr=${business.qrToken}`
+  const origin = scanOrigin()
+  if (business.id && business.qrToken) {
+    return `${origin}/b/${business.id}?qr=${encodeURIComponent(business.qrToken)}`
+  }
+  if (business.customerUrl && !/localhost|127\.0\.0\.1/i.test(business.customerUrl)) {
+    return business.customerUrl
+  }
+  return origin
 }
 
 function App({
@@ -688,7 +706,11 @@ function App({
   )
 }
 function NotificationsPanel({ businessName, orders }: { businessName: string; orders: Order[] }) {
-  const recentOrders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
+  const sortedOrders = useMemo(
+    () => [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [orders],
+  )
+  const ordersPagination = usePagination(sortedOrders, { initialPageSize: 10 })
   const unpaid = orders.filter(o => o.paymentStatus === 'Unpaid' && o.status !== 'Cancelled').length
   const pending = orders.filter(o => o.status === 'Pending').length
 
@@ -733,27 +755,30 @@ function NotificationsPanel({ businessName, orders }: { businessName: string; or
       {/* Recent orders */}
       <div>
         <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>Recent Orders</p>
-        {recentOrders.length === 0 ? (
+        {ordersPagination.totalItems === 0 ? (
           <div style={{ padding: '32px 20px', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>No orders yet for {businessName || 'your business'}.</p>
           </div>
         ) : (
-          recentOrders.map((order) => (
-            <div key={order.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: order.status === 'Pending' ? 'oklch(0.96 0.04 75)' : order.status === 'Completed' ? 'oklch(0.94 0.04 145)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
-                {order.status === 'Pending' ? '🕐' : order.status === 'Completed' ? '✅' : order.status === 'Preparing' ? '👨‍🍳' : order.status === 'Ready' ? '🛎' : '❌'}
+          <>
+            {ordersPagination.pageItems.map((order) => (
+              <div key={order.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: order.status === 'Pending' ? 'oklch(0.96 0.04 75)' : order.status === 'Completed' ? 'oklch(0.94 0.04 145)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                  {order.status === 'Pending' ? '🕐' : order.status === 'Completed' ? '✅' : order.status === 'Preparing' ? '👨‍🍳' : order.status === 'Ready' ? '🛎' : '❌'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{order.id} · {order.customer.name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>
+                    {order.status} · {order.paymentStatus} · {currency(merchantPayoutOf(order))}
+                  </p>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flexShrink: 0 }}>
+                  {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{order.id} · {order.customer.name}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>
-                  {order.status} · {order.paymentStatus} · {currency(merchantPayoutOf(order))}
-                </p>
-              </div>
-              <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flexShrink: 0 }}>
-                {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-          ))
+            ))}
+            <PaginationBar pagination={ordersPagination} hideWhenEmpty={false} />
+          </>
         )}
       </div>
     </div>
@@ -2050,7 +2075,7 @@ function Dashboard({
 
   const pagination = useServerPagination({
     totalItems,
-    initialPageSize: 5,
+    initialPageSize: 20,
     resetKey: business.id,
   })
 
@@ -2400,13 +2425,18 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
   const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0
   const itemSales = reportData.itemSales
   const itemsPagination = usePagination(itemSales, {
-    initialPageSize: 5,
+    initialPageSize: 20,
     resetKey: timeRange,
   })
   const { pageItems: pagedItemSales } = itemsPagination
   const paymentBreakdown = reportData.paymentBreakdown
   const statusBreakdown = reportData.statusBreakdown
   const ordersByStatus = reportData.ordersByStatus
+  const statusOrders = ordersByStatus[selectedStatus] ?? []
+  const statusOrdersPagination = usePagination(statusOrders, {
+    initialPageSize: 20,
+    resetKey: `${timeRange}|${selectedStatus}`,
+  })
   const paymentTotal = paymentBreakdown.Paid + paymentBreakdown.Unpaid + paymentBreakdown.Refunded
 
   return (
@@ -2540,21 +2570,27 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
             ))}
           </div>
           <div className="report-orders-list">
-            {ordersByStatus[selectedStatus].length > 0 ? (
-              ordersByStatus[selectedStatus].map((order) => (
-                <div key={order.id} className="report-order-item">
-                  <div className="report-order-inline">
-                    <strong>{order.id}</strong>
-                    <span className="report-order-customer">{order.customer}</span>
-                    <div className="report-order-items">
-                      {order.items.map((item, idx) => (
-                        <span key={idx} className="report-order-chip">{item}</span>
-                      ))}
+            {statusOrdersPagination.pageItems.length > 0 ? (
+              <>
+                {statusOrdersPagination.pageItems.map((order) => (
+                  <div key={order.id} className="report-order-item">
+                    <div className="report-order-inline">
+                      <strong>{order.id}</strong>
+                      <span className="report-order-customer">{order.customer}</span>
+                      <div className="report-order-items">
+                        {order.items.map((item, idx) => (
+                          <span key={idx} className="report-order-chip">{item}</span>
+                        ))}
+                      </div>
+                      <span className="report-order-total">{currency(order.total)}</span>
                     </div>
-                    <span className="report-order-total">{currency(order.total)}</span>
                   </div>
-                </div>
-              ))
+                ))}
+                <PaginationBar
+                  pagination={statusOrdersPagination}
+                  className="report-list-pagination"
+                />
+              </>
             ) : (
               <p className="report-empty">No {selectedStatus.toLowerCase()} orders for this period.</p>
             )}

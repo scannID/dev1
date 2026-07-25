@@ -115,16 +115,17 @@ export function useQrActivity() {
   return { data, loading, error, refresh: () => refresh(false) }
 }
 
-export function useAuditLog() {
+export function useAuditLog(page = 1, limit = 20) {
   const [data, setData] = useState<Awaited<ReturnType<typeof adminApi.audit.list>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     ;(async () => {
       try {
-        const response = await adminApi.audit.list()
+        const response = await adminApi.audit.list({ page, limit })
         if (!cancelled) {
           setData(response)
           setError(null)
@@ -141,7 +142,7 @@ export function useAuditLog() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [page, limit])
 
   return { data, loading, error }
 }

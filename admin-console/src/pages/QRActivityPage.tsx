@@ -1,4 +1,6 @@
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import { useQrActivity } from '../hooks/usePlatform'
 
 export default function QRActivityPage() {
@@ -6,6 +8,7 @@ export default function QRActivityPage() {
   const summary = data?.summary
   const hourly = data?.hourly ?? []
   const topCodes = data?.topCodes ?? []
+  const codesPagination = usePagination(topCodes, { initialPageSize: 20 })
   const maxScans = Math.max(...hourly.map((h) => h.scans), 1)
 
   return (
@@ -68,9 +71,9 @@ export default function QRActivityPage() {
               </tr>
             </thead>
             <tbody>
-              {topCodes.length === 0 ? (
+              {codesPagination.pageItems.length === 0 ? (
                 <tr><td colSpan={5} style={{ padding: 16, color: 'var(--muted-foreground)' }}>{loading ? <InlineSpinner label="Loading…" /> : 'No QR codes yet.'}</td></tr>
-              ) : topCodes.map((q) => (
+              ) : codesPagination.pageItems.map((q) => (
                 <tr key={q.token} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontWeight: 500 }}>{q.merchant}</td>
                   <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{q.token}</td>
@@ -82,6 +85,7 @@ export default function QRActivityPage() {
             </tbody>
           </table>
         </div>
+        <PaginationBar pagination={codesPagination} hideWhenEmpty={false} />
       </div>
     </>
   )

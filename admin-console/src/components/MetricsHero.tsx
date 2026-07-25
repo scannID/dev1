@@ -140,12 +140,20 @@ export default function MetricsHero() {
 
   useAdminMetricsRealtime(() => {
     void adminApi.analytics.getScansOrders(range).then((data) => {
-      setSeries({
-        ...data,
-        scans: data.scans?.length ? data.scans : EMPTY.scans,
-        orders: data.orders?.length ? data.orders : EMPTY.orders,
-        xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
-        yMax: Math.max(data.yMax || 1, 1),
+      setSeries((prev) => {
+        const next = {
+          ...data,
+          scans: data.scans?.length ? data.scans : EMPTY.scans,
+          orders: data.orders?.length ? data.orders : EMPTY.orders,
+          xLabels: data.xLabels?.length ? data.xLabels : EMPTY.xLabels,
+          yMax: Math.max(data.yMax || 1, 1),
+        }
+        try {
+          if (JSON.stringify(prev) === JSON.stringify(next)) return prev
+        } catch {
+          /* fall through */
+        }
+        return next
       })
     }).catch(() => {
       /* keep last good series */

@@ -4,6 +4,7 @@ import com.scanny.dto.admin.AdminPlatformDtos;
 import com.scanny.service.AdminPlatformService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -32,8 +33,11 @@ public class AdminPlatformController {
     }
 
     @GetMapping("/audit")
-    public AdminPlatformDtos.AuditListResponse getAuditLog() {
-        return adminPlatformService.getAuditLog();
+    public AdminPlatformDtos.AuditListResponse getAuditLog(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int limit
+    ) {
+        return adminPlatformService.getAuditLog(page, limit);
     }
 
     @GetMapping("/revenue/transactions")

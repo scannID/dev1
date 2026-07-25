@@ -67,6 +67,15 @@ public class TicketService {
         ticket.setPaymentStatus(PaymentStatus.Unpaid);
 
         ticket = ticketRepository.save(ticket);
+        auditService.success(
+            "TICKET_CREATED",
+            "ticket",
+            ticket.getId(),
+            Map.of(
+                "eventName", ticket.getEventName() != null ? ticket.getEventName() : "",
+                "ticketType", ticket.getTicketType() != null ? ticket.getTicketType() : ""
+            )
+        );
         broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
     }

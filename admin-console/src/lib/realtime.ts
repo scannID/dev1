@@ -42,6 +42,7 @@ export function createRealtimeClient(options: RealtimeOptions) {
   let pollTimer: number | null = null
   let reconnectTimer: number | null = null
   let lastEventAt = Date.now()
+  let polling = false
   const seen = new Set<string>()
 
   const setStatus = (status: 'connecting' | 'connected' | 'disconnected' | 'fallback') => {
@@ -49,8 +50,9 @@ export function createRealtimeClient(options: RealtimeOptions) {
   }
 
   const startPolling = () => {
-    if (!options.poll) return
-    stopPolling()
+    if (!options.poll || closed) return
+    if (polling) return
+    polling = true
     setStatus('fallback')
     void options.poll()
     pollTimer = window.setInterval(() => {
@@ -59,6 +61,7 @@ export function createRealtimeClient(options: RealtimeOptions) {
   }
 
   const stopPolling = () => {
+    polling = false
     if (pollTimer != null) {
       window.clearInterval(pollTimer)
       pollTimer = null
@@ -83,6 +86,7 @@ export function createRealtimeClient(options: RealtimeOptions) {
 
     socket.onopen = async () => {
       attempt = 0
+      lastEventAt = Date.now()
       const token = await options.getToken?.()
       if (token) {
         socket?.send(JSON.stringify({ type: 'AUTH', token }))
@@ -98,6 +102,7 @@ export function createRealtimeClient(options: RealtimeOptions) {
         const data = JSON.parse(String(evt.data)) as RealtimeEnvelope & { message?: string }
         if (data.type === 'AUTH_OK') {
           setStatus('connected')
+          lastEventAt = Date.now()
           stopPolling()
           for (const channel of options.channels) {
             socket?.send(JSON.stringify({ type: 'SUBSCRIBE', channel }))
@@ -145,15 +150,20 @@ export function createRealtimeClient(options: RealtimeOptions) {
     if (document.hidden) {
       startPolling()
     } else {
+      lastEventAt = Date.now()
       void options.poll?.()
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         void connect()
+      } else {
+        stopPolling()
       }
     }
   }
 
   const staleTimer = window.setInterval(() => {
+    if (closed) return
     if (Date.now() - lastEventAt > (options.pollIntervalMs ?? 15000) * 2) {
+      // One fallback poll path — do not re-enter and fire poll every 5s.
       startPolling()
     }
   }, 5000)

@@ -9,13 +9,21 @@ import { createRealtimeClient } from './realtime'
 export function useAdminMetricsRealtime(onUpdate: () => void | Promise<void>, enabled = true) {
   const onUpdateRef = useRef(onUpdate)
   onUpdateRef.current = onUpdate
+  const debounceTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (!enabled) return
 
-    let client: { close: () => void } | null = null
+    const scheduleUpdate = () => {
+      // Burst scan/order events should not redraw Overview every few ms.
+      if (debounceTimer.current != null) window.clearTimeout(debounceTimer.current)
+      debounceTimer.current = window.setTimeout(() => {
+        debounceTimer.current = null
+        void onUpdateRef.current()
+      }, 750)
+    }
 
-    client = createRealtimeClient({
+    const client = createRealtimeClient({
       channels: ['admin:metrics'],
       getToken: async () => {
         try {
@@ -32,15 +40,17 @@ export function useAdminMetricsRealtime(onUpdate: () => void | Promise<void>, en
         if (
           event.type === 'QR_SCAN_RECORDED' ||
           event.type === 'ORDER_CREATED' ||
+          event.type === 'ORDER_UPDATED' ||
           event.channel === 'admin:metrics'
         ) {
-          void onUpdateRef.current()
+          scheduleUpdate()
         }
       },
     })
 
     return () => {
-      client?.close()
+      if (debounceTimer.current != null) window.clearTimeout(debounceTimer.current)
+      client.close()
     }
   }, [enabled])
 }

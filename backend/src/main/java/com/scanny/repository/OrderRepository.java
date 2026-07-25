@@ -73,12 +73,37 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     List<Order> findByCreatedAtAfterAndStatusNot(Instant cutoff, OrderStatus status);
 
     @Query("""
+            SELECT o.merchantId,
+                   COUNT(o),
+                   COALESCE(SUM(CASE WHEN o.status = :completed THEN o.total ELSE 0 END), 0),
+                   MAX(o.businessName)
+            FROM Order o
+            WHERE o.createdAt >= :cutoff AND o.status <> :cancelled
+            GROUP BY o.merchantId
+            """)
+    List<Object[]> aggregateMerchantStatsSince(
+            @Param("cutoff") Instant cutoff,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("completed") OrderStatus completed
+    );
+
+    @Query("""
             SELECT COUNT(DISTINCT o.merchantId) FROM Order o
             WHERE o.createdAt >= :cutoff
             """)
     long countDistinctMerchantsWithOrdersSince(@Param("cutoff") Instant cutoff);
 
     List<Order> findByCreatedAtAfterOrderByCreatedAtDesc(Instant cutoff);
+
+    @Query("SELECT o.createdAt FROM Order o WHERE o.createdAt >= :cutoff")
+    List<Instant> findCreatedAtsAfter(@Param("cutoff") Instant cutoff);
+
+    @Query("""
+            SELECT o.createdAt, o.total, o.status
+            FROM Order o
+            WHERE o.createdAt >= :cutoff
+            """)
+    List<Object[]> findCreatedAtTotalStatusAfter(@Param("cutoff") Instant cutoff);
 
     @Query("""
             SELECT o.merchantId, COUNT(o), COALESCE(SUM(o.total), 0)

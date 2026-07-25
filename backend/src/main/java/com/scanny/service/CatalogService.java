@@ -196,6 +196,7 @@ public class CatalogService {
         businessService.evictMenuCache(businessId);
         CatalogDtos.CatalogItemResponse response = CatalogDtos.CatalogItemResponse.from(item);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_UPDATED", response);
+        auditService.success("CATALOG_ITEM_UPDATED", "catalog_item", itemId, Map.of("businessId", businessId));
         return response;
     }
 

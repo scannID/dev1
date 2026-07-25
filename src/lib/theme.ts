@@ -25,3 +25,30 @@ export function persistDarkMode(enabled: boolean) {
 export function initThemeFromStorage() {
   applyDarkMode(readDarkMode())
 }
+
+export function toggleDarkMode() {
+  const next = !readDarkMode()
+  persistDarkMode(next)
+  return next
+}
+
+/** Press D to toggle theme (ignored while typing in fields). */
+export function bindThemeHotkey() {
+  function handleKeyPress(e: KeyboardEvent) {
+    if (e.key !== 'd' && e.key !== 'D') return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const target = e.target
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    ) {
+      return
+    }
+    e.preventDefault()
+    toggleDarkMode()
+  }
+  window.addEventListener('keydown', handleKeyPress)
+  return () => window.removeEventListener('keydown', handleKeyPress)
+}

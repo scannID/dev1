@@ -110,20 +110,32 @@ export default function MarketingLayout({ slug, onGetStarted }: Props) {
                 gap: 8,
               }}
             >
+              <span className="cta-primary__label">Get started</span>
               <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Get started
             </button>
             <style>{`
+              .cta-primary {
+                display: inline-flex !important;
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
+              }
               .cta-primary__arrow {
                 display: block;
                 flex-shrink: 0;
+                order: 1;
+                position: relative;
+                z-index: 1;
                 animation: ctaArrowNudge 1.1s ease-in-out infinite;
+              }
+              .cta-primary__label {
+                order: 0;
               }
               @keyframes ctaArrowNudge {
                 0%, 100% { transform: translateX(0); opacity: 0.85; }
-                50% { transform: translateX(4px); opacity: 1; }
+                50% { transform: translateX(3px); opacity: 1; }
               }
               @media (prefers-reduced-motion: reduce) {
                 .cta-primary__arrow { animation: none !important; }

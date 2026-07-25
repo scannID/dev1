@@ -242,14 +242,17 @@ public class AdminPlatformService {
     }
 
     @Transactional(readOnly = true)
-    public AdminPlatformDtos.AuditListResponse getAuditLog() {
+    public AdminPlatformDtos.AuditListResponse getAuditLog(int page, int limit) {
         Instant startOfToday = Instant.now().truncatedTo(ChronoUnit.DAYS);
-        var page = auditService.list(0, 100);
-        List<AdminPlatformDtos.AuditEvent> events = page.getContent().stream()
+        int safePage = Math.max(page, 1);
+        int safeLimit = Math.min(Math.max(limit, 1), 200);
+        var result = auditService.list(safePage - 1, safeLimit);
+        List<AdminPlatformDtos.AuditEvent> events = result.getContent().stream()
             .map(event -> new AdminPlatformDtos.AuditEvent(
                 event.getId().toString(),
-                event.getActorEmail() != null ? event.getActorEmail() : event.getActorId(),
-                event.getAction(),
+                event.getActorEmail() != null ? event.getActorEmail()
+                    : (event.getActorId() != null ? event.getActorId() : "anonymous"),
+                humanizeAction(event.getAction()),
                 (event.getResourceType() != null ? event.getResourceType() + " · " : "")
                     + (event.getResourceId() != null ? event.getResourceId() : ""),
                 event.getClientIp() != null ? event.getClientIp() : "",
@@ -257,26 +260,37 @@ public class AdminPlatformService {
             ))
             .toList();
 
-        long todayCount = events.stream()
-            .filter(e -> {
-                try {
-                    return Instant.parse(e.timestamp()).isAfter(startOfToday);
-                } catch (Exception ex) {
-                    return false;
-                }
-            })
-            .count();
-        long adminActions = events.stream()
-            .filter(e -> e.action() != null && e.action().startsWith("ADMIN"))
-            .count();
-        long systemEvents = events.stream()
-            .filter(e -> "system".equalsIgnoreCase(e.actor()) || "anonymous".equalsIgnoreCase(e.actor()))
-            .count();
+        long todayCount = auditService.countSince(startOfToday);
+        long adminActions = auditService.countByActionPrefix("ADMIN");
+        long systemEvents = auditService.countSystemEvents();
+        int totalPages = Math.max(result.getTotalPages(), 1);
 
         return new AdminPlatformDtos.AuditListResponse(
             events,
-            new AdminPlatformDtos.AuditSummary(todayCount, adminActions, systemEvents)
+            new AdminPlatformDtos.AuditSummary(todayCount, adminActions, systemEvents),
+            new AdminPlatformDtos.AuditPagination(safePage, safeLimit, result.getTotalElements(), totalPages)
         );
+    }
+
+    private static String humanizeAction(String action) {
+        if (action == null || action.isBlank()) {
+            return "";
+        }
+        String[] parts = action.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                sb.append(part.substring(1).toLowerCase());
+            }
+        }
+        return sb.toString();
     }
 
     @Transactional(readOnly = true)

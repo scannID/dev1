@@ -92,9 +92,17 @@ public class AdminPlatformDtos {
         long systemEvents
     ) {}
 
+    public record AuditPagination(
+        int page,
+        int limit,
+        long total,
+        int pages
+    ) {}
+
     public record AuditListResponse(
         List<AuditEvent> events,
-        AuditSummary summary
+        AuditSummary summary,
+        AuditPagination pagination
     ) {}
 
     public record RevenueTransaction(

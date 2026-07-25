@@ -3,11 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 export const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const
 
 export type UsePaginationOptions = {
-  /** Initial rows per page (default 20). */
   initialPageSize?: number
-  /** Allowed page-size choices (default 10 / 20 / 50 / 100). */
   pageSizeOptions?: readonly number[]
-  /** When this changes, page resets to 1 (filters, time range, list identity). */
   resetKey?: string | number
 }
 
