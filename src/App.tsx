@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BarChart3, Bell, Eye, Home, ImagePlus, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
+import { Banknote, BarChart3, Bell, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -499,9 +499,12 @@ function App({
           ].map(({ id, label, icon: Icon, count }) => (
             <button
               type="button"
-              className={view === id ? 'active' : ''}
+              className={!showAddItem && view === id ? 'active' : ''}
               key={id}
-              onClick={() => setView(id)}
+              onClick={() => {
+                setShowAddItem(false)
+                setView(id)
+              }}
             >
               <Icon size={20} />
               <span style={{ flex: 1 }}>{label}</span>
@@ -545,23 +548,25 @@ function App({
         <header className="company-topbar">
           <div>
             <p className="eyebrow">
-              {view === 'account' && 'Merchant · Overview'}
-              {view === 'catalog' && 'Merchant · Catalog'}
-              {view === 'dashboard' && 'Merchant · Orders'}
-              {view === 'reports' && 'Merchant · Reports'}
+              {showAddItem && 'Merchant · Add item'}
+              {!showAddItem && view === 'account' && 'Merchant · Overview'}
+              {!showAddItem && view === 'catalog' && 'Merchant · Catalog'}
+              {!showAddItem && view === 'dashboard' && 'Merchant · Orders'}
+              {!showAddItem && view === 'reports' && 'Merchant · Reports'}
             </p>
             <h2>
-              {view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
-              {view === 'catalog' && 'Catalog'}
-              {view === 'dashboard' && 'Orders'}
-              {view === 'reports' && 'Reports'}
+              {showAddItem && 'Add item'}
+              {!showAddItem && view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
+              {!showAddItem && view === 'catalog' && 'Catalog'}
+              {!showAddItem && view === 'dashboard' && 'Orders'}
+              {!showAddItem && view === 'reports' && 'Reports'}
             </h2>
             {(actionError || sessionError) && (
               <p className="scanny-error" role="alert" style={{ marginTop: 8 }}>{actionError || sessionError}</p>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {view === 'account' && (
+            {!showAddItem && view === 'account' && (
               <Button className="" size="sm" onClick={() => setShowAddItem(true)}>
                 <Plus className="size-3.5" />
                 Add item
@@ -595,83 +600,76 @@ function App({
           </div>
         </header>
 
-        {view === 'account' && (
-          <div className="page-content">
-            <section className="metric-grid overview-metric-grid" aria-label="Overview summary">
-              <div>
-                <span>Open orders</span>
-                <strong>{pendingCount}</strong>
-                <Sparkline data={openOrdersTrend} color="#3b82f6" />
+        {showAddItem ? (
+          <div className="page-content add-item-page-content">
+            <div className="add-item-page">
+              <AddItemForm
+                business={business}
+                onCreateItem={handleCreateCatalogItem}
+                onAddCategory={handleAddCategory}
+                onCancel={() => setShowAddItem(false)}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            {view === 'account' && (
+              <div className="page-content">
+                <section className="metric-grid overview-metric-grid" aria-label="Overview summary">
+                  <div>
+                    <span>Open orders</span>
+                    <strong>{pendingCount}</strong>
+                    <Sparkline data={openOrdersTrend} color="#3b82f6" />
+                  </div>
+                  <div>
+                    <span>Published items</span>
+                    <strong>{availableItems}</strong>
+                    <Sparkline data={catalogTrend} color="#8b5cf6" />
+                  </div>
+                  <div>
+                    <span>Paid sales</span>
+                    <strong>{currency(paidTotal)}</strong>
+                    <Sparkline data={paidSalesTrend} color="#10b981" />
+                  </div>
+                </section>
+                <OverviewPage business={business} orders={businessOrders} />
               </div>
-              <div>
-                <span>Published items</span>
-                <strong>{availableItems}</strong>
-                <Sparkline data={catalogTrend} color="#8b5cf6" />
-              </div>
-              <div>
-                <span>Paid sales</span>
-                <strong>{currency(paidTotal)}</strong>
-                <Sparkline data={paidSalesTrend} color="#10b981" />
-              </div>
-            </section>
-            <OverviewPage business={business} orders={businessOrders} />
-          </div>
-        )}
+            )}
 
-        {view === 'catalog' && (
-          <div className="page-content">
-            <CatalogPage
-              business={business}
-              onCreateItem={handleCreateCatalogItem}
-              onUpdateItem={handleUpdateCatalogItem}
-              onDeleteItem={handleDeleteCatalogItem}
-              onAddCategory={handleAddCategory}
-              onAddItem={() => setShowAddItem(true)}
-              Sparkline={Sparkline}
-            />
-          </div>
-        )}
-
-        {view === 'dashboard' && (
-          <div className="page-content">
-            <Dashboard
-              business={business}
-              orders={businessOrders}
-              onClearCompleted={clearCompleted}
-              onPaymentChange={updatePayment}
-              onStatusChange={updateStatus}
-              Sparkline={Sparkline}
-            />
-          </div>
-        )}
-
-        {view === 'reports' && (
-          <div className="page-content">
-            <ReportsPage business={business} orders={businessOrders} />
-          </div>
-        )}
-
-        {/* Add item — Sheet drawer (accessible from overview & catalog) */}
-        <Sheet open={showAddItem} onOpenChange={setShowAddItem}>
-          <SheetContent
-            side="right"
-            className="inset-0 h-dvh w-screen max-w-none sm:max-w-none data-[side=right]:w-screen data-[side=right]:sm:max-w-none flex flex-col gap-0 p-0 border-0"
-          >
-            <SheetHeader className="border-b border-border px-6 py-4 shrink-0">
-              <SheetTitle className="">Add item</SheetTitle>
-              <SheetDescription className="">Build a menu item with photo, details, and ingredients.</SheetDescription>
-            </SheetHeader>
-            <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl">
-                <AddItemForm
+            {view === 'catalog' && (
+              <div className="page-content">
+                <CatalogPage
                   business={business}
                   onCreateItem={handleCreateCatalogItem}
+                  onUpdateItem={handleUpdateCatalogItem}
+                  onDeleteItem={handleDeleteCatalogItem}
                   onAddCategory={handleAddCategory}
+                  onAddItem={() => setShowAddItem(true)}
+                  Sparkline={Sparkline}
                 />
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            )}
+
+            {view === 'dashboard' && (
+              <div className="page-content">
+                <Dashboard
+                  business={business}
+                  orders={businessOrders}
+                  onClearCompleted={clearCompleted}
+                  onPaymentChange={updatePayment}
+                  onStatusChange={updateStatus}
+                  Sparkline={Sparkline}
+                />
+              </div>
+            )}
+
+            {view === 'reports' && (
+              <div className="page-content">
+                <ReportsPage business={business} orders={businessOrders} />
+              </div>
+            )}
+          </>
+        )}
 
         {/* Notifications drawer */}
         <Sheet open={showNotifications} onOpenChange={setShowNotifications}>
@@ -1366,6 +1364,7 @@ function AddItemForm({
   business,
   onCreateItem,
   onAddCategory,
+  onCancel,
 }: {
   business: Business
   onCreateItem: (data: {
@@ -1380,6 +1379,7 @@ function AddItemForm({
     discountPercent?: number
   }) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
+  onCancel?: () => void
 }) {
   const emptyItem = {
     name: '',
@@ -1437,126 +1437,156 @@ function AddItemForm({
   const salePrice = Number.isFinite(price) && price > 0 ? effectivePrice(price, discountPercent) : null
 
   return (
-    <form className="flex flex-col gap-4 px-6 py-5" noValidate onSubmit={submitItem}>
-      <CatalogItemImageField
-        imageUrl={item.imageUrl}
-        category={item.category}
-        name={item.name}
-        disabled={saving}
-        onChange={(imageUrl) => setItem({ ...item, imageUrl })}
-      />
-
-      <div className="grid gap-1.5">
-        <Label htmlFor="add-item-name">Item name</Label>
-        <Input
-          id="add-item-name"
-          type="text"
-          required
-          aria-invalid={isItemNameMissing}
-          className={isItemNameMissing ? 'border-destructive' : undefined}
-          value={item.name}
-          onChange={(event) => setItem({ ...item, name: event.target.value })}
-          placeholder="Big Burger Combo"
-        />
-        {isItemNameMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
-      </div>
-
-      <div className="grid gap-1.5">
-        <CategoryField
-          id="add-item-category"
-          categories={categories}
-          value={item.category}
-          onChange={(category) => setItem({ ...item, category })}
-          onAddCategory={onAddCategory}
-          error={isCategoryMissing}
+    <form className="add-item-form" noValidate onSubmit={submitItem}>
+      <aside className="add-item-media" aria-label="Item photo">
+        <CatalogItemImageField
+          layout="side"
+          imageUrl={item.imageUrl}
+          category={item.category}
+          name={item.name}
           disabled={saving}
+          onChange={(imageUrl) => setItem({ ...item, imageUrl })}
         />
-        {isCategoryMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
-      </div>
+      </aside>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="add-item-price">Price (UGX)</Label>
-        <Input
-          id="add-item-price"
-          required
-          aria-invalid={isPriceMissing}
-          className={isPriceMissing ? 'border-destructive' : undefined}
-          min="1"
-          type="number"
-          value={item.price}
-          onChange={(event) => setItem({ ...item, price: event.target.value })}
-          placeholder="18000"
-        />
-        {isPriceMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
-      </div>
+      <div className="add-item-fields">
+        <section className="add-item-card" aria-labelledby="add-item-general-heading">
+          <header className="add-item-card-head">
+            <Info className="add-item-card-icon" aria-hidden="true" />
+            <h3 id="add-item-general-heading">General Information</h3>
+          </header>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="add-item-discount">Discount (%)</Label>
-        <Input
-          id="add-item-discount"
-          min="0"
-          max="100"
-          type="number"
-          value={item.discountPercent}
-          onChange={(event) => setItem({ ...item, discountPercent: event.target.value })}
-          placeholder="0"
-        />
-        {discountPercent > 0 && salePrice != null ? (
-          <p className="text-xs text-muted-foreground">
-            Now <strong className="text-foreground">{currency(salePrice)}</strong>
-            {' '}
-            <span className="line-through">{currency(price)}</span>
-          </p>
-        ) : null}
-      </div>
+          <div className="add-item-row">
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-item-name">Item name</Label>
+              <Input
+                id="add-item-name"
+                type="text"
+                required
+                aria-invalid={isItemNameMissing}
+                className={isItemNameMissing ? 'border-destructive' : undefined}
+                value={item.name}
+                onChange={(event) => setItem({ ...item, name: event.target.value })}
+                placeholder="Big Burger Combo"
+              />
+              {isItemNameMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+            </div>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="add-item-description">Short description</Label>
-        <Textarea
-          id="add-item-description"
-          className=""
-          rows={2}
-          value={item.description}
-          onChange={(event) => setItem({ ...item, description: event.target.value })}
-          placeholder="Shown on the card — e.g. Burger + fries + soda"
-        />
-      </div>
+            <div className="grid gap-1.5">
+              <CategoryField
+                id="add-item-category"
+                categories={categories}
+                value={item.category}
+                onChange={(category) => setItem({ ...item, category })}
+                onAddCategory={onAddCategory}
+                error={isCategoryMissing}
+                disabled={saving}
+              />
+              {isCategoryMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+            </div>
+          </div>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="add-item-details">Combo details</Label>
-        <Textarea
-          id="add-item-details"
-          className=""
-          rows={4}
-          value={item.details}
-          onChange={(event) => setItem({ ...item, details: event.target.value })}
-          placeholder="Full details customers see when they expand the item…"
-        />
-      </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-item-description">Short description</Label>
+            <Textarea
+              id="add-item-description"
+              className=""
+              rows={3}
+              value={item.description}
+              onChange={(event) => setItem({ ...item, description: event.target.value })}
+              placeholder="Shown on the card — e.g. Burger + fries + soda"
+            />
+          </div>
+        </section>
 
-      <IngredientsEditor
-        value={item.ingredients}
-        disabled={saving}
-        onChange={(ingredients) => setItem({ ...item, ingredients })}
-      />
+        <section className="add-item-card" aria-labelledby="add-item-pricing-heading">
+          <header className="add-item-card-head">
+            <Banknote className="add-item-card-icon" aria-hidden="true" />
+            <h3 id="add-item-pricing-heading">Pricing &amp; Details</h3>
+          </header>
 
-      <div className="flex items-center gap-2">
-        <input
-          id="add-item-available"
-          checked={item.available}
-          type="checkbox"
-          className="size-4 rounded border-border accent-primary"
-          onChange={(event) => setItem({ ...item, available: event.target.checked })}
-        />
-        <Label htmlFor="add-item-available" className="cursor-pointer font-normal">
-          Available to customers
-        </Label>
-      </div>
+          <div className="add-item-row">
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-item-price">Price (UGX)</Label>
+              <Input
+                id="add-item-price"
+                required
+                aria-invalid={isPriceMissing}
+                className={isPriceMissing ? 'border-destructive' : undefined}
+                min="1"
+                type="number"
+                value={item.price}
+                onChange={(event) => setItem({ ...item, price: event.target.value })}
+                placeholder="18000"
+              />
+              {isPriceMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+            </div>
 
-      <div className="border-t border-border pt-4">
-        <Button className="w-full" type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Add item'}
-        </Button>
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-item-discount">Discount (%)</Label>
+              <Input
+                id="add-item-discount"
+                min="0"
+                max="100"
+                type="number"
+                value={item.discountPercent}
+                onChange={(event) => setItem({ ...item, discountPercent: event.target.value })}
+                placeholder="0"
+              />
+              {discountPercent > 0 && salePrice != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Now <strong className="text-foreground">{currency(salePrice)}</strong>
+                  {' '}
+                  <span className="line-through">{currency(price)}</span>
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-item-details">Combo details</Label>
+            <Textarea
+              id="add-item-details"
+              className=""
+              rows={4}
+              value={item.details}
+              onChange={(event) => setItem({ ...item, details: event.target.value })}
+              placeholder="Full details customers see when they expand the item…"
+            />
+          </div>
+        </section>
+
+        <section className="add-item-card">
+          <IngredientsEditor
+            value={item.ingredients}
+            disabled={saving}
+            onChange={(ingredients) => setItem({ ...item, ingredients })}
+          />
+
+          <div className="flex items-center gap-2">
+            <input
+              id="add-item-available"
+              checked={item.available}
+              type="checkbox"
+              className="size-4 rounded border-border accent-primary"
+              onChange={(event) => setItem({ ...item, available: event.target.checked })}
+            />
+            <Label htmlFor="add-item-available" className="cursor-pointer font-normal">
+              Available to customers
+            </Label>
+          </div>
+
+          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+            {onCancel ? (
+              <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
+                Cancel
+              </Button>
+            ) : null}
+            <Button className="min-w-36" type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Add item'}
+            </Button>
+          </div>
+        </section>
       </div>
     </form>
   )

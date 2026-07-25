@@ -387,7 +387,7 @@ export const publicTicketsApi = {
 }
 
 export const imagesApi = {
-  search: async (query: string, perPage = 8): Promise<ImageSearchResponse> => {
+  search: async (query: string, perPage = 20): Promise<ImageSearchResponse> => {
     const params = new URLSearchParams({
       q: query,
       perPage: String(perPage),

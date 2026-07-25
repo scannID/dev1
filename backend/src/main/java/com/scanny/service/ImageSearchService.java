@@ -70,7 +70,7 @@ public class ImageSearchService {
             );
         }
 
-        int safePerPage = Math.min(Math.max(perPage, 1), 15);
+        int safePerPage = Math.min(Math.max(perPage, 1), 24);
         String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
         URI uri = URI.create(
                 "https://api.pexels.com/v1/search?query=" + encoded + "&per_page=" + safePerPage + "&orientation=square"

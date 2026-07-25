@@ -22,7 +22,7 @@ public class ImageSearchController {
     @GetMapping("/search")
     public ImageSearchDtos.ImageSearchResponse search(
             @RequestParam String q,
-            @RequestParam(required = false, defaultValue = "8") int perPage
+            @RequestParam(required = false, defaultValue = "20") int perPage
     ) {
         return imageSearchService.search(q, perPage);
     }
