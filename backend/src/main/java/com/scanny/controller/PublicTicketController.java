@@ -1,8 +1,11 @@
 package com.scanny.controller;
 
 import com.scanny.dto.PublicTicketDtos;
+import com.scanny.dto.TicketDtos;
+import com.scanny.dto.TicketResponse;
 import com.scanny.service.TicketPurchaseService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,15 +39,8 @@ public class PublicTicketController {
         return ResponseEntity.ok(ticketPurchaseService.getAttendeeView(accessToken));
     }
 
-    @GetMapping("/gate/{gateToken}")
-    public ResponseEntity<PublicTicketDtos.GateEventResponse> gateEvent(@PathVariable String gateToken) {
-        return ResponseEntity.ok(ticketPurchaseService.getGateEvent(gateToken));
-    }
-
-    @PostMapping("/gate/{gateToken}/scan")
-    public ResponseEntity<PublicTicketDtos.GateScanResponse> gateScan(
-            @PathVariable String gateToken,
-            @RequestBody PublicTicketDtos.GateScanRequest request) {
-        return ResponseEntity.ok(ticketPurchaseService.scanAtGate(gateToken, request.qrToken()));
+    @PostMapping("/events")
+    public ResponseEntity<TicketResponse> createEvent(@RequestBody TicketDtos.CreateTicketRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ticketPurchaseService.createPublicEvent(request));
     }
 }

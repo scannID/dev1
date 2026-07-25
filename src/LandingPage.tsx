@@ -776,9 +776,11 @@ function NavHoverLink({
 
 function TopNav({
   onGetStarted,
+  onCreateEventTicket,
   S,
 }: {
   onGetStarted: () => void
+  onCreateEventTicket: () => void
   S: Record<string, CSSProperties>
 }) {
   return (
@@ -800,35 +802,33 @@ function TopNav({
         .scanny-nav-link {
           display: inline-flex;
           align-items: center;
-          padding: 8px 14px;
+          padding: 8px 12px;
           border-radius: 8px;
           color: var(--muted-foreground);
           font-size: 14px;
-          font-weight: 550;
+          font-weight: 500;
           text-decoration: none;
-          transition: color 0.15s ease, background 0.15s ease;
+          white-space: nowrap;
         }
         .scanny-nav-link:hover,
         .scanny-nav-item:focus-within .scanny-nav-link {
           color: var(--foreground);
-          background: rgba(255,255,255,0.55);
-          opacity: 1;
+          background: color-mix(in srgb, var(--foreground) 6%, transparent);
         }
         .scanny-nav-panel {
           position: absolute;
           top: calc(100% + 10px);
           left: 50%;
           transform: translateX(-50%) translateY(6px);
-          width: 280px;
-          padding: 16px 16px 14px;
-          background: rgba(255,255,255,0.96);
-          border: 1px solid rgba(15, 23, 42, 0.08);
+          width: min(280px, 70vw);
+          padding: 14px 16px;
           border-radius: 14px;
+          background: rgba(255,255,255,0.92);
+          border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
           box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
           opacity: 0;
-          visibility: hidden;
           pointer-events: none;
-          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+          transition: opacity 0.15s ease, transform 0.15s ease;
           z-index: 60;
         }
         .scanny-nav-panel::before {
@@ -838,65 +838,82 @@ function TopNav({
           left: 50%;
           width: 12px;
           height: 12px;
-          background: rgba(255,255,255,0.96);
-          border-left: 1px solid rgba(15, 23, 42, 0.08);
-          border-top: 1px solid rgba(15, 23, 42, 0.08);
           transform: translateX(-50%) rotate(45deg);
+          background: rgba(255,255,255,0.92);
+          border-left: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+          border-top: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
         }
         .scanny-nav-item:hover .scanny-nav-panel,
         .scanny-nav-item:focus-within .scanny-nav-panel {
           opacity: 1;
-          visibility: visible;
-          pointer-events: auto;
           transform: translateX(-50%) translateY(0);
+          pointer-events: auto;
         }
         .scanny-nav-panel__title {
           margin: 0 0 6px;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
           color: var(--foreground);
-          letter-spacing: -0.02em;
         }
         .scanny-nav-panel__body {
-          margin: 0 0 12px;
-          font-size: 13px;
-          line-height: 1.5;
+          margin: 0 0 10px;
+          font-size: 12px;
+          line-height: 1.45;
           color: var(--muted-foreground);
         }
         .scanny-nav-panel__list {
           margin: 0;
           padding: 0;
           list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
+          display: grid;
+          gap: 6px;
         }
         .scanny-nav-panel__list li {
           position: relative;
           padding-left: 14px;
-          font-size: 12.5px;
-          font-weight: 550;
+          font-size: 12px;
           color: var(--foreground);
-          line-height: 1.35;
         }
         .scanny-nav-panel__list li::before {
           content: '';
           position: absolute;
           left: 0;
-          top: 6px;
+          top: 7px;
           width: 6px;
           height: 6px;
           border-radius: 50%;
           background: var(--primary);
         }
-        @media (max-width: 768px) {
+        .scanny-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .scanny-nav-event {
+          background: transparent;
+          color: var(--foreground);
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: none;
+          cursor: pointer;
+          border: 1px solid color-mix(in srgb, var(--foreground) 16%, transparent);
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .scanny-nav-event:hover {
+          background: color-mix(in srgb, var(--foreground) 5%, transparent);
+        }
+        @media (max-width: 860px) {
           .scanny-nav-links { display: none; }
         }
       `}</style>
       <div style={S.navInner}>
         <a href="#" style={S.logo}>
           <div style={S.logoMark}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
               <rect x="1"  y="1"  width="6" height="6" rx="1" fill="white"/>
               <rect x="11" y="1"  width="6" height="6" rx="1" fill="white"/>
               <rect x="1"  y="11" width="6" height="6" rx="1" fill="white"/>
@@ -915,12 +932,17 @@ function TopNav({
           ))}
         </ul>
 
-        <button onClick={onGetStarted} style={S.navCta} className="cta-primary">
-          <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Get started
-        </button>
+        <div className="scanny-nav-actions">
+          <button type="button" onClick={onCreateEventTicket} className="scanny-nav-event">
+            Create event ticket
+          </button>
+          <button onClick={onGetStarted} style={S.navCta} className="cta-primary">
+            <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Get started
+          </button>
+        </div>
       </div>
     </nav>
   )
@@ -929,8 +951,10 @@ function TopNav({
 /* ─── Main export ────────────────────────────────────────────────────── */
 export default function LandingPage({
   onGetStarted,
+  onCreateEventTicket,
 }: {
   onGetStarted: () => void
+  onCreateEventTicket: () => void
 }) {
   const S = getStyles(C)
   
@@ -964,7 +988,7 @@ export default function LandingPage({
 
       <div style={{ position: 'relative', zIndex: 1 }}>
       {/* NAV */}
-      <TopNav onGetStarted={onGetStarted} S={S} />
+      <TopNav onGetStarted={onGetStarted} onCreateEventTicket={onCreateEventTicket} S={S} />
 
       {/* HERO */}
       <section style={S.hero}>

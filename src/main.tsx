@@ -10,7 +10,7 @@ import QuickPayTrack from './quickpay/QuickPayTrack'
 import QuickPayCustomer from './quickpay/QuickPayCustomer'
 import TicketPurchasePage from './tickets/TicketPurchasePage'
 import TicketViewPage from './tickets/TicketViewPage'
-import TicketGatePage from './tickets/TicketGatePage'
+import EventTicketPage from './EventTicket'
 import keycloak, { hasMerchantSession, initKeycloak, waitForKeycloak } from './keycloak'
 import { applyDarkMode, initThemeFromStorage, persistDarkMode, readDarkMode } from './lib/theme'
 
@@ -54,9 +54,8 @@ function resolveTicketPurchaseRoute(): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
-function resolveGateRoute(): string | null {
-  const match = window.location.pathname.match(/^\/gate\/([^/]+)\/?$/)
-  return match ? decodeURIComponent(match[1]) : null
+function resolveCreateEventRoute(): boolean {
+  return /^\/create-event\/?$/.test(window.location.pathname)
 }
 
 function goToLanding() {
@@ -67,8 +66,8 @@ const customerRoute = resolveCustomerRoute()
 const payToken = resolvePayRoute()
 const trackNumber = resolveTrackRoute()
 const ticketViewToken = resolveTicketViewRoute()
-const gateToken = resolveGateRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
+const createEventRoute = resolveCreateEventRoute()
 
 if (customerRoute) {
   document.documentElement.classList.add('cm-app')
@@ -84,10 +83,12 @@ if (customerRoute) {
       <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
     </StrictMode>
   )
-} else if (gateToken) {
+} else if (createEventRoute) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <TicketGatePage gateToken={gateToken} />
+      <div style={{ minHeight: '100svh', width: '100%', overflow: 'hidden' }}>
+        <EventTicketPage onBack={goToLanding} />
+      </div>
     </StrictMode>
   )
 } else if (ticketViewToken) {
@@ -207,7 +208,14 @@ if (customerRoute) {
       return <MarketingLayout slug={marketingSlug} onGetStarted={handleGetStarted} />
     }
 
-    return <LandingPage onGetStarted={handleGetStarted} />
+    return (
+      <LandingPage
+        onGetStarted={handleGetStarted}
+        onCreateEventTicket={() => {
+          window.location.href = '/create-event'
+        }}
+      />
+    )
   }
 
   initKeycloak()

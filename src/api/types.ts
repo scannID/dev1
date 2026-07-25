@@ -344,7 +344,6 @@ export interface Ticket {
   redeemedAt?: string
   canBeUsed: boolean
   qrCodeUrl: string
-  gateUrl?: string | null
 }
 
 export interface UpdateTicketStatusRequest {
@@ -388,20 +387,6 @@ export interface TicketPurchaseResponse {
   paymentStatus: PaymentIntentStatus
   message: string
   viewUrl: string
-}
-
-export interface GateScanResponse {
-  valid: boolean
-  result: string
-  message: string
-  holderName: string
-  ticketType: string
-  eventName: string
-}
-
-export interface GateEventResponse {
-  eventName: string
-  eventDate: string | null
 }
 
 export interface AttendeeTicketView {

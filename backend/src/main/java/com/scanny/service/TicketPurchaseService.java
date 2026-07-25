@@ -5,10 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scanny.dto.PaymentDtos;
 import com.scanny.dto.PublicTicketDtos;
 import com.scanny.dto.TicketDtos;
+import com.scanny.dto.TicketResponse;
 import com.scanny.entity.Ticket;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.PaymentStatus;
-import com.scanny.model.enums.ScanResult;
 import com.scanny.model.enums.TicketStatus;
 import com.scanny.payment.PaymentContext;
 import com.scanny.payment.service.PaymentGatewayService;
@@ -53,6 +53,28 @@ public class TicketPurchaseService {
         this.ticketMailService = ticketMailService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
+    }
+
+    @Transactional
+    public TicketResponse createPublicEvent(TicketDtos.CreateTicketRequest request) {
+        if (request == null || request.eventName() == null || request.eventName().isBlank()) {
+            throw new ApiException(400, "Event name is required");
+        }
+        TicketDtos.CreateTicketRequest normalized = new TicketDtos.CreateTicketRequest(
+            request.ticketType() != null && !request.ticketType().isBlank() ? request.ticketType() : "EVENT",
+            request.eventName().trim(),
+            request.eventDate(),
+            "",
+            "",
+            "",
+            Math.max(0, request.price()),
+            request.currency() != null && !request.currency().isBlank() ? request.currency() : "UGX",
+            1_000_000_000,
+            request.expiresAt(),
+            "public-web",
+            request.metadata()
+        );
+        return ticketService.createTicket(normalized);
     }
 
     @Transactional(readOnly = true)
@@ -170,7 +192,7 @@ public class TicketPurchaseService {
             ticket.getEventName(),
             ticket.getEventDate() != null ? ticket.getEventDate().toString() : null,
             ticket.getHolderName(),
-            maskEmail(ticket.getHolderEmail()),
+            ticket.getHolderEmail(),
             ticket.getPrice(),
             ticket.getCurrency(),
             ticket.getStatus().name(),
@@ -181,57 +203,6 @@ public class TicketPurchaseService {
             buildViewUrl(ticket.getAccessToken()),
             ticket.getQrToken()
         );
-    }
-
-    @Transactional
-    public PublicTicketDtos.GateScanResponse scanAtGate(String gateToken, String attendeeQrToken) {
-        Ticket master = ticketRepository.findByGateToken(gateToken.trim())
-            .orElseThrow(() -> new com.scanny.exception.ApiException(404, "Invalid gate link"));
-
-        if (!master.isEventTemplate()) {
-            throw new com.scanny.exception.ApiException(400, "Not an event gate link");
-        }
-
-        String qr = attendeeQrToken == null ? "" : attendeeQrToken.trim();
-        if (qr.isBlank()) {
-            throw new com.scanny.exception.ApiException(400, "Ticket code is required");
-        }
-
-        Ticket attendee = ticketRepository.findByQrToken(qr)
-            .orElseThrow(() -> new com.scanny.exception.ApiException(404, "Ticket not found"));
-
-        if (!attendee.isAttendeeTicket() || !master.getId().equals(attendee.getMasterTicketId())) {
-            return new PublicTicketDtos.GateScanResponse(
-                false,
-                ScanResult.Invalid.name(),
-                "This ticket is not for this event",
-                attendee.getHolderName(),
-                attendee.getTicketType(),
-                master.getEventName()
-            );
-        }
-
-        TicketDtos.ScanValidationResponse scan = ticketService.scanTicket(qr, new TicketDtos.ScanTicketRequest(
-            "gate",
-            master.getEventName(),
-            "public-gate"
-        ));
-
-        return new PublicTicketDtos.GateScanResponse(
-            scan.valid(),
-            scan.result().name(),
-            scan.message(),
-            attendee.getHolderName(),
-            attendee.getTicketType(),
-            master.getEventName()
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public PublicTicketDtos.GateEventResponse getGateEvent(String gateToken) {
-        Ticket master = ticketRepository.findByGateToken(gateToken.trim())
-            .orElseThrow(() -> new com.scanny.exception.ApiException(404, "Invalid gate link"));
-        return new PublicTicketDtos.GateEventResponse(master.getEventName(), master.getEventDate() != null ? master.getEventDate().toString() : null);
     }
 
     private Ticket requireEventTemplate(String qrToken) {
@@ -330,14 +301,6 @@ public class TicketPurchaseService {
             throw new ApiException(400, message);
         }
         return value.trim();
-    }
-
-    private static String maskEmail(String email) {
-        int at = email.indexOf('@');
-        if (at <= 1) {
-            return email;
-        }
-        return email.charAt(0) + "***" + email.substring(at);
     }
 
     private static String generateTicketId() {

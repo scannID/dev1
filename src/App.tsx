@@ -1352,6 +1352,19 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
               <button type="button" onClick={() => window.print()}>
                 Print QR
               </button>
+              <button
+                type="button"
+                disabled={!qrImage}
+                onClick={() => {
+                  if (!qrImage) return
+                  const a = document.createElement('a')
+                  a.href = qrImage
+                  a.download = `${business.name.replace(/[^\w\-]+/g, '_').slice(0, 40) || 'scanny'}-qr.png`
+                  a.click()
+                }}
+              >
+                Download QR
+              </button>
             </div>
           </>
         )}

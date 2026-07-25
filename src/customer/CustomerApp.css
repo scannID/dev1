@@ -1412,7 +1412,8 @@ html.cm-app body {
   color: var(--cm-muted);
 }
 
-.cm-field input {
+.cm-field input,
+.cm-field select {
   border: 1px solid var(--cm-border);
   border-radius: 12px;
   padding: 12px;
@@ -1421,9 +1422,11 @@ html.cm-app body {
   font-weight: 500;
   background: #fff;
   color: var(--cm-text);
+  width: 100%;
 }
 
-.cm-field input:focus {
+.cm-field input:focus,
+.cm-field select:focus {
   outline: 2px solid color-mix(in srgb, var(--cm-teal) 35%, transparent);
   border-color: var(--cm-teal);
 }

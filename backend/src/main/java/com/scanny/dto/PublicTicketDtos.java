@@ -59,20 +59,4 @@ public class PublicTicketDtos {
         String viewUrl,
         String qrToken
     ) {}
-
-    public record GateScanRequest(String qrToken) {}
-
-    public record GateScanResponse(
-        boolean valid,
-        String result,
-        String message,
-        String holderName,
-        String ticketType,
-        String eventName
-    ) {}
-
-    public record GateEventResponse(
-        String eventName,
-        String eventDate
-    ) {}
 }

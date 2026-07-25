@@ -28,8 +28,6 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
 
     Optional<Ticket> findByAccessToken(String accessToken);
 
-    Optional<Ticket> findByGateToken(String gateToken);
-
     @Query("""
             SELECT t.eventName,
                    COUNT(t),

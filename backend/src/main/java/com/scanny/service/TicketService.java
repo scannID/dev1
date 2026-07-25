@@ -66,10 +66,6 @@ public class TicketService {
         ticket.setStatus(TicketStatus.Active);
         ticket.setPaymentStatus(PaymentStatus.Unpaid);
 
-        if (request.usageLimit() > 1_000_000) {
-            ticket.setGateToken(generateGateToken());
-        }
-
         ticket = ticketRepository.save(ticket);
         broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
@@ -230,9 +226,5 @@ public class TicketService {
 
     private String generateQrToken() {
         return UUID.randomUUID().toString().replace("-", "");
-    }
-
-    private String generateGateToken() {
-        return "GATE-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
     }
 }

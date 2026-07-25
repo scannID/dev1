@@ -44,8 +44,6 @@ import type {
   TicketPurchaseResponse,
   TicketEventInfo,
   AttendeeTicketView,
-  GateScanResponse,
-  GateEventResponse,
   PagedResult,
   PaginationMeta,
   FeeConfig,
@@ -377,12 +375,8 @@ export const publicTicketsApi = {
     return api.get<AttendeeTicketView>(`/tickets/public/view/${encodeURIComponent(accessToken)}`)
   },
 
-  getGateEvent: async (gateToken: string): Promise<GateEventResponse> => {
-    return api.get<GateEventResponse>(`/tickets/public/gate/${encodeURIComponent(gateToken)}`)
-  },
-
-  gateScan: async (gateToken: string, qrToken: string): Promise<GateScanResponse> => {
-    return api.post<GateScanResponse>(`/tickets/public/gate/${encodeURIComponent(gateToken)}/scan`, { qrToken })
+  createEvent: async (data: CreateTicketRequest): Promise<Ticket> => {
+    return api.post<Ticket>('/tickets/public/events', data)
   },
 }
 

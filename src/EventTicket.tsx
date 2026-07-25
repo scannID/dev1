@@ -1,50 +1,64 @@
 import { getWsBaseUrl } from './lib/realtime'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
-import { ticketsApi } from './api/services'
+import { ticketsApi, publicTicketsApi } from './api/services'
 import type { TicketStats } from './api/types'
-import { InlineSpinner } from './components/LoadingSpinner'
-
 /* ─── Tokens ────────────────────────────────────────────────────────── */
-const C = {
-  dark:    'var(--muted)',
-  darker:  'var(--card)',
-  teal:    'var(--primary)',
-  tealLt:  'var(--primary)',
-  border:  'var(--border)',
-  muted:   'var(--muted-foreground)',
-  white:   'var(--foreground)',
+const G = {
+  bg: '#050505',
+  panel: '#121212',
+  card: '#161616',
+  cardAlt: '#1a1a1a',
+  border: 'rgba(201, 168, 108, 0.22)',
+  borderSoft: 'rgba(255,255,255,0.08)',
+  gold: '#c9a86c',
+  goldBright: '#e0c48a',
+  goldDim: '#9a7f4f',
+  goldText: '#b8965a',
+  white: '#f5f5f5',
+  muted: '#8a8a8a',
+  danger: '#f87171',
 }
 
+const PREVIEW_IMG =
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80'
+const MASTER_IMG =
+  'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1200&q=80'
+const HOST_AVATAR =
+  'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=120&q=80'
+
 /* ─── Types ─────────────────────────────────────────────────────────── */
-type TemplateId = 'classic' | 'festival' | 'minimal'
+type TemplateId = 'classic' | 'festival' | 'minimal' | 'gold'
 
 type TicketClass = {
   id: string
-  name: string   // Ordinary | VIP | VVIP | custom
+  name: string
   fee: string
 }
 
 type TableOption = {
   id: string
-  name: string   // e.g. "Table A"
-  seats: string  // number of people
-  price: string  // price per table
+  name: string
+  seats: string
+  price: string
 }
 
-type TicketData = {
+export type EventTicketVisual = {
   eventName: string
   date: string
-  paymentDetails: string   // Mobile Money number or bank account
+  time?: string
+  location?: string
+  paymentDetails: string
   template: TemplateId
   ticketClasses: TicketClass[]
   tables: TableOption[]
   ticketId: string
   selectedClass: string
   purchaseUrl?: string
-  gateUrl?: string | null
 }
+
+type TicketData = EventTicketVisual
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
 function currency(val: string) {
@@ -58,6 +72,20 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-UG', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+function fmtDateShort(d: string) {
+  if (!d) return 'TBD'
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function fmtTime(t: string) {
+  if (!t) return 'TBD'
+  const [h, m] = t.split(':').map(Number)
+  if (Number.isNaN(h)) return t
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hour = ((h + 11) % 12) + 1
+  return `${String(hour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')} ${ampm}`
+}
+
 function uid() {
   return 'TKT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase()
 }
@@ -68,8 +96,8 @@ function shortId() {
 
 const CLASS_ACCENT: Record<string, string> = {
   Ordinary: '#0f766e',
-  VIP:      '#7c3aed',
-  VVIP:     '#b45309',
+  VIP: '#7c3aed',
+  VVIP: '#b45309',
 }
 
 function classAccent(name: string) {
@@ -77,17 +105,16 @@ function classAccent(name: string) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TICKET RENDERERS
+   TICKET RENDERERS (purchase / view pages)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. CLASSIC ─────────────────────────────────────────────────────── */
 function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; small?: boolean }) {
   const scale = small ? 0.52 : 1
-  const cls = d.selectedClass || (d.ticketClasses?.[0]?.name) || 'Ordinary'
-  const fee = d.ticketClasses?.find(c => c.name === cls)?.fee || ''
+  const cls = d.selectedClass || d.ticketClasses?.[0]?.name || 'Ordinary'
+  const fee = d.ticketClasses?.find((c) => c.name === cls)?.fee || ''
   const accent = classAccent(cls)
   return (
-    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Inter', sans-serif", background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.4)' }}>
+    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif", background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.4)' }}>
       <div style={{ background: accent, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Scanny · Event Ticket</p>
@@ -103,9 +130,9 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
       <div style={{ padding: '4px 24px 22px', display: 'grid', gridTemplateColumns: '1fr 130px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 14 }}>
           {[
-            ['Date',    fmtDate(d.date || '')],
-            ['Fee',     currency(fee)],
-            ['Pay to',  d.paymentDetails || '—'],
+            ['Date', fmtDate(d.date || '')],
+            ['Fee', currency(fee)],
+            ['Pay to', d.paymentDetails || '—'],
             ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
@@ -115,9 +142,12 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4 }}>
-          {qr ? <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: `2px solid ${accent}33` }} />
-              : <div style={{ width: 120, height: 120, borderRadius: 8, background: '#f9fafb', border: '2px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>QR code</div>}
-          <p style={{ margin: 0, fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>Scan to verify</p>
+          {qr ? (
+            <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: `2px solid ${accent}33` }} />
+          ) : (
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#f9fafb', border: '2px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>QR code</div>
+          )}
+          <p style={{ margin: 0, fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>Paid receipt</p>
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px dashed #e5e7eb', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
@@ -128,13 +158,12 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
   )
 }
 
-/* ── 2. FESTIVAL ────────────────────────────────────────────────────── */
 function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; small?: boolean }) {
   const scale = small ? 0.52 : 1
-  const cls = d.selectedClass || (d.ticketClasses?.[0]?.name) || 'Ordinary'
-  const fee = d.ticketClasses?.find(c => c.name === cls)?.fee || ''
+  const cls = d.selectedClass || d.ticketClasses?.[0]?.name || 'Ordinary'
+  const fee = d.ticketClasses?.find((c) => c.name === cls)?.fee || ''
   return (
-    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Inter', sans-serif", background: '#0d1117', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.6)', border: '1px solid #30363d' }}>
+    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif", background: '#0d1117', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.6)', border: '1px solid #30363d' }}>
       <div style={{ height: 4, background: 'linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)' }} />
       <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #21262d', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -145,7 +174,14 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
       </div>
       <div style={{ padding: '18px 24px', display: 'grid', gridTemplateColumns: '1fr 130px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 14 }}>
-          {[['Date', fmtDate(d.date || ''), '#c084fc'], ['Fee', currency(fee), '#34d399'], ['Pay to', d.paymentDetails || '—', '#60a5fa'], ['Ticket ID', d.ticketId || 'TKT-PREVIEW', '#9ca3af']].map(([label, val, col]) => (
+          {(
+            [
+              ['Date', fmtDate(d.date || ''), '#c084fc'],
+              ['Fee', currency(fee), '#34d399'],
+              ['Pay to', d.paymentDetails || '—', '#60a5fa'],
+              ['Ticket ID', d.ticketId || 'TKT-PREVIEW', '#9ca3af'],
+            ] as const
+          ).map(([label, val, col]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: col }}>{label}</p>
               <p style={{ margin: 0, fontSize: label === 'Fee' ? 20 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f0f6fc', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
@@ -153,9 +189,12 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4 }}>
-          {qr ? <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: '2px solid #7c3aed44' }} />
-              : <div style={{ width: 120, height: 120, borderRadius: 8, background: '#161b22', border: '2px dashed #7c3aed44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#c084fc', fontWeight: 600 }}>QR code</div>}
-          <p style={{ margin: 0, fontSize: 9, color: '#6e7681', textAlign: 'center' }}>Scan to verify</p>
+          {qr ? (
+            <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: '2px solid #7c3aed44' }} />
+          ) : (
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#161b22', border: '2px dashed #7c3aed44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#c084fc', fontWeight: 600 }}>QR code</div>
+          )}
+          <p style={{ margin: 0, fontSize: 9, color: '#6e7681', textAlign: 'center' }}>Paid receipt</p>
         </div>
       </div>
       <div style={{ background: '#161b22', borderTop: '1px solid #21262d', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
@@ -166,13 +205,12 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
   )
 }
 
-/* ── 3. MINIMAL ─────────────────────────────────────────────────────── */
 function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; small?: boolean }) {
   const scale = small ? 0.52 : 1
-  const cls = d.selectedClass || (d.ticketClasses?.[0]?.name) || 'Ordinary'
-  const fee = d.ticketClasses?.find(c => c.name === cls)?.fee || ''
+  const cls = d.selectedClass || d.ticketClasses?.[0]?.name || 'Ordinary'
+  const fee = d.ticketClasses?.find((c) => c.name === cls)?.fee || ''
   return (
-    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Inter', sans-serif", background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.35)', border: '1px solid #e5e7eb' }}>
+    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif", background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.35)', border: '1px solid #e5e7eb' }}>
       <div style={{ height: 3, background: '#111827' }} />
       <div style={{ padding: '22px 28px 18px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -183,7 +221,12 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
       </div>
       <div style={{ padding: '20px 28px', display: 'grid', gridTemplateColumns: '1fr 130px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 14 }}>
-          {[['Date', fmtDate(d.date || '')], ['Ticket fee', currency(fee)], ['Pay to', d.paymentDetails || '—'], ['Ticket ID', d.ticketId || 'TKT-PREVIEW']].map(([label, val]) => (
+          {[
+            ['Date', fmtDate(d.date || '')],
+            ['Ticket fee', currency(fee)],
+            ['Pay to', d.paymentDetails || '—'],
+            ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
+          ].map(([label, val]) => (
             <div key={label} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: 10 }}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9ca3af' }}>{label}</p>
               <p style={{ margin: 0, fontSize: label === 'Ticket fee' ? 19 : 13, fontWeight: label === 'Ticket fee' ? 900 : 600, color: '#111827', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
@@ -191,9 +234,12 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
           ))}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4 }}>
-          {qr ? <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 6, border: '1px solid #e5e7eb' }} />
-              : <div style={{ width: 120, height: 120, borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>QR code</div>}
-          <p style={{ margin: 0, fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>Scan to verify</p>
+          {qr ? (
+            <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 6, border: '1px solid #e5e7eb' }} />
+          ) : (
+            <div style={{ width: 120, height: 120, borderRadius: 6, background: '#f9fafb', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>QR code</div>
+          )}
+          <p style={{ margin: 0, fontSize: 9, color: '#9ca3af', textAlign: 'center' }}>Paid receipt</p>
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '9px 28px', display: 'flex', justifyContent: 'space-between' }}>
@@ -204,323 +250,803 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
   )
 }
 
-function TicketRenderer({ d, qr, small }: { d: Partial<TicketData>; qr?: string; small?: boolean }) {
-  if (d.template === 'festival') return <FestivalTicket d={d} qr={qr} small={small} />
-  if (d.template === 'minimal')  return <MinimalTicket  d={d} qr={qr} small={small} />
-  return <ClassicTicket d={d} qr={qr} small={small} />
-}
-
-/* ─── Template picker ───────────────────────────────────────────────── */
-const TEMPLATES: { id: TemplateId; label: string; desc: string }[] = [
-  { id: 'classic',  label: 'Classic',  desc: 'Clean header band, white body' },
-  { id: 'festival', label: 'Festival', desc: 'Dark full-bleed, neon accents' },
-  { id: 'minimal',  label: 'Minimal',  desc: 'White card, understated type' },
-]
-
-function TemplatePicker({ value, onChange, formData }: { value: TemplateId; onChange: (t: TemplateId) => void; formData: Partial<TicketData> }) {
+function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; small?: boolean }) {
+  const scale = small ? 0.52 : 1
+  const cls = d.selectedClass || d.ticketClasses?.[0]?.name || 'VIP'
+  const fee = d.ticketClasses?.find((c) => c.name === cls)?.fee || ''
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
-      <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Ticket template — pick how the buyer's ticket looks</span>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-        {TEMPLATES.map(t => (
-          <button key={t.id} type="button" onClick={() => onChange(t.id)}
-            style={{ padding: 0, border: `2px solid ${value === t.id ? C.teal : C.border}`, borderRadius: 12, background: value === t.id ? `${C.teal}11` : C.dark, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', transition: 'border-color 0.15s' }}>
-            <div style={{ height: 148, overflow: 'hidden', pointerEvents: 'none', position: 'relative', background: t.id === 'festival' ? '#0d1117' : '#e5e7eb' }}>
-              <div style={{ position: 'absolute', top: 10, left: 10 }}>
-                <TicketRenderer d={{ ...formData, template: t.id }} small />
-              </div>
+    <div style={{ width: 520, transformOrigin: 'top left', transform: `scale(${scale})`, fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif", background: '#0c0a06', borderRadius: 16, overflow: 'hidden', boxShadow: small ? 'none' : '0 24px 60px rgba(0,0,0,0.55)', border: '1px solid rgba(201,168,108,0.45)' }}>
+      <div style={{ padding: '22px 24px 16px', background: 'linear-gradient(135deg,#1a160c,#0c0a06)', borderBottom: '1px solid rgba(201,168,108,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: G.gold }}>Scanny · Gold Reserve</p>
+          <h2 style={{ margin: 0, color: '#f8f1e3', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{d.eventName || 'Event Name'}</h2>
+        </div>
+        <span style={{ background: 'rgba(201,168,108,0.18)', border: '1px solid rgba(201,168,108,0.5)', color: G.goldBright, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
+      </div>
+      <div style={{ padding: '18px 24px', display: 'grid', gridTemplateColumns: '1fr 130px', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gap: 14 }}>
+          {[
+            ['Date', fmtDate(d.date || '')],
+            ['Fee', currency(fee)],
+            ['Pay to', d.paymentDetails || '—'],
+            ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
+          ].map(([label, val]) => (
+            <div key={label}>
+              <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: G.goldDim }}>{label}</p>
+              <p style={{ margin: 0, fontSize: label === 'Fee' ? 19 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f5efe3', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
-            <div style={{ padding: '10px 12px', borderTop: `1px solid ${value === t.id ? `${C.teal}44` : C.border}` }}>
-              <p style={{ margin: 0, color: value === t.id ? C.tealLt : C.white, fontSize: 13, fontWeight: 700 }}>{t.label}</p>
-              <p style={{ margin: '2px 0 0', color: C.muted, fontSize: 11 }}>{t.desc}</p>
-            </div>
-          </button>
-        ))}
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingTop: 4 }}>
+          {qr ? (
+            <img src={qr} alt="QR" style={{ width: 120, height: 120, borderRadius: 8, border: '2px solid rgba(201,168,108,0.4)' }} />
+          ) : (
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#15120c', border: '2px dashed rgba(201,168,108,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: G.gold, fontWeight: 600 }}>QR code</div>
+          )}
+          <p style={{ margin: 0, fontSize: 9, color: G.goldDim, textAlign: 'center' }}>Paid receipt</p>
+        </div>
+      </div>
+      <div style={{ background: '#15120c', borderTop: '1px solid rgba(201,168,108,0.2)', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 10, color: G.gold, fontWeight: 700 }}>scanny.app · Gold Reserve</span>
+        <span style={{ fontSize: 10, color: '#6b5a3e' }}>Non-transferable</span>
       </div>
     </div>
   )
 }
 
-/* ─── Shared input style factory ────────────────────────────────────── */
-function inp(hasError?: boolean): React.CSSProperties {
-  return { width: '100%', padding: '10px 13px', borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', border: `1.5px solid ${hasError ? 'var(--destructive)' : C.border}` }
+export function TicketRenderer({ d, qr, small }: { d: Partial<EventTicketVisual>; qr?: string; small?: boolean }) {
+  if (d.template === 'festival') return <FestivalTicket d={d} qr={qr} small={small} />
+  if (d.template === 'minimal') return <MinimalTicket d={d} qr={qr} small={small} />
+  if (d.template === 'gold') return <GoldTicket d={d} qr={qr} small={small} />
+  return <ClassicTicket d={d} qr={qr} small={small} />
 }
 
-/* ─── Ticket classes editor ─────────────────────────────────────────── */
+/* ─── Shared styles ─────────────────────────────────────────────────── */
+function fieldStyle(hasError?: boolean): CSSProperties {
+  return {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 10,
+    fontSize: 14,
+    fontFamily: 'inherit',
+    background: '#0e0e0e',
+    color: G.white,
+    outline: 'none',
+    border: `1px solid ${hasError ? G.danger : 'rgba(255,255,255,0.1)'}`,
+  }
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <span style={{ color: G.goldText, fontSize: 12, fontWeight: 600, letterSpacing: '0.02em' }}>
+      {children}
+    </span>
+  )
+}
+
+function Stepper({
+  steps,
+  active,
+}: {
+  steps: { id: string; label: string }[]
+  active: number
+}) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 36, marginBottom: 14 }}>
+      {steps.map((s, i) => {
+        const on = i === active
+        const done = i < active
+        return (
+          <div
+            key={s.id}
+            style={{
+              position: 'relative',
+              paddingBottom: 10,
+              color: on || done ? G.goldBright : '#5a5a5a',
+              fontSize: 13,
+              fontWeight: on ? 700 : 500,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {s.label}
+            {on ? (
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  bottom: 0,
+                  transform: 'translateX(-50%)',
+                  width: '100%',
+                  height: 2,
+                  borderRadius: 2,
+                  background: G.gold,
+                }}
+              />
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ─── Live design preview (step 2 stub ticket) ──────────────────────── */
+function LiveTicketStub({
+  eventName,
+  date,
+  time,
+  location,
+}: {
+  eventName: string
+  date: string
+  time: string
+  location: string
+}) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        maxWidth: 340,
+        margin: '0 auto',
+        background: '#111',
+        borderRadius: 18,
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.55)',
+      }}
+    >
+      <div style={{ position: 'relative', height: 120 }}>
+        <img src={PREVIEW_IMG} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <span
+          style={{
+            position: 'absolute',
+            top: 14,
+            left: 14,
+            background: 'rgba(201,168,108,0.92)',
+            color: '#111',
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            padding: '5px 10px',
+            borderRadius: 999,
+          }}
+        >
+          ADMISSION
+        </span>
+      </div>
+      <div style={{ padding: '14px 16px 6px' }}>
+        <h3
+          style={{
+            margin: '0 0 8px',
+            color: G.white,
+            fontSize: 18,
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15,
+            textTransform: 'uppercase',
+          }}
+        >
+          {eventName.trim() || 'GALA DEGUSTATION 2024'}
+        </h3>
+        <p style={{ margin: '0 0 16px', color: '#b0b0b0', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span aria-hidden>📍</span>
+          {location.trim() || 'Lumina Grand Hall, NYC'}
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>DATE</p>
+            <p style={{ margin: '4px 0 0', color: G.white, fontSize: 14, fontWeight: 600 }}>{fmtDateShort(date)}</p>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>TIME</p>
+            <p style={{ margin: '4px 0 0', color: G.white, fontSize: 14, fontWeight: 600 }}>{fmtTime(time)}</p>
+          </div>
+        </div>
+      </div>
+      <div style={{ position: 'relative', marginTop: 8 }}>
+        <div style={{ position: 'absolute', left: -10, top: -10, width: 20, height: 20, borderRadius: '50%', background: G.bg }} />
+        <div style={{ position: 'absolute', right: -10, top: -10, width: 20, height: 20, borderRadius: '50%', background: G.bg }} />
+        <div style={{ borderTop: '1px dashed rgba(255,255,255,0.12)', margin: '0 18px' }} />
+        <div style={{ padding: '16px 18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              width: '100%',
+              height: 48,
+              borderRadius: 4,
+              background:
+                'repeating-linear-gradient(90deg, #f5f5f5 0 2px, #111 2px 4px, #f5f5f5 4px 7px, #111 7px 8px)',
+            }}
+          />
+          <span style={{ fontSize: 11, color: '#777', letterSpacing: '0.12em', fontFamily: 'monospace' }}>SCN-{shortId().toUpperCase()}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Template picker (step 2) ──────────────────────────────────────── */
+const TEMPLATES: {
+  id: TemplateId
+  label: string
+  desc: string
+  thumb: 'classic' | 'festival' | 'minimal' | 'gold'
+}[] = [
+  { id: 'classic', label: 'Classic Culinary', desc: 'Timeless and elegant.', thumb: 'classic' },
+  { id: 'festival', label: 'Modern Festival', desc: 'Vibrant and energetic.', thumb: 'festival' },
+  { id: 'minimal', label: 'Minimalist Noir', desc: 'Sophisticated simplicity.', thumb: 'minimal' },
+  { id: 'gold', label: 'Gold Reserve', desc: 'Premium VIP experience.', thumb: 'gold' },
+]
+
+function TemplateThumb({ kind }: { kind: TemplateId }) {
+  const base: CSSProperties = {
+        height: 56,
+        borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#0d0d0d',
+    position: 'relative',
+    overflow: 'hidden',
+  }
+  if (kind === 'classic') {
+    return (
+      <div style={base}>
+        <div style={{ position: 'absolute', inset: 10, border: '1px solid rgba(201,168,108,0.35)', borderRadius: 6 }} />
+        <div style={{ position: 'absolute', left: 18, top: 22, width: 40, height: 3, background: 'rgba(255,255,255,0.25)', borderRadius: 2 }} />
+        <div style={{ position: 'absolute', left: 18, top: 32, width: 28, height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
+        <div style={{ position: 'absolute', right: 18, top: 24, width: 18, height: 18, borderRadius: '50%', border: '1px solid rgba(201,168,108,0.5)' }} />
+      </div>
+    )
+  }
+  if (kind === 'festival') {
+    return (
+      <div style={{ ...base, background: 'linear-gradient(135deg,#1a1024,#0d0d0d)' }}>
+        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 28, height: 28, borderRadius: '50%', border: '2px solid #c084fc' }} />
+        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, height: 4, borderRadius: 2, background: 'linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)' }} />
+      </div>
+    )
+  }
+  if (kind === 'minimal') {
+    return (
+      <div style={{ ...base, width: 54, margin: '0 auto' }}>
+        <div style={{ position: 'absolute', inset: 8, border: '1px solid rgba(255,255,255,0.2)', borderRadius: 4 }} />
+        <div style={{ position: 'absolute', left: 14, top: 18, width: 26, height: 2, background: 'rgba(255,255,255,0.35)' }} />
+        <div style={{ position: 'absolute', left: 14, top: 26, width: 18, height: 2, background: 'rgba(255,255,255,0.2)' }} />
+      </div>
+    )
+  }
+  return (
+    <div style={{ ...base, background: 'linear-gradient(135deg,#1a160c,#0d0d0d)' }}>
+      <div style={{ position: 'absolute', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', border: `1.5px solid ${G.gold}`, display: 'grid', placeItems: 'center', color: G.gold, fontSize: 12 }}>★</div>
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14, height: 2, background: 'rgba(201,168,108,0.4)' }} />
+    </div>
+  )
+}
+
+/* ─── Classes / tables editors ──────────────────────────────────────── */
 const DEFAULT_CLASSES: TicketClass[] = [
   { id: shortId(), name: 'Ordinary', fee: '' },
-  { id: shortId(), name: 'VIP',      fee: '' },
-  { id: shortId(), name: 'VVIP',     fee: '' },
+  { id: shortId(), name: 'VIP', fee: '' },
 ]
 
 const PRESET_NAMES = ['Ordinary', 'VIP', 'VVIP']
 
 function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange: (c: TicketClass[]) => void }) {
   function updateClass(id: string, field: keyof TicketClass, val: string) {
-    onChange(classes.map(c => c.id === id ? { ...c, [field]: val } : c))
+    onChange(classes.map((c) => (c.id === id ? { ...c, [field]: val } : c)))
   }
   function removeClass(id: string) {
-    onChange(classes.filter(c => c.id !== id))
+    onChange(classes.filter((c) => c.id !== id))
   }
   function addClass() {
     onChange([...classes, { id: shortId(), name: '', fee: '' }])
   }
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Ticket classes & pricing</span>
-        <button type="button" onClick={addClass}
-          style={{ background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 7, cursor: 'pointer' }}>
+        <FieldLabel>Ticket classes</FieldLabel>
+        <button
+          type="button"
+          onClick={addClass}
+          style={{
+            background: 'rgba(201,168,108,0.12)',
+            border: `1px solid ${G.border}`,
+            color: G.goldBright,
+            fontSize: 11,
+            fontWeight: 700,
+            padding: '4px 10px',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
+        >
           + Add class
         </button>
       </div>
-
-      {/* Header row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: 8 }}>
-        <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, paddingLeft: 2 }}>Class name</span>
-        <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, paddingLeft: 2 }}>Fee (UGX)</span>
-        <span />
-      </div>
-
       {classes.map((cls) => (
-        <div key={cls.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 32px', gap: 8, alignItems: 'center' }}>
-          {/* Name — dropdown for presets, free text otherwise */}
-          <div style={{ position: 'relative' }}>
-            <input
-              list={`class-names-${cls.id}`}
-              value={cls.name}
-              onChange={e => updateClass(cls.id, 'name', e.target.value)}
-              placeholder="e.g. VIP"
-              style={{ ...inp(), paddingRight: 28 }}
-            />
-            <datalist id={`class-names-${cls.id}`}>
-              {PRESET_NAMES.map(n => <option key={n} value={n} />)}
-            </datalist>
-            {/* Colour dot */}
-            <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 9, height: 9, borderRadius: '50%', background: classAccent(cls.name) }} />
-          </div>
-          <input
-            type="number"
-            min="0"
-            value={cls.fee}
-            onChange={e => updateClass(cls.id, 'fee', e.target.value)}
-            placeholder="e.g. 50000"
-            style={inp()}
-          />
-          <button type="button" onClick={() => removeClass(cls.id)}
-            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: 'var(--destructive)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div key={cls.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 36px', gap: 6, alignItems: 'center' }}>
+          <input list={`class-names-${cls.id}`} value={cls.name} onChange={(e) => updateClass(cls.id, 'name', e.target.value)} placeholder="e.g. VIP" style={fieldStyle()} />
+          <datalist id={`class-names-${cls.id}`}>
+            {PRESET_NAMES.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+          <input type="number" min="0" value={cls.fee} onChange={(e) => updateClass(cls.id, 'fee', e.target.value)} placeholder="Fee UGX" style={fieldStyle()} />
+          <button
+            type="button"
+            onClick={() => removeClass(cls.id)}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.35)',
+              color: G.danger,
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
+          >
             ×
           </button>
         </div>
       ))}
-
-      {classes.length === 0 && (
-        <p style={{ color: C.muted, fontSize: 13, margin: '4px 0 0' }}>No classes yet — add at least one.</p>
-      )}
     </div>
   )
 }
 
-/* ─── Tables editor ─────────────────────────────────────────────────── */
 function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (t: TableOption[]) => void }) {
   function updateTable(id: string, field: keyof TableOption, val: string) {
-    onChange(tables.map(t => t.id === id ? { ...t, [field]: val } : t))
+    onChange(tables.map((t) => (t.id === id ? { ...t, [field]: val } : t)))
   }
-  function removeTable(id: string) { onChange(tables.filter(t => t.id !== id)) }
+  function removeTable(id: string) {
+    onChange(tables.filter((t) => t.id !== id))
+  }
   function addTable() {
     onChange([...tables, { id: shortId(), name: `Table ${tables.length + 1}`, seats: '', price: '' }])
   }
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Tables (optional)</span>
-        <button type="button" onClick={addTable}
-          style={{ background: '#7c3aed22', border: '1px solid #7c3aed44', color: '#c4b5fd', fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 7, cursor: 'pointer' }}>
+        <FieldLabel>Tables (optional)</FieldLabel>
+        <button
+          type="button"
+          onClick={addTable}
+          style={{
+            background: 'rgba(201,168,108,0.12)',
+            border: `1px solid ${G.border}`,
+            color: G.goldBright,
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '6px 12px',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
+        >
           + Add table
         </button>
       </div>
-
-      {tables.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr 32px', gap: 8 }}>
-          {['Table name', 'Seats', 'Price (UGX)', ''].map(h => (
-            <span key={h} style={{ fontSize: 11, color: C.muted, fontWeight: 600, paddingLeft: 2 }}>{h}</span>
-          ))}
-        </div>
-      )}
-
-      {tables.map(t => (
-        <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr 32px', gap: 8, alignItems: 'center' }}>
-          <input value={t.name} onChange={e => updateTable(t.id, 'name', e.target.value)} placeholder="e.g. Table A" style={inp()} />
-          <input type="number" min="1" value={t.seats} onChange={e => updateTable(t.id, 'seats', e.target.value)} placeholder="6" style={inp()} />
-          <input type="number" min="0" value={t.price} onChange={e => updateTable(t.id, 'price', e.target.value)} placeholder="200000" style={inp()} />
-          <button type="button" onClick={() => removeTable(t.id)}
-            style={{ width: 32, height: 32, borderRadius: 7, background: '#7f1d1d22', border: '1px solid #7f1d1d44', color: 'var(--destructive)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            ×
-          </button>
-        </div>
-      ))}
-
-      {tables.length === 0 && (
-        <p style={{ color: C.muted, fontSize: 12, margin: '2px 0 0' }}>No tables added. Only add if your event has table bookings.</p>
+      {tables.length === 0 ? (
+        <p style={{ margin: 0, color: G.muted, fontSize: 12 }}>No table bookings yet.</p>
+      ) : (
+        tables.map((t) => (
+          <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 1fr 36px', gap: 8 }}>
+            <input value={t.name} onChange={(e) => updateTable(t.id, 'name', e.target.value)} style={fieldStyle()} />
+            <input type="number" min="1" value={t.seats} onChange={(e) => updateTable(t.id, 'seats', e.target.value)} placeholder="Seats" style={fieldStyle()} />
+            <input type="number" min="0" value={t.price} onChange={(e) => updateTable(t.id, 'price', e.target.value)} placeholder="Price" style={fieldStyle()} />
+            <button type="button" onClick={() => removeTable(t.id)} style={{ borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: G.danger, cursor: 'pointer' }}>
+              ×
+            </button>
+          </div>
+        ))
       )}
     </div>
   )
 }
 
-/* ─── Ticket output screen ──────────────────────────────────────────── */
+/* ─── Step 3: Ticket Generated ──────────────────────────────────────── */
 function TicketOutput({
   data,
   qr,
-  onBack,
+  onCreateAnother,
   onRevoke,
   revoking,
   revokeMessage,
-  createdEventStats,
-  statsSearch,
-  onStatsSearchChange,
-  filteredStats,
-  statsLoading,
-  statsError,
 }: {
   data: TicketData
   qr: string
-  onBack: () => void
+  onCreateAnother: () => void
   onRevoke: (ticketId: string) => Promise<void>
   revoking: boolean
   revokeMessage: string | null
-  createdEventStats: TicketStats | null
-  statsSearch: string
-  onStatsSearchChange: (value: string) => void
-  filteredStats: TicketStats[]
-  statsLoading: boolean
-  statsError: string | null
 }) {
-  // If multiple classes, allow switching which class to preview/print
-  const [previewClass, setPreviewClass] = useState(data.ticketClasses[0]?.name || '')
+  const purchaseUrl = data.purchaseUrl || ''
+
+  async function qrToFile(): Promise<File | null> {
+    if (!qr) return null
+    try {
+      const res = await fetch(qr)
+      const blob = await res.blob()
+      const safeName = (data.eventName || 'event').replace(/[^\w\-]+/g, '_').slice(0, 40)
+      return new File([blob], `${safeName}-qr.png`, { type: 'image/png' })
+    } catch {
+      return null
+    }
+  }
+
+  function downloadQr() {
+    if (!qr) return
+    const a = document.createElement('a')
+    a.href = qr
+    a.download = `${(data.eventName || 'event').replace(/[^\w\-]+/g, '_').slice(0, 40)}-qr.png`
+    a.click()
+  }
+
+  async function handleShare() {
+    if (!qr) {
+      toast.error('QR code is not ready yet')
+      return
+    }
+    try {
+      const file = await qrToFile()
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: data.eventName,
+          text: `QR code for ${data.eventName}`,
+        })
+        return
+      }
+      // Desktop / browsers without file share: download QR so it can be attached in WhatsApp
+      downloadQr()
+      toast.success('QR downloaded — attach the image in WhatsApp')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      downloadQr()
+      toast.success('QR downloaded — attach the image in WhatsApp')
+    }
+  }
+
+  function handlePrint() {
+    window.print()
+  }
+
+  const actionBtn: CSSProperties = {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '14px 16px',
+    borderRadius: 12,
+    background: '#1c1c1c',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: G.white,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textAlign: 'left',
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.dark, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', fontFamily: "'Inter', sans-serif" }}>
+    <div
+      className="ticket-output-root"
+      style={{
+        minHeight: '100svh',
+        width: '100%',
+        background: G.bg,
+        color: G.white,
+        fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif",
+        padding: '36px 24px 48px',
+        boxSizing: 'border-box',
+      }}
+    >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         * { box-sizing: border-box; }
-        @media print { .no-print { display: none !important; } body { background: white !important; } }
+        .print-only { display: none !important; }
+        @media print {
+          @page { margin: 12mm; }
+          html, body {
+            background: #fff !important;
+            color: #111 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .ticket-output-root {
+            min-height: auto !important;
+            padding: 0 !important;
+            background: #fff !important;
+            color: #111 !important;
+          }
+          .ticket-gen-grid { display: none !important; }
+          .print-qr-img {
+            width: 220px !important;
+            height: 220px !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+        @media (max-width: 960px) {
+          .ticket-gen-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
-      <div className="no-print" style={{ width: '100%', maxWidth: 560, display: 'flex', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: `1px solid ${C.border}`, color: C.muted, padding: '8px 18px', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}>
-          ← Edit
-        </button>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            type="button"
-            disabled={revoking}
-            onClick={() => onRevoke(data.ticketId)}
-            style={{ background: '#7f1d1d', border: 'none', color: '#fff', padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: revoking ? 'wait' : 'pointer', opacity: revoking ? 0.8 : 1 }}
-          >
-            {revoking ? 'Revoking...' : 'Revoke ticket'}
-          </button>
-          <button onClick={() => window.print()} style={{ background: C.teal, border: 'none', color: C.white, padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            🖨️ Print / Save PDF
-          </button>
-        </div>
+      {/* Print-only sheet — large QR always visible when printing */}
+      <div className="print-only" style={{ textAlign: 'center', padding: 24, fontFamily: 'inherit' }}>
+        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#666' }}>
+          Scanny · Master Pass
+        </p>
+        <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 800, color: '#111' }}>{data.eventName}</h1>
+        <p style={{ margin: '0 0 20px', fontSize: 14, color: '#444' }}>
+          {fmtDateShort(data.date)} · {fmtTime(data.time || '')}
+          {data.location ? ` · ${data.location}` : ''}
+        </p>
+        {qr ? (
+          <img
+            className="print-qr-img"
+            src={qr}
+            alt="Event QR code"
+            width={220}
+            height={220}
+            style={{ width: 220, height: 220, display: '2px solid #111', borderRadius: 8, background: '#fff' }}
+          />
+        ) : (
+          <p style={{ color: '#c00' }}>QR code unavailable</p>
+        )}
+        <p style={{ margin: '14px 0 0', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', color: '#111' }}>SCAN TO BUY / ENTER</p>
+        <p style={{ margin: '8px 0 0', fontSize: 12, fontFamily: 'monospace', color: '#555' }}>#{data.ticketId}</p>
+        {purchaseUrl ? (
+          <p style={{ margin: '10px 0 0', fontSize: 10, color: '#888', wordBreak: 'break-all' }}>{purchaseUrl}</p>
+        ) : null}
       </div>
+
+      <div className="no-print" style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            margin: '0 auto 14px',
+            background: 'rgba(201,168,108,0.15)',
+            border: `1.5px solid ${G.gold}`,
+            display: 'grid',
+            placeItems: 'center',
+            color: G.goldBright,
+            fontSize: 20,
+            fontWeight: 800,
+          }}
+        >
+          ✓
+        </div>
+        <h1 style={{ margin: '0 0 8px', fontSize: 36, fontWeight: 800, letterSpacing: '-0.03em' }}>Ticket Generated</h1>
+        <p style={{ margin: 0, color: G.goldText, fontSize: 15 }}>Your event is live. The master access pass is ready for distribution.</p>
+      </div>
+
       {revokeMessage && (
-        <div className="no-print" style={{ width: '100%', maxWidth: 560, marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${C.border}`, color: C.white, background: C.darker, fontSize: 13 }}>
+        <div className="no-print" style={{ maxWidth: 1100, margin: '0 auto 16px', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: 13 }}>
           {revokeMessage}
         </div>
       )}
 
-      {/* Class switcher — only shown if multiple classes */}
-      {data.ticketClasses.length > 1 && (
-        <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {data.ticketClasses.map(cls => (
-            <button key={cls.id} type="button" onClick={() => setPreviewClass(cls.name)}
-              style={{ padding: '7px 18px', borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: `2px solid ${previewClass === cls.name ? classAccent(cls.name) : C.border}`, background: previewClass === cls.name ? `${classAccent(cls.name)}22` : C.dark, color: previewClass === cls.name ? classAccent(cls.name) : C.muted }}>
-              {cls.name} — {currency(cls.fee)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <TicketRenderer d={{ ...data, selectedClass: previewClass }} qr={qr} />
-
-      <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 20, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 18px' }}>
-        <p style={{ margin: '0 0 8px', color: C.tealLt, fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Two links</p>
-        <p style={{ margin: '0 0 10px', color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
-          <strong style={{ color: C.white }}>Poster QR</strong> — attendees scan to buy.
-          {data.gateUrl ? (
-            <>
-              {' '}<strong style={{ color: C.white }}>Gate link</strong> — send to bouncer (no login):{' '}
-              <a href={data.gateUrl} style={{ color: C.tealLt, wordBreak: 'break-all' }}>{data.gateUrl}</a>
-            </>
-          ) : null}
-        </p>
-      </div>
-
-      {/* Tables summary */}
-      {data.tables.length > 0 && (
-        <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 24, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Table bookings</p>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {data.tables.map(t => (
-              <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: C.dark, borderRadius: 9, border: `1px solid ${C.border}` }}>
+      <div
+        className="ticket-gen-grid no-print"
+        style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.35fr) minmax(280px, 0.75fr)',
+          gap: 24,
+          alignItems: 'start',
+        }}
+      >
+        <div
+          style={{
+            background: G.card,
+            borderRadius: 20,
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.45)',
+          }}
+        >
+          <div style={{ position: 'relative', height: 220 }}>
+            <img src={MASTER_IMG} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <span
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: 16,
+                background: 'rgba(0,0,0,0.65)',
+                border: `1px solid ${G.border}`,
+                color: G.goldBright,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: '0.1em',
+                padding: '6px 12px',
+                borderRadius: 999,
+              }}
+            >
+              MASTER PASS
+            </span>
+          </div>
+          <div style={{ padding: '22px 24px 18px' }}>
+            <p style={{ margin: '0 0 6px', color: G.goldText, fontSize: 11, fontWeight: 700, letterSpacing: '0.1em' }}>EVENT NAME</p>
+            <h2 style={{ margin: '0 0 18px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{data.eventName}</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 16, alignItems: 'start' }}>
+              <div style={{ display: 'grid', gap: 14 }}>
                 <div>
-                  <p style={{ margin: 0, color: C.white, fontSize: 14, fontWeight: 700 }}>{t.name}</p>
-                  <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>{t.seats} seats</p>
+                  <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>DATE</p>
+                  <p style={{ margin: '4px 0 0', fontWeight: 600 }}>{fmtDateShort(data.date)}</p>
                 </div>
-                <strong style={{ color: C.tealLt, fontSize: 15 }}>{currency(t.price)}</strong>
+                <div>
+                  <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>LOCATION</p>
+                  <p style={{ margin: '4px 0 0', fontWeight: 600 }}>{data.location || '—'}</p>
+                </div>
               </div>
-            ))}
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>TIME</p>
+                  <p style={{ margin: '4px 0 0', fontWeight: 600 }}>{fmtTime(data.time || '')}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 10, letterSpacing: '0.1em', color: G.goldDim, fontWeight: 700 }}>TICKET ID</p>
+                  <p style={{ margin: '4px 0 0', fontWeight: 600, fontFamily: 'monospace', fontSize: 13 }}>#{data.ticketId}</p>
+                </div>
+              </div>
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  padding: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                  minWidth: 120,
+                }}
+              >
+                {qr ? (
+                  <img
+                    src={qr}
+                    alt="QR"
+                    width={100}
+                    height={100}
+                    style={{ width: 100, height: 100, display: 'none', background: '#fff' }}
+                  />
+                ) : null}
+                <span style={{ color: '#111', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em' }}>SCAN FOR ENTRY</span>
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
+              margin: '0 24px 20px',
+              paddingTop: 14,
+              borderTop: '1px dashed rgba(255,255,255,0.14)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src={HOST_AVATAR} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+              <span style={{ fontSize: 13, color: '#d1d5db' }}>Host: Scanny Events</span>
+            </div>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: G.goldBright, fontSize: 12, fontWeight: 700 }}>
+              <span aria-hidden>✓</span> Verified Event
+            </span>
           </div>
         </div>
-      )}
 
-      <p className="no-print" style={{ color: C.muted, fontSize: 13, marginTop: 20, textAlign: 'center', maxWidth: 480 }}>
-        Use the class switcher above to preview and print each ticket class separately. Each has a unique QR code.
-      </p>
-
-      <div className="no-print" style={{ width: '100%', maxWidth: 560, marginTop: 20, background: C.darker, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 20px' }}>
-        <p style={{ margin: '0 0 8px', color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          Purchased tickets
-        </p>
-        <p style={{ margin: '0 0 14px', color: C.muted, fontSize: 13 }}>
-          {createdEventStats
-            ? `${createdEventStats.eventName}: ${createdEventStats.purchasedTickets}/${createdEventStats.totalTickets} purchased`
-            : 'Create a ticket to see purchase totals for this event.'}
-        </p>
-
-        <input
-          type="text"
-          placeholder="Search event name"
-          value={statsSearch}
-          onChange={(e) => onStatsSearchChange(e.target.value)}
-          style={{ ...inp(), marginBottom: 10 }}
-        />
-
-        {statsLoading && <InlineSpinner label="Loading ticket stats…" />}
-        {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
-        {!statsLoading && !statsError && (
-          <div style={{ display: 'grid', gap: 8 }}>
-            {filteredStats.slice(0, 6).map((row) => (
-              <div key={row.eventName} style={{ display: 'flex', justifyContent: 'space-between', background: C.dark, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px' }}>
-                <span style={{ color: C.white, fontSize: 13 }}>{row.eventName}</span>
-                <strong style={{ color: C.tealLt, fontSize: 13 }}>{row.purchasedTickets}/{row.totalTickets}</strong>
-              </div>
-            ))}
-            {filteredStats.length === 0 && <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>No events found.</p>}
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div
+            style={{
+              background: G.card,
+              borderRadius: 18,
+              border: '1px solid rgba(255,255,255,0.08)',
+              padding: 18,
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <p style={{ margin: 0, color: G.goldText, fontSize: 11, fontWeight: 800, letterSpacing: '0.12em' }}>DISTRIBUTE & MANAGE</p>
+            <button type="button" onClick={handlePrint} style={actionBtn}>
+              <span>🖨 Print Ticket</span>
+              <span style={{ color: G.muted }}>›</span>
+            </button>
+            <button type="button" onClick={() => void handleShare()} style={actionBtn}>
+              <span>⤴ Share QR (WhatsApp)</span>
+              <span style={{ color: G.muted }}>›</span>
+            </button>
+            <button type="button" onClick={downloadQr} style={actionBtn}>
+              <span>📄 Download QR</span>
+              <span style={{ color: G.muted }}>›</span>
+            </button>
+            <button
+              type="button"
+              onClick={onCreateAnother}
+              style={{
+                marginTop: 4,
+                width: '100%',
+                padding: '15px 16px',
+                borderRadius: 12,
+                border: 'none',
+                background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
+                color: '#111',
+                fontSize: 13,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              + CREATE ANOTHER EVENT
+            </button>
+            <button
+              type="button"
+              disabled={revoking}
+              onClick={() => onRevoke(data.ticketId)}
+              style={{
+                ...actionBtn,
+                color: G.danger,
+                borderColor: 'rgba(239,68,68,0.3)',
+                background: 'rgba(239,68,68,0.08)',
+                justifyContent: 'center',
+                opacity: revoking ? 0.7 : 1,
+              }}
+            >
+              {revoking ? 'Revoking…' : 'Revoke master QR'}
+            </button>
           </div>
-        )}
+
+          <div
+            style={{
+              background: G.cardAlt,
+              borderRadius: 14,
+              border: `1px solid ${G.border}`,
+              padding: 16,
+              display: 'flex',
+              gap: 12,
+              alignItems: 'flex-start',
+            }}
+          >
+            <span
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                border: `1px solid ${G.gold}`,
+                color: G.gold,
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 12,
+                fontWeight: 800,
+                flexShrink: 0,
+              }}
+            >
+              i
+            </span>
+            <p style={{ margin: 0, color: G.goldText, fontSize: 13, lineHeight: 1.5 }}>
+              Tickets are automatically synced with the <span style={{ color: G.goldBright, fontWeight: 700 }}>Scanny Guest App</span>. Attendees will receive a confirmation email within 5 minutes.
+            </p>
+          </div>
+
+          {purchaseUrl ? (
+            <p style={{ margin: 0, color: G.muted, fontSize: 12, wordBreak: 'break-all' }}>{purchaseUrl}</p>
+          ) : null}
+        </div>
       </div>
     </div>
   )
 }
 
-/* ─── Form ──────────────────────────────────────────────────────────── */
+/* ─── Form (steps 1–2) ──────────────────────────────────────────────── */
 type FormState = {
   eventName: string
   date: string
+  time: string
+  location: string
   paymentDetails: string
   template: TemplateId
   ticketClasses: TicketClass[]
@@ -530,66 +1056,69 @@ type FormState = {
 function TicketForm({
   onGenerate,
   onBack,
-  ticketStats,
-  statsLoading,
-  statsError,
-  statsSearch,
-  onStatsSearchChange,
-  filteredStats,
 }: {
   onGenerate: (d: TicketData) => Promise<void>
   onBack: () => void
-  ticketStats: TicketStats[]
-  statsLoading: boolean
-  statsError: string | null
-  statsSearch: string
-  onStatsSearchChange: (value: string) => void
-  filteredStats: TicketStats[]
 }) {
+  const [step, setStep] = useState<1 | 2>(1)
   const [form, setForm] = useState<FormState>({
     eventName: '',
     date: '',
+    time: '19:00',
+    location: '',
     paymentDetails: '',
     template: 'classic',
-    ticketClasses: DEFAULT_CLASSES.map(c => ({ ...c, id: shortId() })),
+    ticketClasses: DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
     tables: [],
   })
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [touched, setTouched] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-
-  const draftEventStats = useMemo(() => {
-    const eventName = form.eventName.trim().toLowerCase()
-    if (!eventName) return null
-    return ticketStats.find((row) => row.eventName.toLowerCase() === eventName) ?? null
-  }, [form.eventName, ticketStats])
+  const [showExtras, setShowExtras] = useState(false)
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
-    setForm(f => ({ ...f, [k]: v }))
+    setForm((f) => ({ ...f, [k]: v }))
   }
 
   function validate() {
     const e: Partial<Record<string, string>> = {}
-    if (!form.eventName.trim())     e.eventName = 'Event name is required'
-    if (!form.date)                 e.date = 'Event date is required'
+    if (!form.eventName.trim()) e.eventName = 'Event name is required'
+    if (!form.date) e.date = 'Event date is required'
+    if (!form.location.trim()) e.location = 'Location is required'
     if (!form.paymentDetails.trim()) e.paymentDetails = 'Add a payment number or bank account'
     if (form.ticketClasses.length === 0) e.ticketClasses = 'Add at least one ticket class'
-    if (form.ticketClasses.some(c => !c.name.trim())) e.ticketClasses = 'All classes need a name'
-    if (form.ticketClasses.some(c => !c.fee || isNaN(Number(c.fee)))) e.ticketClasses = 'All classes need a valid fee'
+    if (form.ticketClasses.some((c) => !c.name.trim())) e.ticketClasses = 'All classes need a name'
+    if (form.ticketClasses.some((c) => !c.fee || isNaN(Number(c.fee)))) e.ticketClasses = 'All classes need a valid fee'
     return e
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  function goToDesign() {
+    setTouched(true)
+    const errs = validate()
+    if (Object.keys(errs).length) {
+      setErrors(errs)
+      return
+    }
+    setErrors({})
+    setStep(2)
+  }
+
+  async function handleGenerate() {
     if (submitting) return
     setTouched(true)
     const errs = validate()
-    if (Object.keys(errs).length) { setErrors(errs); return }
+    if (Object.keys(errs).length) {
+      setErrors(errs)
+      setStep(1)
+      return
+    }
     try {
       setSubmitting(true)
       await onGenerate({
         eventName: form.eventName,
         date: form.date,
+        time: form.time,
+        location: form.location,
         paymentDetails: form.paymentDetails,
         template: form.template,
         ticketClasses: form.ticketClasses,
@@ -602,195 +1131,411 @@ function TicketForm({
     }
   }
 
-  const fieldInp = (field: string): React.CSSProperties => ({
-    width: '100%', padding: '11px 14px', borderRadius: 9, fontSize: 15, fontFamily: 'inherit',
-    background: C.dark, color: C.white, outline: 'none',
-    border: `1.5px solid ${touched && errors[field] ? 'var(--destructive)' : C.border}`,
-  })
+  const steps =
+    step === 1
+      ? [
+          { id: 'details', label: 'Details' },
+          { id: 'template', label: 'Template' },
+          { id: 'review', label: 'Review' },
+        ]
+      : [
+          { id: 'details', label: 'Details' },
+          { id: 'design', label: 'Design' },
+          { id: 'review', label: 'Review' },
+        ]
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 18px 56px', fontFamily: "'Inter', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'); * { box-sizing: border-box; }`}</style>
+    <div
+      style={{
+        height: '100svh',
+        width: '100%',
+        background: G.bg,
+        color: G.white,
+        fontFamily: "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif",
+        padding: '16px 24px 18px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <style>{`
+        
+        * { box-sizing: border-box; }
+        .event-design-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+          gap: 20px;
+          align-items: start;
+        }
+        @media (max-width: 960px) {
+          .event-design-grid { grid-template-columns: 1fr !important; }
+          .design-footer { flex-direction: column; align-items: stretch !important; }
+        }
+      `}</style>
 
-      <div style={{ textAlign: 'center', marginBottom: 24, width: '100%', maxWidth: 1100 }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20, marginBottom: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.tealLt, display: 'inline-block' }} />
-          No sign-in required
-        </div>
-        <h1 style={{ color: C.white, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 8px' }}>Create Event Ticket</h1>
-        <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.55, margin: 0 }}>Set event details, class pricing, and payment destination, then generate a clean printable QR ticket.</p>
-
-        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: `1px solid ${C.border}`, borderRadius: 22, padding: '10px 16px', background: C.darker, minWidth: 340 }}>
-            <span style={{ fontSize: 11, color: C.muted, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Purchased</span>
-            <span style={{ color: C.tealLt, fontSize: 18, fontWeight: 900 }}>
-            {draftEventStats
-              ? `${draftEventStats.purchasedTickets}/${draftEventStats.totalTickets}`
-              : form.eventName.trim()
-                ? '0/0'
-                : 'Select event'}
-            </span>
-          </div>
-        </div>
-
-        {statsLoading && <InlineSpinner label="Refreshing ticket stats…" />}
-        {statsError && !statsLoading && <p style={{ margin: '8px 0 0', color: 'var(--destructive)', fontSize: 11 }}>{statsError}</p>}
-      </div>
-
-      <form onSubmit={handleSubmit} noValidate style={{ width: '100%', maxWidth: '1100px', background: C.darker, border: `1px solid ${C.border}`, borderRadius: 20, padding: '22px', display: 'grid', gap: 18, position: 'relative', boxShadow: '0 24px 60px rgba(0,0,0,0.18)' }}>
-        {/* Back button inside form */}
-        <div style={{ position: 'absolute', top: '18px', left: '18px' }}>
-          <button type="button" onClick={onBack} style={{ background: C.dark, border: `1px solid ${C.border}`, color: C.muted, padding: '8px 14px', borderRadius: 10, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            ← Back to Scanny
-          </button>
-        </div>
-
-        {/* Add padding to account for back button */}
-        <div style={{ height: '42px' }} />
-
-        {/* Live ticket purchases widget (create page) */}
-        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 16px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
-            <div>
-              <div style={{ color: C.tealLt, fontSize: 13, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                Live ticket purchases
-              </div>
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>
-                Search by event name (updates live)
-              </div>
-            </div>
-            <div style={{ color: C.muted, fontSize: 12, fontWeight: 700 }}>
-              {filteredStats.length ? `${filteredStats.length} event(s)` : '—'}
-            </div>
-          </div>
-
-          <input
-            type="text"
-            placeholder="Search event name (e.g. Kampala Rooftop Bash 2025)"
-            value={statsSearch}
-            onChange={(e) => onStatsSearchChange(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: 12,
-              fontSize: 14,
-              fontFamily: 'inherit',
-              background: C.dark,
-              color: C.white,
-              border: `1.5px solid ${C.border}`,
-              outline: 'none',
-              marginBottom: 12,
+      <div style={{ maxWidth: 860, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (step === 2) setStep(1)
+              else onBack()
             }}
-          />
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: G.muted,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              padding: 0,
+            }}
+          >
+            ← {step === 2 ? 'Back to Details' : 'Back'}
+          </button>
+          {step === 2 ? (
+            <p style={{ margin: 0, color: G.muted, fontSize: 13 }}>Step 2: Choose a visual identity for your event entry.</p>
+          ) : (
+            <span />
+          )}
+        </div>
 
-          {statsLoading && <InlineSpinner label="Loading ticket stats…" />}
-          {statsError && !statsLoading && <p style={{ margin: 0, color: 'var(--destructive)', fontSize: 12 }}>{statsError}</p>}
+        <div style={{ flexShrink: 0 }}>
+          <Stepper steps={steps} active={step - 1} />
+        </div>
 
-          {!statsLoading && !statsError && (
-            <div style={{ maxHeight: 210, overflow: 'auto', paddingRight: 6 }}>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {filteredStats.slice(0, 10).map((row) => (
-                  <div
-                    key={row.eventName}
+        {step === 1 ? (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ margin: '0 0 4px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', flexShrink: 0 }}>Event Essentials</h1>
+            <p style={{ margin: '0 0 14px', color: G.goldText, fontSize: 13, lineHeight: 1.4, flexShrink: 0 }}>
+              Define the core parameters of your event experience.
+            </p>
+
+            <div style={{ display: 'grid', gap: 12, flex: 1, minHeight: 0, alignContent: 'start' }}>
+              <label style={{ display: 'grid', gap: 5 }}>
+                <FieldLabel>Event Name</FieldLabel>
+                <input
+                  style={fieldStyle(Boolean(touched && errors.eventName))}
+                  type="text"
+                  placeholder="e.g., Midnight Gala Tasting"
+                  value={form.eventName}
+                  onChange={(e) => set('eventName', e.target.value)}
+                />
+                {touched && errors.eventName && <span style={{ color: G.danger, fontSize: 12 }}>{errors.eventName}</span>}
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <FieldLabel>Date</FieldLabel>
+                  <input
+                    style={{ ...fieldStyle(Boolean(touched && errors.date)), colorScheme: 'dark' }}
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => set('date', e.target.value)}
+                  />
+                  {touched && errors.date && <span style={{ color: G.danger, fontSize: 12 }}>{errors.date}</span>}
+                </label>
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <FieldLabel>Time</FieldLabel>
+                  <input
+                    style={{ ...fieldStyle(), colorScheme: 'dark' }}
+                    type="time"
+                    value={form.time}
+                    onChange={(e) => set('time', e.target.value)}
+                  />
+                </label>
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <FieldLabel>Location</FieldLabel>
+                  <input
+                    style={fieldStyle(Boolean(touched && errors.location))}
+                    type="text"
+                    placeholder="Venue or Address"
+                    value={form.location}
+                    onChange={(e) => set('location', e.target.value)}
+                  />
+                  {touched && errors.location && <span style={{ color: G.danger, fontSize: 12 }}>{errors.location}</span>}
+                </label>
+              </div>
+
+              <div
+                style={{
+                  background: G.card,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 14,
+                  padding: 14,
+                  display: 'grid',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Payment Details</h3>
+                  <span style={{ display: 'flex', gap: 10, color: G.gold, fontSize: 14 }}>
+                    <span aria-hidden>💳</span>
+                    <span aria-hidden>🏛</span>
+                  </span>
+                </div>
+
+                <label style={{ display: 'grid', gap: 5 }}>
+                  <FieldLabel>Payment details</FieldLabel>
+                  <input
+                    style={fieldStyle(Boolean(touched && errors.paymentDetails))}
+                    type="text"
+                    placeholder="MTN / Airtel / Bank account"
+                    value={form.paymentDetails}
+                    onChange={(e) => set('paymentDetails', e.target.value)}
+                  />
+                  {touched && errors.paymentDetails && <span style={{ color: G.danger, fontSize: 12 }}>{errors.paymentDetails}</span>}
+                </label>
+
+                <ClassesEditor classes={form.ticketClasses} onChange={(v) => set('ticketClasses', v)} />
+                {touched && errors.ticketClasses && <span style={{ color: G.danger, fontSize: 12 }}>{errors.ticketClasses}</span>}
+
+                <button
+                  type="button"
+                  onClick={() => setShowExtras((v) => !v)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: G.goldDim,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    padding: 0,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {showExtras ? 'Hide table options' : 'Show table options'}
+                </button>
+                {showExtras ? <TablesEditor tables={form.tables} onChange={(v) => set('tables', v)} /> : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={goToDesign}
+                style={{
+                  background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
+                  color: '#111',
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  marginTop: 'auto',
+                }}
+              >
+                Continue to Template
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="event-design-grid" style={{ flex: 1, minHeight: 0 }}>
+              <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 10,
+                  }}
+                >
+                  {TEMPLATES.map((t) => {
+                    const selected = form.template === t.id
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => set('template', t.id)}
+                        style={{
+                          position: 'relative',
+                          textAlign: 'left',
+                          padding: 14,
+                          borderRadius: 16,
+                          border: `1.5px solid ${selected ? G.gold : 'rgba(255,255,255,0.08)'}`,
+                          background: selected ? 'rgba(201,168,108,0.08)' : G.card,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          color: G.white,
+                        }}
+                      >
+                        {selected ? (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: 12,
+                              right: 12,
+                              width: 22,
+                              height: 22,
+                              borderRadius: '50%',
+                              background: G.gold,
+                              color: '#111',
+                              display: 'grid',
+                              placeItems: 'center',
+                              fontSize: 12,
+                              fontWeight: 900,
+                            }}
+                          >
+                            ✓
+                          </span>
+                        ) : null}
+                        <TemplateThumb kind={t.id} />
+                        <p style={{ margin: '12px 0 4px', fontSize: 15, fontWeight: 700, color: selected ? G.goldBright : G.white }}>{t.label}</p>
+                        <p style={{ margin: 0, fontSize: 12, color: G.muted }}>{t.desc}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    padding: 18,
+                    borderRadius: 16,
+                    background: G.card,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: 'rgba(201,168,108,0.12)',
+                        border: `1px solid ${G.border}`,
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: G.gold,
+                        fontSize: 18,
+                      }}
+                    >
+                      ⤴
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 15 }}>Custom Branding</p>
+                      <p style={{ margin: 0, color: G.muted, fontSize: 13, lineHeight: 1.4 }}>
+                        Upload your own logo and primary brand colors to apply across all assets.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toast.message('Custom branding coming soon')}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: C.darker,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 12,
-                      padding: '10px 12px',
+                      flexShrink: 0,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      border: `1px solid ${G.border}`,
+                      background: 'rgba(201,168,108,0.1)',
+                      color: G.goldBright,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
                     }}
                   >
-                    <span style={{ color: C.white, fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 10 }}>
-                      {row.eventName}
-                    </span>
-                    <strong style={{ color: C.tealLt, fontSize: 14, fontWeight: 1000, whiteSpace: 'nowrap' }}>
-                      {row.purchasedTickets}/{row.totalTickets}
-                    </strong>
-                  </div>
-                ))}
-                {filteredStats.length === 0 && (
-                  <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>No events found.</p>
-                )}
+                    Configure
+                  </button>
+                </div>
+              </div>
+
+              <aside
+                style={{
+                  background: G.card,
+                  borderRadius: 18,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  padding: 18,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <p style={{ margin: 0, color: G.goldText, fontSize: 11, fontWeight: 800, letterSpacing: '0.12em' }}>LIVE PREVIEW</p>
+                  <span style={{ fontSize: 11, color: G.muted, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399' }} />
+                    Auto-updating
+                  </span>
+                </div>
+                <LiveTicketStub eventName={form.eventName} date={form.date} time={form.time} location={form.location} />
+              </aside>
+            </div>
+
+            <div
+              className="design-footer"
+              style={{
+                marginTop: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                paddingTop: 12,
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: G.muted,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                ← Back to Details
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => toast.success('Draft saved locally')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: G.muted,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Save as Draft
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => void handleGenerate()}
+                  style={{
+                    background: `linear-gradient(135deg, ${G.gold}, ${G.goldBright})`,
+                    color: '#111',
+                    border: 'none',
+                    borderRadius: 14,
+                    padding: '14px 22px',
+                    fontSize: 15,
+                    fontWeight: 800,
+                    cursor: submitting ? 'wait' : 'pointer',
+                    opacity: submitting ? 0.8 : 1,
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {submitting ? 'Generating…' : '🚀 Generate Ticket'}
+                </button>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* ── Row 1: Event name + Date side by side ── */}
-        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
-            <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event name</span>
-            <input style={fieldInp('eventName')} type="text" placeholder="e.g. Kampala Rooftop Bash 2025" value={form.eventName} onChange={e => set('eventName', e.target.value)} />
-            {touched && errors.eventName && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.eventName}</span>}
-          </label>
-          <label style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
-            <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Event date</span>
-            <input style={{ ...fieldInp('date'), colorScheme: 'dark' }} type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-            {touched && errors.date && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.date}</span>}
-          </label>
-
-          <label style={{ display: 'grid', gap: 6, gridColumn: '1 / -1' }}>
-            <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>Payment details — where buyers send money</span>
-            <input
-              style={fieldInp('paymentDetails')}
-              type="text"
-              placeholder="e.g. MTN 0771234567 (John D.) or Stanbic 9030012345678"
-              value={form.paymentDetails}
-              onChange={e => set('paymentDetails', e.target.value)}
-            />
-            <span style={{ color: '#6b9e96', fontSize: 11 }}>Mobile Money number, bank account, or Airtel Money. This prints on every ticket.</span>
-            {touched && errors.paymentDetails && <span style={{ color: 'var(--destructive)', fontSize: 12 }}>{errors.paymentDetails}</span>}
-          </label>
-        </div>
-
-        <div style={{ borderTop: `1px solid ${C.border}`, opacity: 0.55 }} />
-
-        {/* ── Row 3: Ticket classes + Tables side by side ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, alignItems: 'start' }}>
-          <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
-            <ClassesEditor classes={form.ticketClasses} onChange={v => set('ticketClasses', v)} />
-            {touched && errors.ticketClasses && <span style={{ color: 'var(--destructive)', fontSize: 12, marginTop: 4, display: 'block' }}>{errors.ticketClasses}</span>}
           </div>
-          <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
-            <TablesEditor tables={form.tables} onChange={v => set('tables', v)} />
-          </div>
-        </div>
-
-        <div style={{ borderTop: `1px solid ${C.border}`, opacity: 0.55 }} />
-
-        {/* ── Row 4: Template picker full width ── */}
-        <div style={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }}>
-          <TemplatePicker value={form.template} onChange={t => set('template', t)} formData={{ ...form, selectedClass: form.ticketClasses[0]?.name }} />
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting}
-          style={{
-            marginTop: 2,
-            background: 'linear-gradient(135deg, #0f766e, #14b8a6)',
-            color: C.white,
-            border: 'none',
-            borderRadius: 12,
-            padding: '14px',
-            fontSize: 16,
-            fontWeight: 800,
-            cursor: submitting ? 'wait' : 'pointer',
-            opacity: submitting ? 0.8 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-          }}
-        >
-          {submitting ? 'Generating QR code...' : 'Generate QR Ticket'}
-          {!submitting && (
-            <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          )}
-        </button>
-      </form>
+        )}
+      </div>
     </div>
   )
 }
@@ -800,23 +1545,16 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [qr, setQr] = useState('')
   const [stats, setStats] = useState<TicketStats[]>([])
-  const [statsSearch, setStatsSearch] = useState('')
-  const [statsLoading, setStatsLoading] = useState(false)
-  const [statsError, setStatsError] = useState<string | null>(null)
   const [revoking, setRevoking] = useState(false)
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null)
   const [lastCreatedEventName, setLastCreatedEventName] = useState<string | null>(null)
 
   async function loadStats(search?: string) {
     try {
-      setStatsLoading(true)
-      setStatsError(null)
       const data = await ticketsApi.getStats(search)
       setStats(data)
-    } catch (err) {
-      setStatsError(err instanceof Error ? err.message : 'Failed to load ticket stats')
-    } finally {
-      setStatsLoading(false)
+    } catch {
+      setStats([])
     }
   }
 
@@ -833,40 +1571,32 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           setStats(parsed.stats)
         }
       } catch {
-        // Ignore malformed messages and keep polling/manual refresh behavior.
+        // ignore
       }
     }
     return () => ws.close()
   }, [])
 
-  const filteredStats = useMemo(() => {
-    const query = statsSearch.trim().toLowerCase()
-    if (!query) return stats
-    return stats.filter((row) => row.eventName.toLowerCase().includes(query))
-  }, [stats, statsSearch])
-
-  const createdEventStats = useMemo(() => {
-    if (!lastCreatedEventName) return null
-    return stats.find((row) => row.eventName === lastCreatedEventName) ?? null
-  }, [lastCreatedEventName, stats])
+  // Keep stats subscription active for live updates without cluttering the new UI.
+  void stats
 
   async function handleGenerate(data: TicketData) {
     try {
       setRevokeMessage(null)
-      // Create one reusable event QR that can be scanned by all attendees
-      // until the creator revokes/cancels it.
-      const createdTicket = await ticketsApi.create({
+      const createdTicket = await publicTicketsApi.createEvent({
         ticketType: data.ticketClasses[0]?.name || 'EVENT',
         eventName: data.eventName,
-        eventDate: new Date(`${data.date}T00:00:00.000Z`).toISOString(),
+        eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
         price: Number(data.ticketClasses[0]?.fee || 0),
         currency: 'UGX',
         usageLimit: 1000000000,
-        issuedBy: 'merchant-web',
+        issuedBy: 'public-web',
         metadata: JSON.stringify({
           reusable: true,
           template: data.template,
           payTo: data.paymentDetails,
+          location: data.location,
+          time: data.time,
           ticketClasses: data.ticketClasses,
           tables: data.tables,
         }),
@@ -884,13 +1614,11 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         ...data,
         ticketId: createdTicket.id,
         purchaseUrl: createdTicket.qrCodeUrl,
-        gateUrl: createdTicket.gateUrl ?? null,
       })
       await loadStats(data.eventName)
       toast.success('Event ticket QR created successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create ticket'
-      setStatsError(message)
       toast.error(message)
       throw err
     }
@@ -905,7 +1633,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       toast.success('Ticket revoked successfully')
       await loadStats(lastCreatedEventName ?? undefined)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke ticket'
+      const message = err instanceof Error ? err.message : 'Sign in as a merchant to revoke event QRs.'
       setRevokeMessage(message)
       toast.error(message)
     } finally {
@@ -918,35 +1646,17 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       <TicketOutput
         data={ticket}
         qr={qr}
-        onBack={() => {
+        onCreateAnother={() => {
           setTicket(null)
           setQr('')
+          setRevokeMessage(null)
         }}
         onRevoke={handleRevoke}
         revoking={revoking}
         revokeMessage={revokeMessage}
-        createdEventStats={createdEventStats}
-        statsSearch={statsSearch}
-        onStatsSearchChange={setStatsSearch}
-        filteredStats={filteredStats}
-        statsLoading={statsLoading}
-        statsError={statsError}
       />
     )
   }
 
-  return (
-    <div>
-      <TicketForm
-        onGenerate={handleGenerate}
-        onBack={onBack}
-        ticketStats={stats}
-        statsLoading={statsLoading}
-        statsError={statsError}
-        statsSearch={statsSearch}
-        onStatsSearchChange={setStatsSearch}
-        filteredStats={filteredStats}
-      />
-    </div>
-  )
+  return <TicketForm onGenerate={handleGenerate} onBack={onBack} />
 }

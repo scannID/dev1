@@ -93,7 +93,7 @@ public class Ticket {
     @Column(name = "access_token")
     private String accessToken;
 
-    /** Secret link for gate staff to scan tickets — no login required. */
+    /** Legacy column — gate check-in was removed; kept for existing rows. */
     @Column(name = "gate_token")
     private String gateToken;
 

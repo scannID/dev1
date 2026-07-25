@@ -28,13 +28,9 @@ public record TicketResponse(
     Instant updatedAt,
     Instant redeemedAt,
     boolean canBeUsed,
-    String qrCodeUrl,
-    String gateUrl
+    String qrCodeUrl
 ) {
     public static TicketResponse from(Ticket ticket, String baseUrl) {
-        String gateUrl = ticket.getGateToken() != null && !ticket.getGateToken().isBlank()
-            ? baseUrl + "/gate/" + ticket.getGateToken()
-            : null;
         return new TicketResponse(
             ticket.getId(),
             ticket.getQrToken(),
@@ -58,8 +54,7 @@ public record TicketResponse(
             ticket.getUpdatedAt(),
             ticket.getRedeemedAt(),
             ticket.canBeUsed(),
-            baseUrl + "/ticket/" + ticket.getQrToken(),
-            gateUrl
+            baseUrl + "/ticket/" + ticket.getQrToken()
         );
     }
 }

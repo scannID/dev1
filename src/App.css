@@ -292,6 +292,7 @@ button:disabled {
 
 .qr-actions {
   display: grid;
+  gap: 8px;
   margin-top: 18px;
 }
 
@@ -308,6 +309,11 @@ button:disabled {
 
 .qr-actions button:hover {
   opacity: 0.85;
+}
+
+.qr-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .qr-code {
@@ -836,6 +842,10 @@ button:disabled {
 
 .add-item-page .universal-item-form {
   max-width: none;
+}
+
+.event-ticket-page-content {
+  overflow-x: auto;
 }
 
 .setup-list {
