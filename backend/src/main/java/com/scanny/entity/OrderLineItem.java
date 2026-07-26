@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "order_line_items")
@@ -39,6 +40,15 @@ public class OrderLineItem {
 
     @Column(name = "removed_ingredients_json", nullable = false, columnDefinition = "TEXT DEFAULT '[]'")
     private String removedIngredientsJson = "[]";
+
+    @Column(name = "check_in_date")
+    private LocalDate checkInDate;
+
+    @Column(name = "check_out_date")
+    private LocalDate checkOutDate;
+
+    @Column
+    private Integer nights;
 
     public Long getId() {
         return id;
@@ -103,5 +113,29 @@ public class OrderLineItem {
     public void setRemovedIngredientsJson(String removedIngredientsJson) {
         this.removedIngredientsJson =
                 removedIngredientsJson == null || removedIngredientsJson.isBlank() ? "[]" : removedIngredientsJson;
+    }
+
+    public LocalDate getCheckInDate() {
+        return checkInDate;
+    }
+
+    public void setCheckInDate(LocalDate checkInDate) {
+        this.checkInDate = checkInDate;
+    }
+
+    public LocalDate getCheckOutDate() {
+        return checkOutDate;
+    }
+
+    public void setCheckOutDate(LocalDate checkOutDate) {
+        this.checkOutDate = checkOutDate;
+    }
+
+    public Integer getNights() {
+        return nights;
+    }
+
+    public void setNights(Integer nights) {
+        this.nights = nights;
     }
 }

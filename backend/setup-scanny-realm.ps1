@@ -109,7 +109,7 @@ function Ensure-UserWithRole {
 
   $uid = (Invoke-RestMethod -Method Get -Uri "$kc/admin/realms/$realm/users?username=$Username" -Headers $H)[0].id
   $role = Invoke-RestMethod -Method Get -Uri "$kc/admin/realms/$realm/roles/$RoleName" -Headers $H
-  # Windows PowerShell 5.1 unwraps single-element arrays in ConvertTo-Json — force a JSON array.
+  # Windows PowerShell 5.1 unwraps single-element arrays in ConvertTo-Json â€” force a JSON array.
   $roleJson = '[' + (@{ id = $role.id; name = $role.name } | ConvertTo-Json -Compress) + ']'
   try {
     Invoke-RestMethod -Method Post -Uri "$kc/admin/realms/$realm/users/$uid/role-mappings/realm" -Headers ($H + @{ 'Content-Type' = 'application/json' }) -Body $roleJson | Out-Null
@@ -197,11 +197,20 @@ Ensure-UserWithRole `
   -Password 'QtyBites@2026!' `
   -RoleName 'MERCHANT'
 
+Ensure-UserWithRole `
+  -Username 'pentagon@scanny.local' `
+  -Email 'pentagon@scanny.local' `
+  -FirstName 'Pentagon' `
+  -LastName 'Hotel' `
+  -Password 'Pentagon@2026!' `
+  -RoleName 'MERCHANT'
+
 Write-Output 'DONE'
 Write-Output ''
 Write-Output 'Local logins:'
 Write-Output '  Merchant app  (:5173): samantha@scanny.local / Samantha@2026!'
 Write-Output '  Merchant app  (:5173): lolo@scanny.local / Lolo@2026!'
 Write-Output '  Merchant app  (:5173): qtybites@scanny.local / QtyBites@2026!'
+Write-Output '  Merchant app  (:5173): pentagon@scanny.local / Pentagon@2026!'
 Write-Output '  Merchant app  (:5173): testuser / password'
 Write-Output '  Admin console (:5174): adminuser / Admin@2026!'

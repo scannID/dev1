@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Banknote, BarChart3, Bell, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { BookLoader } from './components/BookLoader'
 import CategoryField from './components/CategoryField'
 import { CatalogItemImageField } from './components/CatalogItemImageField'
+import { CatalogItemGalleryField } from './components/CatalogItemGalleryField'
 import { IngredientsEditor } from './components/IngredientsEditor'
 import { PaginationBar } from './components/PaginationBar'
 import { businessCategories } from './lib/catalogCategories'
@@ -58,13 +59,16 @@ import { useServerPagination } from './hooks/useServerPagination'
 import type {
   Business as ApiBusiness,
   CatalogItem as ApiCatalogItem,
+  CatalogItemKind,
+  CreateCatalogItemRequest,
   Order as ApiOrder,
   OrderStatus,
   PaymentStatus,
 } from './api/types'
 import { scannyApi } from './api/services'
+import { MetricsCard } from './MetricsCard'
 import { resizeImageFile } from './lib/resizeImage'
-import { buildMetricSeries, buildReportData, dailySeries, type MetricRange } from './lib/orderAnalytics'
+import { buildReportData, dailySeries } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
 import './App.css'
 
@@ -203,6 +207,7 @@ function App({
   const [view, setView] = useState('account')
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
+  const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
   const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const [actionError, setActionError] = useState<string | null>(null)
@@ -305,17 +310,7 @@ function App({
     .reduce((sum, _order) => sum + merchantPayoutOf(_order), 0)
   const availableItems = (business.items ?? []).filter((item) => item.available).length
 
-  async function handleCreateCatalogItem(data: {
-    name: string
-    category: string
-    price: number
-    description: string
-    imageUrl?: string | null
-    details?: string
-    ingredients?: CatalogItem['ingredients']
-    available: boolean
-    discountPercent?: number
-  }) {
+  async function handleCreateCatalogItem(data: CreateCatalogItemRequest) {
     if (!business.id) return
     setActionError(null)
     try {
@@ -340,10 +335,15 @@ function App({
         price: data.price,
         description: data.description,
         imageUrl: data.imageUrl,
+        imageUrls: data.imageUrls,
         details: data.details,
         ingredients: data.ingredients,
         available: data.available,
         discountPercent: data.discountPercent,
+        itemKind: data.itemKind,
+        capacity: data.capacity,
+        amenities: data.amenities,
+        unitsAvailable: data.unitsAvailable,
       })
       await refreshBusiness(business.id)
       toast.success('Item updated successfully')
@@ -585,7 +585,7 @@ function App({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {!showAddItem && view === 'account' && (
-              <Button className="" size="sm" onClick={() => setShowAddItem(true)}>
+              <Button className="" size="sm" onClick={() => { setAddItemSection('food'); setShowAddItem(true) }}>
                 <Plus className="size-3.5" />
                 Add item
               </Button>
@@ -623,6 +623,7 @@ function App({
             <div className="add-item-page">
               <AddItemForm
                 business={business}
+                section={addItemSection}
                 onCreateItem={handleCreateCatalogItem}
                 onAddCategory={handleAddCategory}
                 onCancel={() => setShowAddItem(false)}
@@ -662,7 +663,10 @@ function App({
                   onUpdateItem={handleUpdateCatalogItem}
                   onDeleteItem={handleDeleteCatalogItem}
                   onAddCategory={handleAddCategory}
-                  onAddItem={() => setShowAddItem(true)}
+                  onAddItem={(section) => {
+                    setAddItemSection(section)
+                    setShowAddItem(true)
+                  }}
                   Sparkline={Sparkline}
                 />
               </div>
@@ -890,7 +894,7 @@ function OverviewPage({
 
   return (
     <div className="account-layout">
-      <MetricsCard business={business} orders={orders} />
+      <MetricsCard business={business} />
 
       <section className="account-summary">
         <QrPanel business={business} />
@@ -932,401 +936,6 @@ function OverviewPage({
   )
 }
 
-function MetricsCard({
-  business,
-  orders,
-}: {
-  business: Business
-  orders: Order[]
-}) {
-  const RANGE_META: { key: MetricRange; label: string; span: string }[] = [
-    { key: 'day', label: 'Daily', span: 'today by hour' },
-    { key: 'week', label: 'Weekly', span: 'last 7 days' },
-    { key: 'month', label: 'Monthly', span: 'last 5 weeks' },
-    { key: 'year', label: 'Yearly', span: 'last 12 months' },
-  ]
-
-  const VW = 600
-  const VH = 220
-  const PL = 40
-  const PR = 10
-  const PT = 16
-  const PB = 28
-  const CW = VW - PL - PR
-  const CH = VH - PT - PB
-
-  const tx = (i: number, n: number) => PL + (i / Math.max(n - 1, 1)) * CW
-  const ty = (v: number, max: number) => PT + CH - (v / Math.max(max, 1)) * CH
-
-  function smooth(pts: [number, number][]) {
-    if (pts.length < 2) return ''
-    let d = `M${pts[0][0]},${pts[0][1]}`
-    for (let i = 1; i < pts.length; i++) {
-      const mx = (pts[i - 1][0] + pts[i][0]) / 2
-      d += ` C${mx},${pts[i - 1][1]} ${mx},${pts[i][1]} ${pts[i][0]},${pts[i][1]}`
-    }
-    return d
-  }
-
-  function areaPath(pts: [number, number][]) {
-    const last = pts[pts.length - 1]
-    const first = pts[0]
-    return `${smooth(pts)} L${last[0]},${VH - PB} L${first[0]},${VH - PB} Z`
-  }
-
-  function fmt(v: number) {
-    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
-    return String(v)
-  }
-
-  const metricData = useMemo(
-    () => ({
-      day: buildMetricSeries(orders, 'day'),
-      week: buildMetricSeries(orders, 'week'),
-      month: buildMetricSeries(orders, 'month'),
-      year: buildMetricSeries(orders, 'year'),
-    }),
-    [orders],
-  )
-  const [range, setRange] = useState<MetricRange>('week')
-  const [activeIndex, setActiveIndex] = useState<number | null>(null)
-  const chartRef = useRef<HTMLDivElement>(null)
-  const data = metricData[range]
-  const n = data.points.length
-  const yMax = data.yMax
-
-  const orderPts = data.points.map((p, i): [number, number] => [tx(i, n), ty(p.orders, yMax)])
-  const paidPts = data.points.map((p, i): [number, number] => [tx(i, n), ty(p.paidCount, yMax)])
-  const orderLine = smooth(orderPts)
-  const orderArea = areaPath(orderPts)
-  const paidLine = smooth(paidPts)
-  const paidArea = areaPath(paidPts)
-  const yTicks = [0.25, 0.5, 0.75, 1].map((f) => Math.round(yMax * f))
-  const xStep = n <= 7 ? 1 : n <= 16 ? 2 : Math.ceil(n / 7)
-  const rangeSpan = RANGE_META.find((r) => r.key === range)?.span ?? ''
-
-  const indexFromClientX = useCallback(
-    (clientX: number) => {
-      const el = chartRef.current
-      if (!el || n < 1) return null
-      const rect = el.getBoundingClientRect()
-      if (rect.width <= 0) return null
-      const svgX = ((clientX - rect.left) / rect.width) * VW
-      const plotX = Math.min(Math.max(svgX, PL), VW - PR)
-      const t = (plotX - PL) / Math.max(CW, 1)
-      return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))))
-    },
-    [n],
-  )
-
-  const onChartPointer = useCallback(
-    (e: ReactPointerEvent) => {
-      const idx = indexFromClientX(e.clientX)
-      if (idx !== null) setActiveIndex(idx)
-    },
-    [indexFromClientX],
-  )
-
-  const clearActive = useCallback(() => setActiveIndex(null), [])
-
-  const active =
-    activeIndex !== null && activeIndex >= 0 && activeIndex < n
-      ? {
-          i: activeIndex,
-          label: data.points[activeIndex]?.label ?? '—',
-          orders: data.points[activeIndex]?.orders ?? 0,
-          paidCount: data.points[activeIndex]?.paidCount ?? 0,
-          paid: data.points[activeIndex]?.paid ?? 0,
-          x: orderPts[activeIndex]?.[0] ?? PL,
-          orderY: orderPts[activeIndex]?.[1] ?? PT,
-          paidY: paidPts[activeIndex]?.[1] ?? PT,
-        }
-      : null
-
-  const conversion =
-    active && active.orders > 0
-      ? Math.round((active.paidCount / active.orders) * 1000) / 10
-      : active
-        ? 0
-        : null
-
-  const tooltipLeftPct = active ? (active.x / VW) * 100 : 0
-  const tooltipSide = tooltipLeftPct > 62 ? 'right' : 'left'
-
-  return (
-    <section
-      aria-label={`${business.name} activity metrics`}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-        height: '100%',
-        minHeight: 360,
-        background: 'var(--card)',
-        borderRadius: 10,
-        overflow: 'hidden',
-        border: '1px solid var(--border)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 10,
-          padding: '12px 16px 0',
-        }}
-      >
-        <div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--muted-foreground)',
-            }}
-          >
-            Platform Activity
-          </p>
-          <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>
-            Active Scans &amp; Orders
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 2, background: 'var(--muted)', borderRadius: 8, padding: 3 }}>
-          {RANGE_META.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => {
-                setRange(r.key)
-                setActiveIndex(null)
-              }}
-              style={{
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: range === r.key ? 600 : 400,
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                background: range === r.key ? 'var(--card)' : 'transparent',
-                color: range === r.key ? 'var(--primary)' : 'var(--muted-foreground)',
-                transition: 'all 0.15s',
-                boxShadow: range === r.key ? '0 1px 3px oklch(0 0 0 / 12%)' : 'none',
-              }}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '8px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 20, height: 2, borderRadius: 2, background: '#5ac8fa', display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Orders</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#5ac8fa', marginLeft: 2 }}>
-            {fmt(data.ordersTotalRaw)}
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {rangeSpan}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 20, height: 2, borderRadius: 2, background: '#f07848', display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Paid</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#f07848', marginLeft: 2 }}>
-            {fmt(data.paidCountTotal)}
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {currency(data.paidRevenueTotal)}</span>
-        </div>
-      </div>
-
-      <div
-        ref={chartRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          padding: '4px 0 0',
-          position: 'relative',
-          touchAction: 'none',
-          cursor: 'crosshair',
-        }}
-        onPointerMove={onChartPointer}
-        onPointerDown={onChartPointer}
-        onPointerLeave={clearActive}
-        role="img"
-        aria-label="Orders and paid activity over time. Hover or tap a point to see details."
-      >
-        <svg
-          viewBox={`0 0 ${VW} ${VH}`}
-          style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}
-          preserveAspectRatio="xMidYMid meet"
-        >
-          <defs>
-            <linearGradient id="mh-m-fill-order" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5ac8fa" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#5ac8fa" stopOpacity="0.02" />
-            </linearGradient>
-            <linearGradient id="mh-m-fill-paid" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f07848" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#f07848" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-
-          {yTicks.map((v) => {
-            const y = ty(v, yMax)
-            return (
-              <g key={v}>
-                <line
-                  x1={PL}
-                  y1={y}
-                  x2={VW - PR}
-                  y2={y}
-                  stroke="var(--border)"
-                  strokeWidth="1"
-                  strokeDasharray="4 5"
-                />
-                <text
-                  x={PL - 5}
-                  y={y + 3.5}
-                  textAnchor="end"
-                  fontSize="8"
-                  fill="var(--muted-foreground)"
-                  fontFamily="'Outfit Variable', ui-sans-serif, sans-serif"
-                >
-                  {fmt(v)}
-                </text>
-              </g>
-            )
-          })}
-
-          {data.xLabels.map((label, i) => {
-            if (i % xStep !== 0 && i !== data.xLabels.length - 1) return null
-            return (
-              <text
-                key={`${label}-${i}`}
-                x={tx(i, n)}
-                y={VH - 6}
-                textAnchor="middle"
-                fontSize="8"
-                fill="var(--muted-foreground)"
-                fontFamily="'Outfit Variable', ui-sans-serif, sans-serif"
-              >
-                {label}
-              </text>
-            )
-          })}
-
-          <path d={orderArea} fill="url(#mh-m-fill-order)" />
-          <path d={paidArea} fill="url(#mh-m-fill-paid)" />
-          <path d={orderLine} fill="none" stroke="#5ac8fa" strokeWidth="2" strokeLinejoin="round" />
-          <path d={paidLine} fill="none" stroke="#f07848" strokeWidth="1.8" strokeLinejoin="round" />
-
-          {active && (
-            <g pointerEvents="none">
-              <line
-                x1={active.x}
-                y1={PT}
-                x2={active.x}
-                y2={VH - PB}
-                stroke="var(--foreground)"
-                strokeOpacity="0.18"
-                strokeWidth="1"
-                strokeDasharray="3 4"
-              />
-              <circle cx={active.x} cy={active.orderY} r="6" fill="#5ac8fa" opacity="0.18" />
-              <circle cx={active.x} cy={active.orderY} r="3.4" fill="#5ac8fa" stroke="#e8f8ff" strokeWidth="1.2" />
-              <circle cx={active.x} cy={active.paidY} r="5.5" fill="#f07848" opacity="0.18" />
-              <circle cx={active.x} cy={active.paidY} r="3.1" fill="#f07848" stroke="#ffe0c8" strokeWidth="1.2" />
-            </g>
-          )}
-        </svg>
-
-        {active && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 10,
-              ...(tooltipSide === 'left'
-                ? { left: `calc(${tooltipLeftPct}% + 10px)` }
-                : { right: `calc(${100 - tooltipLeftPct}% + 10px)` }),
-              zIndex: 2,
-              minWidth: 148,
-              maxWidth: 210,
-              padding: '10px 12px',
-              borderRadius: 10,
-              background: 'color-mix(in oklch, var(--card) 92%, var(--foreground) 8%)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 8px 24px oklch(0 0 0 / 14%)',
-              pointerEvents: 'none',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--muted-foreground)',
-              }}
-            >
-              {RANGE_META.find((r) => r.key === range)?.label ?? 'Period'}
-            </p>
-            <p style={{ margin: '2px 0 8px', fontSize: 13, fontWeight: 650, color: 'var(--foreground)' }}>
-              {active.label}
-            </p>
-            <div style={{ display: 'grid', gap: 5 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#5ac8fa' }} />
-                  Orders
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 650, color: '#5ac8fa', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmt(active.orders)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted-foreground)' }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f07848' }} />
-                  Paid
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 650, color: '#f07848', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmt(active.paidCount)}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  paddingTop: 5,
-                  borderTop: '1px solid var(--border)',
-                }}
-              >
-                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Revenue</span>
-                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
-                  {currency(active.paid)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Paid rate</span>
-                <span style={{ fontSize: 12, fontWeight: 650, color: 'var(--foreground)', fontVariantNumeric: 'tabular-nums' }}>
-                  {conversion === null ? '—' : `${conversion}%`}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
 
 function QrPanel({ business, compact = false }: { business: Business; compact?: boolean }) {
   const [qrImage, setQrImage] = useState('')
@@ -1400,40 +1009,43 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
 
 function AddItemForm({
   business,
+  section = 'food',
   onCreateItem,
   onAddCategory,
   onCancel,
 }: {
   business: Business
-  onCreateItem: (data: {
-    name: string
-    category: string
-    price: number
-    description: string
-    imageUrl?: string | null
-    details?: string
-    ingredients?: CatalogItem['ingredients']
-    available: boolean
-    discountPercent?: number
-  }) => Promise<void> | void
+  section?: 'food' | 'lodging'
+  onCreateItem: (data: CreateCatalogItemRequest) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
   onCancel?: () => void
 }) {
+  const isHotel = business.type === 'Hotel'
+  const isLodging = isHotel && section === 'lodging'
   const emptyItem = {
     name: '',
-    category: '',
+    category: isLodging ? 'Rooms' : '',
     price: '',
     discountPercent: '0',
     description: '',
     imageUrl: null as string | null,
+    imageUrls: [] as string[],
     details: '',
     ingredients: [] as NonNullable<CatalogItem['ingredients']>,
     available: true,
+    itemKind: (isLodging ? 'ROOM' : 'FOOD') as CatalogItemKind,
+    capacity: '2',
+    amenitiesText: '',
+    unitsAvailable: '1',
   }
   const [item, setItem] = useState(emptyItem)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
-  const categories = businessCategories(business)
+  const categories = businessCategories(business).filter((cat) => {
+    if (!isHotel) return true
+    const lodgingCats = cat === 'Rooms' || cat === 'Suites'
+    return isLodging ? lodgingCats || cat === item.category : !lodgingCats
+  })
 
   async function submitItem(event) {
     event.preventDefault()
@@ -1442,23 +1054,40 @@ function AddItemForm({
     const category = item.category.trim()
     const price = Number(item.price)
     const discountPercent = Math.max(0, Math.min(100, Math.round(Number(item.discountPercent) || 0)))
+    const capacity = Math.max(0, Math.round(Number(item.capacity) || 0))
+    const unitsAvailable = Math.max(0, Math.round(Number(item.unitsAvailable) || 0))
 
     setSubmitted(true)
 
     if (!name || !category || !Number.isFinite(price) || price <= 0) return
+    if (isLodging && (capacity < 1 || unitsAvailable < 1)) return
 
     setSaving(true)
     try {
+      const amenities = item.amenitiesText
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      const gallery = isLodging
+        ? item.imageUrls
+        : item.imageUrl
+          ? [item.imageUrl]
+          : []
       await onCreateItem({
         name,
         category,
         price,
-        description: item.description.trim() || 'No description added yet.',
-        imageUrl: item.imageUrl,
+        description: item.description.trim() || (isLodging ? 'Comfortable stay.' : 'No description added yet.'),
+        imageUrl: gallery[0] ?? item.imageUrl,
+        imageUrls: gallery,
         details: item.details.trim(),
-        ingredients: item.ingredients,
+        ingredients: isLodging ? [] : item.ingredients,
         available: item.available,
         discountPercent,
+        itemKind: isLodging ? item.itemKind : 'FOOD',
+        capacity: isLodging ? capacity : 0,
+        amenities: isLodging ? amenities : [],
+        unitsAvailable: isLodging ? unitsAvailable : 0,
       })
       setItem(emptyItem)
       setSubmitted(false)
@@ -1471,32 +1100,67 @@ function AddItemForm({
   const isCategoryMissing = submitted && !item.category.trim()
   const price = Number(item.price)
   const isPriceMissing = submitted && (!Number.isFinite(price) || price <= 0)
+  const capacity = Number(item.capacity)
+  const unitsAvailable = Number(item.unitsAvailable)
+  const isCapacityMissing = isLodging && submitted && (!Number.isFinite(capacity) || capacity < 1)
+  const isUnitsMissing = isLodging && submitted && (!Number.isFinite(unitsAvailable) || unitsAvailable < 1)
   const discountPercent = Math.max(0, Math.min(100, Math.round(Number(item.discountPercent) || 0)))
   const salePrice = Number.isFinite(price) && price > 0 ? effectivePrice(price, discountPercent) : null
 
   return (
     <form className="add-item-form" noValidate onSubmit={submitItem}>
-      <aside className="add-item-media" aria-label="Item photo">
-        <CatalogItemImageField
-          layout="side"
-          imageUrl={item.imageUrl}
-          category={item.category}
-          name={item.name}
-          disabled={saving}
-          onChange={(imageUrl) => setItem({ ...item, imageUrl })}
-        />
+      <aside className="add-item-media" aria-label={isLodging ? 'Room photos' : 'Item photo'}>
+        {isLodging ? (
+          <CatalogItemGalleryField
+            imageUrls={item.imageUrls}
+            name={item.name}
+            disabled={saving}
+            onChange={(imageUrls) => setItem({ ...item, imageUrls, imageUrl: imageUrls[0] ?? null })}
+          />
+        ) : (
+          <CatalogItemImageField
+            layout="side"
+            imageUrl={item.imageUrl}
+            category={item.category}
+            name={item.name}
+            disabled={saving}
+            onChange={(imageUrl) => setItem({ ...item, imageUrl })}
+          />
+        )}
       </aside>
 
       <div className="add-item-fields">
         <section className="add-item-card" aria-labelledby="add-item-general-heading">
           <header className="add-item-card-head">
             <Info className="add-item-card-icon" aria-hidden="true" />
-            <h3 id="add-item-general-heading">General Information</h3>
+            <h3 id="add-item-general-heading">{isLodging ? 'Room / Suite' : 'General Information'}</h3>
           </header>
+
+          {isLodging ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-item-kind">Type</Label>
+              <Select
+                value={item.itemKind}
+                onValueChange={(value) =>
+                  setItem({
+                    ...item,
+                    itemKind: value as CatalogItemKind,
+                    category: value === 'SUITE' ? 'Suites' : 'Rooms',
+                  })
+                }
+              >
+                <SelectTrigger id="add-item-kind"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ROOM">Room</SelectItem>
+                  <SelectItem value="SUITE">Suite</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <div className="add-item-row">
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-name">Item name</Label>
+              <Label htmlFor="add-item-name">{isLodging ? 'Name' : 'Item name'}</Label>
               <Input
                 id="add-item-name"
                 type="text"
@@ -1505,7 +1169,7 @@ function AddItemForm({
                 className={isItemNameMissing ? 'border-destructive' : undefined}
                 value={item.name}
                 onChange={(event) => setItem({ ...item, name: event.target.value })}
-                placeholder="Big Burger Combo"
+                placeholder={isLodging ? 'Deluxe King Suite' : 'Big Burger Combo'}
               />
               {isItemNameMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
             </div>
@@ -1513,7 +1177,7 @@ function AddItemForm({
             <div className="grid gap-1.5">
               <CategoryField
                 id="add-item-category"
-                categories={categories}
+                categories={categories.length ? categories : isLodging ? ['Rooms', 'Suites'] : []}
                 value={item.category}
                 onChange={(category) => setItem({ ...item, category })}
                 onAddCategory={onAddCategory}
@@ -1532,7 +1196,7 @@ function AddItemForm({
               rows={3}
               value={item.description}
               onChange={(event) => setItem({ ...item, description: event.target.value })}
-              placeholder="Shown on the card — e.g. Burger + fries + soda"
+              placeholder={isLodging ? 'City view, king bed, ensuite bathroom' : 'Shown on the card — e.g. Burger + fries + soda'}
             />
           </div>
         </section>
@@ -1540,12 +1204,12 @@ function AddItemForm({
         <section className="add-item-card" aria-labelledby="add-item-pricing-heading">
           <header className="add-item-card-head">
             <Banknote className="add-item-card-icon" aria-hidden="true" />
-            <h3 id="add-item-pricing-heading">Pricing &amp; Details</h3>
+            <h3 id="add-item-pricing-heading">{isLodging ? 'Nightly rate & stay details' : 'Pricing & Details'}</h3>
           </header>
 
           <div className="add-item-row">
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-price">Price (UGX)</Label>
+              <Label htmlFor="add-item-price">{isLodging ? 'Price per night (UGX)' : 'Price (UGX)'}</Label>
               <Input
                 id="add-item-price"
                 required
@@ -1555,7 +1219,7 @@ function AddItemForm({
                 type="number"
                 value={item.price}
                 onChange={(event) => setItem({ ...item, price: event.target.value })}
-                placeholder="18000"
+                placeholder={isLodging ? '250000' : '18000'}
               />
               {isPriceMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
             </div>
@@ -1576,30 +1240,75 @@ function AddItemForm({
                   Now <strong className="text-foreground">{currency(salePrice)}</strong>
                   {' '}
                   <span className="line-through">{currency(price)}</span>
+                  {isLodging ? ' / night' : ''}
                 </p>
               ) : null}
             </div>
           </div>
 
+          {isLodging ? (
+            <>
+              <div className="add-item-row">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="add-item-capacity">Max guests</Label>
+                  <Input
+                    id="add-item-capacity"
+                    type="number"
+                    min="1"
+                    aria-invalid={isCapacityMissing}
+                    className={isCapacityMissing ? 'border-destructive' : undefined}
+                    value={item.capacity}
+                    onChange={(event) => setItem({ ...item, capacity: event.target.value })}
+                  />
+                  {isCapacityMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="add-item-units">Units available</Label>
+                  <Input
+                    id="add-item-units"
+                    type="number"
+                    min="1"
+                    aria-invalid={isUnitsMissing}
+                    className={isUnitsMissing ? 'border-destructive' : undefined}
+                    value={item.unitsAvailable}
+                    onChange={(event) => setItem({ ...item, unitsAvailable: event.target.value })}
+                  />
+                  {isUnitsMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="add-item-amenities">Amenities (comma-separated)</Label>
+                <Input
+                  id="add-item-amenities"
+                  value={item.amenitiesText}
+                  onChange={(event) => setItem({ ...item, amenitiesText: event.target.value })}
+                  placeholder="Wi‑Fi, AC, Mini bar, Balcony"
+                />
+              </div>
+            </>
+          ) : null}
+
           <div className="grid gap-1.5">
-            <Label htmlFor="add-item-details">Combo details</Label>
+            <Label htmlFor="add-item-details">{isLodging ? 'Full details' : 'Combo details'}</Label>
             <Textarea
               id="add-item-details"
               className=""
               rows={4}
               value={item.details}
               onChange={(event) => setItem({ ...item, details: event.target.value })}
-              placeholder="Full details customers see when they expand the item…"
+              placeholder={isLodging ? 'Room size, bed type, view, house rules…' : 'Full details customers see when they expand the item…'}
             />
           </div>
         </section>
 
         <section className="add-item-card">
-          <IngredientsEditor
-            value={item.ingredients}
-            disabled={saving}
-            onChange={(ingredients) => setItem({ ...item, ingredients })}
-          />
+          {!isLodging ? (
+            <IngredientsEditor
+              value={item.ingredients}
+              disabled={saving}
+              onChange={(ingredients) => setItem({ ...item, ingredients })}
+            />
+          ) : null}
 
           <div className="flex items-center gap-2">
             <input
@@ -1621,7 +1330,7 @@ function AddItemForm({
               </Button>
             ) : null}
             <Button className="min-w-36" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Add item'}
+              {saving ? 'Saving…' : isLodging ? 'Add room / suite' : 'Add item'}
             </Button>
           </div>
         </section>
@@ -1639,30 +1348,29 @@ function CatalogPage({
   Sparkline,
 }: {
   business: Business
-  onCreateItem: (data: {
-    name: string
-    category: string
-    price: number
-    description: string
-    imageUrl?: string | null
-    details?: string
-    ingredients?: CatalogItem['ingredients']
-    available: boolean
-    discountPercent?: number
-  }) => Promise<void> | void
+  onCreateItem: (data: CreateCatalogItemRequest) => Promise<void> | void
   onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
   onDeleteItem: (itemId: string) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
-  onAddItem: () => void
+  onAddItem: (section: 'food' | 'lodging') => void
   Sparkline: (props: { data: number[]; color?: string }) => ReactElement | null
 }) {
-  const categories = useMemo(() => businessCategories(business), [business])
+  const isHotel = business.type === 'Hotel'
+  const [catalogSection, setCatalogSection] = useState<'food' | 'lodging'>('food')
+  const categories = useMemo(() => {
+    const all = businessCategories(business)
+    if (!isHotel) return all
+    return all.filter((cat) => {
+      const lodging = cat === 'Rooms' || cat === 'Suites'
+      return catalogSection === 'lodging' ? lodging : !lodging
+    })
+  }, [business, isHotel, catalogSection])
 
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Partial<CatalogItem>>({})
+  const [editDraft, setEditDraft] = useState<Partial<CatalogItem> & { amenitiesText?: string }>({})
   const [saving, setSaving] = useState(false)
   const [pageItems, setPageItems] = useState<CatalogItem[]>([])
   const [totalItems, setTotalItems] = useState(0)
@@ -1670,7 +1378,7 @@ function CatalogPage({
   const [listError, setListError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
 
-  const filterResetKey = `${search}|${filterCategory}|${filterStatus}`
+  const filterResetKey = `${search}|${filterCategory}|${filterStatus}|${catalogSection}`
   const pagination = useServerPagination({
     totalItems,
     initialPageSize: 20,
@@ -1692,6 +1400,7 @@ function CatalogPage({
           search: search.trim() || undefined,
           category: filterCategory === 'all' ? undefined : filterCategory,
           available,
+          lodging: isHotel ? catalogSection === 'lodging' : undefined,
         })
         if (cancelled) return
         setPageItems(result.items)
@@ -1718,11 +1427,17 @@ function CatalogPage({
     filterStatus,
     reloadToken,
     business.items.length,
+    catalogSection,
+    isHotel,
   ])
 
   function startEdit(item: CatalogItem) {
     setEditingId(item.id)
-    setEditDraft({ ...item })
+    setEditDraft({
+      ...item,
+      amenitiesText: (item.amenities ?? []).join(', '),
+      imageUrls: item.imageUrls?.length ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [],
+    })
   }
 
   function cancelEdit() {
@@ -1732,12 +1447,28 @@ function CatalogPage({
 
   async function saveEdit() {
     if (!editDraft.name?.trim() || !editDraft.category?.trim() || !editingId) return
+    const isLodging = editDraft.itemKind === 'ROOM' || editDraft.itemKind === 'SUITE'
     setSaving(true)
     try {
+      const amenities = (editDraft.amenitiesText ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      const gallery = isLodging
+        ? (editDraft.imageUrls ?? [])
+        : editDraft.imageUrl
+          ? [editDraft.imageUrl]
+          : []
       await onUpdateItem(editingId, {
         ...editDraft,
         price: Number(editDraft.price) || 0,
         discountPercent: Math.max(0, Math.min(100, Math.round(Number(editDraft.discountPercent) || 0))),
+        imageUrls: gallery,
+        imageUrl: gallery[0] ?? editDraft.imageUrl ?? null,
+        amenities: isLodging ? amenities : [],
+        capacity: isLodging ? Number(editDraft.capacity) || 1 : 0,
+        unitsAvailable: isLodging ? Number(editDraft.unitsAvailable) || 1 : 0,
+        ingredients: isLodging ? [] : editDraft.ingredients,
       })
       cancelEdit()
       setReloadToken((n) => n + 1)
@@ -1764,27 +1495,54 @@ function CatalogPage({
   }
 
   const isFiltered = search || filterCategory !== 'all' || filterStatus !== 'all'
+  const editingLodging = editDraft.itemKind === 'ROOM' || editDraft.itemKind === 'SUITE'
 
   // silence unused until bulk-create UI needs it
   void onCreateItem
 
+  const sectionItems = (business.items ?? []).filter((item) => {
+    const lodging = item.itemKind === 'ROOM' || item.itemKind === 'SUITE'
+    return isHotel && catalogSection === 'lodging' ? lodging : !lodging
+  })
+
   return (
     <section className="catalog-page">
+      {isHotel ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={catalogSection === 'food' ? 'default' : 'outline'}
+            onClick={() => { setCatalogSection('food'); resetFilters() }}
+          >
+            Food menu
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={catalogSection === 'lodging' ? 'default' : 'outline'}
+            onClick={() => { setCatalogSection('lodging'); resetFilters() }}
+          >
+            Rooms &amp; suites
+          </Button>
+        </div>
+      ) : null}
+
       <section className="metric-grid" aria-label="Catalog summary">
         <div>
           <span>Total items</span>
-          <strong>{business.items.length}</strong>
-          <Sparkline data={Array.from({ length: 7 }, () => business.items.length)} color="#3b82f6" />
+          <strong>{sectionItems.length}</strong>
+          <Sparkline data={Array.from({ length: 7 }, () => sectionItems.length)} color="#3b82f6" />
         </div>
         <div>
           <span>Available</span>
-          <strong>{business.items.filter(i => i.available).length}</strong>
-          <Sparkline data={Array.from({ length: 7 }, () => business.items.filter(i => i.available).length)} color="#10b981" />
+          <strong>{sectionItems.filter(i => i.available).length}</strong>
+          <Sparkline data={Array.from({ length: 7 }, () => sectionItems.filter(i => i.available).length)} color="#10b981" />
         </div>
         <div>
           <span>Hidden</span>
-          <strong>{business.items.filter(i => !i.available).length}</strong>
-          <Sparkline data={Array.from({ length: 7 }, () => business.items.filter(i => !i.available).length)} color="#f59e0b" />
+          <strong>{sectionItems.filter(i => !i.available).length}</strong>
+          <Sparkline data={Array.from({ length: 7 }, () => sectionItems.filter(i => !i.available).length)} color="#f59e0b" />
         </div>
         <div>
           <span>Categories</span>
@@ -1801,7 +1559,7 @@ function CatalogPage({
               <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search items…"
+                placeholder={catalogSection === 'lodging' ? 'Search rooms…' : 'Search items…'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 pl-8 text-sm"
@@ -1828,16 +1586,16 @@ function CatalogPage({
               </SelectContent>
             </Select>
             <span className="text-xs text-muted-foreground ml-auto">
-              {totalItems} of {business.items.length} items
+              {totalItems} of {sectionItems.length} items
             </span>
             {isFiltered && (
               <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-xs">
                 Clear filters
               </Button>
             )}
-            <Button size="sm" className="h-8" onClick={onAddItem}>
+            <Button size="sm" className="h-8" onClick={() => onAddItem(catalogSection)}>
               <Plus className="size-3.5" />
-              Add item
+              {catalogSection === 'lodging' ? 'Add room / suite' : 'Add item'}
             </Button>
           </div>
 
@@ -1854,10 +1612,12 @@ function CatalogPage({
             ) : (
               <div className="catalog-item-grid">
                 {pageItems.map((entry) => {
-                  const thumb = entry.imageUrl || getCategoryImage(entry.category)
+                  const thumb = entry.imageUrl || entry.imageUrls?.[0] || getCategoryImage(entry.category)
                   const ingredientCount = entry.ingredients?.length ?? 0
+                  const galleryCount = entry.imageUrls?.length ?? (entry.imageUrl ? 1 : 0)
                   const off = discountPercentOf(entry)
                   const sale = effectivePrice(entry)
+                  const lodging = entry.itemKind === 'ROOM' || entry.itemKind === 'SUITE'
                   return (
                     <article key={entry.id} className="catalog-item-card">
                       <button type="button" className="catalog-item-card-media" onClick={() => startEdit(entry)}>
@@ -1870,21 +1630,27 @@ function CatalogPage({
                       <div className="catalog-item-card-body">
                         <div className="catalog-item-card-top">
                           <h3>{entry.name}</h3>
-                          <Badge variant="secondary" className="shrink-0">{entry.category}</Badge>
+                          <Badge variant="secondary" className="shrink-0">
+                            {lodging ? entry.itemKind : entry.category}
+                          </Badge>
                         </div>
                         {entry.description ? <p className="catalog-item-card-desc">{entry.description}</p> : null}
                         <div className="catalog-item-card-meta">
                           {off > 0 ? (
                             <strong>
-                              {currency(sale)}{' '}
+                              {currency(sale)}{lodging ? ' / night' : ''}{' '}
                               <span className="text-xs font-normal text-muted-foreground line-through">
                                 {currency(entry.price)}
                               </span>
                             </strong>
                           ) : (
-                            <strong>{currency(entry.price)}</strong>
+                            <strong>{currency(entry.price)}{lodging ? ' / night' : ''}</strong>
                           )}
-                          {ingredientCount > 0 ? (
+                          {lodging ? (
+                            <span className="text-xs text-muted-foreground">
+                              {entry.capacity ?? 0} guests · {galleryCount} photo{galleryCount === 1 ? '' : 's'}
+                            </span>
+                          ) : ingredientCount > 0 ? (
                             <span className="text-xs text-muted-foreground">{ingredientCount} ingredients</span>
                           ) : null}
                         </div>
@@ -1923,18 +1689,48 @@ function CatalogPage({
             className="inset-0 h-dvh w-screen max-w-none sm:max-w-none data-[side=right]:w-screen data-[side=right]:sm:max-w-none flex flex-col gap-0 p-0 border-0"
           >
             <SheetHeader className="border-b border-border px-6 py-4 shrink-0">
-              <SheetTitle className={undefined}>Edit item</SheetTitle>
+              <SheetTitle className={undefined}>{editingLodging ? 'Edit room / suite' : 'Edit item'}</SheetTitle>
               <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <div className="mx-auto w-full max-w-3xl flex flex-col gap-4">
-                <CatalogItemImageField
-                  imageUrl={editDraft.imageUrl}
-                  category={editDraft.category}
-                  name={editDraft.name}
-                  disabled={saving}
-                  onChange={(imageUrl) => setEditDraft({ ...editDraft, imageUrl: imageUrl ?? '' })}
-                />
+                {editingLodging ? (
+                  <CatalogItemGalleryField
+                    imageUrls={editDraft.imageUrls ?? []}
+                    name={editDraft.name}
+                    disabled={saving}
+                    onChange={(imageUrls) => setEditDraft({ ...editDraft, imageUrls, imageUrl: imageUrls[0] ?? '' })}
+                  />
+                ) : (
+                  <CatalogItemImageField
+                    imageUrl={editDraft.imageUrl}
+                    category={editDraft.category}
+                    name={editDraft.name}
+                    disabled={saving}
+                    onChange={(imageUrl) => setEditDraft({ ...editDraft, imageUrl: imageUrl ?? '' })}
+                  />
+                )}
+                {editingLodging ? (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="edit-kind">Type</Label>
+                    <Select
+                      value={editDraft.itemKind ?? 'ROOM'}
+                      onValueChange={(value) =>
+                        setEditDraft({
+                          ...editDraft,
+                          itemKind: value as CatalogItemKind,
+                          category: value === 'SUITE' ? 'Suites' : 'Rooms',
+                        })
+                      }
+                    >
+                      <SelectTrigger id="edit-kind"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ROOM">Room</SelectItem>
+                        <SelectItem value="SUITE">Suite</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
                 <div className="grid gap-1.5">
                   <Label className="" htmlFor="edit-name">Name</Label>
                   <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
@@ -1950,7 +1746,7 @@ function CatalogPage({
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-price">Price (UGX)</Label>
+                  <Label className="" htmlFor="edit-price">{editingLodging ? 'Price per night (UGX)' : 'Price (UGX)'}</Label>
                   <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
                 </div>
                 <div className="grid gap-1.5">
@@ -1975,20 +1771,56 @@ function CatalogPage({
                     </p>
                   ) : null}
                 </div>
+                {editingLodging ? (
+                  <>
+                    <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="edit-capacity">Max guests</Label>
+                        <Input
+                          id="edit-capacity"
+                          type="number"
+                          min="1"
+                          value={editDraft.capacity ?? 1}
+                          onChange={(e) => setEditDraft({ ...editDraft, capacity: Number(e.target.value) || 1 })}
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="edit-units">Units available</Label>
+                        <Input
+                          id="edit-units"
+                          type="number"
+                          min="1"
+                          value={editDraft.unitsAvailable ?? 1}
+                          onChange={(e) => setEditDraft({ ...editDraft, unitsAvailable: Number(e.target.value) || 1 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="edit-amenities">Amenities (comma-separated)</Label>
+                      <Input
+                        id="edit-amenities"
+                        value={editDraft.amenitiesText ?? ''}
+                        onChange={(e) => setEditDraft({ ...editDraft, amenitiesText: e.target.value })}
+                      />
+                    </div>
+                  </>
+                ) : null}
                 <div className="grid gap-1.5">
                   <Label className="" htmlFor="edit-description">Short description</Label>
                   <Textarea className="" id="edit-description" rows={2} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-details">Combo details</Label>
+                  <Label className="" htmlFor="edit-details">{editingLodging ? 'Full details' : 'Combo details'}</Label>
                   <Textarea className="" id="edit-details" rows={4} value={editDraft.details ?? ''} onChange={(e) => setEditDraft({ ...editDraft, details: e.target.value })} />
                 </div>
-                <IngredientsEditor
-                  id="edit-ingredients"
-                  value={editDraft.ingredients ?? []}
-                  disabled={saving}
-                  onChange={(ingredients) => setEditDraft({ ...editDraft, ingredients })}
-                />
+                {!editingLodging ? (
+                  <IngredientsEditor
+                    id="edit-ingredients"
+                    value={editDraft.ingredients ?? []}
+                    disabled={saving}
+                    onChange={(ingredients) => setEditDraft({ ...editDraft, ingredients })}
+                  />
+                ) : null}
                 <div className="flex items-center gap-2">
                   <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
                   <Label htmlFor="edit-available" className="cursor-pointer font-normal">Available to customers</Label>

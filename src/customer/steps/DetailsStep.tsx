@@ -2,6 +2,7 @@ import type { Business } from '../../api/types'
 
 export function DetailsStep({
   business,
+  mode = 'food',
   customerName,
   customerLocation,
   customerNote,
@@ -12,6 +13,7 @@ export function DetailsStep({
   onNote,
 }: {
   business: Business
+  mode?: 'food' | 'stay'
   customerName: string
   customerLocation: string
   customerNote: string
@@ -21,19 +23,24 @@ export function DetailsStep({
   onLocation: (value: string) => void
   onNote: (value: string) => void
 }) {
+  const isStay = mode === 'stay'
   const locationLabel = business.tableLabel || 'Table / location'
 
   return (
     <div className="cm-step cm-step-enter cm-panel">
-      <h2>Your details</h2>
-      <p className="cm-muted">So {business.name} can find your order</p>
+      <h2>{isStay ? 'Guest details' : 'Your details'}</h2>
+      <p className="cm-muted">
+        {isStay
+          ? `So ${business.name} knows who the stay is for`
+          : `So ${business.name} can find your order`}
+      </p>
 
       <label className="cm-field">
-        Your name
+        {isStay ? 'Guest name' : 'Your name'}
         <input
           value={customerName}
           onChange={(e) => onName(e.target.value)}
-          placeholder="e.g. Jane"
+          placeholder={isStay ? 'e.g. Jane Okello' : 'e.g. Jane'}
           autoComplete="name"
           required
           aria-required="true"
@@ -42,25 +49,27 @@ export function DetailsStep({
         {nameError ? <span className="cm-field-error">{nameError}</span> : null}
       </label>
 
-      <label className="cm-field">
-        {locationLabel}
-        <input
-          value={customerLocation}
-          onChange={(e) => onLocation(e.target.value)}
-          placeholder="Table 4, counter…"
-          required
-          aria-required="true"
-          aria-invalid={Boolean(locationError)}
-        />
-        {locationError ? <span className="cm-field-error">{locationError}</span> : null}
-      </label>
+      {!isStay ? (
+        <label className="cm-field">
+          {locationLabel}
+          <input
+            value={customerLocation}
+            onChange={(e) => onLocation(e.target.value)}
+            placeholder="Table 4, counter…"
+            required
+            aria-required="true"
+            aria-invalid={Boolean(locationError)}
+          />
+          {locationError ? <span className="cm-field-error">{locationError}</span> : null}
+        </label>
+      ) : null}
 
       <label className="cm-field">
         Note <span className="cm-optional">(optional)</span>
         <input
           value={customerNote}
           onChange={(e) => onNote(e.target.value)}
-          placeholder="No onions, extra sauce…"
+          placeholder={isStay ? 'Early check-in, extra pillows…' : 'No onions, extra sauce…'}
         />
       </label>
     </div>

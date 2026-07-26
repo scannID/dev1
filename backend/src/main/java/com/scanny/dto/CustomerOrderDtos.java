@@ -13,12 +13,22 @@ public final class CustomerOrderDtos {
     private CustomerOrderDtos() {
     }
 
-    public record TrackingLineItem(String name, int quantity, List<String> removedIngredients) {
+    public record TrackingLineItem(
+            String name,
+            int quantity,
+            List<String> removedIngredients,
+            String checkInDate,
+            String checkOutDate,
+            Integer nights
+    ) {
         static TrackingLineItem from(OrderLineItem line) {
             return new TrackingLineItem(
                     line.getName(),
                     line.getQuantity(),
-                    JsonLists.readStringList(line.getRemovedIngredientsJson())
+                    JsonLists.readStringList(line.getRemovedIngredientsJson()),
+                    line.getCheckInDate() != null ? line.getCheckInDate().toString() : null,
+                    line.getCheckOutDate() != null ? line.getCheckOutDate().toString() : null,
+                    line.getNights()
             );
         }
     }

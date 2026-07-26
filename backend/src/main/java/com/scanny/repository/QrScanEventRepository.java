@@ -33,6 +33,15 @@ public interface QrScanEventRepository extends JpaRepository<QrScanEvent, Long> 
     List<Instant> findScannedAtsAfter(@Param("cutoff") Instant cutoff);
 
     @Query("""
+            SELECT e.scannedAt FROM QrScanEvent e
+            WHERE e.businessId = :businessId AND e.scannedAt >= :cutoff
+            """)
+    List<Instant> findScannedAtsByBusinessIdAfter(
+            @Param("businessId") String businessId,
+            @Param("cutoff") Instant cutoff
+    );
+
+    @Query("""
             SELECT COUNT(e) FROM QrScanEvent e
             WHERE e.scannedAt >= :start AND e.scannedAt < :end
             """)

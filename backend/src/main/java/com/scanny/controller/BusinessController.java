@@ -6,7 +6,9 @@ import com.scanny.dto.OrdersPageResponse;
 import com.scanny.dto.PageDtos;
 import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
+import com.scanny.dto.admin.AdminAnalyticsDtos;
 import com.scanny.service.BusinessService;
+import com.scanny.service.MerchantAnalyticsService;
 import com.scanny.service.OrderService;
 import com.scanny.service.QrScanService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,15 +32,18 @@ public class BusinessController {
     private final BusinessService businessService;
     private final OrderService orderService;
     private final QrScanService qrScanService;
+    private final MerchantAnalyticsService merchantAnalyticsService;
 
     public BusinessController(
             BusinessService businessService,
             OrderService orderService,
-            QrScanService qrScanService
+            QrScanService qrScanService,
+            MerchantAnalyticsService merchantAnalyticsService
     ) {
         this.businessService = businessService;
         this.orderService = orderService;
         this.qrScanService = qrScanService;
+        this.merchantAnalyticsService = merchantAnalyticsService;
     }
 
     @GetMapping("/businesses")
@@ -90,6 +95,14 @@ public class BusinessController {
             HttpServletRequest request
     ) {
         qrScanService.recordMenuScan(businessId, qr, request.getHeader("User-Agent"));
+    }
+
+    @GetMapping("/businesses/{businessId}/analytics/scans-orders")
+    public AdminAnalyticsDtos.ScansOrdersSeries getScansOrders(
+            @PathVariable String businessId,
+            @RequestParam(defaultValue = "week") String range
+    ) {
+        return merchantAnalyticsService.getScansOrders(businessId, range);
     }
 
     @PostMapping("/qr/{qrToken}/scans")

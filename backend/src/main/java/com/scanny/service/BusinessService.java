@@ -320,6 +320,7 @@ public class BusinessService {
             case PARKING -> BusinessType.Boutique;
             case OTHER -> BusinessType.Restaurant;
             case RESTAURANT -> BusinessType.Restaurant;
+            case HOTEL -> BusinessType.Hotel;
         };
     }
 }

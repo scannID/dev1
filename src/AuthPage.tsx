@@ -36,7 +36,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
 
   // Register form state
   const [regBusinessName, setRegBusinessName] = useState('')
-  const [regBusinessType, setRegBusinessType] = useState<'Restaurant' | 'Bar' | 'School' | 'Boutique'>('Restaurant')
+  const [regBusinessType, setRegBusinessType] = useState<'RESTAURANT' | 'HOTEL'>('RESTAURANT')
   const [regEmail, setRegEmail] = useState('')
   const [regPhone, setRegPhone] = useState('')
   const [regPaymentDest, setRegPaymentDest] = useState('')
@@ -100,9 +100,22 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
           businessName: regBusinessName.trim(),
           businessType: regBusinessType,
           email: regEmail.trim().toLowerCase(),
-          phone: regPhone.trim(),
-          paymentDestination: regPaymentDest.trim(),
-          paymentType: regPaymentType,
+          phoneNumber: regPhone.trim(),
+          paymentDestination:
+            regPaymentType === 'MOBILE_MONEY'
+              ? {
+                  type: 'MOBILE_MONEY',
+                  provider: 'MTN',
+                  number: regPaymentDest.trim(),
+                  accountName: regBusinessName.trim(),
+                }
+              : {
+                  type: 'BANK_ACCOUNT',
+                  bankName: 'Bank',
+                  bankAccountNumber: regPaymentDest.trim(),
+                  accountName: regBusinessName.trim(),
+                },
+          termsAccepted: true,
         }),
       })
 
@@ -474,10 +487,8 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
                     color: C.text,
                   }}
                 >
-                  <option value="Restaurant">Restaurant</option>
-                  <option value="Bar">Bar</option>
-                  <option value="School">School</option>
-                  <option value="Boutique">Boutique</option>
+                  <option value="RESTAURANT">Restaurant</option>
+                  <option value="HOTEL">Hotel</option>
                 </select>
               </label>
             </div>

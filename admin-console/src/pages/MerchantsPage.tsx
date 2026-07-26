@@ -257,10 +257,7 @@ export default function MerchantsPage() {
                     <SelectTrigger id="businessType"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="RESTAURANT">Restaurant</SelectItem>
-                      <SelectItem value="BAR">Bar</SelectItem>
-                      <SelectItem value="RETAIL">Retail</SelectItem>
-                      <SelectItem value="EVENT">Event</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
+                      <SelectItem value="HOTEL">Hotel</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

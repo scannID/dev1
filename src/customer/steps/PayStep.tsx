@@ -1,5 +1,5 @@
 import type { Business } from '../../api/types'
-import { formatRemovedIngredients } from '../../lib/catalogCart'
+import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
 import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
@@ -49,13 +49,20 @@ export function PayStep({
       <div className="cm-order-strip">
         {cartItems.map((item) => {
           const removed = formatRemovedIngredients(item.removedIngredients)
+          const amount =
+            isLodgingItem(item) && item.nights
+              ? effectivePrice(item) * item.nights * item.quantity
+              : effectivePrice(item) * item.quantity
           return (
           <div key={item.lineKey}>
             <span>
               {item.quantity}× {item.name}
+              {item.checkInDate && item.checkOutDate
+                ? ` · ${item.checkInDate} → ${item.checkOutDate}`
+                : ''}
               {removed ? <em className="cm-line-removed"> · {removed}</em> : null}
             </span>
-            <span>{currency(effectivePrice(item) * item.quantity)}</span>
+            <span>{currency(amount)}</span>
           </div>
           )
         })}

@@ -27,6 +27,8 @@ import type {
   QrCodeResponse,
   OnboardingStatusResponse,
   MenuResponse,
+  MerchantMetricRange,
+  ScansOrdersSeries,
   CreateTicketRequest,
   Ticket,
   TicketStats,
@@ -56,6 +58,7 @@ export type CatalogListParams = {
   search?: string
   category?: string
   available?: boolean
+  lodging?: boolean
 }
 
 export type OrdersListParams = {
@@ -147,6 +150,13 @@ export const businessApi = {
     const url = `/businesses/${businessId}/scans${qr ? `?qr=${encodeURIComponent(qr)}` : ''}`
     await api.post(url, {})
   },
+
+  getScansOrders: async (
+    businessId: string,
+    range: MerchantMetricRange = 'week',
+  ): Promise<ScansOrdersSeries> => {
+    return api.get(`/businesses/${businessId}/analytics/scans-orders?range=${range}`)
+  },
 }
 
 export const catalogApi = {
@@ -164,6 +174,7 @@ export const catalogApi = {
       search: params.search,
       category: params.category,
       available: params.available,
+      lodging: params.lodging,
     })
     const response = await api.get<CatalogItemsResponse>(`/businesses/${businessId}/catalog${qs}`)
     const pagination: PaginationMeta = response.pagination ?? {
@@ -187,10 +198,15 @@ export const catalogApi = {
       price: data.price,
       description: data.description,
       imageUrl: data.imageUrl ?? null,
+      imageUrls: data.imageUrls ?? [],
       details: data.details ?? '',
       ingredients: data.ingredients ?? [],
       available: data.available ?? true,
       discountPercent: data.discountPercent ?? 0,
+      itemKind: data.itemKind ?? 'FOOD',
+      capacity: data.capacity,
+      amenities: data.amenities ?? [],
+      unitsAvailable: data.unitsAvailable,
     })
     return response.item
   },

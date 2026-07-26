@@ -2,6 +2,7 @@ package com.scanny.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.scanny.entity.CatalogItem;
+import com.scanny.model.enums.ItemKind;
 import com.scanny.util.JsonLists;
 import java.util.List;
 
@@ -13,23 +14,38 @@ public record CatalogItemResponse(
         int price,
         String description,
         String imageUrl,
+        List<String> imageUrls,
         String details,
         List<CatalogIngredient> ingredients,
         boolean available,
-        int discountPercent
+        int discountPercent,
+        ItemKind itemKind,
+        Integer capacity,
+        List<String> amenities,
+        Integer unitsAvailable
 ) {
     public static CatalogItemResponse from(CatalogItem item) {
+        List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson());
+        String cover = item.getImageUrl();
+        if ((cover == null || cover.isBlank()) && !gallery.isEmpty()) {
+            cover = gallery.get(0);
+        }
         return new CatalogItemResponse(
                 item.getId(),
                 item.getName(),
                 item.getCategory(),
                 item.getPrice(),
                 item.getDescription(),
-                item.getImageUrl(),
+                cover,
+                gallery.isEmpty() ? null : gallery,
                 item.getDetails() == null ? "" : item.getDetails(),
                 JsonLists.readIngredients(item.getIngredientsJson()),
                 item.isAvailable(),
-                item.getDiscountPercent()
+                item.getDiscountPercent(),
+                item.getItemKind(),
+                item.isLodging() ? item.getCapacity() : null,
+                item.isLodging() ? JsonLists.readStringList(item.getAmenitiesJson()) : null,
+                item.isLodging() ? item.getUnitsAvailable() : null
         );
     }
 }

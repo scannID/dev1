@@ -40,14 +40,15 @@ public class CatalogController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) Boolean available
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) Boolean lodging
     ) {
-        if (page == null && size == null && search == null && category == null && available == null) {
+        if (page == null && size == null && search == null && category == null && available == null && lodging == null) {
             return Map.of("items", catalogService.getCatalogItems(businessId));
         }
         int safePage = page != null ? page : 1;
         int safeSize = size != null ? size : 20;
-        return catalogService.getCatalogItemsPaged(businessId, safePage, safeSize, search, category, available);
+        return catalogService.getCatalogItemsPaged(businessId, safePage, safeSize, search, category, available, lodging);
     }
 
     @GetMapping("/{itemId}")

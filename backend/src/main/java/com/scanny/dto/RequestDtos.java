@@ -40,7 +40,9 @@ public final class RequestDtos {
             String itemId,
             String id,
             @NotNull Integer quantity,
-            List<String> removedIngredients
+            List<String> removedIngredients,
+            String checkInDate,
+            String checkOutDate
     ) {
         public String resolvedItemId() {
             if (itemId != null && !itemId.isBlank()) {

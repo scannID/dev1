@@ -99,6 +99,15 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     List<Instant> findCreatedAtsAfter(@Param("cutoff") Instant cutoff);
 
     @Query("""
+            SELECT o.createdAt FROM Order o
+            WHERE o.business.id = :businessId AND o.createdAt >= :cutoff
+            """)
+    List<Instant> findCreatedAtsByBusinessIdAfter(
+            @Param("businessId") String businessId,
+            @Param("cutoff") Instant cutoff
+    );
+
+    @Query("""
             SELECT o.createdAt, o.total, o.status
             FROM Order o
             WHERE o.createdAt >= :cutoff
@@ -145,5 +154,24 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             @Param("cancelled") OrderStatus cancelled,
             @Param("since") Instant since,
             Pageable pageable
+    );
+
+    @Query("""
+            SELECT COALESCE(SUM(li.quantity), 0)
+            FROM OrderLineItem li
+            WHERE li.itemId = :itemId
+              AND li.checkInDate IS NOT NULL
+              AND li.checkOutDate IS NOT NULL
+              AND li.order.status <> :cancelled
+              AND li.order.paymentStatus <> :refunded
+              AND li.checkInDate < :checkOut
+              AND li.checkOutDate > :checkIn
+            """)
+    long sumOverlappingLodgingUnits(
+            @Param("itemId") String itemId,
+            @Param("checkIn") java.time.LocalDate checkIn,
+            @Param("checkOut") java.time.LocalDate checkOut,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("refunded") PaymentStatus refunded
     );
 }

@@ -196,6 +196,7 @@ public class Merchant {
     // Enums
     public enum BusinessType {
         RESTAURANT,
+        HOTEL,
         BAR,
         PARKING,
         EVENT,

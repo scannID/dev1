@@ -12,10 +12,15 @@ import org.springframework.data.repository.query.Param;
 public interface CatalogItemRepository extends JpaRepository<CatalogItem, String> {
 
     @Query("""
-            SELECT c FROM CatalogItem c
+            SELECT c from CatalogItem c
             WHERE c.business.id = :businessId
               AND (:category IS NULL OR c.category = :category)
               AND (:available IS NULL OR c.available = :available)
+              AND (
+                :lodging IS NULL
+                OR (:lodging = TRUE AND c.itemKind IN (com.scanny.model.enums.ItemKind.ROOM, com.scanny.model.enums.ItemKind.SUITE))
+                OR (:lodging = FALSE AND (c.itemKind IS NULL OR c.itemKind = com.scanny.model.enums.ItemKind.FOOD))
+              )
               AND (
                 :search IS NULL OR :search = ''
                 OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -28,6 +33,7 @@ public interface CatalogItemRepository extends JpaRepository<CatalogItem, String
             @Param("search") String search,
             @Param("category") String category,
             @Param("available") Boolean available,
+            @Param("lodging") Boolean lodging,
             Pageable pageable
     );
 

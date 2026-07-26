@@ -5,6 +5,7 @@ import com.scanny.dto.PageDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.CatalogItem;
 import com.scanny.exception.ApiException;
+import com.scanny.model.enums.ItemKind;
 import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.security.MerchantAccessService;
@@ -63,7 +64,8 @@ public class CatalogService {
             int size,
             String search,
             String category,
-            Boolean available
+            Boolean available,
+            Boolean lodging
     ) {
         merchantAccessService.requireOwnedBusiness(businessId);
         int safePage = Math.max(page, 1);
@@ -77,6 +79,7 @@ public class CatalogService {
                 normalizedSearch,
                 normalizedCategory,
                 available,
+                lodging,
                 pageable
         );
 
@@ -125,18 +128,39 @@ public class CatalogService {
         if (category.isBlank()) {
             throw new ApiException(400, "Category is required.");
         }
+        if (request.name() == null || request.name().isBlank()) {
+            throw new ApiException(400, "Name is required.");
+        }
+        if (request.price() <= 0) {
+            throw new ApiException(400, "Price must be greater than zero.");
+        }
+
+        ItemKind kind = request.itemKind() != null ? request.itemKind() : ItemKind.FOOD;
+        List<String> gallery = CatalogImageUrls.normalizeGallery(request.imageUrls());
+        String cover = CatalogImageUrls.normalizeOptional(request.imageUrl());
+        if (cover == null && !gallery.isEmpty()) {
+            cover = gallery.get(0);
+        }
+        if (gallery.isEmpty() && cover != null) {
+            gallery = List.of(cover);
+        }
 
         CatalogItem item = new CatalogItem();
         item.setId(generateItemId());
-        item.setName(request.name());
+        item.setName(request.name().trim());
         item.setCategory(category);
         item.setPrice(request.price());
         item.setDiscountPercent(requireDiscountPercent(request.discountPercent()));
         item.setDescription(request.description() != null ? request.description() : "");
-        item.setImageUrl(CatalogImageUrls.normalizeOptional(request.imageUrl()));
+        item.setImageUrl(cover);
+        item.setImageUrlsJson(JsonLists.writeStringList(gallery));
         item.setDetails(request.details() != null ? request.details().trim() : "");
-        item.setIngredientsJson(JsonLists.writeIngredients(request.ingredients()));
+        item.setIngredientsJson(JsonLists.writeIngredients(
+                kind == ItemKind.FOOD ? request.ingredients() : List.of()
+        ));
         item.setAvailable(request.available());
+        item.setItemKind(kind);
+        applyLodgingFields(item, kind, request.capacity(), request.amenities(), request.unitsAvailable());
 
         business.addCustomCategory(category);
         business.addItem(item);
@@ -179,8 +203,24 @@ public class CatalogService {
         if (request.description() != null) {
             item.setDescription(request.description());
         }
+        if (request.imageUrls() != null) {
+            List<String> gallery = CatalogImageUrls.normalizeGallery(request.imageUrls());
+            item.setImageUrlsJson(JsonLists.writeStringList(gallery));
+            if (!gallery.isEmpty()) {
+                item.setImageUrl(gallery.get(0));
+            } else if (request.imageUrl() == null) {
+                item.setImageUrl(null);
+            }
+        }
         if (request.imageUrl() != null) {
-            item.setImageUrl(CatalogImageUrls.normalizeOptional(request.imageUrl()));
+            String cover = CatalogImageUrls.normalizeOptional(request.imageUrl());
+            item.setImageUrl(cover);
+            if (request.imageUrls() == null && cover != null) {
+                List<String> existing = JsonLists.readStringList(item.getImageUrlsJson());
+                if (existing.isEmpty()) {
+                    item.setImageUrlsJson(JsonLists.writeStringList(List.of(cover)));
+                }
+            }
         }
         if (request.details() != null) {
             item.setDetails(request.details().trim());
@@ -190,6 +230,19 @@ public class CatalogService {
         }
         if (request.available() != null) {
             item.setAvailable(request.available());
+        }
+        if (request.itemKind() != null) {
+            item.setItemKind(request.itemKind());
+        }
+        ItemKind kind = item.getItemKind();
+        if (request.capacity() != null || request.amenities() != null || request.unitsAvailable() != null || request.itemKind() != null) {
+            applyLodgingFields(
+                    item,
+                    kind,
+                    request.capacity() != null ? request.capacity() : item.getCapacity(),
+                    request.amenities() != null ? request.amenities() : JsonLists.readStringList(item.getAmenitiesJson()),
+                    request.unitsAvailable() != null ? request.unitsAvailable() : item.getUnitsAvailable()
+            );
         }
 
         item = catalogItemRepository.save(item);
@@ -223,6 +276,33 @@ public class CatalogService {
         businessService.evictMenuCache(businessId);
         realtimeEventPublisher.publishCatalogEvent(businessId, "CATALOG_ITEM_DELETED", Map.of("id", itemId));
         auditService.success("CATALOG_ITEM_DELETED", "catalog_item", itemId, Map.of("businessId", businessId));
+    }
+
+    private static void applyLodgingFields(
+            CatalogItem item,
+            ItemKind kind,
+            Integer capacity,
+            List<String> amenities,
+            Integer unitsAvailable
+    ) {
+        if (kind == ItemKind.ROOM || kind == ItemKind.SUITE) {
+            int cap = capacity != null ? capacity : 2;
+            if (cap < 1) {
+                throw new ApiException(400, "Capacity must be at least 1 guest for rooms and suites.");
+            }
+            int units = unitsAvailable != null ? unitsAvailable : 1;
+            if (units < 1) {
+                throw new ApiException(400, "Units available must be at least 1 for rooms and suites.");
+            }
+            item.setCapacity(cap);
+            item.setUnitsAvailable(units);
+            item.setAmenitiesJson(JsonLists.writeStringList(amenities));
+            item.setIngredientsJson("[]");
+        } else {
+            item.setCapacity(0);
+            item.setUnitsAvailable(0);
+            item.setAmenitiesJson("[]");
+        }
     }
 
     private CatalogItem requireOwnedItem(String businessId, String itemId) {

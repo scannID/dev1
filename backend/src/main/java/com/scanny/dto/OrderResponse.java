@@ -73,7 +73,10 @@ record OrderLineResponse(
         int price,
         int quantity,
         int lineTotal,
-        List<String> removedIngredients
+        List<String> removedIngredients,
+        String checkInDate,
+        String checkOutDate,
+        Integer nights
 ) {
     static OrderLineResponse from(OrderLineItem line) {
         return new OrderLineResponse(
@@ -82,7 +85,10 @@ record OrderLineResponse(
                 line.getPrice(),
                 line.getQuantity(),
                 line.getLineTotal(),
-                JsonLists.readStringList(line.getRemovedIngredientsJson())
+                JsonLists.readStringList(line.getRemovedIngredientsJson()),
+                line.getCheckInDate() != null ? line.getCheckInDate().toString() : null,
+                line.getCheckOutDate() != null ? line.getCheckOutDate().toString() : null,
+                line.getNights()
         );
     }
 }

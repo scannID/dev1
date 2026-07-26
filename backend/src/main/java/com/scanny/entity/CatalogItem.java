@@ -1,7 +1,10 @@
 package com.scanny.entity;
 
+import com.scanny.model.enums.ItemKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -46,6 +49,22 @@ public class CatalogItem {
 
     @Column(nullable = false)
     private boolean available = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_kind", nullable = false)
+    private ItemKind itemKind = ItemKind.FOOD;
+
+    @Column(name = "image_urls", nullable = false, columnDefinition = "TEXT DEFAULT '[]'")
+    private String imageUrlsJson = "[]";
+
+    @Column(nullable = false)
+    private int capacity = 0;
+
+    @Column(name = "amenities_json", nullable = false, columnDefinition = "TEXT DEFAULT '[]'")
+    private String amenitiesJson = "[]";
+
+    @Column(name = "units_available", nullable = false)
+    private int unitsAvailable = 0;
 
     public String getId() {
         return id;
@@ -133,5 +152,50 @@ public class CatalogItem {
 
     public void setAvailable(boolean available) {
         this.available = available;
+    }
+
+    public ItemKind getItemKind() {
+        return itemKind == null ? ItemKind.FOOD : itemKind;
+    }
+
+    public void setItemKind(ItemKind itemKind) {
+        this.itemKind = itemKind == null ? ItemKind.FOOD : itemKind;
+    }
+
+    public String getImageUrlsJson() {
+        return imageUrlsJson;
+    }
+
+    public void setImageUrlsJson(String imageUrlsJson) {
+        this.imageUrlsJson = imageUrlsJson == null || imageUrlsJson.isBlank() ? "[]" : imageUrlsJson;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(int capacity) {
+        this.capacity = Math.max(0, capacity);
+    }
+
+    public String getAmenitiesJson() {
+        return amenitiesJson;
+    }
+
+    public void setAmenitiesJson(String amenitiesJson) {
+        this.amenitiesJson = amenitiesJson == null || amenitiesJson.isBlank() ? "[]" : amenitiesJson;
+    }
+
+    public int getUnitsAvailable() {
+        return unitsAvailable;
+    }
+
+    public void setUnitsAvailable(int unitsAvailable) {
+        this.unitsAvailable = Math.max(0, unitsAvailable);
+    }
+
+    public boolean isLodging() {
+        ItemKind kind = getItemKind();
+        return kind == ItemKind.ROOM || kind == ItemKind.SUITE;
     }
 }

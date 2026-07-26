@@ -20,6 +20,7 @@ public final class CatalogCategories {
             case Bar -> List.of("Drinks", "Bites", "Tickets");
             case School -> List.of("Meals", "Snacks", "Tickets");
             case Boutique -> List.of("Goods", "Services");
+            case Hotel -> List.of("Meals", "Drinks", "Bites", "Sides", "Desserts", "Rooms", "Suites");
         };
     }
 

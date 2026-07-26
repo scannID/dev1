@@ -1,6 +1,6 @@
 import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
-import { formatRemovedIngredients } from '../../lib/catalogCart'
+import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
 
@@ -8,6 +8,17 @@ export interface CartLine extends CatalogItem {
   quantity: number
   removedIngredients: string[]
   lineKey: string
+  checkInDate?: string
+  checkOutDate?: string
+  nights?: number
+}
+
+function lineAmount(item: CartLine) {
+  const unit = effectivePrice(item)
+  if (isLodgingItem(item) && item.nights) {
+    return unit * item.nights * item.quantity
+  }
+  return unit * item.quantity
 }
 
 export function CartStep({
@@ -29,9 +40,9 @@ export function CartStep({
     return (
       <div className="cm-step cm-step-enter cm-panel">
         <h2>Your cart</h2>
-        <p className="cm-muted">Nothing here yet. Add something from the menu.</p>
+        <p className="cm-muted">Nothing here yet. Add a stay or something from the menu.</p>
         <button type="button" className="cm-primary cm-full" onClick={onBackToMenu}>
-          Browse menu
+          Continue browsing
         </button>
       </div>
     )
@@ -45,13 +56,22 @@ export function CartStep({
       <div className="cm-summary">
         {cartItems.map((item) => {
           const removed = formatRemovedIngredients(item.removedIngredients)
+          const lodging = isLodgingItem(item)
           const unit = effectivePrice(item)
           return (
             <div key={item.lineKey} className="cm-summary-line">
               <div className="cm-summary-main">
                 <strong>{item.name}</strong>
+                {lodging && item.checkInDate && item.checkOutDate ? (
+                  <span className="cm-line-removed">
+                    {item.checkInDate} → {item.checkOutDate} · {item.nights ?? 1} night
+                    {(item.nights ?? 1) === 1 ? '' : 's'}
+                  </span>
+                ) : null}
                 {removed ? <span className="cm-line-removed">{removed}</span> : null}
-                <span className="cm-line-meta">{currency(unit)} each</span>
+                <span className="cm-line-meta">
+                  {lodging ? `${currency(unit)} / night` : `${currency(unit)} each`}
+                </span>
                 <div className="cm-qty compact">
                   <button type="button" onClick={() => onUpdateQty(item.lineKey, -1)} aria-label={`Decrease ${item.name}`}>
                     <Minus size={12} />
@@ -70,7 +90,7 @@ export function CartStep({
                   </button>
                 </div>
               </div>
-              <span className="cm-line-total">{currency(unit * item.quantity)}</span>
+              <span className="cm-line-total">{currency(lineAmount(item))}</span>
             </div>
           )
         })}

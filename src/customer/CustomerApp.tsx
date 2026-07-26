@@ -21,11 +21,18 @@ import { CartStep, type CartLine } from './steps/CartStep'
 import { DetailsStep } from './steps/DetailsStep'
 import { DoneStep } from './steps/DoneStep'
 import { MenuStep } from './steps/MenuStep'
+import { StayStep } from './steps/StayStep'
 import { PayStep } from './steps/PayStep'
 import { WaitingStep } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
-import { cartLineKey, normalizeRemovedIngredients, parseCartLineKey } from '../lib/catalogCart'
+import {
+  cartLineKey,
+  isLodgingItem,
+  nightsBetween,
+  normalizeRemovedIngredients,
+  parseCartLineKey,
+} from '../lib/catalogCart'
 import { effectivePrice } from '../lib/catalogPricing'
 import {
   buildReceipt,
@@ -64,6 +71,7 @@ export default function CustomerApp({
 
   const [cart, setCart] = useState<Record<string, number>>(draft?.cart ?? {})
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [browseMode, setBrowseMode] = useState<'stay' | 'food'>('stay')
   const [step, setStep] = useState<CheckoutStep>(() => {
     const saved = draft?.step
     if (saved && PROGRESS_STEPS.includes(saved)) return saved
@@ -106,21 +114,39 @@ export default function CustomerApp({
   const cartItems: CartLine[] = useMemo(() => {
     return Object.entries(cart)
       .map(([lineKey, quantity]) => {
-        const { itemId, removedIngredients } = parseCartLineKey(lineKey)
+        const { itemId, removedIngredients, checkInDate, checkOutDate } = parseCartLineKey(lineKey)
         const item = items.find((i) => i.id === itemId)
-        return item
-          ? {
-              ...item,
-              quantity,
-              removedIngredients,
-              lineKey,
-            }
-          : null
+        if (!item) return null
+        const nights =
+          checkInDate && checkOutDate ? nightsBetween(checkInDate, checkOutDate) : undefined
+        return {
+          ...item,
+          quantity,
+          removedIngredients,
+          lineKey,
+          checkInDate,
+          checkOutDate,
+          nights,
+        }
       })
       .filter((item): item is CartLine => item !== null)
   }, [items, cart])
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + effectivePrice(item) * item.quantity, 0)
+  const checkoutMode = useMemo<'food' | 'stay'>(() => {
+    if (cartItems.length > 0) {
+      return cartItems.every((item) => isLodgingItem(item)) ? 'stay' : 'food'
+    }
+    if (business?.type === 'Hotel' && browseMode === 'stay') return 'stay'
+    return 'food'
+  }, [cartItems, business?.type, browseMode])
+
+  const cartTotal = cartItems.reduce((sum, item) => {
+    const unit = effectivePrice(item)
+    if (isLodgingItem(item) && item.nights) {
+      return sum + unit * item.nights * item.quantity
+    }
+    return sum + unit * item.quantity
+  }, 0)
   const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
 
@@ -218,6 +244,9 @@ export default function CustomerApp({
         setBusiness(menu.business)
         setItems(menu.items ?? [])
         setPopularItems(menu.popular ?? [])
+        if (menu.business.type === 'Hotel') {
+          setBrowseMode('stay')
+        }
         setEstimatedWaitMinutes(
           typeof menu.estimatedWaitMinutes === 'number' ? menu.estimatedWaitMinutes : null,
         )
@@ -318,6 +347,13 @@ export default function CustomerApp({
     setCart((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
   }, [])
 
+  const addStayToCart = useCallback((itemId: string, checkInDate: string, checkOutDate: string) => {
+    const key = cartLineKey(itemId, null, { checkInDate, checkOutDate })
+    setCart((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
+    setStep('cart')
+    toast.success('Stay added to cart')
+  }, [])
+
   const updateQuantity = useCallback((lineKey: string, delta: number) => {
     setCart((prev) => {
       const nextQty = (prev[lineKey] || 0) + delta
@@ -395,18 +431,28 @@ export default function CustomerApp({
       setStep('menu')
       return
     }
+    const incompleteStay = cartItems.some(
+      (item) => isLodgingItem(item) && (!item.checkInDate || !item.checkOutDate || !item.nights),
+    )
+    if (incompleteStay) {
+      setError('Each stay needs valid check-in and check-out dates')
+      setStep('menu')
+      setBrowseMode('stay')
+      return
+    }
+    setError(null)
     setStep('details')
   }
 
   function goPay() {
     let valid = true
     if (!customerName.trim()) {
-      setNameError('Enter your name to continue')
+      setNameError(checkoutMode === 'stay' ? 'Enter the guest name to continue' : 'Enter your name to continue')
       valid = false
     } else {
       setNameError(null)
     }
-    if (!customerLocation.trim()) {
+    if (checkoutMode !== 'stay' && !customerLocation.trim()) {
       const label = (business?.tableLabel || 'Table / location').toLowerCase()
       setLocationError(`Enter your ${label} to continue`)
       valid = false
@@ -451,9 +497,12 @@ export default function CustomerApp({
 
   async function submitPayment() {
     if (!business) return
-    if (!customerName.trim() || !customerLocation.trim()) {
-      if (!customerName.trim()) setNameError('Enter your name to continue')
-      if (!customerLocation.trim()) {
+    const needsLocation = checkoutMode !== 'stay'
+    if (!customerName.trim() || (needsLocation && !customerLocation.trim())) {
+      if (!customerName.trim()) {
+        setNameError(checkoutMode === 'stay' ? 'Enter the guest name to continue' : 'Enter your name to continue')
+      }
+      if (needsLocation && !customerLocation.trim()) {
         const label = (business.tableLabel || 'Table / location').toLowerCase()
         setLocationError(`Enter your ${label} to continue`)
       }
@@ -486,13 +535,15 @@ export default function CustomerApp({
         customer: {
           name: customerName.trim(),
           phone: phone.trim(),
-          location: customerLocation.trim(),
+          location: checkoutMode === 'stay' ? '' : customerLocation.trim(),
           note: customerNote.trim() || undefined,
         },
         items: cartItems.map((item) => ({
           id: item.id,
           quantity: item.quantity,
           removedIngredients: item.removedIngredients,
+          checkInDate: item.checkInDate,
+          checkOutDate: item.checkOutDate,
         })),
       })
 
@@ -725,14 +776,41 @@ export default function CustomerApp({
         </div>
       </header>
 
-      <StepProgress step={step} />
+      <StepProgress step={step} variant={checkoutMode} />
 
       {error && step !== 'waiting' ? <div className="cm-error">{error}</div> : null}
 
-      {step === 'menu' && (
+      {step === 'menu' && business?.type === 'Hotel' ? (
+        <div className="cm-browse-tabs" role="tablist" aria-label="Browse">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={browseMode === 'stay'}
+            className={browseMode === 'stay' ? 'active' : undefined}
+            onClick={() => setBrowseMode('stay')}
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={browseMode === 'food'}
+            className={browseMode === 'food' ? 'active' : undefined}
+            onClick={() => setBrowseMode('food')}
+          >
+            Food
+          </button>
+        </div>
+      ) : null}
+
+      {step === 'menu' && business?.type === 'Hotel' && browseMode === 'stay' ? (
+        <StayStep items={items} onAddStay={addStayToCart} />
+      ) : null}
+
+      {step === 'menu' && (business?.type !== 'Hotel' || browseMode === 'food') && (
         <MenuStep
-          items={items}
-          popularItems={popularItems}
+          items={items.filter((item) => !isLodgingItem(item))}
+          popularItems={popularItems.filter((item) => !isLodgingItem(item))}
           cart={cart}
           selectedCategory={selectedCategory}
           onCategory={setSelectedCategory}
@@ -755,6 +833,7 @@ export default function CustomerApp({
       {step === 'details' && (
         <DetailsStep
           business={business}
+          mode={checkoutMode}
           customerName={customerName}
           customerLocation={customerLocation}
           customerNote={customerNote}

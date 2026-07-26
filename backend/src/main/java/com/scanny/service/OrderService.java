@@ -197,21 +197,55 @@ public class OrderService {
                 continue;
             }
 
-            List<String> allowedNames = JsonLists.readIngredients(item.getIngredientsJson()).stream()
-                    .map(ingredient -> ingredient.name())
-                    .toList();
-            List<String> removed = JsonLists.normalizeStringList(lineRequest.removedIngredients()).stream()
-                    .filter(allowedNames::contains)
-                    .toList();
-
             OrderLineItem line = new OrderLineItem();
             line.setItemId(item.getId());
             line.setName(item.getName());
             int unitPrice = CatalogPricing.effectivePrice(item.getPrice(), item.getDiscountPercent());
             line.setPrice(unitPrice);
             line.setQuantity(quantity);
-            line.setLineTotal(unitPrice * quantity);
-            line.setRemovedIngredientsJson(JsonLists.writeStringList(removed));
+
+            if (item.isLodging()) {
+                java.time.LocalDate checkIn = parseRequiredDate(lineRequest.checkInDate(), "Check-in date");
+                java.time.LocalDate checkOut = parseRequiredDate(lineRequest.checkOutDate(), "Check-out date");
+                if (!checkOut.isAfter(checkIn)) {
+                    throw new ApiException(400, "Check-out must be after check-in for " + item.getName() + ".");
+                }
+                int nights = (int) java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
+                if (nights < 1) {
+                    throw new ApiException(400, "Stay must be at least 1 night for " + item.getName() + ".");
+                }
+
+                long booked = orderRepository.sumOverlappingLodgingUnits(
+                        item.getId(),
+                        checkIn,
+                        checkOut,
+                        OrderStatus.Cancelled,
+                        PaymentStatus.Refunded
+                );
+                int units = Math.max(item.getUnitsAvailable(), 1);
+                if (booked + quantity > units) {
+                    throw new ApiException(
+                            409,
+                            item.getName() + " is not available for those dates ("
+                                    + (units - booked) + " of " + units + " left)."
+                    );
+                }
+
+                line.setCheckInDate(checkIn);
+                line.setCheckOutDate(checkOut);
+                line.setNights(nights);
+                line.setLineTotal(unitPrice * nights * quantity);
+                line.setRemovedIngredientsJson("[]");
+            } else {
+                List<String> allowedNames = JsonLists.readIngredients(item.getIngredientsJson()).stream()
+                        .map(ingredient -> ingredient.name())
+                        .toList();
+                List<String> removed = JsonLists.normalizeStringList(lineRequest.removedIngredients()).stream()
+                        .filter(allowedNames::contains)
+                        .toList();
+                line.setLineTotal(unitPrice * quantity);
+                line.setRemovedIngredientsJson(JsonLists.writeStringList(removed));
+            }
             lines.add(line);
         }
 
@@ -478,5 +512,16 @@ public class OrderService {
 
         receiptService.generateReceipt(receiptRequest);
         logger.info("Auto-generated receipt for order {}", order.getId());
+    }
+
+    private static java.time.LocalDate parseRequiredDate(String raw, String label) {
+        if (raw == null || raw.isBlank()) {
+            throw new ApiException(400, label + " is required for room and suite bookings.");
+        }
+        try {
+            return java.time.LocalDate.parse(raw.trim());
+        } catch (java.time.format.DateTimeParseException ex) {
+            throw new ApiException(400, label + " must be YYYY-MM-DD.");
+        }
     }
 }

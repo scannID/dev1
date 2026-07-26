@@ -1,6 +1,8 @@
 ﻿// TypeScript types for Scanny API — aligned with backend DTOs
 
-export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique'
+export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique' | 'Hotel'
+
+export type CatalogItemKind = 'FOOD' | 'ROOM' | 'SUITE'
 
 export interface CatalogIngredient {
   id: string
@@ -14,11 +16,16 @@ export interface CatalogItem {
   price: number
   description: string
   imageUrl?: string | null
+  imageUrls?: string[]
   details?: string
   ingredients?: CatalogIngredient[]
   available: boolean
   /** Knock-off percent from list price (0 = no discount). */
   discountPercent?: number
+  itemKind?: CatalogItemKind
+  capacity?: number
+  amenities?: string[]
+  unitsAvailable?: number
 }
 
 export interface Business {
@@ -60,10 +67,15 @@ export interface CreateCatalogItemRequest {
   price: number
   description: string
   imageUrl?: string | null
+  imageUrls?: string[]
   details?: string
   ingredients?: CatalogIngredient[]
   available?: boolean
   discountPercent?: number
+  itemKind?: CatalogItemKind
+  capacity?: number
+  amenities?: string[]
+  unitsAvailable?: number
 }
 
 export interface UpdateCatalogItemRequest {
@@ -72,10 +84,15 @@ export interface UpdateCatalogItemRequest {
   price?: number
   description?: string
   imageUrl?: string | null
+  imageUrls?: string[]
   details?: string
   ingredients?: CatalogIngredient[]
   available?: boolean
   discountPercent?: number
+  itemKind?: CatalogItemKind
+  capacity?: number
+  amenities?: string[]
+  unitsAvailable?: number
 }
 
 export interface CategoriesResponse {
@@ -134,6 +151,9 @@ export interface OrderItem {
   quantity: number
   lineTotal: number
   removedIngredients?: string[]
+  checkInDate?: string | null
+  checkOutDate?: string | null
+  nights?: number | null
 }
 
 export interface Customer {
@@ -181,6 +201,8 @@ export interface CreateOrderRequest {
     itemId?: string
     quantity: number
     removedIngredients?: string[]
+    checkInDate?: string
+    checkOutDate?: string
   }>
 }
 
@@ -231,10 +253,14 @@ export interface CartLine extends CatalogItem {
   lineTotal: number
   removedIngredients?: string[]
   lineKey?: string
+  checkInDate?: string
+  checkOutDate?: string
+  nights?: number
 }
 
 export type MerchantBusinessType =
   | 'RESTAURANT'
+  | 'HOTEL'
   | 'BAR'
   | 'PARKING'
   | 'EVENT'
@@ -303,6 +329,16 @@ export interface MenuResponse {
   items: CatalogItem[]
   popular?: CatalogItem[]
   estimatedWaitMinutes?: number
+}
+
+export type MerchantMetricRange = 'day' | 'week' | 'month' | 'year'
+
+export interface ScansOrdersSeries {
+  range: string
+  scans: number[]
+  orders: number[]
+  yMax: number
+  xLabels: string[]
 }
 
 export interface CreateTicketRequest {

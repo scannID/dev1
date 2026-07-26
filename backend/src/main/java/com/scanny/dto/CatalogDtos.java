@@ -1,6 +1,7 @@
 package com.scanny.dto;
 
 import com.scanny.entity.CatalogItem;
+import com.scanny.model.enums.ItemKind;
 import com.scanny.util.JsonLists;
 import java.util.List;
 
@@ -12,10 +13,15 @@ public class CatalogDtos {
         int price,
         String description,
         String imageUrl,
+        List<String> imageUrls,
         String details,
         List<CatalogIngredient> ingredients,
         boolean available,
-        Integer discountPercent
+        Integer discountPercent,
+        ItemKind itemKind,
+        Integer capacity,
+        List<String> amenities,
+        Integer unitsAvailable
     ) {}
 
     public record UpdateCatalogItemRequest(
@@ -24,10 +30,15 @@ public class CatalogDtos {
         Integer price,
         String description,
         String imageUrl,
+        List<String> imageUrls,
         String details,
         List<CatalogIngredient> ingredients,
         Boolean available,
-        Integer discountPercent
+        Integer discountPercent,
+        ItemKind itemKind,
+        Integer capacity,
+        List<String> amenities,
+        Integer unitsAvailable
     ) {}
 
     public record UpdateAvailabilityRequest(
@@ -49,23 +60,38 @@ public class CatalogDtos {
         int price,
         String description,
         String imageUrl,
+        List<String> imageUrls,
         String details,
         List<CatalogIngredient> ingredients,
         boolean available,
-        int discountPercent
+        int discountPercent,
+        ItemKind itemKind,
+        int capacity,
+        List<String> amenities,
+        int unitsAvailable
     ) {
         public static CatalogItemResponse from(CatalogItem item) {
+            List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson());
+            String cover = item.getImageUrl();
+            if ((cover == null || cover.isBlank()) && !gallery.isEmpty()) {
+                cover = gallery.get(0);
+            }
             return new CatalogItemResponse(
                 item.getId(),
                 item.getName(),
                 item.getCategory(),
                 item.getPrice(),
                 item.getDescription(),
-                item.getImageUrl(),
+                cover,
+                gallery,
                 item.getDetails() == null ? "" : item.getDetails(),
                 JsonLists.readIngredients(item.getIngredientsJson()),
                 item.isAvailable(),
-                item.getDiscountPercent()
+                item.getDiscountPercent(),
+                item.getItemKind(),
+                item.getCapacity(),
+                JsonLists.readStringList(item.getAmenitiesJson()),
+                item.getUnitsAvailable()
             );
         }
     }

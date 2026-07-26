@@ -4,5 +4,6 @@ public enum BusinessType {
     Restaurant,
     Bar,
     School,
-    Boutique
+    Boutique,
+    Hotel
 }
