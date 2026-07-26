@@ -113,7 +113,7 @@ export function SiteFooter({
           }}
         >
           <p style={{ color: mutedColor, fontSize: 13, margin: 0 }}>
-            © {new Date().getFullYear()} Scanny. All rights reserved.
+            © {new Date().getFullYear()} Kode. All rights reserved.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <a href="/privacy" className="footer-link" onClick={e => handleFooterClick(e, '/privacy')}>

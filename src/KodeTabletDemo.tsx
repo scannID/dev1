@@ -128,7 +128,7 @@ function StatusPill({ status }: { status: OrderRow['status'] }) {
   )
 }
 
-export function ScannyTabletDemo() {
+export function KodeTabletDemo() {
   const [orders, setOrders] = useState<OrderRow[]>(baseOrders)
   const [openCount, setOpenCount] = useState(3)
   const [showToast, setShowToast] = useState(false)
@@ -289,7 +289,7 @@ export function ScannyTabletDemo() {
                   S
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Scanny</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Kode</div>
                   <div style={{ fontSize: 7.5, color: '#7a867f' }}>Merchant</div>
                 </div>
               </div>

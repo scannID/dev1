@@ -14,7 +14,7 @@ Short operational guides. Keep them current when hosting changes.
 ### Local (dev)
 ```powershell
 scanny -Stop
-scanny -All
+kode -All
 ```
 Or from repo root:
 ```powershell

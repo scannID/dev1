@@ -1,8 +1,8 @@
-export function ScannyMark({ size = 28 }: { size?: number }) {
+export function KodeMark({ size = 28 }: { size?: number }) {
   return (
     <img
       src="/qrcode1.png"
-      alt="Scanny"
+      alt="Kode"
       width={size}
       height={size}
       style={{

@@ -1,4 +1,4 @@
-# Scanny local dev — one command to start Keycloak + backend (+ optional frontends).
+# Kode local dev — one command to start Keycloak + backend (+ optional frontends).
 # Usage:
 #   .\start-dev.ps1              # Keycloak + API (H2)
 #   .\start-dev.ps1 -Frontend    # also npm run dev on :5173
@@ -102,7 +102,7 @@ function Start-DevWindow {
 }
 
 Write-Host ''
-Write-Host 'Starting Scanny dev stack...' -ForegroundColor Cyan
+Write-Host 'Starting Kode dev stack...' -ForegroundColor Cyan
 Write-Host ''
 
 if (-not (Test-Path $JavaHome)) {
@@ -120,7 +120,7 @@ if (-not $SkipKeycloak) {
             throw "Keycloak not found: $KeycloakBin\kc.bat"
         }
         Write-Host 'Starting Keycloak on :8080...'
-        Start-DevWindow -Name 'keycloak' -Title 'Scanny Keycloak' -WorkingDirectory $KeycloakBin -Lines @(
+        Start-DevWindow -Name 'keycloak' -Title 'Kode Keycloak' -WorkingDirectory $KeycloakBin -Lines @(
             "`$env:JAVA_HOME = '$JavaHome'"
             "`$env:Path = `"`$env:JAVA_HOME\bin;`$env:Path`""
             "`$env:KC_BOOTSTRAP_ADMIN_USERNAME = 'admin'"
@@ -155,7 +155,7 @@ if (-not $SkipBackend) {
             }
         }
         $pexelsLine = if ($pexelsKey) { "`$env:PEXELS_API_KEY = '$pexelsKey'" } else { "`$env:PEXELS_API_KEY = ''" }
-        Start-DevWindow -Name 'backend' -Title 'Scanny Backend' -WorkingDirectory $BackendDir -Lines @(
+        Start-DevWindow -Name 'backend' -Title 'Kode Backend' -WorkingDirectory $BackendDir -Lines @(
             "`$env:JAVA_HOME = '$JavaHome'"
             "`$env:Path = `"`$env:JAVA_HOME\bin;$MavenBin;`$env:Path`""
             "`$env:SCAN_BASE_URL = '$ScanBaseUrl'"
@@ -171,7 +171,7 @@ if ($Frontend) {
         Write-Host 'Frontend already listening on :5173' -ForegroundColor Yellow
     } else {
         Write-Host 'Starting merchant app on :5173...'
-        Start-DevWindow -Name 'frontend' -Title 'Scanny Frontend' -WorkingDirectory $Root -Lines @(
+        Start-DevWindow -Name 'frontend' -Title 'Kode Frontend' -WorkingDirectory $Root -Lines @(
             "`$env:VITE_API_BASE_URL = 'http://$HostIp`:4000/api'"
             "`$env:VITE_SCAN_BASE_URL = 'http://$HostIp`:5173'"
             "`$env:VITE_WS_BASE_URL = 'ws://$HostIp`:4000'"
@@ -186,7 +186,7 @@ if ($Admin) {
         Write-Host 'Admin console already listening on :5174' -ForegroundColor Yellow
     } else {
         Write-Host 'Starting admin console on :5174...'
-        Start-DevWindow -Name 'admin' -Title 'Scanny Admin' -WorkingDirectory $Root -Lines @(
+        Start-DevWindow -Name 'admin' -Title 'Kode Admin' -WorkingDirectory $Root -Lines @(
             "`$env:VITE_API_BASE_URL = 'http://$HostIp`:4000/api'"
             "`$env:VITE_WS_BASE_URL = 'ws://$HostIp`:4000'"
             "`$env:VITE_KEYCLOAK_URL = 'http://localhost:8080'"

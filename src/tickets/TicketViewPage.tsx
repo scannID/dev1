@@ -4,7 +4,7 @@ import { Check, Clock } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
 import type { AttendeeTicketView } from '../api/types'
 import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
-import { ScannyMark } from '../customer/ScannyMark'
+import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
@@ -161,7 +161,7 @@ export default function TicketViewPage({ accessToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Scanny</p>
+          <p className="tk-hero-kicker">Kode</p>
           <h2>Ticket unavailable</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error ?? 'Not found'}
@@ -177,9 +177,9 @@ export default function TicketViewPage({ accessToken }: Props) {
     <div className="tk-shell">
       <header className="tk-topbar">
         <div className="tk-brand">
-          <ScannyMark size={28} />
+          <KodeMark size={28} />
           <div>
-            <strong>Scanny</strong>
+            <strong>Kode</strong>
             <span>{visual.host?.trim() || ticket.holderName || 'Hosted event'}</span>
           </div>
         </div>

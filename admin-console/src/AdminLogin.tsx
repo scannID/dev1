@@ -20,7 +20,7 @@ export default function AdminLogin({
         <div className="admin-login-brand">
           <img src="/qrcode1.png" alt="" className="admin-login-logo" />
           <div>
-            <p className="admin-login-name">Scanny</p>
+            <p className="admin-login-name">Kode</p>
             <p className="admin-login-tag">Admin Console</p>
           </div>
         </div>
@@ -40,12 +40,12 @@ export default function AdminLogin({
             disabled={busy}
           >
             <Shield size={16} />
-            {busy ? 'Redirecting…' : 'Continue with SSO'}
+            {busy ? 'Redirecting…' : 'Sign in'}
           </Button>
         </div>
 
         <p className="admin-login-foot">
-          Authorised access only · © {new Date().getFullYear()} Scanny
+          Authorised access only · © {new Date().getFullYear()} Kode
         </p>
       </div>
     </div>

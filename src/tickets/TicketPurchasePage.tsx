@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { Smartphone } from 'lucide-react'
 import { publicTicketsApi, paymentsApi } from '../api/services'
 import type { TicketEventInfo, TicketPurchaseResponse } from '../api/types'
-import { ScannyMark } from '../customer/ScannyMark'
+import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
@@ -168,7 +168,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Scanny</p>
+          <p className="tk-hero-kicker">Kode</p>
           <h2>Event unavailable</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error}
@@ -185,9 +185,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       <div className="tk-shell">
         <header className="tk-topbar">
           <div className="tk-brand">
-            <ScannyMark size={28} />
+            <KodeMark size={28} />
             <div>
-              <strong>Scanny</strong>
+              <strong>Kode</strong>
               <span>Event ticket</span>
             </div>
           </div>
@@ -219,9 +219,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     <div className="tk-shell">
       <header className="tk-topbar">
         <div className="tk-brand">
-          <ScannyMark size={28} />
+          <KodeMark size={28} />
           <div>
-            <strong>Scanny</strong>
+            <strong>Kode</strong>
             <span>{event.host?.trim() || 'Hosted event'}</span>
           </div>
         </div>

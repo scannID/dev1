@@ -2,12 +2,24 @@ import Keycloak from 'keycloak-js'
 
 const MERCHANT_CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-client'
 
-/** Match Keycloak host to the page host (localhost vs LAN IP). */
+/**
+ * Prod builds set VITE_KEYCLOAK_URL to https://auth.kode.com — always use that.
+ * Local/LAN: match the page host on :8080 so phone access via 192.168.x.x still works
+ * even when Vite env points at localhost.
+ */
 function resolveKeycloakUrl(): string {
+  const configured = (import.meta.env.VITE_KEYCLOAK_URL as string | undefined)?.replace(/\/$/, '')
   if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8080`
+    const host = window.location.hostname
+    const isLocalOrLan =
+      host === 'localhost' || host === '127.0.0.1' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
+    if (isLocalOrLan) {
+      if (configured && !/localhost|127\.0\.0\.1/.test(configured)) return configured
+      return `${window.location.protocol}//${host}:8080`
+    }
   }
-  return import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
+  if (configured) return configured
+  return 'http://localhost:8080'
 }
 
 const keycloak = new Keycloak({
@@ -42,6 +54,15 @@ export function hasMerchantSession() {
     Boolean(keycloak.token) &&
     hasMerchantRole()
   )
+}
+
+/** End Keycloak SSO (shared across merchant/admin on the same realm). */
+export function logoutMerchant(redirectUri: string) {
+  if (keycloak.authenticated) {
+    return keycloak.logout({ redirectUri })
+  }
+  window.location.href = keycloak.createLogoutUrl({ redirectUri })
+  return Promise.resolve()
 }
 
 export { MERCHANT_CLIENT_ID }

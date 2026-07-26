@@ -1,5 +1,5 @@
 import { type CSSProperties, useState, useEffect, useRef } from 'react'
-import { ScannyDeviceStack } from './ScannyDeviceStack'
+import { KodeDeviceStack } from './KodeDeviceStack'
 import { SiteFooter } from './marketing/SiteFooter'
 
 /* ─── Design tokens (follow global light/dark via CSS vars) ─────────── */
@@ -90,7 +90,7 @@ function MeshGradientBackground() {
           top: -12%;
           left: -8%;
           background: radial-gradient(circle, #8b5cf6 0%, #a78bfa 35%, transparent 70%);
-          animation: scannyMeshA 22s ease-in-out infinite;
+          animation: KodeMeshA 22s ease-in-out infinite;
         }
         .scanny-mesh__blob--pink {
           width: min(52vw, 640px);
@@ -98,7 +98,7 @@ function MeshGradientBackground() {
           top: 8%;
           right: -10%;
           background: radial-gradient(circle, #ec4899 0%, #f472b6 40%, transparent 72%);
-          animation: scannyMeshB 26s ease-in-out infinite;
+          animation: KodeMeshB 26s ease-in-out infinite;
         }
         .scanny-mesh__blob--blue {
           width: min(60vw, 760px);
@@ -106,7 +106,7 @@ function MeshGradientBackground() {
           bottom: -18%;
           left: 18%;
           background: radial-gradient(circle, #38bdf8 0%, #7dd3fc 38%, transparent 70%);
-          animation: scannyMeshC 24s ease-in-out infinite;
+          animation: KodeMeshC 24s ease-in-out infinite;
         }
         .scanny-mesh__blob--peach {
           width: min(48vw, 580px);
@@ -114,7 +114,7 @@ function MeshGradientBackground() {
           bottom: 10%;
           right: 5%;
           background: radial-gradient(circle, #fdba74 0%, #fed7aa 42%, transparent 72%);
-          animation: scannyMeshD 20s ease-in-out infinite;
+          animation: KodeMeshD 20s ease-in-out infinite;
         }
         .scanny-mesh__blob--lilac {
           width: min(40vw, 480px);
@@ -123,33 +123,33 @@ function MeshGradientBackground() {
           left: 36%;
           background: radial-gradient(circle, #c4b5fd 0%, #ddd6fe 45%, transparent 70%);
           opacity: 0.55;
-          animation: scannyMeshE 28s ease-in-out infinite;
+          animation: KodeMeshE 28s ease-in-out infinite;
         }
         .scanny-mesh__wash {
           position: absolute;
           inset: 0;
           background: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.35) 100%);
         }
-        @keyframes scannyMeshA {
+        @keyframes KodeMeshA {
           0%, 100% { transform: translate(0, 0) scale(1); }
           33% { transform: translate(12%, 18%) scale(1.12); }
           66% { transform: translate(22%, 6%) scale(0.94); }
         }
-        @keyframes scannyMeshB {
+        @keyframes KodeMeshB {
           0%, 100% { transform: translate(0, 0) scale(1.05); }
           40% { transform: translate(-16%, 14%) scale(0.92); }
           70% { transform: translate(-8%, 22%) scale(1.1); }
         }
-        @keyframes scannyMeshC {
+        @keyframes KodeMeshC {
           0%, 100% { transform: translate(0, 0) scale(1); }
           50% { transform: translate(14%, -18%) scale(1.15); }
         }
-        @keyframes scannyMeshD {
+        @keyframes KodeMeshD {
           0%, 100% { transform: translate(0, 0) scale(0.96); }
           35% { transform: translate(-18%, -12%) scale(1.08); }
           65% { transform: translate(-6%, -22%) scale(1); }
         }
-        @keyframes scannyMeshE {
+        @keyframes KodeMeshE {
           0%, 100% { transform: translate(0, 0) scale(1); }
           50% { transform: translate(-20%, 10%) scale(1.2); }
         }
@@ -217,7 +217,7 @@ function _QRMockup({ C: tokens }: { C: LandingTokens }) {
         </div>
         <div style={{ textAlign: 'center', marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: tokens.teal }} />
-          <span style={{ fontSize: 11, color: tokens.muted, fontWeight: 500 }}>scanny.app/menu/brewhousecafe</span>
+          <span style={{ fontSize: 11, color: tokens.muted, fontWeight: 500 }}>kode.com/menu/brewhousecafe</span>
         </div>
       </div>
     </div>
@@ -544,16 +544,16 @@ function VenueCarousel({ C }: { C: LandingTokens }) {
         .scanny-marquee-strip {
           display: flex;
           width: max-content;
-          animation: scannyMarqueeLeft linear infinite;
+          animation: KodeMarqueeLeft linear infinite;
         }
         .scanny-marquee-strip--reverse {
-          animation-name: scannyMarqueeRight;
+          animation-name: KodeMarqueeRight;
         }
-        @keyframes scannyMarqueeLeft {
+        @keyframes KodeMarqueeLeft {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
         }
-        @keyframes scannyMarqueeRight {
+        @keyframes KodeMarqueeRight {
           from { transform: translateX(-50%); }
           to { transform: translateX(0); }
         }
@@ -767,19 +767,19 @@ function TopNav({
           z-index: 1;
           color: #ea580c;
           transform-origin: center;
-          animation: scannyTicketFloat 1.8s ease-in-out infinite;
+          animation: KodeTicketFloat 1.8s ease-in-out infinite;
         }
         .scanny-nav-event__label {
           order: 0;
         }
         .scanny-nav-event:hover .scanny-nav-event__ticket {
-          animation: scannyTicketPop 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+          animation: KodeTicketPop 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
         }
-        @keyframes scannyTicketFloat {
+        @keyframes KodeTicketFloat {
           0%, 100% { transform: translateY(0) rotate(-6deg); }
           50% { transform: translateY(-2px) rotate(4deg); }
         }
-        @keyframes scannyTicketPop {
+        @keyframes KodeTicketPop {
           0% { transform: translateY(0) rotate(-6deg) scale(1); }
           45% { transform: translateY(-3px) rotate(10deg) scale(1.12); }
           100% { transform: translateY(0) rotate(-4deg) scale(1); }
@@ -801,7 +801,7 @@ function TopNav({
               <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white"/>
             </svg>
           </div>
-          <span style={S.logoText}>Scanny</span>
+          <span style={S.logoText}>Kode</span>
         </a>
 
         <div className="scanny-nav-actions">
@@ -899,7 +899,7 @@ export default function LandingPage({
             </p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }} className="hero-visual">
-            <ScannyDeviceStack />
+            <KodeDeviceStack />
           </div>
         </div>
       </section>

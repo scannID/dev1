@@ -91,7 +91,7 @@ body {
 }
 
 #kc-logo a::after {
-  content: 'Scanny';
+  content: 'Kode';
   color: var(--scanny-text);
   font-weight: 800;
   font-size: 32px;

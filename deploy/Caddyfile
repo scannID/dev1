@@ -9,17 +9,17 @@
 	}
 }
 
-scanny.app {
+kode.com {
 	import scanny_common
 	reverse_proxy merchant:80
 }
 
-admin.scanny.app {
+admin.kode.com {
 	import scanny_common
 	reverse_proxy admin:80
 }
 
-api.scanny.app {
+api.kode.com {
 	import scanny_common
 	# Round-robin across API replicas; WebSocket upgrades are forwarded automatically.
 	reverse_proxy api-1:4000 api-2:4000 api-3:4000 {
@@ -30,7 +30,7 @@ api.scanny.app {
 	}
 }
 
-auth.scanny.app {
+auth.kode.com {
 	import scanny_common
 	reverse_proxy keycloak:8080
 }

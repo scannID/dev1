@@ -11,27 +11,30 @@ x-api: &api
     POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    HIKARI_MAX_POOL_SIZE: ${HIKARI_MAX_POOL_SIZE:-20}
-    HIKARI_MIN_IDLE: ${HIKARI_MIN_IDLE:-5}
+    HIKARI_MAX_POOL_SIZE: ${HIKARI_MAX_POOL_SIZE:-10}
+    HIKARI_MIN_IDLE: ${HIKARI_MIN_IDLE:-2}
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     KEYCLOAK_SERVER_URL: http://keycloak:8080
-    KEYCLOAK_ISSUER_URI: https://auth.scanny.app/realms/${KEYCLOAK_REALM:-scanny}
+    KEYCLOAK_ISSUER_URI: https://auth.kode.com/realms/${KEYCLOAK_REALM:-scanny}
     KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-scanny}/protocol/openid-connect/certs
     KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
     KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
     KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
     KEYCLOAK_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-scanny-backend}
     KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?KEYCLOAK_BACKEND_CLIENT_SECRET is required}
-    SCAN_BASE_URL: https://scanny.app
-    SCANNY_CORS_ORIGIN_PATTERNS: https://scanny.app,https://admin.scanny.app
+    SCAN_BASE_URL: https://kode.com
+    SCANNY_CORS_ORIGIN_PATTERNS: https://kode.com,https://admin.kode.com
     SCANNY_JWT_ACCEPTED_AUDIENCES: ${SCANNY_JWT_ACCEPTED_AUDIENCES:-account}
     SCANNY_JWT_ACCEPTED_AZP: ${SCANNY_JWT_ACCEPTED_AZP:-scanny-client,scanny-admin}
     SCANNY_TRUST_FORWARDED_HEADERS: ${SCANNY_TRUST_FORWARDED_HEADERS:-true}
     SCANNY_TRUSTED_PROXIES: ${SCANNY_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32}
     SCANNY_HSTS_ENABLED: ${SCANNY_HSTS_ENABLED:-true}
     RATE_LIMIT_FAIL_CLOSED: ${RATE_LIMIT_FAIL_CLOSED:-true}
+    # Cap heap so 3 API replicas fit an ~8 GB Contabo VPS with Keycloak + Postgres + Redis.
+    JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75.0 -Xms256m -Xmx512m}
+  mem_limit: ${API_MEM_LIMIT:-768m}
   expose:
     - "4000"
   networks:
@@ -43,6 +46,16 @@ x-api: &api
       condition: service_healthy
     keycloak:
       condition: service_healthy
+  healthcheck:
+    test:
+      [
+        "CMD-SHELL",
+        "curl --fail --silent --show-error http://127.0.0.1:4000/health || curl --fail --silent --show-error http://127.0.0.1:4000/api/health || exit 1",
+      ]
+    interval: 15s
+    timeout: 5s
+    start_period: 60s
+    retries: 8
 
 services:
   caddy:
@@ -89,10 +102,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: https://api.scanny.app/api
-        VITE_SCAN_BASE_URL: https://scanny.app
-        VITE_WS_BASE_URL: wss://api.scanny.app
-        VITE_KEYCLOAK_URL: https://auth.scanny.app
+        VITE_API_BASE_URL: https://api.kode.com/api
+        VITE_SCAN_BASE_URL: https://kode.com
+        VITE_WS_BASE_URL: wss://api.kode.com
+        VITE_KEYCLOAK_URL: https://auth.kode.com
         VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-scanny-client}
     restart: unless-stopped
@@ -100,14 +113,21 @@ services:
       - "80"
     networks:
       - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    mem_limit: ${UI_MEM_LIMIT:-128m}
 
   admin:
     build:
       context: ./admin-console
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: https://api.scanny.app/api
-        VITE_KEYCLOAK_URL: https://auth.scanny.app
+        VITE_API_BASE_URL: https://api.kode.com/api
+        VITE_KEYCLOAK_URL: https://auth.kode.com
         VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_ADMIN_KEYCLOAK_CLIENT_ID:-scanny-admin}
     restart: unless-stopped
@@ -115,6 +135,46 @@ services:
       - "80"
     networks:
       - scanny-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    mem_limit: ${UI_MEM_LIMIT:-128m}
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    restart: unless-stopped
+    command: ["start"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: https://auth.kode.com
+      KC_PROXY_HEADERS: xforwarded
+      JAVA_OPTS_APPEND: ${KEYCLOAK_JAVA_OPTS_APPEND:--Xms256m -Xmx768m}
+    mem_limit: ${KEYCLOAK_MEM_LIMIT:-1280m}
+    expose:
+      - "8080"
+    networks:
+      - scanny-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 10
 
   postgres:
     image: postgres:16-alpine
@@ -140,6 +200,7 @@ services:
       - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
     networks:
       - scanny-network
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1280m}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
@@ -149,49 +210,19 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\" --maxmemory 128mb --maxmemory-policy allkeys-lru"]
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - scanny_redis_data:/data
     networks:
       - scanny-network
+    mem_limit: ${REDIS_MEM_LIMIT:-192m}
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0.7
-    restart: unless-stopped
-    command: ["start"]
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
-      KC_DB: postgres
-      KC_DB_URL_HOST: postgres
-      KC_DB_URL_PORT: 5432
-      KC_DB_URL_DATABASE: keycloak
-      KC_DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER is required}
-      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      KC_HEALTH_ENABLED: "true"
-      KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME: https://auth.scanny.app
-      KC_PROXY_HEADERS: xforwarded
-    expose:
-      - "8080"
-    networks:
-      - scanny-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
-      interval: 15s
-      timeout: 5s
-      start_period: 45s
-      retries: 10
 
 volumes:
   scanny_pg_data:

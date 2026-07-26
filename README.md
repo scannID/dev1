@@ -1,6 +1,8 @@
-# Scanny
+# Kode
 
-Scanny (`scanny.app`) is a QR-powered commerce platform. Merchants manage their business, catalog, orders, tickets, and payments; customers scan a QR code to open a public menu and place an order; administrators use a separate console for platform operations.
+Kode (`kode.com`) is a QR-powered commerce platform. Merchants manage their business, catalog, orders, tickets, and payments; customers scan a QR code to open a public menu and place an order; administrators use a separate console for platform operations.
+
+> Internal repo/package names may still say `scanny` (Keycloak clients, Java packages). The public product name is **Kode**.
 
 ## Architecture
 

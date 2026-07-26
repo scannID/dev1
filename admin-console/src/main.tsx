@@ -4,11 +4,11 @@ import './admin-index.css'
 import './admin.css'
 import AdminLogin from './AdminLogin'
 import AdminApp from './AdminApp'
-import adminKeycloak from './api/keycloak'
+import adminKeycloak, { hasAdminSession, logoutAdmin } from './api/keycloak'
 
 // Isolated session key — only this app sets/reads this key
 const SESSION_KEY = 'scanny-admin-authenticated'
-const EXPECTED_CLIENT = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-admin'
+const LOGIN_INTENT_KEY = 'scanny-admin-login-intent'
 
 let kcInitPromise: Promise<boolean> | null = null
 
@@ -17,15 +17,6 @@ function initKc() {
     kcInitPromise = adminKeycloak.init({ onLoad: 'check-sso', checkLoginIframe: false })
   }
   return kcInitPromise
-}
-
-function hasAdminRole(): boolean {
-  const roles = (adminKeycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
-  return roles.includes('ADMIN')
-}
-
-function isAdminClient(): boolean {
-  return adminKeycloak.tokenParsed?.azp === EXPECTED_CLIENT
 }
 
 function redirectUri() {
@@ -40,25 +31,34 @@ function Root() {
   const [authError, setAuthError] = useState<string | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
 
-  // Restore session only if THIS app's flag is set
+  // Restore only after intentional login or an existing admin session flag.
+  // Ambient merchant SSO on the shared realm must never open the admin app.
   useEffect(() => {
     const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
-    if (!hadSession) return
+    const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
+    if (!hadSession && !hadIntent) return
 
     initKc()
       .then((authenticated) => {
-        if (authenticated && isAdminClient() && hasAdminRole()) {
+        sessionStorage.removeItem(LOGIN_INTENT_KEY)
+        if (authenticated && hasAdminSession()) {
           const name = adminKeycloak.tokenParsed?.name
             || adminKeycloak.tokenParsed?.preferred_username
             || adminKeycloak.tokenParsed?.email
             || 'Admin'
           setKcUsername(name)
+          sessionStorage.setItem(SESSION_KEY, '1')
+          setAuthError(null)
           setView('app')
           return
         }
         sessionStorage.removeItem(SESSION_KEY)
+        if (hadIntent && authenticated && !hasAdminSession()) {
+          setAuthError('This account is not an admin. Use an ADMIN user, or open the merchant app.')
+        }
       })
       .catch(() => {
+        sessionStorage.removeItem(LOGIN_INTENT_KEY)
         sessionStorage.removeItem(SESSION_KEY)
       })
   }, [])
@@ -68,6 +68,7 @@ function Root() {
     setLoginBusy(true)
     try {
       await initKc()
+      sessionStorage.setItem(LOGIN_INTENT_KEY, '1')
       // Force the Keycloak login form — silent SSO can leave a merchant
       // session in place and make Sign in appear to do nothing.
       await adminKeycloak.login({
@@ -76,6 +77,7 @@ function Root() {
       })
     } catch (err) {
       console.error('[ADMIN] Login error:', err)
+      sessionStorage.removeItem(LOGIN_INTENT_KEY)
       setAuthError(err instanceof Error ? err.message : 'Failed to start Keycloak login')
       setLoginBusy(false)
     }
@@ -83,11 +85,8 @@ function Root() {
 
   function handleLogout() {
     sessionStorage.removeItem(SESSION_KEY)
-    if (adminKeycloak.authenticated) {
-      adminKeycloak.logout({ redirectUri: redirectUri() })
-    } else {
-      setView('landing')
-    }
+    sessionStorage.removeItem(LOGIN_INTENT_KEY)
+    logoutAdmin(redirectUri())
   }
 
   if (view === 'app') {
@@ -106,33 +105,35 @@ function Root() {
 console.log('[ADMIN] Initializing Keycloak...', {
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
   realm: import.meta.env.VITE_KEYCLOAK_REALM || 'scanny',
-  clientId: EXPECTED_CLIENT,
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-admin',
 })
 
+// Complete OAuth redirect via check-sso; do not promote ambient SSO into an admin session.
 kcInitPromise = adminKeycloak.init({ onLoad: 'check-sso', checkLoginIframe: false })
 
 kcInitPromise
   .then((authenticated) => {
     console.log('[ADMIN] Keycloak init complete - authenticated:', authenticated)
-    if (!authenticated) return
+    const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
+    const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
 
-    console.log('[ADMIN] Token:', {
-      azp: adminKeycloak.tokenParsed?.azp,
-      roles: (adminKeycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles,
-    })
-
-    if (isAdminClient() && hasAdminRole()) {
+    if (authenticated && hasAdminSession() && (hadSession || hadIntent)) {
       sessionStorage.setItem(SESSION_KEY, '1')
       return
     }
 
-    sessionStorage.removeItem(SESSION_KEY)
-    if (isAdminClient() && !hasAdminRole()) {
-      console.warn('[ADMIN] Signed in without ADMIN realm role')
+    if (!hadIntent) {
+      sessionStorage.removeItem(SESSION_KEY)
+    }
+
+    if (authenticated && hadIntent && !hasAdminSession()) {
+      console.warn('[ADMIN] Signed in without ADMIN realm role / wrong client')
     }
   })
   .catch((err) => {
     console.error('[ADMIN] Keycloak init error:', err)
+    sessionStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(LOGIN_INTENT_KEY)
     kcInitPromise = Promise.resolve(false)
   })
   .finally(() => {

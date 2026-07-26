@@ -168,7 +168,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
       <EventImageBanner src={d.eventImageUrl} />
       <div style={{ background: accent, padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Scanny · Event Ticket</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Kode · Event Ticket</p>
           <h2 style={{ margin: '5px 0 0', color: '#fff', fontSize: 22, fontWeight: 900, lineHeight: 1.2, letterSpacing: '-0.02em' }}>{d.eventName || 'Event Name'}</h2>
         </div>
         <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4, letterSpacing: '0.04em' }}>{cls}</span>
@@ -202,7 +202,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px dashed #e5e7eb', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>scanny.app · Powered by Scanny</span>
+        <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>kode.com · Powered by Kode</span>
         <span style={{ fontSize: 10, color: '#9ca3af' }}>Non-transferable</span>
       </div>
     </div>
@@ -219,7 +219,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
       <EventImageBanner src={d.eventImageUrl} />
       <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #21262d', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scanny · Festival Ticket</p>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Kode · Festival Ticket</p>
           <h2 style={{ margin: 0, color: '#f0f6fc', fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{d.eventName || 'Event Name'}</h2>
         </div>
         <span style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
@@ -250,7 +250,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
         </div>
       </div>
       <div style={{ background: '#161b22', borderTop: '1px solid #21262d', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>scanny.app</span>
+        <span style={{ fontSize: 10, fontWeight: 700, background: 'linear-gradient(90deg,#c084fc,#f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>kode.com</span>
         <span style={{ fontSize: 10, color: '#6e7681' }}>Non-transferable</span>
       </div>
     </div>
@@ -296,7 +296,7 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
       </div>
       <div style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '9px 28px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>scanny.app · Powered by Scanny</span>
+        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>kode.com · Powered by Kode</span>
         <span style={{ fontSize: 10, color: '#9ca3af' }}>Non-transferable</span>
       </div>
     </div>
@@ -312,7 +312,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
       <EventImageBanner src={d.eventImageUrl} />
       <div style={{ padding: '22px 24px 16px', background: 'linear-gradient(135deg,#1a160c,#0c0a06)', borderBottom: '1px solid rgba(201,168,108,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD_VISUAL.gold }}>Scanny · Gold Reserve</p>
+          <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: GOLD_VISUAL.gold }}>Kode · Gold Reserve</p>
           <h2 style={{ margin: 0, color: '#f8f1e3', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.15 }}>{d.eventName || 'Event Name'}</h2>
         </div>
         <span style={{ background: 'rgba(201,168,108,0.18)', border: '1px solid rgba(201,168,108,0.5)', color: GOLD_VISUAL.goldBright, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20, whiteSpace: 'nowrap', marginTop: 4 }}>{cls}</span>
@@ -341,7 +341,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
         </div>
       </div>
       <div style={{ background: '#15120c', borderTop: '1px solid rgba(201,168,108,0.2)', padding: '9px 24px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, color: GOLD_VISUAL.gold, fontWeight: 700 }}>scanny.app · Gold Reserve</span>
+        <span style={{ fontSize: 10, color: GOLD_VISUAL.gold, fontWeight: 700 }}>kode.com · Gold Reserve</span>
         <span style={{ fontSize: 10, color: '#6b5a3e' }}>Non-transferable</span>
       </div>
     </div>
@@ -638,7 +638,7 @@ function TicketOutput({
   revokeMessage: string | null
 }) {
   const purchaseUrl = data.purchaseUrl || ''
-  const hostName = data.host?.trim() || 'Scanny Events'
+  const hostName = data.host?.trim() || 'Kode Events'
 
   async function buildPrintableQr(): Promise<string> {
     const link = purchaseUrl
@@ -778,7 +778,7 @@ function TicketOutput({
 
       <div className="print-only" style={{ textAlign: 'center', padding: 24 }}>
         <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#666' }}>
-          Scanny · Master Pass
+          Kode · Master Pass
         </p>
         <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 600, fontFamily: SCANN_FONT, color: '#111' }}>{data.eventName}</h1>
         <p style={{ margin: '0 0 20px', fontSize: 14, color: '#444' }}>
@@ -1979,7 +1979,7 @@ function TicketForm({
                   >
                     <div style={{ minWidth: 0 }}>
                       <p style={{ margin: '0 0 3px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>
-                        Scanny · Event ticket
+                        Kode · Event ticket
                       </p>
                       <p
                         style={{
@@ -2056,7 +2056,7 @@ function TicketForm({
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 16px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: CREATE.teal }}>scanny.app · Powered by Scanny</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: CREATE.teal }}>kode.com · Powered by Kode</span>
                     <span style={{ fontSize: 9.5, color: CREATE.muted, fontWeight: 500 }}>Non-transferable</span>
                   </div>
                 </div>

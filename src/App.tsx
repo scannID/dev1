@@ -499,11 +499,11 @@ function App({
         <div className="sidebar-brand">
           <img
             src="/qrcode1.png"
-            alt="Scanny"
+            alt="Kode"
             className="sidebar-brand-logo"
           />
           <div className="sidebar-brand-text">
-            <strong>Scanny</strong>
+            <strong>Kode</strong>
             <span>Merchant Portal</span>
           </div>
         </div>
@@ -547,7 +547,7 @@ function App({
         <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Log out of Scanny?</AlertDialogTitle>
+              <AlertDialogTitle>Log out of Kode?</AlertDialogTitle>
               <AlertDialogDescription>
                 You will be logged out and returned to the landing page.
               </AlertDialogDescription>
@@ -1354,7 +1354,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
   return (
     <div className={compact ? 'qr-panel compact' : 'qr-panel large'} style={{ '--accent': business.accent } as QrStyle}>
       <div className="print-card">
-        <div className="print-brand">Scanny</div>
+        <div className="print-brand">Kode</div>
         <h3>{business.name}</h3>
         <p>Scan to view prices, browse the menu, and place orders.</p>
         {qrImage ? <img src={qrImage} alt={`${business.name} QR code`} /> : <div className="qr-loading" />}
@@ -1384,7 +1384,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
                   if (!qrImage) return
                   const a = document.createElement('a')
                   a.href = qrImage
-                  a.download = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'scanny'}-qr.png`
+                  a.download = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kode'}-qr.png`
                   a.click()
                 }}
               >

@@ -244,7 +244,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
                 <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white" />
               </svg>
             </div>
-            <span style={{ color: C.text, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>Scanny</span>
+            <span style={{ color: C.text, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>Kode</span>
           </div>
         </div>
 

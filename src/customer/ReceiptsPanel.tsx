@@ -1,6 +1,6 @@
 import { ArrowLeft, Receipt, RotateCcw, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { ScannyMark } from './ScannyMark'
+import { KodeMark } from './KodeMark'
 import {
   formatReceiptDate,
   formatReceiptDay,
@@ -24,7 +24,7 @@ function ReceiptCard({
             <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-card-logo" />
           ) : (
             <span className="cm-receipt-card-mark">
-              <ScannyMark size={22} />
+              <KodeMark size={22} />
             </span>
           )}
           <div>
@@ -66,7 +66,7 @@ function ReceiptDetail({
           {receipt.businessLogoUrl ? (
             <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-paper-logo" />
           ) : (
-            <ScannyMark size={28} />
+            <KodeMark size={28} />
           )}
           <div>
             <p className="cm-receipt-paper-label">Receipt</p>

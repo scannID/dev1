@@ -73,7 +73,7 @@ export default function MarketingLayout({ slug, onGetStarted }: Props) {
                 <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white" />
               </svg>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>Scanny</span>
+            <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>Kode</span>
           </a>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

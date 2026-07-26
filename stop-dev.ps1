@@ -1,4 +1,4 @@
-# Stop Scanny dev processes started by start-dev.ps1 (ports 4000, 8080, 5173, 5174).
+# Stop Kode dev processes started by start-dev.ps1 (ports 4000, 8080, 5173, 5174).
 
 param(
     [switch]$Force
@@ -7,7 +7,7 @@ param(
 $ports = @(4000, 8080, 5173, 5174)
 
 Write-Host ''
-Write-Host 'Stopping Scanny dev services...' -ForegroundColor Cyan
+Write-Host 'Stopping Kode dev services...' -ForegroundColor Cyan
 
 foreach ($port in $ports) {
     $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
@@ -34,5 +34,5 @@ foreach ($port in $ports) {
 }
 
 Write-Host ''
-Write-Host 'Done. Close any leftover Scanny PowerShell windows if they are still open.'
+Write-Host 'Done. Close any leftover Kode PowerShell windows if they are still open.'
 Write-Host ''

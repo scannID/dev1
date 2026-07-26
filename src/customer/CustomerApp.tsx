@@ -6,7 +6,7 @@ import { businessApi, devicesApi, feesApi, ordersApi } from '../api/services'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
-import { ScannyMark } from './ScannyMark'
+import { KodeMark } from './KodeMark'
 import {
   clearActiveOrder,
   clearCheckoutDraft,
@@ -236,7 +236,7 @@ export default function CustomerApp({
 
   // One scan beacon per business/QR open — not tied to menu GET (avoids StrictMode/double-fetch inflation).
   useEffect(() => {
-    const key = `scanny:scan:${businessId}:${qrToken || ''}`
+    const key = `Kode:scan:${businessId}:${qrToken || ''}`
     try {
       if (sessionStorage.getItem(key)) return
       sessionStorage.setItem(key, String(Date.now()))
@@ -641,7 +641,7 @@ export default function CustomerApp({
   if (!business) {
     return (
       <div className="cm-page cm-centered">
-        <ScannyMark />
+        <KodeMark />
         <h2>Menu unavailable</h2>
         <p className="cm-muted">{error || 'This QR code is invalid or expired.'}</p>
       </div>
@@ -666,10 +666,10 @@ export default function CustomerApp({
           {business.logoUrl ? (
             <img src={business.logoUrl} alt="" className="cm-brand-logo" />
           ) : (
-            <ScannyMark size={30} />
+            <KodeMark size={30} />
           )}
           <div className="cm-brand-text">
-            <span className="cm-brand-name">Scanny</span>
+            <span className="cm-brand-name">Kode</span>
             <span className="cm-brand-biz">{business.name}</span>
           </div>
         </div>

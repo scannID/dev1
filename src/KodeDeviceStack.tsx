@@ -1,8 +1,8 @@
-import { ScannyPhoneDemo } from './ScannyPhoneDemo'
-import { ScannyTabletDemo } from './ScannyTabletDemo'
+import { KodePhoneDemo } from './KodePhoneDemo'
+import { KodeTabletDemo } from './KodeTabletDemo'
 
 /** Hero composition: merchant tablet with customer iPhone overlapping on top. */
-export function ScannyDeviceStack() {
+export function KodeDeviceStack() {
   return (
     <div
       className="scanny-device-stack"
@@ -70,10 +70,10 @@ export function ScannyDeviceStack() {
         }
       `}</style>
 
-      <ScannyTabletDemo />
+      <KodeTabletDemo />
 
       <div className="scanny-phone-layer" aria-hidden={false}>
-        <ScannyPhoneDemo />
+        <KodePhoneDemo />
       </div>
     </div>
   )
