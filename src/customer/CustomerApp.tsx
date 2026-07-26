@@ -210,7 +210,10 @@ export default function CustomerApp({
       try {
         setLoading(true)
         setError(null)
+        const started = Date.now()
         const menu = await businessApi.getMenu(businessId, qrToken || undefined)
+        const remaining = Math.max(0, 700 - (Date.now() - started))
+        if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (cancelled) return
         setBusiness(menu.business)
         setItems(menu.items ?? [])

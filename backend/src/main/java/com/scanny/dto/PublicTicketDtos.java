@@ -14,6 +14,12 @@ public class PublicTicketDtos {
         int price
     ) {}
 
+    public record TicketTableOption(
+        String name,
+        int seats,
+        int price
+    ) {}
+
     public record EventInfoResponse(
         String masterTicketId,
         String eventName,
@@ -21,8 +27,11 @@ public class PublicTicketDtos {
         String currency,
         String template,
         List<TicketClassOption> ticketClasses,
+        List<TicketTableOption> tables,
         String paymentDestination,
-        String purchaseUrl
+        String purchaseUrl,
+        String eventImageUrl,
+        String host
     ) {}
 
     public record PurchaseRequest(

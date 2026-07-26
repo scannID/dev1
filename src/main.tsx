@@ -84,6 +84,7 @@ if (customerRoute) {
     </StrictMode>
   )
 } else if (createEventRoute) {
+  applyDarkMode(false)
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <div style={{ minHeight: '100svh', width: '100%', overflow: 'hidden' }}>

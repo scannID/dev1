@@ -3,9 +3,9 @@ import QRCode from 'qrcode'
 import { Check, Clock } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
 import type { AttendeeTicketView } from '../api/types'
-import { LoadingSpinner } from '../components/LoadingSpinner'
 import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
 import { ScannyMark } from '../customer/ScannyMark'
+import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
 type Props = { accessToken: string }
@@ -97,7 +97,10 @@ export default function TicketViewPage({ accessToken }: Props) {
     ;(async () => {
       try {
         setLoading(true)
+        const started = Date.now()
         const data = await publicTicketsApi.view(accessToken)
+        const remaining = Math.max(0, 700 - (Date.now() - started))
+        if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (cancelled) return
         setTicket(data)
         if (data.paymentStatus === 'Paid') {
@@ -127,6 +130,7 @@ export default function TicketViewPage({ accessToken }: Props) {
     const location = typeof meta.location === 'string' ? meta.location : ''
     const time = typeof meta.time === 'string' ? meta.time : ''
     const host = typeof meta.host === 'string' ? meta.host : ''
+    const eventImageUrl = typeof meta.eventImageUrl === 'string' ? meta.eventImageUrl : undefined
     const dateIso = ticket.eventDate
     const date = dateIso ? dateIso.slice(0, 10) : ''
     return {
@@ -141,13 +145,14 @@ export default function TicketViewPage({ accessToken }: Props) {
       tables: [],
       ticketId: ticket.id,
       selectedClass: ticket.ticketType,
+      eventImageUrl,
     }
   }, [ticket])
 
   if (loading) {
     return (
-      <div className="tk-shell tk-centered">
-        <LoadingSpinner fullPage label="Loading ticket…" />
+      <div className="tk-shell tk-centered tk-boot">
+        <MusicInstrumentLoader />
       </div>
     )
   }
@@ -175,13 +180,18 @@ export default function TicketViewPage({ accessToken }: Props) {
           <ScannyMark size={28} />
           <div>
             <strong>Scanny</strong>
-            <span>{paid ? 'Your ticket' : 'Payment pending'}</span>
+            <span>{visual.host?.trim() || ticket.holderName || 'Hosted event'}</span>
           </div>
         </div>
       </header>
 
       <main className="tk-main">
         <header className="tk-hero tk-enter">
+          {visual.eventImageUrl ? (
+            <div className="tk-hero-art">
+              <img src={visual.eventImageUrl} alt="" />
+            </div>
+          ) : null}
           <p className="tk-hero-kicker">{paid ? 'Entry pass' : 'Almost there'}</p>
           <h1>{ticket.eventName}</h1>
           <p className="tk-hero-meta">

@@ -82,6 +82,7 @@ public class TicketPurchaseService {
         Ticket master = requireEventTemplate(masterQrToken);
         Map<String, Object> meta = parseMetadata(master.getMetadata());
         List<PublicTicketDtos.TicketClassOption> classes = parseClasses(meta, master.getTicketType(), master.getPrice());
+        List<PublicTicketDtos.TicketTableOption> tables = parseTables(meta);
         return new PublicTicketDtos.EventInfoResponse(
             master.getId(),
             master.getEventName(),
@@ -89,8 +90,11 @@ public class TicketPurchaseService {
             master.getCurrency(),
             stringMeta(meta, "template", "classic"),
             classes,
+            tables,
             stringMeta(meta, "payTo", ""),
-            customerUrl + "/ticket/" + master.getQrToken()
+            customerUrl + "/ticket/" + master.getQrToken(),
+            stringMeta(meta, "eventImageUrl", ""),
+            stringMeta(meta, "host", "")
         );
     }
 
@@ -100,7 +104,7 @@ public class TicketPurchaseService {
         String email = requireEmail(request.holderEmail());
         String name = requireText(request.holderName(), "Your name is required");
         String phone = requireText(request.holderPhone(), "Mobile money number is required");
-        String ticketClass = requireText(request.ticketClass(), "Select a ticket class");
+        String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
 
         if (ticketRepository.existsByEventNameAndHolderEmailIgnoreCaseAndPaymentStatusAndMasterTicketIdIsNotNull(
                 master.getEventName(), email, PaymentStatus.Paid)) {
@@ -108,7 +112,10 @@ public class TicketPurchaseService {
         }
 
         Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
-        int price = resolveClassPrice(masterMeta, ticketClass, master.getPrice());
+        int price = resolveSelectionPrice(masterMeta, ticketClass, master.getPrice());
+        if (price < 0) {
+            throw new ApiException(400, "Unknown ticket class or table");
+        }
 
         Ticket attendee = new Ticket();
         attendee.setId(generateTicketId());
@@ -241,7 +248,7 @@ public class TicketPurchaseService {
                 if (item instanceof Map<?, ?> map) {
                     String name = String.valueOf(map.get("name"));
                     int price = parsePrice(map.get("fee"), fallbackPrice);
-                    if (!name.isBlank()) {
+                    if (!name.isBlank() && !"null".equalsIgnoreCase(name)) {
                         classes.add(new PublicTicketDtos.TicketClassOption(name, price));
                     }
                 }
@@ -253,12 +260,39 @@ public class TicketPurchaseService {
         return classes;
     }
 
-    private int resolveClassPrice(Map<String, Object> meta, String ticketClass, int fallbackPrice) {
-        return parseClasses(meta, ticketClass, fallbackPrice).stream()
-            .filter(c -> c.name().equalsIgnoreCase(ticketClass))
-            .map(PublicTicketDtos.TicketClassOption::price)
-            .findFirst()
-            .orElse(fallbackPrice);
+    @SuppressWarnings("unchecked")
+    private List<PublicTicketDtos.TicketTableOption> parseTables(Map<String, Object> meta) {
+        Object raw = meta.get("tables");
+        List<PublicTicketDtos.TicketTableOption> tables = new ArrayList<>();
+        if (!(raw instanceof List<?> list)) {
+            return tables;
+        }
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                String name = String.valueOf(map.get("name"));
+                if (name.isBlank() || "null".equalsIgnoreCase(name)) {
+                    continue;
+                }
+                int seats = parsePrice(map.get("seats"), 0);
+                int price = parsePrice(map.get("price"), 0);
+                tables.add(new PublicTicketDtos.TicketTableOption(name, seats, price));
+            }
+        }
+        return tables;
+    }
+
+    private int resolveSelectionPrice(Map<String, Object> meta, String selection, int fallbackPrice) {
+        for (PublicTicketDtos.TicketClassOption option : parseClasses(meta, selection, fallbackPrice)) {
+            if (option.name().equalsIgnoreCase(selection)) {
+                return option.price();
+            }
+        }
+        for (PublicTicketDtos.TicketTableOption table : parseTables(meta)) {
+            if (table.name().equalsIgnoreCase(selection)) {
+                return table.price();
+            }
+        }
+        return -1;
     }
 
     private int parsePrice(Object fee, int fallback) {

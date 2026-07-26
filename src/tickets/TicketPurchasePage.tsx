@@ -2,11 +2,13 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { Smartphone } from 'lucide-react'
 import { publicTicketsApi, paymentsApi } from '../api/services'
 import type { TicketEventInfo, TicketPurchaseResponse } from '../api/types'
-import { LoadingSpinner } from '../components/LoadingSpinner'
 import { ScannyMark } from '../customer/ScannyMark'
+import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
 type Props = { masterQrToken: string }
+
+const PAYMENT_WAIT_LIMIT_SEC = 30
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -30,6 +32,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [event, setEvent] = useState<TicketEventInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
   const [holderEmail, setHolderEmail] = useState('')
@@ -38,6 +41,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [purchase, setPurchase] = useState<TicketPurchaseResponse | null>(null)
   const [waiting, setWaiting] = useState(false)
+  const [waitSecondsLeft, setWaitSecondsLeft] = useState(PAYMENT_WAIT_LIMIT_SEC)
 
   useEffect(() => {
     document.documentElement.classList.add('tk-app')
@@ -53,10 +57,14 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     ;(async () => {
       try {
         setLoading(true)
+        const started = Date.now()
         const data = await publicTicketsApi.getEvent(masterQrToken)
+        const remaining = Math.max(0, 700 - (Date.now() - started))
+        if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (!cancelled) {
           setEvent(data)
           setTicketClass(data.ticketClasses[0]?.name ?? '')
+          setBuyTab('classes')
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Event not found')
@@ -74,6 +82,8 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     if (!waiting) return
 
     let cancelled = false
+    setWaitSecondsLeft(PAYMENT_WAIT_LIMIT_SEC)
+
     const interval = window.setInterval(async () => {
       try {
         const status = await paymentsApi.status(purchase.paymentId)
@@ -89,9 +99,26 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       }
     }, 3000)
 
+    const countdown = window.setInterval(() => {
+      setWaitSecondsLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(countdown)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return
+      window.location.href = '/'
+    }, PAYMENT_WAIT_LIMIT_SEC * 1000)
+
     return () => {
       cancelled = true
       window.clearInterval(interval)
+      window.clearInterval(countdown)
+      window.clearTimeout(timeout)
     }
   }, [purchase, waiting])
 
@@ -122,13 +149,17 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     }
   }
 
-  const selected = event?.ticketClasses.find((c) => c.name === ticketClass)
+  const tables = event?.tables ?? []
+  const hasTables = tables.length > 0
+  const selectedClass = event?.ticketClasses.find((c) => c.name === ticketClass)
+  const selectedTable = tables.find((t) => t.name === ticketClass)
+  const selectedPrice = selectedClass?.price ?? selectedTable?.price ?? 0
   const dateLabel = formatEventDate(event?.eventDate ?? null)
 
   if (loading) {
     return (
-      <div className="tk-shell tk-centered">
-        <LoadingSpinner fullPage label="Loading event…" />
+      <div className="tk-shell tk-centered tk-boot">
+        <MusicInstrumentLoader />
       </div>
     )
   }
@@ -175,6 +206,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               Once paid, your ticket opens here and we email <strong>{holderEmail}</strong>.
             </p>
             <p className="tk-ref">Payment ref: {purchase.paymentId}</p>
+            <p className="tk-ref" role="status">
+              Waiting {waitSecondsLeft}s — then back to home if still pending
+            </p>
           </div>
         </main>
       </div>
@@ -188,13 +222,18 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <ScannyMark size={28} />
           <div>
             <strong>Scanny</strong>
-            <span>Event ticket</span>
+            <span>{event.host?.trim() || 'Hosted event'}</span>
           </div>
         </div>
       </header>
 
       <main className="tk-main">
         <header className="tk-hero tk-enter">
+          {event.eventImageUrl ? (
+            <div className="tk-hero-art">
+              <img src={event.eventImageUrl} alt="" />
+            </div>
+          ) : null}
           <p className="tk-hero-kicker">Get your ticket</p>
           <h1>{event.eventName}</h1>
           <p className="tk-hero-meta">
@@ -203,25 +242,81 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="tk-panel tk-enter">
-          <p className="tk-section-label">Ticket class</p>
-          <div className="tk-class-grid" role="radiogroup" aria-label="Ticket class">
-            {event.ticketClasses.map((c) => {
-              const active = c.name === ticketClass
-              return (
-                <button
-                  key={c.name}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  className={`tk-class-card${active ? ' is-selected' : ''}`}
-                  onClick={() => setTicketClass(c.name)}
-                  disabled={submitting}
-                >
-                  <strong>{c.name}</strong>
-                  <span>{money(c.price, event.currency)}</span>
-                </button>
-              )
-            })}
+          {hasTables ? (
+            <div className="tk-tabs" role="tablist" aria-label="Buy general tickets or tables">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={buyTab === 'classes'}
+                className={`tk-tab${buyTab === 'classes' ? ' is-active' : ''}`}
+                onClick={() => {
+                  setBuyTab('classes')
+                  setTicketClass(event.ticketClasses[0]?.name ?? '')
+                }}
+                disabled={submitting}
+              >
+                General
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={buyTab === 'tables'}
+                className={`tk-tab${buyTab === 'tables' ? ' is-active' : ''}`}
+                onClick={() => {
+                  setBuyTab('tables')
+                  setTicketClass(tables[0]?.name ?? '')
+                }}
+                disabled={submitting}
+              >
+                Tables
+              </button>
+            </div>
+          ) : null}
+
+          <p className="tk-section-label">{buyTab === 'tables' && hasTables ? 'Table' : 'Ticket'}</p>
+          <div
+            className="tk-class-grid"
+            role="radiogroup"
+            aria-label={buyTab === 'tables' && hasTables ? 'Table' : 'Ticket'}
+          >
+            {buyTab === 'tables' && hasTables
+              ? tables.map((t) => {
+                  const active = t.name === ticketClass
+                  return (
+                    <button
+                      key={t.name}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={`tk-class-card${active ? ' is-selected' : ''}`}
+                      onClick={() => setTicketClass(t.name)}
+                      disabled={submitting}
+                    >
+                      <span>
+                        <strong>{t.name}</strong>
+                        {t.seats > 0 ? <em className="tk-card-meta">{t.seats} seats</em> : null}
+                      </span>
+                      <span>{money(t.price, event.currency)}</span>
+                    </button>
+                  )
+                })
+              : event.ticketClasses.map((c) => {
+                  const active = c.name === ticketClass
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={`tk-class-card${active ? ' is-selected' : ''}`}
+                      onClick={() => setTicketClass(c.name)}
+                      disabled={submitting}
+                    >
+                      <strong>{c.name}</strong>
+                      <span>{money(c.price, event.currency)}</span>
+                    </button>
+                  )
+                })}
           </div>
 
           <div className="tk-fields">
@@ -252,18 +347,6 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 Ticket is emailed here after payment — one purchase per email for this event.
               </p>
             </label>
-
-            <label className="tk-field">
-              Mobile money number
-              <input
-                value={holderPhone}
-                onChange={(e) => setHolderPhone(e.target.value)}
-                placeholder="+256…"
-                autoComplete="tel"
-                required
-                disabled={submitting}
-              />
-            </label>
           </div>
 
           <p className="tk-section-label" style={{ marginTop: 16 }}>
@@ -292,6 +375,20 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </button>
           </div>
 
+          <div className="tk-fields" style={{ marginTop: 14 }}>
+            <label className="tk-field">
+              Mobile money number
+              <input
+                value={holderPhone}
+                onChange={(e) => setHolderPhone(e.target.value)}
+                placeholder="+256…"
+                autoComplete="tel"
+                required
+                disabled={submitting}
+              />
+            </label>
+          </div>
+
           {error ? (
             <div className="tk-error" role="alert">
               {error}
@@ -299,7 +396,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           ) : null}
 
           <button type="submit" className="tk-cta" disabled={submitting || !ticketClass}>
-            {submitting ? 'Starting…' : `Pay ${money(selected?.price ?? 0, event.currency)}`}
+            {submitting ? 'Starting…' : `Pay ${money(selectedPrice, event.currency)}`}
           </button>
         </form>
       </main>

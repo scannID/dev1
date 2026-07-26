@@ -9,16 +9,16 @@ html.tk-app body {
 
 .tk-shell {
   --tk-bg: #ffffff;
-  --tk-bg-elev: #f7f8f9;
+  --tk-bg-elev: #fff7ed;
   --tk-panel: #ffffff;
-  --tk-panel-2: #f3f4f6;
-  --tk-gold: #0f766e;
-  --tk-gold-bright: #0d9488;
+  --tk-panel-2: #fff7ed;
+  --tk-gold: #ea580c;
+  --tk-gold-bright: #f97316;
   --tk-gold-dim: color-mix(in srgb, var(--tk-gold) 28%, transparent);
-  --tk-gold-soft: color-mix(in srgb, var(--tk-gold) 10%, transparent);
+  --tk-gold-soft: color-mix(in srgb, var(--tk-gold) 12%, transparent);
   --tk-text: #111827;
   --tk-muted: #6b7280;
-  --tk-border: #e5e7eb;
+  --tk-border: #fed7aa;
   --tk-danger: #dc2626;
   --tk-ok: #16a34a;
   --tk-font: 'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif;
@@ -28,8 +28,8 @@ html.tk-app body {
   color: var(--tk-text);
   font-family: var(--tk-font);
   background:
-    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(15, 118, 110, 0.08), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(15, 118, 110, 0.04), transparent 45%),
+    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(249, 115, 22, 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(234, 88, 12, 0.06), transparent 45%),
     var(--tk-bg);
   background-attachment: fixed;
 }
@@ -45,8 +45,7 @@ html.tk-app body {
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--tk-border);
-  background: color-mix(in srgb, #ffffff 88%, transparent);
-  backdrop-filter: blur(12px);
+  background: #ffffff;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -101,6 +100,23 @@ html.tk-app body {
   margin-bottom: 22px;
 }
 
+.tk-hero-art {
+  margin: 0 0 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--tk-border);
+  aspect-ratio: 16 / 9;
+  max-height: 200px;
+  background: var(--tk-bg-elev);
+}
+
+.tk-hero-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .tk-hero-kicker {
   margin: 0 0 8px;
   font-size: 11px;
@@ -143,6 +159,44 @@ html.tk-app body {
   color: var(--tk-muted);
 }
 
+.tk-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--tk-bg-elev);
+  border: 1px solid var(--tk-border);
+}
+
+.tk-tab {
+  appearance: none;
+  border: none;
+  border-radius: 9px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tk-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.tk-tab.is-active {
+  background: #ffffff;
+  color: var(--tk-text);
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.08);
+}
+
+.tk-tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .tk-class-grid {
   display: grid;
   gap: 10px;
@@ -168,6 +222,15 @@ html.tk-app body {
     background 180ms ease,
     transform 160ms ease,
     box-shadow 180ms ease;
+}
+
+.tk-card-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--tk-muted);
 }
 
 .tk-class-card:hover:not(:disabled) {
@@ -524,6 +587,54 @@ html.tk-app body {
   display: grid;
   place-items: center;
   padding: 24px 16px;
+}
+
+.tk-boot {
+  gap: 0;
+}
+
+.tk-music-loader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 14px;
+  color: var(--tk-gold-bright);
+  height: calc(var(--tk-music-size, 56px) * 1.15);
+}
+
+.tk-music-icon {
+  width: calc(var(--tk-music-size, 56px) * 0.48);
+  height: var(--tk-music-size, 56px);
+  transform-origin: 50% 100%;
+  animation: tk-music-bounce 1.05s ease-in-out infinite;
+}
+
+.tk-music-note {
+  animation-delay: 0ms;
+}
+
+.tk-music-guitar {
+  animation-delay: 140ms;
+}
+
+.tk-music-drum {
+  animation-delay: 280ms;
+}
+
+@keyframes tk-music-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.72;
+  }
+  35% {
+    transform: translateY(-10px) rotate(-4deg);
+    opacity: 1;
+  }
+  55% {
+    transform: translateY(-4px) rotate(3deg);
+    opacity: 1;
+  }
 }
 
 .tk-shell .scanny-loading-label {

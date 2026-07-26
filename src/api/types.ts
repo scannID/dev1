@@ -361,6 +361,12 @@ export interface TicketClassOption {
   price: number
 }
 
+export interface TicketTableOption {
+  name: string
+  seats: number
+  price: number
+}
+
 export interface TicketEventInfo {
   masterTicketId: string
   eventName: string
@@ -368,8 +374,11 @@ export interface TicketEventInfo {
   currency: string
   template: string
   ticketClasses: TicketClassOption[]
+  tables?: TicketTableOption[]
   paymentDestination: string
   purchaseUrl: string
+  eventImageUrl?: string | null
+  host?: string | null
 }
 
 export interface TicketPurchaseRequest {
