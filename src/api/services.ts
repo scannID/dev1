@@ -23,6 +23,7 @@ import type {
   UpdatePaymentStatusRequest,
   ClearCompletedResponse,
   MerchantMeResponse,
+  MerchantProfile,
   QrCodeResponse,
   OnboardingStatusResponse,
   MenuResponse,

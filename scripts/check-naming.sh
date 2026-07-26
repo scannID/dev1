@@ -9,7 +9,8 @@ if git grep -nEI \
   -e 'ScanIT' \
   -- . \
   ':(exclude)docs/archive/**' \
-  ':(exclude)backend/src/main/resources/db/migration/**'
+  ':(exclude)backend/src/main/resources/db/migration/**' \
+  ':(exclude)scripts/check-naming.sh'
 then
   echo "error: legacy product naming remains outside docs/archive/ and historical migrations"
   failed=1
