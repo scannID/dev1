@@ -181,7 +181,7 @@ function customerUrl(business: Business) {
 function App({
   onLogout,
   onBackToLanding: _onBackToLanding,
-  kcUsername,
+  kcUsername: _kcUsername,
 }: {
   onLogout?: () => void
   onBackToLanding?: () => void
@@ -1384,7 +1384,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
                   if (!qrImage) return
                   const a = document.createElement('a')
                   a.href = qrImage
-                  a.download = `${business.name.replace(/[^\w\-]+/g, '_').slice(0, 40) || 'scanny'}-qr.png`
+                  a.download = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'scanny'}-qr.png`
                   a.click()
                 }}
               >

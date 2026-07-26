@@ -24,7 +24,7 @@ export function useOrders(businessId: string) {
       const message = toErrorMessage(err, 'Failed to create order')
       console.error('Failed to create order:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -39,7 +39,7 @@ export function useOrders(businessId: string) {
       const message = toErrorMessage(err, 'Failed to update order status')
       console.error('Failed to update order status:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -54,7 +54,7 @@ export function useOrders(businessId: string) {
       const message = toErrorMessage(err, 'Failed to update payment status')
       console.error('Failed to update payment status:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -69,7 +69,7 @@ export function useOrders(businessId: string) {
       const message = toErrorMessage(err, 'Failed to clear completed orders')
       console.error('Failed to clear completed orders:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }

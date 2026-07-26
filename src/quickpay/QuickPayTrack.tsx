@@ -204,7 +204,6 @@ export default function QuickPayTrack({ trackingNumber: initial, onBack }: Props
 
   useEffect(() => {
     load(initial || DEMO_TRACKING_NUMBER).catch(() => undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial])
 
   function handleSubmit(e: FormEvent) {

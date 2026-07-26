@@ -657,7 +657,7 @@ function TicketOutput({
       if (!dataUrl) return null
       const res = await fetch(dataUrl)
       const blob = await res.blob()
-      const safeName = (data.eventName || 'event').replace(/[^\w\-]+/g, '_').slice(0, 40)
+      const safeName = (data.eventName || 'event').replace(/[^\w-]+/g, '_').slice(0, 40)
       return new File([blob], `${safeName}-qr.png`, { type: 'image/png' })
     } catch {
       return null

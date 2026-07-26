@@ -24,7 +24,7 @@ export function useCatalog(businessId: string) {
       const message = toErrorMessage(err, 'Failed to create item')
       console.error('Failed to create catalog item:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -39,7 +39,7 @@ export function useCatalog(businessId: string) {
       const message = toErrorMessage(err, 'Failed to update item')
       console.error('Failed to update catalog item:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -54,7 +54,7 @@ export function useCatalog(businessId: string) {
       const message = toErrorMessage(err, 'Failed to toggle availability')
       console.error('Failed to toggle availability:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -69,7 +69,7 @@ export function useCatalog(businessId: string) {
       const message = toErrorMessage(err, 'Failed to delete item')
       console.error('Failed to delete catalog item:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }
@@ -84,7 +84,7 @@ export function useCatalog(businessId: string) {
       const message = toErrorMessage(err, 'Failed to add category')
       console.error('Failed to add category:', err)
       setError(message)
-      throw new Error(message)
+      throw new Error(message, { cause: err })
     } finally {
       setLoading(false)
     }

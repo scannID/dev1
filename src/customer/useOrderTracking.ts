@@ -20,7 +20,7 @@ export function useOrderTracking(
     }
 
     let cancelled = false
-    let intervalId: number | undefined
+    const timer: { id?: number } = {}
 
     const fetchStatus = async () => {
       try {
@@ -28,8 +28,8 @@ export function useOrderTracking(
         if (cancelled) return result
         setOrder(result)
         setError(null)
-        if (TERMINAL.includes(result.status) && intervalId !== undefined) {
-          window.clearInterval(intervalId)
+        if (TERMINAL.includes(result.status) && timer.id !== undefined) {
+          window.clearInterval(timer.id)
         }
         return result
       } catch (err) {
@@ -43,14 +43,14 @@ export function useOrderTracking(
     setLoading(true)
     void fetchStatus()
 
-    intervalId = window.setInterval(() => {
+    timer.id = window.setInterval(() => {
       void fetchStatus()
     }, pollMs)
 
     return () => {
       cancelled = true
-      if (intervalId !== undefined) {
-        window.clearInterval(intervalId)
+      if (timer.id !== undefined) {
+        window.clearInterval(timer.id)
       }
     }
   }, [publicId, phone, enabled, pollMs])

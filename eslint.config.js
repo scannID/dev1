@@ -6,9 +6,19 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'admin-console/**', 'backend/**', 'docs/**', 'node_modules/**']),
+  globalIgnores([
+    'dist',
+    'admin-console/**',
+    'backend/**',
+    'docs/**',
+    'node_modules/**',
+    '.dev/**',
+    'loadtests/**',
+    'keycloak-theme/**',
+    'ui proj ref/**',
+  ]),
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ['**/*.{js,jsx,mjs,cjs,ts,tsx}'],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
