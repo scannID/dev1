@@ -4,7 +4,12 @@ import type { CatalogItem } from '../../api/types'
 import { getCategoryImage } from '../../lib/categoryImages'
 import { cartLineKey, normalizeRemovedIngredients } from '../../lib/catalogCart'
 import { discountPercentOf, effectivePrice, isOnOffer } from '../../lib/catalogPricing'
-import { currency } from '../utils'
+import { currency, usdEquiv } from '../utils'
+
+function UsdHint({ amount }: { amount: number }) {
+  const usd = usdEquiv(amount)
+  return usd ? <span className="cm-usd">{usd}</span> : null
+}
 
 const PAGE_SIZE = 20
 
@@ -12,11 +17,11 @@ function PriceBlock({ item, className }: { item: CatalogItem; className?: string
   const off = discountPercentOf(item)
   const sale = effectivePrice(item)
   if (off <= 0) {
-    return <strong className={className}>{currency(item.price)}</strong>
+    return <strong className={className}>{currency(item.price)}<UsdHint amount={item.price} /></strong>
   }
   return (
     <strong className={`cm-price-sale${className ? ` ${className}` : ''}`}>
-      <span className="cm-price-now">{currency(sale)}</span>
+      <span className="cm-price-now">{currency(sale)}<UsdHint amount={sale} /></span>
       <span className="cm-price-was">{currency(item.price)}</span>
     </strong>
   )
@@ -218,7 +223,7 @@ export function MenuStep({
                     <div className="cm-offer-card-scrub">
                       <h3>{item.name}</h3>
                       <div className="cm-offer-prices">
-                        <span className="cm-offer-now">{currency(sale)}</span>
+                        <span className="cm-offer-now">{currency(sale)}<UsdHint amount={sale} /></span>
                         {off > 0 ? <span className="cm-offer-was">{currency(item.price)}</span> : null}
                       </div>
                     </div>
@@ -440,12 +445,12 @@ function ItemDetailSheet({
             <p className="cm-item-sheet-price">
               {off > 0 ? (
                 <>
-                  <span className="cm-price-now">{currency(sale)}</span>
+                  <span className="cm-price-now">{currency(sale)}<UsdHint amount={sale} /></span>
                   <span className="cm-price-was">{currency(item.price)}</span>
                   <span className="cm-item-sheet-off">{off}% off</span>
                 </>
               ) : (
-                currency(item.price)
+                <>{currency(item.price)}<UsdHint amount={item.price} /></>
               )}
             </p>
           </div>

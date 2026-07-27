@@ -184,35 +184,34 @@ export function useRevenue() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const [ov, tx] = await Promise.all([
-          adminApi.revenue.getOverview(),
-          adminApi.revenue.listTransactions(),
-        ])
-        if (!cancelled) {
-          setOverview(ov)
-          setTransactions(tx)
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load revenue')
-          setOverview(null)
-          setTransactions([])
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+  const refresh = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const [ov, tx] = await Promise.all([
+        adminApi.revenue.getOverview(),
+        adminApi.revenue.listTransactions(),
+      ])
+      setOverview(ov)
+      setTransactions(tx)
+      setError(null)
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load revenue')
+        setOverview(null)
+        setTransactions([])
       }
-    })()
-    return () => {
-      cancelled = true
+    } finally {
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  return { overview, transactions, loading, error }
+  useEffect(() => {
+    void refresh(false)
+  }, [refresh])
+
+  useAdminMetricsRealtime(() => refresh(true))
+
+  return { overview, transactions, loading, error, refresh: () => refresh(false) }
 }
 
 export function useConfigs() {

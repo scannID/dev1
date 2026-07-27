@@ -2295,3 +2295,11 @@ html.cm-app body {
 .cm-stay-dates .cm-field-error {
   font-weight: 500;
 }
+
+.cm-usd {
+  display: inline-block;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--cm-muted);
+  margin-left: 4px;
+}

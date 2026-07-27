@@ -130,7 +130,7 @@ export default function MetricsHero() {
     void load(false)
     pollTimer = window.setInterval(() => {
       void load(true)
-    }, 60000)
+    }, 5000)
 
     return () => {
       cancelled = true

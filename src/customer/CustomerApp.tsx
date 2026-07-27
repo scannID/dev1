@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { businessApi, devicesApi, feesApi, ordersApi } from '../api/services'
+import { businessApi, devicesApi, feesApi, fxApi, ordersApi } from '../api/services'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
@@ -42,7 +42,14 @@ import {
   type CustomerReceipt,
 } from './receipts'
 import { useOrderTracking } from './useOrderTracking'
-import { currency, formatUgPhoneHint, getOrCreateDeviceId, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from './utils'
+import {
+  currency,
+  formatUgPhoneHint,
+  getOrCreateDeviceId,
+  DEFAULT_SERVICE_FEE_UGX,
+  setLiveUgxPerUsd,
+  withServiceFee,
+} from './utils'
 import { UtensilLoader } from './UtensilLoader'
 import './CustomerApp.css'
 
@@ -68,6 +75,7 @@ export default function CustomerApp({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [serviceFeeUgx, setServiceFeeUgx] = useState(DEFAULT_SERVICE_FEE_UGX)
+  const [, setFxTick] = useState(0)
 
   const [cart, setCart] = useState<Record<string, number>>(draft?.cart ?? {})
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -232,6 +240,28 @@ export default function CustomerApp({
 
   useEffect(() => {
     let cancelled = false
+    const refreshLiveFx = async () => {
+      try {
+        const rate = await fxApi.ugxPerUsd()
+        if (cancelled) return
+        setLiveUgxPerUsd(rate)
+        setFxTick((v) => v + 1)
+      } catch {
+        // keep last known rate or env fallback
+      }
+    }
+    void refreshLiveFx()
+    const id = window.setInterval(() => {
+      void refreshLiveFx()
+    }, 1000 * 60 * 5)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     async function loadMenu() {
       try {
         setLoading(true)
@@ -263,25 +293,47 @@ export default function CustomerApp({
     }
   }, [businessId, qrToken])
 
-  // One scan beacon per business/QR open — not tied to menu GET (avoids StrictMode/double-fetch inflation).
+  // Record one scan per open. Server also dedupes (~45s). sessionStorage only
+  // suppresses rapid reloads in the same tab so counts still move on real revisits.
   useEffect(() => {
     const key = `Kode:scan:${businessId}:${qrToken || ''}`
+    const DEDUPE_MS = 45_000
+    const now = Date.now()
+
     try {
-      if (sessionStorage.getItem(key)) return
-      sessionStorage.setItem(key, String(Date.now()))
+      const prev = Number(sessionStorage.getItem(key) || 0)
+      if (Number.isFinite(prev) && prev > 0 && now - prev < DEDUPE_MS) return
     } catch {
-      // private mode / blocked storage — still attempt once via module guard below
+      // private mode / blocked storage
     }
+
+    // In-memory guard for React StrictMode double-mount in the same tick.
     if (recordedScanKeys.has(key)) return
     recordedScanKeys.add(key)
-    void businessApi.recordScan(businessId, qrToken || undefined).catch(() => {
-      recordedScanKeys.delete(key)
-      try {
-        sessionStorage.removeItem(key)
-      } catch {
-        /* ignore */
-      }
-    })
+
+    let cancelled = false
+    void businessApi
+      .recordScan(businessId, qrToken || undefined)
+      .then(() => {
+        // Persist even if this effect was cleaned up (StrictMode) — the scan was saved.
+        try {
+          sessionStorage.setItem(key, String(now))
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        if (!cancelled) recordedScanKeys.delete(key)
+      })
+      .finally(() => {
+        window.setTimeout(() => {
+          recordedScanKeys.delete(key)
+        }, DEDUPE_MS)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [businessId, qrToken])
 
   const restoredActiveOrder = useRef(false)

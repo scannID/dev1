@@ -2,6 +2,7 @@ package com.scanny.controller;
 
 import com.scanny.dto.admin.AdminAnalyticsDtos;
 import com.scanny.service.AdminAnalyticsService;
+import com.scanny.service.CookieConsentAnalyticsService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,9 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminAnalyticsController {
 
     private final AdminAnalyticsService adminAnalyticsService;
+    private final CookieConsentAnalyticsService cookieConsentAnalyticsService;
 
-    public AdminAnalyticsController(AdminAnalyticsService adminAnalyticsService) {
+    public AdminAnalyticsController(
+            AdminAnalyticsService adminAnalyticsService,
+            CookieConsentAnalyticsService cookieConsentAnalyticsService
+    ) {
         this.adminAnalyticsService = adminAnalyticsService;
+        this.cookieConsentAnalyticsService = cookieConsentAnalyticsService;
     }
 
     @GetMapping("/analytics/tickets")
@@ -37,6 +43,13 @@ public class AdminAnalyticsController {
         @RequestParam(defaultValue = "daily") String range
     ) {
         return adminAnalyticsService.getScansOrders(range);
+    }
+
+    @GetMapping("/analytics/cookie-consents")
+    public AdminAnalyticsDtos.CookieConsentAnalytics getCookieConsents(
+        @RequestParam(defaultValue = "daily") String range
+    ) {
+        return cookieConsentAnalyticsService.getAnalytics(range);
     }
 
     @GetMapping("/revenue/overview")

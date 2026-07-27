@@ -2,7 +2,7 @@ import { Check } from 'lucide-react'
 import type { OrderStatus } from '../../api/types'
 import { formatWaitRange } from '../../lib/waitEstimate'
 import { OrderStatusTracker } from '../OrderStatusTracker'
-import { currency } from '../utils'
+import { currency, usdEquiv } from '../utils'
 
 export function DoneStep({
   businessName,
@@ -38,7 +38,7 @@ export function DoneStep({
         {businessName} has your paid order
         {orderId ? ` (${orderId})` : ''}.
       </p>
-      <p className="cm-done-total">{currency(total)}</p>
+      <p className="cm-done-total">{currency(total)}{usdEquiv(total) ? <span className="cm-usd">{usdEquiv(total)}</span> : null}</p>
 
       {waitLabel ? (
         <div className="cm-wait-estimate" role="status">

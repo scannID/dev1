@@ -4,7 +4,7 @@ import { createRealtimeClient } from './realtime'
 
 /**
  * Subscribe to platform metric events and refresh immediately.
- * Falls back to the existing poll interval when the socket is down.
+ * Keeps a short REST poll even while connected so scan cards never go stale.
  */
 export function useAdminMetricsRealtime(onUpdate: () => void | Promise<void>, enabled = true) {
   const onUpdateRef = useRef(onUpdate)
@@ -15,12 +15,11 @@ export function useAdminMetricsRealtime(onUpdate: () => void | Promise<void>, en
     if (!enabled) return
 
     const scheduleUpdate = () => {
-      // Burst scan/order events should not redraw Overview every few ms.
       if (debounceTimer.current != null) window.clearTimeout(debounceTimer.current)
       debounceTimer.current = window.setTimeout(() => {
         debounceTimer.current = null
         void onUpdateRef.current()
-      }, 750)
+      }, 250)
     }
 
     const client = createRealtimeClient({
@@ -34,13 +33,16 @@ export function useAdminMetricsRealtime(onUpdate: () => void | Promise<void>, en
         return adminKeycloak.token
       },
       poll: () => onUpdateRef.current(),
-      // Slow safety net only — realtime should drive updates.
-      pollIntervalMs: 60000,
+      // Fast safety net: scans must show up even if a WS event is missed.
+      pollIntervalMs: 5000,
+      keepPollingWhileConnected: true,
       onEvent: (event) => {
         if (
           event.type === 'QR_SCAN_RECORDED' ||
           event.type === 'ORDER_CREATED' ||
           event.type === 'ORDER_UPDATED' ||
+          event.type === 'ORDER_PAYMENT_UPDATED' ||
+          event.type === 'ORDER_STATUS_UPDATED' ||
           event.channel === 'admin:metrics'
         ) {
           scheduleUpdate()

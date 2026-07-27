@@ -5,6 +5,7 @@ import com.scanny.entity.QrScanEvent;
 import com.scanny.exception.ApiException;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.QrScanEventRepository;
+import com.scanny.websocket.RealtimeEventPublisher;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -13,6 +14,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class QrScanService {
@@ -23,6 +26,7 @@ public class QrScanService {
     private final BusinessRepository businessRepository;
     private final BusinessService businessService;
     private final OutboxService outboxService;
+    private final RealtimeEventPublisher realtimeEventPublisher;
     private final StringRedisTemplate redisTemplate;
 
     public QrScanService(
@@ -30,12 +34,14 @@ public class QrScanService {
             BusinessRepository businessRepository,
             BusinessService businessService,
             OutboxService outboxService,
+            RealtimeEventPublisher realtimeEventPublisher,
             ObjectProvider<StringRedisTemplate> redisTemplateProvider
     ) {
         this.qrScanEventRepository = qrScanEventRepository;
         this.businessRepository = businessRepository;
         this.businessService = businessService;
         this.outboxService = outboxService;
+        this.realtimeEventPublisher = realtimeEventPublisher;
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
     }
 
@@ -68,16 +74,31 @@ public class QrScanService {
         event.setUserAgent(normalizedAgent);
         QrScanEvent saved = qrScanEventRepository.save(event);
 
-        outboxService.enqueueRealtime(
-                "admin:metrics",
-                "QR_SCAN_RECORDED",
-                businessId,
-                Map.of(
-                        "businessId", businessId,
-                        "qrToken", normalizedToken,
-                        "scannedAt", saved.getScannedAt().toString()
-                )
+        Map<String, Object> body = Map.of(
+                "businessId", businessId,
+                "qrToken", normalizedToken,
+                "scannedAt", saved.getScannedAt().toString()
         );
+
+        // Durable fan-out for multi-node / retry.
+        outboxService.enqueueRealtime("admin:metrics", "QR_SCAN_RECORDED", businessId, body);
+        outboxService.enqueueRealtime("metrics:" + businessId, "QR_SCAN_RECORDED", businessId, body);
+
+        // Immediate push after commit so admin/merchant charts update without waiting for outbox poll.
+        Runnable publishNow = () -> {
+            realtimeEventPublisher.publish("admin:metrics", "QR_SCAN_RECORDED", businessId, body);
+            realtimeEventPublisher.publish("metrics:" + businessId, "QR_SCAN_RECORDED", businessId, body);
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publishNow.run();
+                }
+            });
+        } else {
+            publishNow.run();
+        }
         return true;
     }
 

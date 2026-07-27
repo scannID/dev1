@@ -367,6 +367,37 @@ export interface ScansOrdersSeries {
   xLabels: string[]
 }
 
+export interface CookieConsentSummary {
+  total: number
+  accepted: number
+  essential: number
+  uniqueClients: number
+  last24Hours: number
+}
+
+export interface CookieConsentSeries {
+  range: ScansOrdersRange | string
+  accepted: number[]
+  essential: number[]
+  yMax: number
+  xLabels: string[]
+}
+
+export interface CookieConsentRecent {
+  choice: string
+  source: string | null
+  path: string | null
+  clientId: string | null
+  actorEmail: string | null
+  consentedAt: string
+}
+
+export interface CookieConsentAnalytics {
+  summary: CookieConsentSummary
+  series: CookieConsentSeries
+  recent: CookieConsentRecent[]
+}
+
 export interface AdminNotification {
   id: string
   icon: string

@@ -2,7 +2,12 @@ import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
-import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+
+function UsdHint({ amount }: { amount: number }) {
+  const usd = usdEquiv(amount)
+  return usd ? <span className="cm-usd">{usd}</span> : null
+}
 
 export interface CartLine extends CatalogItem {
   quantity: number
@@ -90,7 +95,7 @@ export function CartStep({
                   </button>
                 </div>
               </div>
-              <span className="cm-line-total">{currency(lineAmount(item))}</span>
+              <span className="cm-line-total">{currency(lineAmount(item))}<UsdHint amount={lineAmount(item)} /></span>
             </div>
           )
         })}
@@ -104,7 +109,7 @@ export function CartStep({
         </div>
         <div className="cm-summary-total">
           <span>Total</span>
-          <strong>{currency(withServiceFee(cartTotal, serviceFeeUgx))}</strong>
+          <strong>{currency(withServiceFee(cartTotal, serviceFeeUgx))}<UsdHint amount={withServiceFee(cartTotal, serviceFeeUgx)} /></strong>
         </div>
       </div>
     </div>

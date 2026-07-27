@@ -306,6 +306,12 @@ public class OrderService {
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
         outboxService.enqueueRealtime("orders:" + order.getBusiness().getId(), "ORDER_UPDATED", order.getBusiness().getId(), response);
+        outboxService.enqueueRealtime(
+                "admin:metrics",
+                "ORDER_UPDATED",
+                order.getBusiness().getId(),
+                Map.of("businessId", order.getBusiness().getId(), "orderId", response.id())
+        );
         outboxService.enqueueAudit("ORDER_UPDATE", "order", order.getId(), Map.of(
                 "status", String.valueOf(order.getStatus()),
                 "paymentStatus", String.valueOf(order.getPaymentStatus())
@@ -362,6 +368,26 @@ public class OrderService {
                 "ORDER_PAYMENT_UPDATED",
                 savedOrder.getBusiness().getId(),
                 response
+        );
+        outboxService.enqueueRealtime(
+                "admin:metrics",
+                "ORDER_PAYMENT_UPDATED",
+                savedOrder.getBusiness().getId(),
+                Map.of(
+                        "businessId", savedOrder.getBusiness().getId(),
+                        "orderId", response.id(),
+                        "paymentStatus", paymentStatus.name()
+                )
+        );
+        outboxService.enqueueRealtime(
+                "metrics:" + savedOrder.getBusiness().getId(),
+                "ORDER_PAYMENT_UPDATED",
+                savedOrder.getBusiness().getId(),
+                Map.of(
+                        "businessId", savedOrder.getBusiness().getId(),
+                        "orderId", response.id(),
+                        "paymentStatus", paymentStatus.name()
+                )
         );
         outboxService.enqueueAudit(
                 "ORDER_PAYMENT_UPDATE",

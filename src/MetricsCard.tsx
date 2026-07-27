@@ -62,33 +62,86 @@ export function MetricsCard({ business }: { business: BusinessLike }) {
   const [data, setData] = useState<ScansOrdersSeries>(EMPTY)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const chartRef = useRef<HTMLDivElement>(null)
+  const rangeRef = useRef(range)
+  rangeRef.current = range
 
   useEffect(() => {
     let cancelled = false
-    const load = async () => {
+    let debounceTimer: number | null = null
+
+    const applySeries = (series: ScansOrdersSeries, selectedRange: MerchantMetricRange) => {
+      setData({
+        range: series.range || selectedRange,
+        scans: series.scans?.length ? series.scans : EMPTY.scans,
+        orders: series.orders?.length ? series.orders : EMPTY.orders,
+        yMax: Math.max(10, series.yMax || 10),
+        xLabels: series.xLabels?.length ? series.xLabels : EMPTY.xLabels,
+      })
+    }
+
+    const load = async (silent = false) => {
+      const selectedRange = rangeRef.current
       try {
-        const series = await scannyApi.businesses.getScansOrders(business.id, range)
-        if (!cancelled) {
-          setData({
-            range: series.range || range,
-            scans: series.scans?.length ? series.scans : EMPTY.scans,
-            orders: series.orders?.length ? series.orders : EMPTY.orders,
-            yMax: Math.max(10, series.yMax || 10),
-            xLabels: series.xLabels?.length ? series.xLabels : EMPTY.xLabels,
-          })
-        }
+        const series = await scannyApi.businesses.getScansOrders(business.id, selectedRange)
+        if (!cancelled) applySeries(series, selectedRange)
       } catch {
-        if (!cancelled) setData({ ...EMPTY, range })
+        if (!cancelled && !silent) setData({ ...EMPTY, range: selectedRange })
       }
     }
-    void load()
-    const timer = window.setInterval(load, 20_000)
-    const onFocus = () => void load()
+
+    const scheduleLoad = () => {
+      if (debounceTimer != null) window.clearTimeout(debounceTimer)
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null
+        void load(true)
+      }, 400)
+    }
+
+    void load(false)
+
+    let client: { close: () => void } | null = null
+    let started = false
+
+    async function startRealtime() {
+      if (started || cancelled) return
+      started = true
+      const { createRealtimeClient } = await import('./lib/realtime')
+      const keycloak = (await import('./keycloak')).default
+      if (cancelled) return
+      client = createRealtimeClient({
+        channels: [`metrics:${business.id}`, `orders:${business.id}`],
+        getToken: async () => {
+          try {
+            await keycloak.updateToken(30)
+          } catch {
+            /* keep current token */
+          }
+          return keycloak.token
+        },
+        poll: () => load(true),
+        // Slow safety net only — scans/orders should arrive over the socket.
+        pollIntervalMs: 60_000,
+        onEvent: (event) => {
+          if (
+            event.type === 'QR_SCAN_RECORDED' ||
+            event.type?.startsWith('ORDER') ||
+            event.type === 'ORDERS_CLEARED'
+          ) {
+            scheduleLoad()
+          }
+        },
+      })
+    }
+
+    void startRealtime()
+    const onFocus = () => void load(true)
     window.addEventListener('focus', onFocus)
+
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      if (debounceTimer != null) window.clearTimeout(debounceTimer)
       window.removeEventListener('focus', onFocus)
+      client?.close()
     }
   }, [business.id, range])
 

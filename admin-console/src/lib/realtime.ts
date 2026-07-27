@@ -19,12 +19,26 @@ type RealtimeOptions = {
   onStatus?: (status: 'connecting' | 'connected' | 'disconnected' | 'fallback') => void
   poll?: () => void | Promise<void>
   pollIntervalMs?: number
+  /** Keep REST polling even while the socket is connected (metrics safety net). */
+  keepPollingWhileConnected?: boolean
   enabled?: boolean
 }
 
 function resolveWsBase(): string {
-  const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined
-  if (explicit) return explicit.replace(/\/$/, '')
+  const explicit = (import.meta.env.VITE_WS_BASE_URL as string | undefined)?.replace(/\/$/, '')
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location
+    const isLocalOrLan =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)
+    if (isLocalOrLan) {
+      if (explicit && !/localhost|127\.0\.0\.1/.test(explicit)) return explicit
+      const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${wsProtocol}//${hostname}:4000`
+    }
+  }
+  if (explicit) return explicit
   const api = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:4000/api'
   try {
     const url = new URL(api)
@@ -103,13 +117,22 @@ export function createRealtimeClient(options: RealtimeOptions) {
         if (data.type === 'AUTH_OK') {
           setStatus('connected')
           lastEventAt = Date.now()
-          stopPolling()
+          if (!options.keepPollingWhileConnected) {
+            stopPolling()
+          } else if (!polling) {
+            startPolling()
+          }
           for (const channel of options.channels) {
             socket?.send(JSON.stringify({ type: 'SUBSCRIBE', channel }))
           }
           return
         }
-        if (data.type === 'SUBSCRIBED' || data.type === 'ERROR') return
+        if (data.type === 'SUBSCRIBED') return
+        if (data.type === 'ERROR') {
+          // Forbidden / bad channel — fall back to REST polling.
+          startPolling()
+          return
+        }
         if (data.eventId) {
           if (seen.has(data.eventId)) return
           seen.add(data.eventId)

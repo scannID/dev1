@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { BookLoader } from './components/BookLoader'
+import { DanceLoader } from './components/DanceLoader'
 import CategoryField from './components/CategoryField'
 import { CatalogItemImageField } from './components/CatalogItemImageField'
 import { CatalogItemGalleryField } from './components/CatalogItemGalleryField'
@@ -180,6 +180,67 @@ function customerUrl(business: Business) {
     return business.customerUrl
   }
   return origin
+}
+
+function loadQrLogo(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Failed to load logo'))
+    if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+      img.crossOrigin = 'anonymous'
+    }
+    img.src = src
+  })
+}
+
+/** QR with merchant logo nested in the center (high error correction keeps it scannable). */
+async function merchantQrDataUrl(url: string, logoUrl: string | null | undefined, size: number) {
+  const canvas = document.createElement('canvas')
+  await QRCode.toCanvas(canvas, url, {
+    errorCorrectionLevel: 'H',
+    margin: 1,
+    width: size,
+    color: {
+      dark: '#18211f',
+      light: '#ffffff',
+    },
+  })
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx || !logoUrl) return canvas.toDataURL('image/png')
+
+  try {
+    const logo = await loadQrLogo(logoUrl)
+    const logoSize = Math.round(size * 0.22)
+    const pad = Math.max(4, Math.round(logoSize * 0.18))
+    const box = logoSize + pad * 2
+    const boxX = (size - box) / 2
+    const boxY = (size - box) / 2
+    const radius = Math.max(3, Math.round(box * 0.12))
+
+    ctx.beginPath()
+    ctx.moveTo(boxX + radius, boxY)
+    ctx.arcTo(boxX + box, boxY, boxX + box, boxY + box, radius)
+    ctx.arcTo(boxX + box, boxY + box, boxX, boxY + box, radius)
+    ctx.arcTo(boxX, boxY + box, boxX, boxY, radius)
+    ctx.arcTo(boxX, boxY, boxX + box, boxY, radius)
+    ctx.closePath()
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+
+    // Contain-fit logo inside the padded box
+    const scale = Math.min(logoSize / logo.width, logoSize / logo.height)
+    const drawW = logo.width * scale
+    const drawH = logo.height * scale
+    const drawX = (size - drawW) / 2
+    const drawY = (size - drawH) / 2
+    ctx.drawImage(logo, drawX, drawY, drawW, drawH)
+  } catch {
+    // Keep plain QR if logo can't load
+  }
+
+  return canvas.toDataURL('image/png')
 }
 
 function App({
@@ -466,7 +527,7 @@ function App({
   if (sessionLoading) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-        <BookLoader label="Opening your portal…" />
+        <DanceLoader label="Opening your portal…" />
       </main>
     )
   }
@@ -865,6 +926,7 @@ function SidebarProfile({
       />
       <div className="sidebar-profile-info">
         <strong>{businessName}</strong>
+        <span className="sidebar-profile-type">{business.type || 'Business'}</span>
         {uploadError ? <span className="sidebar-profile-error">{uploadError}</span> : null}
       </div>
       <button
@@ -940,25 +1002,24 @@ function OverviewPage({
 function QrPanel({ business, compact = false }: { business: Business; compact?: boolean }) {
   const [qrImage, setQrImage] = useState('')
   const url = customerUrl(business)
+  const size = compact ? 110 : 220
+  const logoUrl = business.logoUrl || null
 
   useEffect(() => {
     let cancelled = false
 
-    QRCode.toDataURL(url, {
-      color: {
-        dark: '#18211f',
-        light: '#ffffff',
-      },
-      margin: 1,
-      width: compact ? 110 : 220,
-    }).then((image) => {
-      if (!cancelled) setQrImage(image)
-    })
+    merchantQrDataUrl(url, logoUrl, size)
+      .then((image) => {
+        if (!cancelled) setQrImage(image)
+      })
+      .catch(() => {
+        if (!cancelled) setQrImage('')
+      })
 
     return () => {
       cancelled = true
     }
-  }, [business.id, compact, url])
+  }, [business.id, compact, logoUrl, size, url])
 
   return (
     <div className={compact ? 'qr-panel compact' : 'qr-panel large'} style={{ '--accent': business.accent } as QrStyle}>

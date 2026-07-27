@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../api/services'
+import { useAdminMetricsRealtime } from '../lib/useAdminMetricsRealtime'
 import type { Merchant, MerchantSummary, MerchantsListResponse } from '../api/types'
 
 type LoadParams = {
@@ -48,6 +49,8 @@ export function useMerchants(params: { page: number; limit: number; search?: str
   useEffect(() => {
     void loadMerchants()
   }, [loadMerchants])
+
+  useAdminMetricsRealtime(() => loadMerchants({ silent: true }))
 
   return {
     merchants,

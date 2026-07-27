@@ -3,7 +3,7 @@ import type { OrderStatus } from '../../api/types'
 import { formatWaitRange } from '../../lib/waitEstimate'
 import type { PaymentProvider, PaymentStatus } from '../payments'
 import { OrderStatusTracker } from '../OrderStatusTracker'
-import { currency } from '../utils'
+import { currency, usdEquiv } from '../utils'
 
 export function WaitingStep({
   businessName,

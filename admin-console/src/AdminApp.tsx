@@ -25,6 +25,16 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Toaster } from '@/components/ui/sonner'
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
@@ -98,6 +108,7 @@ export default function AdminApp({
 }) {
   const [view, setView] = useState<View>('overview')
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
@@ -239,12 +250,35 @@ export default function AdminApp({
             type="button"
             className="admin-dark-toggle"
             title="Sign out"
-            onClick={onLogout}
+            onClick={() => setShowLogoutDialog(true)}
           >
             <LogOut size={14} />
           </button>
         </div>
       </aside>
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log out of Kode?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will be signed out of the admin console and returned to the sign-in page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setShowLogoutDialog(false)
+                onLogout?.()
+              }}
+            >
+              Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <section className="admin-workspace">
         <header className="admin-topbar">

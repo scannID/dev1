@@ -5,6 +5,9 @@ import './admin.css'
 import AdminLogin from './AdminLogin'
 import AdminApp from './AdminApp'
 import adminKeycloak, { hasAdminSession, logoutAdmin } from './api/keycloak'
+import { DanceLoader } from './components/DanceLoader'
+import { WaveLoader } from './components/WaveLoader'
+import { CookieConsent } from './components/CookieConsent'
 
 // Isolated session key — only this app sets/reads this key
 const SESSION_KEY = 'scanny-admin-authenticated'
@@ -23,10 +26,38 @@ function redirectUri() {
   return window.location.origin
 }
 
-type View = 'landing' | 'app'
+function needsAuthRestore() {
+  return (
+    sessionStorage.getItem(SESSION_KEY) === '1' ||
+    sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
+  )
+}
+
+type Phase = 'boot' | 'landing' | 'app' | 'redirecting'
+
+function AuthBootScreen({ mode }: { mode: 'boot' | 'redirecting' }) {
+  return (
+    <div
+      style={{
+        minHeight: '100dvh',
+        display: 'grid',
+        placeItems: 'center',
+        background: 'var(--background, #fff)',
+        color: 'var(--foreground, #111)',
+        fontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+      }}
+    >
+      {mode === 'redirecting' ? (
+        <WaveLoader label="Signing you out…" />
+      ) : (
+        <DanceLoader label="Opening admin console…" />
+      )}
+    </div>
+  )
+}
 
 function Root() {
-  const [view, setView] = useState<View>('landing')
+  const [phase, setPhase] = useState<Phase>(() => (needsAuthRestore() ? 'boot' : 'landing'))
   const [kcUsername, setKcUsername] = useState('Admin')
   const [authError, setAuthError] = useState<string | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
@@ -36,10 +67,15 @@ function Root() {
   useEffect(() => {
     const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
     const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
-    if (!hadSession && !hadIntent) return
+    if (!hadSession && !hadIntent) {
+      setPhase((prev) => (prev === 'boot' ? 'landing' : prev))
+      return
+    }
 
+    let cancelled = false
     initKc()
       .then((authenticated) => {
+        if (cancelled) return
         sessionStorage.removeItem(LOGIN_INTENT_KEY)
         if (authenticated && hasAdminSession()) {
           const name = adminKeycloak.tokenParsed?.name
@@ -49,18 +85,25 @@ function Root() {
           setKcUsername(name)
           sessionStorage.setItem(SESSION_KEY, '1')
           setAuthError(null)
-          setView('app')
+          setPhase('app')
           return
         }
         sessionStorage.removeItem(SESSION_KEY)
         if (hadIntent && authenticated && !hasAdminSession()) {
           setAuthError('This account is not an admin. Use an ADMIN user, or open the merchant app.')
         }
+        setPhase('landing')
       })
       .catch(() => {
+        if (cancelled) return
         sessionStorage.removeItem(LOGIN_INTENT_KEY)
         sessionStorage.removeItem(SESSION_KEY)
+        setPhase('landing')
       })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function handleLogin() {
@@ -84,12 +127,20 @@ function Root() {
   }
 
   function handleLogout() {
+    setPhase('redirecting')
     sessionStorage.removeItem(SESSION_KEY)
     sessionStorage.removeItem(LOGIN_INTENT_KEY)
-    logoutAdmin(redirectUri())
+    // Defer Keycloak redirect so React can paint the wave loader first.
+    window.setTimeout(() => {
+      logoutAdmin(redirectUri())
+    }, 650)
   }
 
-  if (view === 'app') {
+  if (phase === 'boot' || phase === 'redirecting') {
+    return <AuthBootScreen mode={phase} />
+  }
+
+  if (phase === 'app') {
     return <AdminApp kcUsername={kcUsername} onLogout={handleLogout} />
   }
 
@@ -138,6 +189,11 @@ kcInitPromise
   })
   .finally(() => {
     createRoot(document.getElementById('admin-root')!).render(
-      <StrictMode><Root /></StrictMode>
+      <StrictMode>
+        <>
+          <Root />
+          <CookieConsent />
+        </>
+      </StrictMode>
     )
   })

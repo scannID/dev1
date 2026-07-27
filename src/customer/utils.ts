@@ -1,4 +1,5 @@
 const DEVICE_KEY = 'scanny-device-id'
+let liveUgxPerUsd: number | null = null
 
 /** Fallback when `/api/fees` has not loaded yet. Backend is source of truth. */
 export const DEFAULT_SERVICE_FEE_UGX = 700
@@ -17,6 +18,22 @@ export function currency(amount: number) {
     currency: 'UGX',
     minimumFractionDigits: 0,
   }).format(amount)
+}
+
+export function usdEquiv(amount: number): string | null {
+  const ugxPerUsd = liveUgxPerUsd ?? Number(import.meta.env.VITE_UGX_PER_USD ?? '3700')
+  if (!Number.isFinite(ugxPerUsd) || ugxPerUsd <= 0 || amount === 0) return null
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount / ugxPerUsd)
+}
+
+export function setLiveUgxPerUsd(rate: number | null) {
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) return
+  liveUgxPerUsd = rate
 }
 
 /** Works on http://LAN-IP too — crypto.randomUUID is HTTPS/localhost-only. */

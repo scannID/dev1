@@ -412,6 +412,25 @@ export const imagesApi = {
   },
 }
 
+async function fetchUsdToUgxFrom(url: string): Promise<number | null> {
+  const res = await fetch(url, { method: 'GET' })
+  if (!res.ok) return null
+  const data = await res.json() as { rates?: Record<string, number> }
+  const ugx = data?.rates?.UGX
+  return typeof ugx === 'number' && Number.isFinite(ugx) && ugx > 0 ? ugx : null
+}
+
+export const fxApi = {
+  /** Live UGX-per-USD quote for customer price hints. */
+  ugxPerUsd: async (): Promise<number> => {
+    const primary = await fetchUsdToUgxFrom('https://open.er-api.com/v6/latest/USD')
+    if (primary) return primary
+    const backup = await fetchUsdToUgxFrom('https://api.exchangerate.host/latest?base=USD&symbols=UGX')
+    if (backup) return backup
+    throw new Error('Unable to fetch live FX rate')
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -423,6 +442,7 @@ export const scannyApi = {
   quickPayments: quickPaymentsApi,
   payments: paymentsApi,
   fees: feesApi,
+  fx: fxApi,
   publicTickets: publicTicketsApi,
 }
 

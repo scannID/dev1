@@ -18,6 +18,9 @@ import keycloak, {
   waitForKeycloak,
 } from './keycloak'
 import { applyDarkMode, initThemeFromStorage, persistDarkMode, readDarkMode } from './lib/theme'
+import { DanceLoader } from './components/DanceLoader'
+import { WaveLoader } from './components/WaveLoader'
+import { CookieConsent } from './components/CookieConsent'
 
 initThemeFromStorage()
 
@@ -85,40 +88,58 @@ if (customerRoute) {
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
+      <>
+        <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
+        <CookieConsent variant="customer" />
+      </>
     </StrictMode>
   )
 } else if (createEventRoute) {
   applyDarkMode(false)
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <div style={{ minHeight: '100svh', width: '100%', overflow: 'hidden' }}>
-        <EventTicketPage onBack={goToLanding} />
-      </div>
+      <>
+        <div style={{ minHeight: '100svh', width: '100%', overflow: 'hidden' }}>
+          <EventTicketPage onBack={goToLanding} />
+        </div>
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else if (ticketViewToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <TicketViewPage accessToken={ticketViewToken} />
+      <>
+        <TicketViewPage accessToken={ticketViewToken} />
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else if (ticketMasterToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <TicketPurchasePage masterQrToken={ticketMasterToken} />
+      <>
+        <TicketPurchasePage masterQrToken={ticketMasterToken} />
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else if (payToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <QuickPayCustomer qrToken={payToken} />
+      <>
+        <QuickPayCustomer qrToken={payToken} />
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else if (trackNumber) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <QuickPayTrack trackingNumber={trackNumber} onBack={goToLanding} />
+      <>
+        <QuickPayTrack trackingNumber={trackNumber} onBack={goToLanding} />
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else {
@@ -126,10 +147,38 @@ if (customerRoute) {
   const LOGIN_INTENT_KEY = 'scanny-merchant-login-intent'
   const MERCHANT_REDIRECT_URI = window.location.origin
 
-  type View = 'landing' | 'app'
+  type Phase = 'boot' | 'landing' | 'app' | 'redirecting'
+
+  function needsAuthRestore() {
+    return (
+      sessionStorage.getItem(SESSION_KEY) === '1' ||
+      sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
+    )
+  }
+
+  function AuthBootScreen({ mode }: { mode: 'boot' | 'redirecting' }) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'grid',
+          placeItems: 'center',
+          background: 'var(--background, #fff)',
+          color: 'var(--foreground, #111)',
+          fontFamily: 'Outfit, ui-sans-serif, system-ui, sans-serif',
+        }}
+      >
+        {mode === 'redirecting' ? (
+          <WaveLoader label="Signing you out…" />
+        ) : (
+          <DanceLoader label="Opening your portal…" />
+        )}
+      </div>
+    )
+  }
 
   function Root() {
-    const [view, setView] = useState<View>('landing')
+    const [phase, setPhase] = useState<Phase>(() => (needsAuthRestore() ? 'boot' : 'landing'))
     const [authError, setAuthError] = useState<string | null>(null)
     const [darkMode, setDarkMode] = useState(() => readDarkMode())
     const [marketingSlug, setMarketingSlug] = useState<MarketingSlug | null>(() =>
@@ -147,26 +196,38 @@ if (customerRoute) {
     useEffect(() => {
       const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
       const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
-      if (!hadSession && !hadIntent) return
+      if (!hadSession && !hadIntent) {
+        setPhase((prev) => (prev === 'boot' ? 'landing' : prev))
+        return
+      }
 
+      let cancelled = false
       waitForKeycloak()
         .then((authenticated) => {
+          if (cancelled) return
           sessionStorage.removeItem(LOGIN_INTENT_KEY)
           if (authenticated && hasMerchantSession()) {
             sessionStorage.setItem(SESSION_KEY, '1')
             setAuthError(null)
-            setView('app')
+            setPhase('app')
             return
           }
           sessionStorage.removeItem(SESSION_KEY)
           if (hadIntent && authenticated && !hasMerchantSession()) {
             setAuthError('This account is not a merchant. Use a MERCHANT user, or open the admin console.')
           }
+          setPhase('landing')
         })
         .catch(() => {
+          if (cancelled) return
           sessionStorage.removeItem(LOGIN_INTENT_KEY)
           sessionStorage.removeItem(SESSION_KEY)
+          setPhase('landing')
         })
+
+      return () => {
+        cancelled = true
+      }
     }, [])
 
     useEffect(() => {
@@ -207,21 +268,29 @@ if (customerRoute) {
     }
 
     function handleLogout() {
+      setPhase('redirecting')
       sessionStorage.removeItem(SESSION_KEY)
       sessionStorage.removeItem(LOGIN_INTENT_KEY)
-      logoutMerchant(MERCHANT_REDIRECT_URI)
+      // Defer Keycloak redirect so React can paint the wave loader first.
+      window.setTimeout(() => {
+        logoutMerchant(MERCHANT_REDIRECT_URI)
+      }, 650)
     }
 
     function handleBackToLanding() {
       sessionStorage.removeItem(SESSION_KEY)
-      setView('landing')
+      setPhase('landing')
     }
 
     const kcUsername = keycloak.authenticated && keycloak.tokenParsed
       ? (keycloak.tokenParsed.name || keycloak.tokenParsed.preferred_username || keycloak.tokenParsed.email || '')
       : ''
 
-    if (view === 'app') {
+    if (phase === 'boot' || phase === 'redirecting') {
+      return <AuthBootScreen mode={phase} />
+    }
+
+    if (phase === 'app') {
       return (
         <App
           onLogout={handleLogout}
@@ -288,7 +357,10 @@ if (customerRoute) {
     .finally(() => {
       createRoot(document.getElementById('root')!).render(
         <StrictMode>
-          <Root />
+          <>
+            <Root />
+            <CookieConsent />
+          </>
         </StrictMode>
       )
     })

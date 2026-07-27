@@ -105,6 +105,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/payments/webhooks/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/tickets/public/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/tickets/public/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/consents/cookies").permitAll()
                 // Temporary: allow public create-event image search (tighten later)
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/tickets/qr/*/scan").hasAnyRole("MERCHANT", "ADMIN")

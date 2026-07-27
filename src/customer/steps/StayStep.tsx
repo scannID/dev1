@@ -3,7 +3,7 @@ import { ArrowLeft, Bath, BedDouble, Users } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { isLodgingItem, nightsBetween } from '../../lib/catalogCart'
 import { discountPercentOf, effectivePrice } from '../../lib/catalogPricing'
-import { currency } from '../utils'
+import { currency, usdEquiv } from '../utils'
 
 function todayIso() {
   const d = new Date()
@@ -29,6 +29,11 @@ export function StayStep({
   items: CatalogItem[]
   onAddStay: (itemId: string, checkInDate: string, checkOutDate: string) => void
 }) {
+  function UsdHint({ amount }: { amount: number }) {
+    const usd = usdEquiv(amount)
+    return usd ? <span className="cm-usd">{usd}</span> : null
+  }
+
   const lodging = useMemo(
     () => items.filter((item) => item.available && isLodgingItem(item)),
     [items],
@@ -128,6 +133,7 @@ export function StayStep({
           </div>
           <strong className="cm-stay-amount">
             {currency(nightly)}
+            <UsdHint amount={nightly} />
             <span className="cm-muted"> / night</span>
             {off > 0 ? <span className="cm-price-was">{currency(selected.price)}</span> : null}
           </strong>
@@ -189,7 +195,7 @@ export function StayStep({
         </div>
         <p className="cm-muted">
           {datesValid
-            ? <>{nights} night{nights === 1 ? '' : 's'} · <span className="cm-stay-amount">{currency(stayTotal)}</span></>
+            ? <>{nights} night{nights === 1 ? '' : 's'} · <span className="cm-stay-amount">{currency(stayTotal)}<UsdHint amount={stayTotal} /></span></>
             : 'Choose valid check-in and check-out dates'}
         </p>
         <button type="button" className="cm-primary cm-full" onClick={book} disabled={!datesValid}>
@@ -220,7 +226,7 @@ export function StayStep({
                   <span className="cm-muted">
                     {item.itemKind === 'SUITE' ? 'Suite' : 'Room'} · {item.capacity ?? 1} guests
                   </span>
-                  <span className="cm-stay-amount">{currency(nightly)} / night</span>
+                  <span className="cm-stay-amount">{currency(nightly)}<UsdHint amount={nightly} /> / night</span>
                 </div>
               </button>
             )

@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2 } from 'lucide-react'
-import { currency } from './utils'
+import { currency, usdEquiv } from './utils'
 
 export function BottomBar({
   count,
@@ -22,7 +22,7 @@ export function BottomBar({
         <span>
           {count} item{count === 1 ? '' : 's'}
         </span>
-        <strong>{currency(total)}</strong>
+        <strong>{currency(total)}{usdEquiv(total) ? <span className="cm-usd">{usdEquiv(total)}</span> : null}</strong>
       </div>
       <button type="button" className="cm-primary" disabled={disabled || loading} onClick={onAction}>
         {loading ? (

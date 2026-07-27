@@ -1,4 +1,4 @@
-﻿$Host.UI.RawUI.WindowTitle = 'Scanny Keycloak'
+﻿$Host.UI.RawUI.WindowTitle = 'Kode Keycloak'
 Set-Location -LiteralPath 'C:\Users\Alsek\Desktop\scanny\backend\keycloak-26.0.7\bin'
 $env:JAVA_HOME = 'C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot'
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"

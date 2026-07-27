@@ -3275,9 +3275,19 @@ button:disabled {
 }
 
 .sidebar-profile-info strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-profile-info .sidebar-profile-type {
   font-size: 10px;
   font-weight: 500;
   color: var(--muted-foreground);
+  text-transform: capitalize;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

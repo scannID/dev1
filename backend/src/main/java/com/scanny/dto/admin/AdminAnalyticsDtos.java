@@ -130,4 +130,35 @@ public class AdminAnalyticsDtos {
         int yMax,
         List<String> xLabels
     ) {}
+
+    public record CookieConsentSummary(
+        int total,
+        int accepted,
+        int essential,
+        int uniqueClients,
+        int last24Hours
+    ) {}
+
+    public record CookieConsentSeries(
+        String range,
+        List<Integer> accepted,
+        List<Integer> essential,
+        int yMax,
+        List<String> xLabels
+    ) {}
+
+    public record CookieConsentRecent(
+        String choice,
+        String source,
+        String path,
+        String clientId,
+        String actorEmail,
+        String consentedAt
+    ) {}
+
+    public record CookieConsentAnalytics(
+        CookieConsentSummary summary,
+        CookieConsentSeries series,
+        List<CookieConsentRecent> recent
+    ) {}
 }

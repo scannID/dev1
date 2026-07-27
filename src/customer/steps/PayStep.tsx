@@ -2,7 +2,12 @@ import type { Business } from '../../api/types'
 import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
-import { currency, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+
+function UsdHint({ amount }: { amount: number }) {
+  const usd = usdEquiv(amount)
+  return usd ? <span className="cm-usd">{usd}</span> : null
+}
 import type { CartLine } from './CartStep'
 
 export function PayStep({
@@ -76,7 +81,7 @@ export function PayStep({
         </div>
         <div className="cm-order-strip-total">
           <span>Total</span>
-          <strong>{currency(payableTotal)}</strong>
+          <strong>{currency(payableTotal)}<UsdHint amount={payableTotal} /></strong>
         </div>
       </div>
 

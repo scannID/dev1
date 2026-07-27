@@ -30,6 +30,7 @@ import type {
   ConfigActionResult,
   ScansOrdersRange,
   ScansOrdersSeries,
+  CookieConsentAnalytics,
   NotificationsResponse,
 } from './types'
 
@@ -122,6 +123,10 @@ export const analyticsApi = {
 
   getScansOrders: async (range: ScansOrdersRange = 'daily'): Promise<ScansOrdersSeries> => {
     return api.get<ScansOrdersSeries>(`/admin/analytics/scans-orders?range=${range}`)
+  },
+
+  getCookieConsents: async (range: ScansOrdersRange = 'daily'): Promise<CookieConsentAnalytics> => {
+    return api.get<CookieConsentAnalytics>(`/admin/analytics/cookie-consents?range=${range}`)
   },
 
   getRevenueOverview: async (): Promise<RevenueOverview> => {
