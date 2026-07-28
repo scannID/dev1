@@ -1,22 +1,20 @@
 .cm-page {
   --cm-orange: #e86a17;
   --cm-orange-deep: #c4530d;
-  --cm-teal: var(--cm-orange);
-  --cm-teal-soft: color-mix(in srgb, var(--cm-orange) 16%, transparent);
-  --cm-teal-mid: var(--cm-orange-deep);
-  --cm-text: var(--foreground);
-  --cm-muted: var(--muted-foreground);
-  --cm-border: var(--border);
-  --cm-bg: var(--background);
-  --cm-card: var(--card);
-  --cm-accent: var(--cm-orange);
-  --cm-danger: var(--destructive);
-  --cm-danger-bg: color-mix(in srgb, var(--destructive) 14%, transparent);
+  --cm-teal: #e86a17;
+  --cm-teal-soft: color-mix(in srgb, #e86a17 14%, transparent);
+  --cm-teal-mid: #c4530d;
+  --cm-text: #111827;
+  --cm-muted: #6b7280;
+  --cm-border: #e5e7eb;
+  --cm-bg: #ffffff;
+  --cm-card: #ffffff;
+  --cm-accent: #e86a17;
+  --cm-danger: #dc2626;
+  --cm-danger-bg: color-mix(in srgb, #dc2626 14%, transparent);
 
   min-height: 100dvh;
-  background:
-    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--cm-orange) 14%, transparent), transparent 55%),
-    var(--cm-bg);
+  background: #ffffff;
   color: var(--cm-text);
   font-family: 'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif;
   padding-bottom: 108px;
@@ -34,6 +32,43 @@ html.cm-app body {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  color-scheme: light;
+  /* Kill global green/purple/dark tokens — white + Kode orange only */
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #e86a17;
+  --primary-foreground: #ffffff;
+  --secondary: #fff7ed;
+  --secondary-foreground: #9a3412;
+  --muted: #f8fafc;
+  --muted-foreground: #6b7280;
+  --accent: #fff7ed;
+  --accent-foreground: #c2410c;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #e86a17;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #e86a17;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff7ed;
+  --sidebar-accent-foreground: #9a3412;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #e86a17;
+  background: #ffffff;
+  color: #111827;
+}
+
+html.cm-app body,
+html.cm-app #root {
+  background: #ffffff;
+  color: #111827;
+  min-height: 100%;
 }
 
 /* iOS zooms focused inputs under 16px — keep form controls at 16px */
@@ -107,7 +142,8 @@ html.cm-app body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--cm-card);
   border-bottom: 1px solid var(--cm-border);
 }
@@ -115,14 +151,15 @@ html.cm-app body {
 .cm-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
 .cm-brand-logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   object-fit: cover;
   border: 1px solid var(--cm-border);
   background: var(--cm-card);
@@ -138,17 +175,17 @@ html.cm-app body {
 
 .cm-brand-name {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   letter-spacing: -0.02em;
 }
 
 .cm-brand-biz {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--cm-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: min(42vw, 160px);
 }
 
 .cm-cart-btn,
@@ -158,22 +195,33 @@ html.cm-app body {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid var(--cm-border);
   background: var(--cm-card);
   color: var(--cm-text);
   border-radius: 999px;
-  padding: 8px 12px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cm-ghost-btn {
+  width: auto;
+  min-width: 32px;
+  padding: 0 10px;
+  gap: 4px;
 }
 
 .cm-topbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -181,8 +229,8 @@ html.cm-app body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--cm-danger) 35%, var(--cm-border));
   background: var(--cm-danger-bg);
@@ -204,15 +252,15 @@ html.cm-app body {
 
 .cm-badge {
   position: absolute;
-  top: -6px;
+  top: -5px;
   right: -4px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--cm-teal);
   color: #fff;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -2302,4 +2350,221 @@ html.cm-app body {
   font-weight: 500;
   color: var(--cm-muted);
   margin-left: 4px;
+}
+
+.cm-ops-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+}
+
+.cm-ops-banner.paused {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.split-pay-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 14px;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.split-pay-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.split-pay-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.split-pay-panel li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.split-pay-panel .cm-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.split-pay-panel select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  font: inherit;
+}
+
+.split-draft-row {
+  display: grid !important;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.split-draft-row-multi {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 420px) {
+  .split-draft-row-multi {
+    grid-template-columns: 1fr 1.1fr 0.85fr;
+  }
+}
+
+.split-draft-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font: inherit;
+  background: #fff;
+}
+
+.split-live-row {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.split-live-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.split-live-status.paid {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.split-live-status.pending {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.split-live-status.failed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.split-remaining {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.split-remaining.ok {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.split-remaining.over {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.customer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: end center;
+  padding: 16px;
+}
+
+.customer-overlay-card {
+  width: min(480px, 100%);
+  max-height: 80svh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.customer-overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.customer-overlay-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.history-form,
+.history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.history-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.history-form input {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.history-actions,
+.customer-secondary-btn {
+  display: inline-flex;
+}
+
+.history-actions button,
+.customer-secondary-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.history-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.history-list li {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
 }

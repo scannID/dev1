@@ -24,4 +24,9 @@ public final class CodeUtils {
         String suffix = String.valueOf(System.currentTimeMillis());
         return prefix + "-" + alpha + "-" + suffix.substring(suffix.length() - 6);
     }
+
+    public static String randomToken(int length) {
+        String raw = java.util.UUID.randomUUID().toString().replace("-", "");
+        return raw.substring(0, Math.min(length, raw.length()));
+    }
 }

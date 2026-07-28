@@ -18,6 +18,15 @@ export interface InitiatePaymentInput {
   customerName?: string
 }
 
+export interface InitiateSplitPaymentInput {
+  splitId: string
+  provider: PaymentProvider
+  phone: string
+  amount: number
+  businessId: string
+  customerName?: string
+}
+
 export interface PaymentResult {
   paymentId: string
   status: PaymentStatus
@@ -34,6 +43,23 @@ export const payments = {
     const response = await paymentsApi.initiate({
       context: 'ORDER',
       referenceId: input.orderId,
+      provider: input.provider,
+      amount: input.amount,
+      currency: 'UGX',
+      customerPhone: input.phone,
+      customerName: input.customerName,
+      businessId: input.businessId,
+    })
+    return {
+      paymentId: response.paymentId,
+      status: mapStatus(response.status),
+    }
+  },
+
+  async initiateSplit(input: InitiateSplitPaymentInput): Promise<PaymentResult> {
+    const response = await paymentsApi.initiate({
+      context: 'ORDER_SPLIT',
+      referenceId: input.splitId,
       provider: input.provider,
       amount: input.amount,
       currency: 'UGX',

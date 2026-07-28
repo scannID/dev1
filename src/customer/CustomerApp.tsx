@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Package, Receipt, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Clock3, History, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { businessApi, devicesApi, feesApi, fxApi, ordersApi } from '../api/services'
@@ -7,6 +7,7 @@ import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../ap
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
 import { KodeMark } from './KodeMark'
+import { OrderHistoryPanel } from './OrderHistoryPanel'
 import {
   clearActiveOrder,
   clearCheckoutDraft,
@@ -22,8 +23,8 @@ import { DetailsStep } from './steps/DetailsStep'
 import { DoneStep } from './steps/DoneStep'
 import { MenuStep } from './steps/MenuStep'
 import { StayStep } from './steps/StayStep'
-import { PayStep } from './steps/PayStep'
-import { WaitingStep } from './steps/WaitingStep'
+import { PayStep, type SplitShareDraft } from './steps/PayStep'
+import { WaitingStep, type SplitShareLive } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
 import {
@@ -93,6 +94,9 @@ export default function CustomerApp({
   const [locationError, setLocationError] = useState<string | null>(null)
 
   const [provider, setProvider] = useState<PaymentProvider>(draft?.provider ?? 'MTN')
+  const [splitEnabled, setSplitEnabled] = useState(false)
+  const [splitShares, setSplitShares] = useState<SplitShareDraft[]>([])
+  const [splitSummary, setSplitSummary] = useState<SplitShareLive[] | null>(null)
   const [phone, setPhone] = useState(draft?.phone ?? '')
   const [saveNumber, setSaveNumber] = useState(draft?.saveNumber ?? true)
   const [phoneError, setPhoneError] = useState<string | null>(null)
@@ -109,8 +113,11 @@ export default function CustomerApp({
   const [fulfillmentStatus, setFulfillmentStatus] = useState<OrderStatus>('Pending')
   const [showTracking, setShowTracking] = useState(false)
   const [showReceipts, setShowReceipts] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
   const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
+  const [ordersPaused, setOrdersPaused] = useState(false)
+  const [busyBanner, setBusyBanner] = useState<string | null>(null)
 
   const trackOrder = Boolean(orderPublicId) && Boolean(phone.trim())
   const {
@@ -280,6 +287,24 @@ export default function CustomerApp({
         setEstimatedWaitMinutes(
           typeof menu.estimatedWaitMinutes === 'number' ? menu.estimatedWaitMinutes : null,
         )
+        const accepting = menu.business.acceptingOrders !== false
+        setOrdersPaused(!accepting)
+        if (menu.business.busyMode) {
+          const eta = menu.business.busyEtaMinutes
+          setBusyBanner(
+            menu.business.pauseMessage?.trim()
+              || (typeof eta === 'number' && eta > 0
+                ? `Kitchen is busy — about ${eta} min wait`
+                : 'Kitchen is busy right now'),
+          )
+        } else {
+          setBusyBanner(null)
+        }
+        if (!accepting) {
+          setBusyBanner(
+            menu.business.pauseMessage?.trim() || 'This location is not accepting orders right now.',
+          )
+        }
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Failed to load menu')
@@ -477,6 +502,10 @@ export default function CustomerApp({
   }
 
   function goDetails() {
+    if (ordersPaused) {
+      setError(busyBanner || 'This location is not accepting orders right now.')
+      return
+    }
     setNameError(null)
     setLocationError(null)
     if (cartCount === 0) {
@@ -537,6 +566,7 @@ export default function CustomerApp({
     })
     setPaymentId(payment.paymentId)
     setPaymentStatus(payment.status)
+    setSplitSummary(null)
     if (payment.status === 'PAID') {
       persistPaidReceipt(orderId, amount, cartItems)
       clearCheckoutDraft(businessId)
@@ -547,7 +577,129 @@ export default function CustomerApp({
     }
   }
 
+  async function startSplitPayments(
+    orderId: string,
+    publicId: string,
+    shares: Array<{ name: string; phone: string; amount: number }>,
+    orderTotal: number,
+  ) {
+    const { operationsApi } = await import('../api/operations')
+    const created = await operationsApi.createPublicCustomSplits(publicId, {
+      shares: shares.map((share) => ({
+        payerName: share.name,
+        payerPhone: share.phone,
+        amount: share.amount,
+      })),
+    })
+
+    const live: SplitShareLive[] = []
+    for (let i = 0; i < created.length; i++) {
+      const split = created[i]
+      const draft = shares[i]
+      try {
+        const payment = await payments.initiateSplit({
+          splitId: split.id,
+          provider,
+          phone: (draft?.phone || split.payerPhone || '').trim(),
+          amount: split.amount,
+          businessId,
+          customerName: draft?.name || split.payerName,
+        })
+        live.push({
+          name: draft?.name || split.payerName,
+          phone: draft?.phone || split.payerPhone,
+          amount: split.amount,
+          splitId: split.id,
+          paymentId: payment.paymentId,
+          status: payment.status,
+        })
+      } catch {
+        live.push({
+          name: draft?.name || split.payerName,
+          phone: draft?.phone || split.payerPhone,
+          amount: split.amount,
+          splitId: split.id,
+          status: 'FAILED',
+        })
+      }
+    }
+
+    setSplitSummary(live)
+    setPaymentId(live.find((s) => s.paymentId)?.paymentId ?? null)
+
+    const allPaid = live.length > 0 && live.every((s) => s.status === 'PAID')
+    const anyFailed = live.some((s) => s.status === 'FAILED')
+    if (allPaid) {
+      setPaymentStatus('PAID')
+      persistPaidReceipt(orderId, orderTotal, cartItems)
+      clearCheckoutDraft(businessId)
+      setCart({})
+      setStep('done')
+      return
+    }
+    setPaymentStatus(anyFailed && live.every((s) => s.status !== 'PENDING') ? 'FAILED' : 'PENDING')
+    setStep('waiting')
+  }
+
+  async function retryUnpaidSplits() {
+    if (!splitSummary?.length || !business) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const next: SplitShareLive[] = []
+      for (const share of splitSummary) {
+        if (share.status === 'PAID') {
+          next.push(share)
+          continue
+        }
+        if (!share.splitId) {
+          next.push({ ...share, status: 'FAILED' })
+          continue
+        }
+        const payment = await payments.initiateSplit({
+          splitId: share.splitId,
+          provider,
+          phone: share.phone.trim(),
+          amount: share.amount,
+          businessId,
+          customerName: share.name,
+        })
+        next.push({
+          ...share,
+          paymentId: payment.paymentId,
+          status: payment.status,
+        })
+      }
+      setSplitSummary(next)
+      setPaymentId(next.find((s) => s.paymentId && s.status === 'PENDING')?.paymentId ?? next[0]?.paymentId ?? null)
+      const allPaid = next.every((s) => s.status === 'PAID')
+      const anyPending = next.some((s) => s.status === 'PENDING')
+      if (allPaid) {
+        setPaymentStatus('PAID')
+        if (placedOrderId) {
+          persistPaidReceipt(placedOrderId, paidTotal || payableTotal, cartItems)
+        }
+        clearCheckoutDraft(businessId)
+        setCart({})
+        setStep('done')
+      } else {
+        setPaymentStatus(anyPending ? 'PENDING' : 'FAILED')
+      }
+    } catch (err) {
+      setPaymentStatus('FAILED')
+      const message = err instanceof Error ? err.message : 'Failed to retry split payments'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function submitPayment() {
+    if (ordersPaused && !placedOrderId) {
+      setError(busyBanner || 'This location is not accepting orders right now.')
+      return
+    }
     if (!business) return
     const needsLocation = checkoutMode !== 'stay'
     if (!customerName.trim() || (needsLocation && !customerLocation.trim())) {
@@ -561,11 +713,50 @@ export default function CustomerApp({
       setStep('details')
       return
     }
-    const phoneIssue = validatePhone(phone)
-    if (phoneIssue) {
-      setPhoneError(phoneIssue)
-      return
+
+    const splitAllocation = splitEnabled
+      ? splitShares.map((share, index) => ({
+          name: share.name.trim() || `Guest ${index + 1}`,
+          phone: share.phone.trim(),
+          amount: Math.round(Number(share.amount) || 0),
+        }))
+      : null
+
+    if (splitAllocation) {
+      const allocated = splitAllocation.reduce((sum, share) => sum + share.amount, 0)
+      if (splitAllocation.length < 2) {
+        setError('Split needs at least 2 people')
+        return
+      }
+      if (splitAllocation.some((share) => share.amount < 1)) {
+        setError('Each person needs an amount greater than 0')
+        return
+      }
+      if (allocated !== payableTotal) {
+        setError(
+          allocated < payableTotal
+            ? `Allocate the remaining ${currency(payableTotal - allocated)} before paying`
+            : `Shares are over by ${currency(allocated - payableTotal)}`,
+        )
+        return
+      }
+      for (let i = 0; i < splitAllocation.length; i++) {
+        const phoneIssue = validatePhone(splitAllocation[i].phone)
+        if (phoneIssue) {
+          setPhoneError(`${splitAllocation[i].name}: ${phoneIssue}`)
+          return
+        }
+      }
+      // Order contact = first payer
+      setPhone(splitAllocation[0].phone)
+    } else {
+      const phoneIssue = validatePhone(phone)
+      if (phoneIssue) {
+        setPhoneError(phoneIssue)
+        return
+      }
     }
+
     if (!provider) {
       setError('Choose MTN or Airtel to continue')
       return
@@ -577,16 +768,30 @@ export default function CustomerApp({
     try {
       // Re-prompt payment for an already-placed order (e.g. after changing number)
       if (placedOrderId) {
+        if (splitSummary?.length) {
+          await retryUnpaidSplits()
+          return
+        }
         await startPaymentForOrder(placedOrderId, paidTotal || payableTotal)
         return
       }
 
       if (cartItems.length === 0) return
 
+      const orderPhone = splitAllocation?.[0]?.phone || phone.trim()
+
+      // Only attach table session when a real table scan was used.
+      // Business menu QR also uses ?qr= — never send that as a table token.
+      const url = new URL(window.location.href)
+      const tableId = url.searchParams.get('table') || undefined
+      const tableQrToken = tableId
+        ? url.searchParams.get('tableQr') || url.searchParams.get('tqr') || undefined
+        : undefined
+
       const order = await ordersApi.create(business.id, {
         customer: {
           name: customerName.trim(),
-          phone: phone.trim(),
+          phone: orderPhone,
           location: checkoutMode === 'stay' ? '' : customerLocation.trim(),
           note: customerNote.trim() || undefined,
         },
@@ -597,6 +802,8 @@ export default function CustomerApp({
           checkInDate: item.checkInDate,
           checkOutDate: item.checkOutDate,
         })),
+        tableId,
+        tableQrToken,
       })
 
       setPlacedOrderId(order.id)
@@ -607,11 +814,11 @@ export default function CustomerApp({
         saveActiveOrder(businessId, {
           publicId: order.publicId,
           orderId: order.id,
-          phone: phone.trim(),
+          phone: orderPhone,
         })
       }
 
-      if (!deviceKnown && saveNumber) {
+      if (!deviceKnown && saveNumber && !splitAllocation) {
         try {
           const deviceId = getOrCreateDeviceId()
           await devicesApi.register({
@@ -629,7 +836,13 @@ export default function CustomerApp({
         }
       }
 
-      await startPaymentForOrder(order.id, order.total || payableTotal)
+      if (splitAllocation && order.publicId) {
+        toast.message('Sending MoMo prompts to each payer…')
+        await startSplitPayments(order.id, order.publicId, splitAllocation, order.total || payableTotal)
+      } else {
+        setSplitSummary(null)
+        await startPaymentForOrder(order.id, order.total || payableTotal)
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to place order'
       setError(message)
@@ -642,6 +855,10 @@ export default function CustomerApp({
   async function retryPayment() {
     if (!placedOrderId) {
       void submitPayment()
+      return
+    }
+    if (splitSummary?.length) {
+      await retryUnpaidSplits()
       return
     }
     setSubmitting(true)
@@ -659,9 +876,84 @@ export default function CustomerApp({
     }
   }
 
+  const pendingSplitPaymentKey = (splitSummary ?? [])
+    .filter((s) => s.paymentId && s.status === 'PENDING')
+    .map((s) => s.paymentId)
+    .join('|')
+
   useEffect(() => {
-    if (step !== 'waiting' || !paymentId) return
+    if (step !== 'waiting') return
     if (paymentStatus === 'PAID' || paymentStatus === 'FAILED') return
+
+    if (splitSummary && splitSummary.length > 0) {
+      const multiIds = splitSummary
+        .filter((s) => s.paymentId && s.status === 'PENDING')
+        .map((s) => s.paymentId!)
+
+      if (multiIds.length === 0) {
+        const allPaid = splitSummary.every((s) => s.status === 'PAID')
+        if (allPaid) {
+          setPaymentStatus('PAID')
+          if (placedOrderId) {
+            persistPaidReceipt(placedOrderId, paidTotal || payableTotal, cartItems)
+          }
+          clearCheckoutDraft(businessId)
+          setCart({})
+          setStep('done')
+        } else if (splitSummary.some((s) => s.status === 'FAILED')) {
+          setPaymentStatus('FAILED')
+        }
+        return
+      }
+
+      let cancelled = false
+      const tick = async () => {
+        try {
+          const updates = await Promise.all(
+            multiIds.map(async (id) => {
+              const result = await payments.status(id)
+              return { paymentId: id, status: result.status as PaymentStatus }
+            }),
+          )
+          if (cancelled) return
+
+          setSplitSummary((current) => {
+            if (!current) return current
+            const next = current.map((share) => {
+              const hit = updates.find((u) => u.paymentId === share.paymentId)
+              return hit ? { ...share, status: hit.status } : share
+            })
+            const allPaid = next.every((s) => s.status === 'PAID')
+            const anyPending = next.some((s) => s.status === 'PENDING')
+            if (allPaid) {
+              setPaymentStatus('PAID')
+              if (placedOrderId) {
+                persistPaidReceipt(placedOrderId, paidTotal || payableTotal, cartItems)
+              }
+              clearCheckoutDraft(businessId)
+              setCart({})
+              setStep('done')
+            } else if (!anyPending) {
+              setPaymentStatus('FAILED')
+            }
+            return next
+          })
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : 'Could not check payment status')
+          }
+        }
+      }
+
+      tick()
+      const id = window.setInterval(tick, 3000)
+      return () => {
+        cancelled = true
+        window.clearInterval(id)
+      }
+    }
+
+    if (!paymentId) return
 
     let cancelled = false
     const tick = async () => {
@@ -690,7 +982,18 @@ export default function CustomerApp({
       cancelled = true
       window.clearInterval(id)
     }
-  }, [step, paymentId, paymentStatus, businessId, placedOrderId, paidTotal, payableTotal, cartItems, persistPaidReceipt])
+  }, [
+    step,
+    paymentId,
+    paymentStatus,
+    pendingSplitPaymentKey,
+    businessId,
+    placedOrderId,
+    paidTotal,
+    payableTotal,
+    cartItems,
+    persistPaidReceipt,
+  ])
 
   function orderMore() {
     clearCheckoutDraft(businessId)
@@ -704,6 +1007,9 @@ export default function CustomerApp({
     setPaymentStatus('PENDING')
     setPaidTotal(0)
     setFulfillmentStatus('Pending')
+    setSplitEnabled(false)
+    setSplitShares([])
+    setSplitSummary(null)
     setError(null)
     setStep('menu')
   }
@@ -728,6 +1034,9 @@ export default function CustomerApp({
     setPaymentStatus('PENDING')
     setPaidTotal(0)
     setFulfillmentStatus('Pending')
+    setSplitEnabled(false)
+    setSplitShares([])
+    setSplitSummary(null)
     setError(null)
     setSelectedCategory('all')
     setStep('menu')
@@ -751,25 +1060,32 @@ export default function CustomerApp({
     )
   }
 
-  const accent = business.accent || '#0f766e'
   const showBottomMenu = step === 'menu' && cartCount > 0
   const showBottomCart = step === 'cart' && cartCount > 0
   const showBottomDetails = step === 'details'
   const showBottomPay = step === 'pay'
   const payTotal = paidTotal || payableTotal
   const payCount = cartCount || (placedOrderId ? 1 : 0)
+  const splitAllocated = splitShares.reduce((sum, share) => sum + (Math.round(Number(share.amount)) || 0), 0)
+  const splitPhonesOk =
+    !splitEnabled ||
+    (splitShares.length >= 2 &&
+      splitShares.every((share) => !validatePhone(share.phone.trim())))
+  const splitReady =
+    !splitEnabled || (splitShares.length >= 2 && splitAllocated === payableTotal && splitPhonesOk)
+  const payBlocked = submitting || (step === 'pay' && !splitReady)
   const canCancel =
     step !== 'done' && (step !== 'menu' || cartCount > 0 || Boolean(placedOrderId) || Boolean(paymentId))
 
   return (
-    <div className="cm-page" style={{ ['--cm-accent' as string]: accent }}>
+    <div className="cm-page">
       <Toaster />
       <header className="cm-topbar">
         <div className="cm-brand">
           {business.logoUrl ? (
             <img src={business.logoUrl} alt="" className="cm-brand-logo" />
           ) : (
-            <KodeMark size={30} />
+            <KodeMark size={26} />
           )}
           <div className="cm-brand-text">
             <span className="cm-brand-name">Kode</span>
@@ -785,9 +1101,17 @@ export default function CustomerApp({
               disabled={submitting}
               aria-label="Cancel"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           ) : null}
+          <button
+            type="button"
+            className="cm-track-btn"
+            onClick={() => setShowHistory(true)}
+            aria-label="Order history"
+          >
+            <History size={15} />
+          </button>
           {orderPublicId ? (
             <button
               type="button"
@@ -795,7 +1119,7 @@ export default function CustomerApp({
               onClick={() => setShowTracking(true)}
               aria-label="Track order"
             >
-              <Package size={18} />
+              <Package size={15} />
             </button>
           ) : null}
           {receiptCount > 0 ? (
@@ -805,7 +1129,7 @@ export default function CustomerApp({
               onClick={() => setShowReceipts(true)}
               aria-label={`${receiptCount} receipts on this device`}
             >
-              <Receipt size={18} />
+              <Receipt size={15} />
               <span className="cm-badge">{receiptCount > 99 ? '99+' : receiptCount}</span>
             </button>
           ) : null}
@@ -817,16 +1141,23 @@ export default function CustomerApp({
               disabled={cartCount === 0}
               aria-label="Open cart"
             >
-              <ShoppingCart size={18} />
+              <ShoppingCart size={15} />
               {cartCount > 0 && <span className="cm-badge">{cartCount}</span>}
             </button>
           ) : canGoBack(step) || step === 'waiting' ? (
-            <button type="button" className="cm-ghost-btn" onClick={goBack}>
-              <ArrowLeft size={16} /> Back
+            <button type="button" className="cm-ghost-btn" onClick={goBack} aria-label="Back">
+              <ArrowLeft size={14} />
             </button>
           ) : null}
         </div>
       </header>
+
+      {busyBanner ? (
+        <div className={`cm-ops-banner${ordersPaused ? ' paused' : ''}`} role="status">
+          <Clock3 size={16} />
+          <span>{busyBanner}</span>
+        </div>
+      ) : null}
 
       <StepProgress step={step} variant={checkoutMode} />
 
@@ -916,6 +1247,10 @@ export default function CustomerApp({
           savedPhone={savedDevice?.primaryPhone}
           phoneError={phoneError}
           submitting={submitting}
+          splitEnabled={splitEnabled}
+          splitShares={splitShares}
+          onSplitEnabled={setSplitEnabled}
+          onSplitShares={setSplitShares}
           onProvider={setProvider}
           onPhone={(v) => {
             setPhone(formatUgPhoneHint(v))
@@ -928,10 +1263,14 @@ export default function CustomerApp({
       {step === 'waiting' && placedOrderId && (
         <WaitingStep
           businessName={business.name}
+          paymentReference={business.paymentReference}
+          businessId={business.id}
           orderId={placedOrderId}
+          publicId={orderPublicId}
           total={paidTotal || payableTotal}
           provider={provider}
           phone={phone}
+          customerName={customerName}
           status={paymentStatus}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
           estimatedWaitMinutes={
@@ -939,6 +1278,7 @@ export default function CustomerApp({
           }
           trackingLoading={trackingLoading}
           error={error}
+          splitSummary={splitSummary}
           onRetry={() => void retryPayment()}
           onChangeNumber={() => {
             setStep('pay')
@@ -951,6 +1291,8 @@ export default function CustomerApp({
         <DoneStep
           businessName={business.name}
           orderId={placedOrderId}
+          publicId={orderPublicId}
+          businessId={business.id}
           total={paidTotal}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
           estimatedWaitMinutes={
@@ -959,16 +1301,19 @@ export default function CustomerApp({
           trackingLoading={trackingLoading}
           trackingError={trackingError}
           onOrderMore={orderMore}
+          phone={phone}
+          customerName={customerName}
+          provider={provider}
         />
       )}
 
-      {showBottomMenu && (
+      {showBottomMenu && !ordersPaused && (
         <BottomBar count={cartCount} total={payableTotal} label="View cart" onAction={() => setStep('cart')} />
       )}
-      {showBottomCart && (
+      {showBottomCart && !ordersPaused && (
         <BottomBar count={cartCount} total={payableTotal} label="Continue" onAction={goDetails} />
       )}
-      {showBottomDetails && (
+      {showBottomDetails && !ordersPaused && (
         <BottomBar
           count={cartCount}
           total={payableTotal}
@@ -981,10 +1326,28 @@ export default function CustomerApp({
         <BottomBar
           count={Math.max(cartCount, payCount)}
           total={payTotal}
-          label={submitting ? 'Sending…' : `Pay ${currency(payTotal)}`}
+          label={
+            submitting
+              ? splitEnabled
+                ? 'Prompting payers…'
+                : 'Sending…'
+              : !splitReady
+                ? !splitPhonesOk
+                  ? 'Add each MoMo number'
+                  : splitAllocated < payableTotal
+                    ? `Allocate ${currency(payableTotal - splitAllocated)} more`
+                    : 'Fix split amounts'
+                : splitEnabled
+                  ? `Prompt ${splitShares.length} payers · ${currency(payTotal)}`
+                  : `Pay ${currency(payTotal)}`
+          }
           onAction={() => void submitPayment()}
           loading={submitting}
-          disabled={submitting || (!placedOrderId && cartCount === 0)}
+          disabled={
+            submitting
+            || !splitReady
+            || (!placedOrderId && (cartCount === 0 || ordersPaused))
+          }
         />
       )}
 
@@ -1003,6 +1366,10 @@ export default function CustomerApp({
         onReorder={reorderFromReceipt}
         onClose={() => setShowReceipts(false)}
       />
+
+      {showHistory ? (
+        <OrderHistoryPanel initialPhone={phone} onClose={() => setShowHistory(false)} />
+      ) : null}
     </div>
   )
 }

@@ -29,6 +29,7 @@ public class OutboxDispatcher {
     private final PaymentIntentService paymentIntentService;
     private final OrderService orderService;
     private final AuditService auditService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
 
     public OutboxDispatcher(
             OutboxEventRepository outboxEventRepository,
@@ -36,7 +37,8 @@ public class OutboxDispatcher {
             RealtimeEventPublisher realtimeEventPublisher,
             @Lazy PaymentIntentService paymentIntentService,
             @Lazy OrderService orderService,
-            AuditService auditService
+            AuditService auditService,
+            WhatsAppNotificationService whatsAppNotificationService
     ) {
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
@@ -44,6 +46,7 @@ public class OutboxDispatcher {
         this.paymentIntentService = paymentIntentService;
         this.orderService = orderService;
         this.auditService = auditService;
+        this.whatsAppNotificationService = whatsAppNotificationService;
     }
 
     @Scheduled(fixedDelayString = "${scanny.outbox.poll-ms:500}")
@@ -87,6 +90,11 @@ public class OutboxDispatcher {
                         String.valueOf(payload.getOrDefault("resourceId", "")),
                         castDetails(payload.get("details"))
                 );
+            }
+            case OutboxService.TYPE_WHATSAPP -> {
+                String to = String.valueOf(payload.getOrDefault("to", ""));
+                String message = String.valueOf(payload.getOrDefault("message", ""));
+                whatsAppNotificationService.sendText(to, message);
             }
             default -> log.debug("Unknown outbox type {}", event.getEventType());
         }

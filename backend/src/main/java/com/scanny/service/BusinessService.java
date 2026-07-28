@@ -9,6 +9,7 @@ import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.BusinessType;
 import com.scanny.repository.BusinessRepository;
+import com.scanny.repository.BusinessTableRepository;
 import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.MerchantRepository;
 import com.scanny.security.MerchantAccessService;
@@ -43,6 +44,7 @@ public class BusinessService {
 
     private final BusinessRepository businessRepository;
     private final CatalogItemRepository catalogItemRepository;
+    private final BusinessTableRepository businessTableRepository;
     private final MerchantRepository merchantRepository;
     private final OrderRepository orderRepository;
     private final StarterCatalogService starterCatalogService;
@@ -52,6 +54,7 @@ public class BusinessService {
     public BusinessService(
             BusinessRepository businessRepository,
             CatalogItemRepository catalogItemRepository,
+            BusinessTableRepository businessTableRepository,
             MerchantRepository merchantRepository,
             OrderRepository orderRepository,
             StarterCatalogService starterCatalogService,
@@ -60,6 +63,7 @@ public class BusinessService {
     ) {
         this.businessRepository = businessRepository;
         this.catalogItemRepository = catalogItemRepository;
+        this.businessTableRepository = businessTableRepository;
         this.merchantRepository = merchantRepository;
         this.orderRepository = orderRepository;
         this.starterCatalogService = starterCatalogService;
@@ -75,9 +79,9 @@ public class BusinessService {
                     .toList();
         }
         Merchant merchant = merchantAccessService.requireCurrentMerchant();
-        return businessRepository.findWithItemsByMerchantId(merchant.getId().toString())
-                .map(business -> List.of(toResponse(business, true)))
-                .orElse(List.of());
+        return businessRepository.findByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchant.getId().toString()).stream()
+                .map(business -> toResponse(business, true))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -116,9 +120,7 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public List<CatalogItem> getAvailableMenu(String businessId, String qrToken) {
         Business business = requireBusiness(businessId);
-        if (qrToken != null && !qrToken.isBlank() && !qrToken.equals(business.getQrToken())) {
-            throw new ApiException(403, "QR code does not match this business.");
-        }
+        assertMenuQrAllowed(business, qrToken);
         return business.getItems().stream().filter(CatalogItem::isAvailable).toList();
     }
 
@@ -126,12 +128,24 @@ public class BusinessService {
     @Cacheable(cacheNames = RedisConfig.MENU_CACHE, key = "#businessId")
     public List<CatalogDtos.CatalogItemResponse> getAvailableMenuCached(String businessId, String qrToken) {
         Business business = requireBusinessLight(businessId);
-        if (qrToken != null && !qrToken.isBlank() && !qrToken.equals(business.getQrToken())) {
-            throw new ApiException(403, "QR code does not match this business.");
-        }
+        assertMenuQrAllowed(business, qrToken);
         return catalogItemRepository.findByBusiness_IdAndAvailableTrue(businessId).stream()
                 .map(CatalogDtos.CatalogItemResponse::from)
                 .toList();
+    }
+
+    /** Accept business menu QR, or a valid active table QR for this business. */
+    private void assertMenuQrAllowed(Business business, String qrToken) {
+        if (qrToken == null || qrToken.isBlank() || qrToken.equals(business.getQrToken())) {
+            return;
+        }
+        boolean tableQr = businessTableRepository.findByQrToken(qrToken)
+                .filter(table -> table.isActive() && table.getBusiness() != null)
+                .filter(table -> business.getId().equals(table.getBusiness().getId()))
+                .isPresent();
+        if (!tableQr) {
+            throw new ApiException(403, "QR code does not match this business.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -177,12 +191,17 @@ public class BusinessService {
 
     @Transactional(readOnly = true)
     public int estimateWaitMinutes(String businessId) {
-        requireBusinessLight(businessId);
+        Business business = requireBusinessLight(businessId);
         long open = orderRepository.countByBusinessIdAndStatusIn(
                 businessId,
                 List.of(OrderStatus.Pending, OrderStatus.Preparing)
         );
-        return WaitEstimate.estimateMinutes(open);
+        int base = WaitEstimate.estimateMinutes(open);
+        if (business.isBusyMode()) {
+            int busyEta = business.getBusyEtaMinutes();
+            return Math.max(base, busyEta > 0 ? busyEta : base + 15);
+        }
+        return base;
     }
 
     @Caching(evict = {
@@ -273,13 +292,81 @@ public class BusinessService {
 
             starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
             business = businessRepository.save(business);
-        } else if (merchant.getQrCodeToken() != null
-                && !merchant.getQrCodeToken().equals(business.getQrToken())) {
-            business.setQrToken(merchant.getQrCodeToken());
-            business = businessRepository.save(business);
+        } else {
+            boolean dirty = false;
+            if (merchant.getQrCodeToken() != null
+                    && !merchant.getQrCodeToken().equals(business.getQrToken())) {
+                business.setQrToken(merchant.getQrCodeToken());
+                dirty = true;
+            }
+
+            BusinessType desiredType = mapMerchantType(merchant.getBusinessType());
+            if (desiredType != business.getType()) {
+                business.setType(desiredType);
+                business.setTableLabel(starterCatalogService.defaultTableLabel(desiredType));
+                for (String category : CatalogCategories.defaultNames(desiredType)) {
+                    business.addCustomCategory(category);
+                }
+                if (desiredType == BusinessType.Hotel) {
+                    ensureHotelLodgingCatalog(business);
+                }
+                if (merchant.getBusinessName() != null
+                        && !merchant.getBusinessName().isBlank()
+                        && !merchant.getBusinessName().equals(business.getName())) {
+                    business.setName(merchant.getBusinessName());
+                }
+                dirty = true;
+            } else if (desiredType == BusinessType.Hotel) {
+                int before = business.getItems() != null ? business.getItems().size() : 0;
+                ensureHotelLodgingCatalog(business);
+                int after = business.getItems() != null ? business.getItems().size() : 0;
+                if (after > before) {
+                    dirty = true;
+                }
+            }
+
+            if (dirty) {
+                business = businessRepository.save(business);
+            }
         }
 
         return toResponse(business, true);
+    }
+
+    /** Add rooms/suites (+ hotel food defaults) when a venue is promoted to Hotel. */
+    private void ensureHotelLodgingCatalog(Business business) {
+        java.util.Set<String> names = new java.util.HashSet<>();
+        if (business.getItems() != null) {
+            for (CatalogItem existing : business.getItems()) {
+                if (existing.getName() != null) {
+                    names.add(existing.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+        }
+        boolean hasLodging = business.getItems() != null && business.getItems().stream()
+                .anyMatch(CatalogItem::isLodging);
+        if (hasLodging) {
+            return;
+        }
+        int index = (business.getItems() != null ? business.getItems().size() : 0) + 1;
+        for (var spec : starterCatalogService.premiumHotelRooms()) {
+            if (names.contains(spec.name().trim().toLowerCase(java.util.Locale.ROOT))) {
+                continue;
+            }
+            CatalogItem item = new CatalogItem();
+            item.setId(business.getId() + "-room-" + (index++));
+            item.setName(spec.name());
+            item.setCategory(spec.category());
+            item.setPrice(spec.price());
+            item.setDescription(spec.description());
+            item.setAvailable(true);
+            item.setItemKind(spec.kind());
+            item.setCapacity(spec.capacity());
+            item.setUnitsAvailable(spec.units());
+            item.setAmenitiesJson(spec.amenitiesJson());
+            business.addItem(item);
+            business.addCustomCategory(spec.category());
+        }
     }
 
     private BusinessResponse toResponse(Business business, boolean includeItems) {

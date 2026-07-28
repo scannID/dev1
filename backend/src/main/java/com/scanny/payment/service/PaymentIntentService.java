@@ -20,6 +20,7 @@ import com.scanny.repository.QuickPaymentTransactionRepository;
 import com.scanny.service.FeeService;
 import com.scanny.service.OrderService;
 import com.scanny.service.OutboxService;
+import com.scanny.service.TableService;
 import com.scanny.service.TicketPurchaseService;
 import com.scanny.entity.Order;
 import java.time.Instant;
@@ -47,6 +48,7 @@ public class PaymentIntentService {
     private final OutboxService outboxService;
     private final FeeService feeService;
     private final PaymentProperties paymentProperties;
+    private final TableService tableService;
 
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
@@ -57,7 +59,8 @@ public class PaymentIntentService {
             TicketPurchaseService ticketPurchaseService,
             OutboxService outboxService,
             FeeService feeService,
-            PaymentProperties paymentProperties) {
+            PaymentProperties paymentProperties,
+            TableService tableService) {
         this.paymentIntentRepository = paymentIntentRepository;
         this.orderService = orderService;
         this.quickPaymentTransactionRepository = quickPaymentTransactionRepository;
@@ -67,6 +70,7 @@ public class PaymentIntentService {
         this.outboxService = outboxService;
         this.feeService = feeService;
         this.paymentProperties = paymentProperties;
+        this.tableService = tableService;
     }
 
     @Transactional
@@ -98,6 +102,19 @@ public class PaymentIntentService {
             intent.setPsoFee(order.getPsoFee());
             intent.setPlatformFee(order.getPlatformFee());
             intent.setMerchantPayout(order.getMerchantPayout());
+            intent.setMerchantMomoDestination(order.getMerchantMomoDestination());
+            intent.setBusinessId(order.getBusiness().getId());
+            return;
+        }
+        if (request.context() == PaymentContext.ORDER_SPLIT) {
+            var split = tableService.requireUnpaidSplit(request.referenceId());
+            Order order = orderService.requireOrderForPayment(split.getOrderId());
+            intent.setAmount(split.getAmount());
+            intent.setSubtotal(split.getAmount());
+            intent.setServiceFee(0);
+            intent.setPsoFee(0);
+            intent.setPlatformFee(0);
+            intent.setMerchantPayout(split.getAmount());
             intent.setMerchantMomoDestination(order.getMerchantMomoDestination());
             intent.setBusinessId(order.getBusiness().getId());
             return;
@@ -231,6 +248,7 @@ public class PaymentIntentService {
     private void onPaid(PaymentIntent intent) {
         switch (intent.getContext()) {
             case ORDER -> orderService.confirmPaymentFromGateway(intent.getReferenceId(), PaymentStatus.Paid);
+            case ORDER_SPLIT -> tableService.confirmSplitFromGateway(intent.getReferenceId());
             case QUICK_PAY -> completeQuickPay(intent.getReferenceId(), TransactionStatus.Completed, null);
             case TICKET -> ticketPurchaseService.confirmPurchaseFromPayment(
                 intent.getReferenceId(),

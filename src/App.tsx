@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, BarChart3, Bell, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, ShoppingCart, Sun, Trash2 } from 'lucide-react'
+import { Banknote, BarChart3, Bell, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -67,6 +67,10 @@ import type {
 } from './api/types'
 import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
+import { OperationsHub } from './operations/OperationsHub'
+import { SplitBillPanel } from './operations/SplitBillPanel'
+import { openPrintReceipt } from './lib/printReceipt'
+import { operationsApi } from './api/operations'
 import { resizeImageFile } from './lib/resizeImage'
 import { buildReportData, dailySeries } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
@@ -269,6 +273,7 @@ function App({
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
   const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const [actionError, setActionError] = useState<string | null>(null)
@@ -378,6 +383,7 @@ function App({
       await catalogHook.createItem(data)
       await refreshBusiness(business.id)
       setShowAddItem(false)
+      setEditingItem(null)
       toast.success('Item created successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create item'
@@ -407,6 +413,8 @@ function App({
         unitsAvailable: data.unitsAvailable,
       })
       await refreshBusiness(business.id)
+      setEditingItem(null)
+      setShowAddItem(false)
       toast.success('Item updated successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update item'
@@ -424,6 +432,8 @@ function App({
         business.id,
         (business.items ?? []).filter((entry) => entry.id !== itemId),
       )
+      setEditingItem(null)
+      setShowAddItem(false)
       toast.success('Item deleted successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete item'
@@ -574,14 +584,17 @@ function App({
             { id: 'account', label: 'Overview', icon: Home },
             { id: 'catalog', label: 'Catalog', icon: Package },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount },
+            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed },
+            { id: 'operations', label: 'Roles', icon: Settings2 },
             { id: 'reports', label: 'Reports', icon: BarChart3 },
           ].map(({ id, label, icon: Icon, count }) => (
             <button
               type="button"
-              className={!showAddItem && view === id ? 'active' : ''}
+              className={!showAddItem && !editingItem && view === id ? 'active' : ''}
               key={id}
               onClick={() => {
                 setShowAddItem(false)
+                setEditingItem(null)
                 setView(id)
               }}
             >
@@ -627,26 +640,36 @@ function App({
         <header className="company-topbar">
           <div>
             <p className="eyebrow">
-              {showAddItem && 'Merchant · Add item'}
-              {!showAddItem && view === 'account' && 'Merchant · Overview'}
-              {!showAddItem && view === 'catalog' && 'Merchant · Catalog'}
-              {!showAddItem && view === 'dashboard' && 'Merchant · Orders'}
-              {!showAddItem && view === 'reports' && 'Merchant · Reports'}
+              {editingItem && (editingItem.itemKind === 'ROOM' || editingItem.itemKind === 'SUITE'
+                ? 'Merchant · Edit room / suite'
+                : 'Merchant · Edit item')}
+              {!editingItem && showAddItem && 'Merchant · Add item'}
+              {!editingItem && !showAddItem && view === 'account' && 'Merchant · Overview'}
+              {!editingItem && !showAddItem && view === 'catalog' && 'Merchant · Catalog'}
+              {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
+              {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
+              {!editingItem && !showAddItem && view === 'operations' && 'Merchant · Roles & permissions'}
+              {!editingItem && !showAddItem && view === 'reports' && 'Merchant · Reports'}
             </p>
             <h2>
-              {showAddItem && 'Add item'}
-              {!showAddItem && view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
-              {!showAddItem && view === 'catalog' && 'Catalog'}
-              {!showAddItem && view === 'dashboard' && 'Orders'}
-              {!showAddItem && view === 'reports' && 'Reports'}
+              {editingItem && (editingItem.itemKind === 'ROOM' || editingItem.itemKind === 'SUITE'
+                ? 'Edit room / suite'
+                : 'Edit item')}
+              {!editingItem && showAddItem && 'Add item'}
+              {!editingItem && !showAddItem && view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
+              {!editingItem && !showAddItem && view === 'catalog' && 'Catalog'}
+              {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
+              {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
+              {!editingItem && !showAddItem && view === 'operations' && 'Roles & permissions'}
+              {!editingItem && !showAddItem && view === 'reports' && 'Reports'}
             </h2>
             {(actionError || sessionError) && (
               <p className="scanny-error" role="alert" style={{ marginTop: 8 }}>{actionError || sessionError}</p>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {!showAddItem && view === 'account' && (
-              <Button className="" size="sm" onClick={() => { setAddItemSection('food'); setShowAddItem(true) }}>
+            {!showAddItem && !editingItem && view === 'account' && (
+              <Button className="" size="sm" onClick={() => { setAddItemSection('food'); setEditingItem(null); setShowAddItem(true) }}>
                 <Plus className="size-3.5" />
                 Add item
               </Button>
@@ -679,15 +702,26 @@ function App({
           </div>
         </header>
 
-        {showAddItem ? (
+        {showAddItem || editingItem ? (
           <div className="page-content add-item-page-content">
             <div className="add-item-page">
               <AddItemForm
+                key={editingItem?.id ?? `new-${addItemSection}`}
                 business={business}
-                section={addItemSection}
+                section={
+                  editingItem
+                    ? (editingItem.itemKind === 'ROOM' || editingItem.itemKind === 'SUITE' ? 'lodging' : 'food')
+                    : addItemSection
+                }
+                initialItem={editingItem ?? undefined}
                 onCreateItem={handleCreateCatalogItem}
+                onUpdateItem={handleUpdateCatalogItem}
+                onDeleteItem={editingItem ? handleDeleteCatalogItem : undefined}
                 onAddCategory={handleAddCategory}
-                onCancel={() => setShowAddItem(false)}
+                onCancel={() => {
+                  setShowAddItem(false)
+                  setEditingItem(null)
+                }}
               />
             </div>
           </div>
@@ -720,13 +754,15 @@ function App({
               <div className="page-content">
                 <CatalogPage
                   business={business}
-                  onCreateItem={handleCreateCatalogItem}
-                  onUpdateItem={handleUpdateCatalogItem}
-                  onDeleteItem={handleDeleteCatalogItem}
-                  onAddCategory={handleAddCategory}
                   onAddItem={(section) => {
+                    setEditingItem(null)
                     setAddItemSection(section)
                     setShowAddItem(true)
+                  }}
+                  onEditItem={(item) => {
+                    setShowAddItem(false)
+                    setEditingItem(item)
+                    setView('catalog')
                   }}
                   Sparkline={Sparkline}
                 />
@@ -743,6 +779,27 @@ function App({
                   onStatusChange={updateStatus}
                   Sparkline={Sparkline}
                 />
+              </div>
+            )}
+
+            {view === 'kitchen' && (
+              <div className="page-content">
+                <div style={{ marginBottom: 12 }}>
+                  <Button variant="outline" onClick={() => window.open(`/kitchen/${business.id}`, '_blank')}>
+                    Open fullscreen kitchen
+                  </Button>
+                </div>
+                <iframe
+                  title="Kitchen display"
+                  src={`/kitchen/${business.id}`}
+                  style={{ width: '100%', minHeight: '70vh', border: '1px solid var(--border)', borderRadius: 12 }}
+                />
+              </div>
+            )}
+
+            {view === 'operations' && (
+              <div className="page-content">
+                <OperationsHub businessId={business.id} />
               </div>
             )}
 
@@ -1068,38 +1125,70 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
   )
 }
 
+function catalogItemToFormState(item: CatalogItem | undefined, isLodging: boolean) {
+  if (!item) {
+    return {
+      name: '',
+      category: isLodging ? 'Rooms' : '',
+      price: '',
+      discountPercent: '0',
+      description: '',
+      imageUrl: null as string | null,
+      imageUrls: [] as string[],
+      details: '',
+      ingredients: [] as NonNullable<CatalogItem['ingredients']>,
+      available: true,
+      itemKind: (isLodging ? 'ROOM' : 'FOOD') as CatalogItemKind,
+      capacity: '2',
+      amenitiesText: '',
+      unitsAvailable: '1',
+    }
+  }
+  return {
+    name: item.name ?? '',
+    category: item.category ?? (isLodging ? 'Rooms' : ''),
+    price: item.price != null ? String(item.price) : '',
+    discountPercent: String(item.discountPercent ?? 0),
+    description: item.description ?? '',
+    imageUrl: item.imageUrl ?? null,
+    imageUrls: item.imageUrls?.length ? [...item.imageUrls] : item.imageUrl ? [item.imageUrl] : [],
+    details: item.details ?? '',
+    ingredients: item.ingredients ? [...item.ingredients] : [],
+    available: item.available !== false,
+    itemKind: (item.itemKind ?? (isLodging ? 'ROOM' : 'FOOD')) as CatalogItemKind,
+    capacity: String(item.capacity ?? 2),
+    amenitiesText: (item.amenities ?? []).join(', '),
+    unitsAvailable: String(item.unitsAvailable ?? 1),
+  }
+}
+
 function AddItemForm({
   business,
   section = 'food',
+  initialItem,
   onCreateItem,
+  onUpdateItem,
+  onDeleteItem,
   onAddCategory,
   onCancel,
 }: {
   business: Business
   section?: 'food' | 'lodging'
+  initialItem?: CatalogItem
   onCreateItem: (data: CreateCatalogItemRequest) => Promise<void> | void
+  onUpdateItem?: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
+  onDeleteItem?: (itemId: string) => Promise<void> | void
   onAddCategory: (name: string) => Promise<string[] | void>
   onCancel?: () => void
 }) {
   const isHotel = business.type === 'Hotel'
-  const isLodging = isHotel && section === 'lodging'
-  const emptyItem = {
-    name: '',
-    category: isLodging ? 'Rooms' : '',
-    price: '',
-    discountPercent: '0',
-    description: '',
-    imageUrl: null as string | null,
-    imageUrls: [] as string[],
-    details: '',
-    ingredients: [] as NonNullable<CatalogItem['ingredients']>,
-    available: true,
-    itemKind: (isLodging ? 'ROOM' : 'FOOD') as CatalogItemKind,
-    capacity: '2',
-    amenitiesText: '',
-    unitsAvailable: '1',
-  }
-  const [item, setItem] = useState(emptyItem)
+  const isEdit = Boolean(initialItem?.id)
+  const isLodging = isHotel && (
+    section === 'lodging'
+    || initialItem?.itemKind === 'ROOM'
+    || initialItem?.itemKind === 'SUITE'
+  )
+  const [item, setItem] = useState(() => catalogItemToFormState(initialItem, isLodging))
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
   const categories = businessCategories(business).filter((cat) => {
@@ -1134,7 +1223,7 @@ function AddItemForm({
         : item.imageUrl
           ? [item.imageUrl]
           : []
-      await onCreateItem({
+      const payload = {
         name,
         category,
         price,
@@ -1145,13 +1234,28 @@ function AddItemForm({
         ingredients: isLodging ? [] : item.ingredients,
         available: item.available,
         discountPercent,
-        itemKind: isLodging ? item.itemKind : 'FOOD',
+        itemKind: isLodging ? item.itemKind : 'FOOD' as CatalogItemKind,
         capacity: isLodging ? capacity : 0,
         amenities: isLodging ? amenities : [],
         unitsAvailable: isLodging ? unitsAvailable : 0,
-      })
-      setItem(emptyItem)
-      setSubmitted(false)
+      }
+      if (isEdit && initialItem?.id && onUpdateItem) {
+        await onUpdateItem(initialItem.id, payload)
+      } else {
+        await onCreateItem(payload)
+        setItem(catalogItemToFormState(undefined, isLodging))
+        setSubmitted(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!initialItem?.id || !onDeleteItem) return
+    setSaving(true)
+    try {
+      await onDeleteItem(initialItem.id)
     } finally {
       setSaving(false)
     }
@@ -1167,6 +1271,7 @@ function AddItemForm({
   const isUnitsMissing = isLodging && submitted && (!Number.isFinite(unitsAvailable) || unitsAvailable < 1)
   const discountPercent = Math.max(0, Math.min(100, Math.round(Number(item.discountPercent) || 0)))
   const salePrice = Number.isFinite(price) && price > 0 ? effectivePrice(price, discountPercent) : null
+  const formId = isEdit ? 'edit-item' : 'add-item'
 
   return (
     <form className="add-item-form" noValidate onSubmit={submitItem}>
@@ -1191,15 +1296,15 @@ function AddItemForm({
       </aside>
 
       <div className="add-item-fields">
-        <section className="add-item-card" aria-labelledby="add-item-general-heading">
+        <section className="add-item-card" aria-labelledby={`${formId}-general-heading`}>
           <header className="add-item-card-head">
             <Info className="add-item-card-icon" aria-hidden="true" />
-            <h3 id="add-item-general-heading">{isLodging ? 'Room / Suite' : 'General Information'}</h3>
+            <h3 id={`${formId}-general-heading`}>{isLodging ? 'Room / Suite' : 'General Information'}</h3>
           </header>
 
           {isLodging ? (
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-kind">Type</Label>
+              <Label htmlFor={`${formId}-kind`}>Type</Label>
               <Select
                 value={item.itemKind}
                 onValueChange={(value) =>
@@ -1210,7 +1315,7 @@ function AddItemForm({
                   })
                 }
               >
-                <SelectTrigger id="add-item-kind"><SelectValue /></SelectTrigger>
+                <SelectTrigger id={`${formId}-kind`}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ROOM">Room</SelectItem>
                   <SelectItem value="SUITE">Suite</SelectItem>
@@ -1221,9 +1326,9 @@ function AddItemForm({
 
           <div className="add-item-row">
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-name">{isLodging ? 'Name' : 'Item name'}</Label>
+              <Label htmlFor={`${formId}-name`}>{isLodging ? 'Name' : 'Item name'}</Label>
               <Input
-                id="add-item-name"
+                id={`${formId}-name`}
                 type="text"
                 required
                 aria-invalid={isItemNameMissing}
@@ -1237,7 +1342,7 @@ function AddItemForm({
 
             <div className="grid gap-1.5">
               <CategoryField
-                id="add-item-category"
+                id={`${formId}-category`}
                 categories={categories.length ? categories : isLodging ? ['Rooms', 'Suites'] : []}
                 value={item.category}
                 onChange={(category) => setItem({ ...item, category })}
@@ -1250,9 +1355,9 @@ function AddItemForm({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="add-item-description">Short description</Label>
+            <Label htmlFor={`${formId}-description`}>Short description</Label>
             <Textarea
-              id="add-item-description"
+              id={`${formId}-description`}
               className=""
               rows={3}
               value={item.description}
@@ -1262,17 +1367,17 @@ function AddItemForm({
           </div>
         </section>
 
-        <section className="add-item-card" aria-labelledby="add-item-pricing-heading">
+        <section className="add-item-card" aria-labelledby={`${formId}-pricing-heading`}>
           <header className="add-item-card-head">
             <Banknote className="add-item-card-icon" aria-hidden="true" />
-            <h3 id="add-item-pricing-heading">{isLodging ? 'Nightly rate & stay details' : 'Pricing & Details'}</h3>
+            <h3 id={`${formId}-pricing-heading`}>{isLodging ? 'Nightly rate & stay details' : 'Pricing & Details'}</h3>
           </header>
 
           <div className="add-item-row">
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-price">{isLodging ? 'Price per night (UGX)' : 'Price (UGX)'}</Label>
+              <Label htmlFor={`${formId}-price`}>{isLodging ? 'Price per night (UGX)' : 'Price (UGX)'}</Label>
               <Input
-                id="add-item-price"
+                id={`${formId}-price`}
                 required
                 aria-invalid={isPriceMissing}
                 className={isPriceMissing ? 'border-destructive' : undefined}
@@ -1286,9 +1391,9 @@ function AddItemForm({
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="add-item-discount">Discount (%)</Label>
+              <Label htmlFor={`${formId}-discount`}>Discount (%)</Label>
               <Input
-                id="add-item-discount"
+                id={`${formId}-discount`}
                 min="0"
                 max="100"
                 type="number"
@@ -1311,9 +1416,9 @@ function AddItemForm({
             <>
               <div className="add-item-row">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="add-item-capacity">Max guests</Label>
+                  <Label htmlFor={`${formId}-capacity`}>Max guests</Label>
                   <Input
-                    id="add-item-capacity"
+                    id={`${formId}-capacity`}
                     type="number"
                     min="1"
                     aria-invalid={isCapacityMissing}
@@ -1324,9 +1429,9 @@ function AddItemForm({
                   {isCapacityMissing && <span className="text-xs text-destructive">{REQUIRED_FIELD_MESSAGE}</span>}
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="add-item-units">Units available</Label>
+                  <Label htmlFor={`${formId}-units`}>Units available</Label>
                   <Input
-                    id="add-item-units"
+                    id={`${formId}-units`}
                     type="number"
                     min="1"
                     aria-invalid={isUnitsMissing}
@@ -1338,9 +1443,9 @@ function AddItemForm({
                 </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="add-item-amenities">Amenities (comma-separated)</Label>
+                <Label htmlFor={`${formId}-amenities`}>Amenities (comma-separated)</Label>
                 <Input
-                  id="add-item-amenities"
+                  id={`${formId}-amenities`}
                   value={item.amenitiesText}
                   onChange={(event) => setItem({ ...item, amenitiesText: event.target.value })}
                   placeholder="Wi‑Fi, AC, Mini bar, Balcony"
@@ -1350,9 +1455,9 @@ function AddItemForm({
           ) : null}
 
           <div className="grid gap-1.5">
-            <Label htmlFor="add-item-details">{isLodging ? 'Full details' : 'Combo details'}</Label>
+            <Label htmlFor={`${formId}-details`}>{isLodging ? 'Full details' : 'Combo details'}</Label>
             <Textarea
-              id="add-item-details"
+              id={`${formId}-details`}
               className=""
               rows={4}
               value={item.details}
@@ -1373,13 +1478,13 @@ function AddItemForm({
 
           <div className="flex items-center gap-2">
             <input
-              id="add-item-available"
+              id={`${formId}-available`}
               checked={item.available}
               type="checkbox"
               className="size-4 rounded border-border accent-primary"
               onChange={(event) => setItem({ ...item, available: event.target.checked })}
             />
-            <Label htmlFor="add-item-available" className="cursor-pointer font-normal">
+            <Label htmlFor={`${formId}-available`} className="cursor-pointer font-normal">
               Available to customers
             </Label>
           </div>
@@ -1391,8 +1496,26 @@ function AddItemForm({
               </Button>
             ) : null}
             <Button className="min-w-36" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : isLodging ? 'Add room / suite' : 'Add item'}
+              {saving
+                ? 'Saving…'
+                : isEdit
+                  ? 'Save changes'
+                  : isLodging
+                    ? 'Add room / suite'
+                    : 'Add item'}
             </Button>
+            {isEdit && onDeleteItem ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                disabled={saving}
+                title="Delete item"
+                onClick={() => void handleDelete()}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            ) : null}
           </div>
         </section>
       </div>
@@ -1401,19 +1524,13 @@ function AddItemForm({
 }
 function CatalogPage({
   business,
-  onCreateItem,
-  onUpdateItem,
-  onDeleteItem,
-  onAddCategory,
   onAddItem,
+  onEditItem,
   Sparkline,
 }: {
   business: Business
-  onCreateItem: (data: CreateCatalogItemRequest) => Promise<void> | void
-  onUpdateItem: (itemId: string, data: Partial<CatalogItem>) => Promise<void> | void
-  onDeleteItem: (itemId: string) => Promise<void> | void
-  onAddCategory: (name: string) => Promise<string[] | void>
   onAddItem: (section: 'food' | 'lodging') => void
+  onEditItem: (item: CatalogItem) => void
   Sparkline: (props: { data: number[]; color?: string }) => ReactElement | null
 }) {
   const isHotel = business.type === 'Hotel'
@@ -1430,14 +1547,10 @@ function CatalogPage({
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Partial<CatalogItem> & { amenitiesText?: string }>({})
-  const [saving, setSaving] = useState(false)
   const [pageItems, setPageItems] = useState<CatalogItem[]>([])
   const [totalItems, setTotalItems] = useState(0)
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [reloadToken, setReloadToken] = useState(0)
 
   const filterResetKey = `${search}|${filterCategory}|${filterStatus}|${catalogSection}`
   const pagination = useServerPagination({
@@ -1486,68 +1599,10 @@ function CatalogPage({
     search,
     filterCategory,
     filterStatus,
-    reloadToken,
     business.items.length,
     catalogSection,
     isHotel,
   ])
-
-  function startEdit(item: CatalogItem) {
-    setEditingId(item.id)
-    setEditDraft({
-      ...item,
-      amenitiesText: (item.amenities ?? []).join(', '),
-      imageUrls: item.imageUrls?.length ? item.imageUrls : item.imageUrl ? [item.imageUrl] : [],
-    })
-  }
-
-  function cancelEdit() {
-    setEditingId(null)
-    setEditDraft({})
-  }
-
-  async function saveEdit() {
-    if (!editDraft.name?.trim() || !editDraft.category?.trim() || !editingId) return
-    const isLodging = editDraft.itemKind === 'ROOM' || editDraft.itemKind === 'SUITE'
-    setSaving(true)
-    try {
-      const amenities = (editDraft.amenitiesText ?? '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-      const gallery = isLodging
-        ? (editDraft.imageUrls ?? [])
-        : editDraft.imageUrl
-          ? [editDraft.imageUrl]
-          : []
-      await onUpdateItem(editingId, {
-        ...editDraft,
-        price: Number(editDraft.price) || 0,
-        discountPercent: Math.max(0, Math.min(100, Math.round(Number(editDraft.discountPercent) || 0))),
-        imageUrls: gallery,
-        imageUrl: gallery[0] ?? editDraft.imageUrl ?? null,
-        amenities: isLodging ? amenities : [],
-        capacity: isLodging ? Number(editDraft.capacity) || 1 : 0,
-        unitsAvailable: isLodging ? Number(editDraft.unitsAvailable) || 1 : 0,
-        ingredients: isLodging ? [] : editDraft.ingredients,
-      })
-      cancelEdit()
-      setReloadToken((n) => n + 1)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function removeItem(itemId: string) {
-    setSaving(true)
-    try {
-      await onDeleteItem(itemId)
-      if (editingId === itemId) cancelEdit()
-      setReloadToken((n) => n + 1)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   function resetFilters() {
     setSearch('')
@@ -1556,10 +1611,6 @@ function CatalogPage({
   }
 
   const isFiltered = search || filterCategory !== 'all' || filterStatus !== 'all'
-  const editingLodging = editDraft.itemKind === 'ROOM' || editDraft.itemKind === 'SUITE'
-
-  // silence unused until bulk-create UI needs it
-  void onCreateItem
 
   const sectionItems = (business.items ?? []).filter((item) => {
     const lodging = item.itemKind === 'ROOM' || item.itemKind === 'SUITE'
@@ -1681,7 +1732,7 @@ function CatalogPage({
                   const lodging = entry.itemKind === 'ROOM' || entry.itemKind === 'SUITE'
                   return (
                     <article key={entry.id} className="catalog-item-card">
-                      <button type="button" className="catalog-item-card-media" onClick={() => startEdit(entry)}>
+                      <button type="button" className="catalog-item-card-media" onClick={() => onEditItem(entry)}>
                         <img src={thumb} alt="" />
                         {!entry.available ? <span className="catalog-item-card-ribbon">Hidden</span> : null}
                         {entry.available && off > 0 ? (
@@ -1724,7 +1775,7 @@ function CatalogPage({
                           >
                             {entry.available ? 'Available' : 'Hidden'}
                           </Badge>
-                          <Button variant="outline" size="sm" className="h-7 text-xs ml-auto" onClick={() => startEdit(entry)}>
+                          <Button variant="outline" size="sm" className="h-7 text-xs ml-auto" onClick={() => onEditItem(entry)}>
                             <Pencil className="size-3" />
                             Edit
                           </Button>
@@ -1742,168 +1793,17 @@ function CatalogPage({
             <PaginationBar pagination={pagination} hideWhenEmpty={false} />
           </div>
         </div>
-
-        {/* Edit item — Sheet drawer */}
-        <Sheet open={!!editingId} onOpenChange={(open) => { if (!open) cancelEdit() }}>
-          <SheetContent
-            side="right"
-            className="inset-0 h-dvh w-screen max-w-none sm:max-w-none data-[side=right]:w-screen data-[side=right]:sm:max-w-none flex flex-col gap-0 p-0 border-0"
-          >
-            <SheetHeader className="border-b border-border px-6 py-4 shrink-0">
-              <SheetTitle className={undefined}>{editingLodging ? 'Edit room / suite' : 'Edit item'}</SheetTitle>
-              <SheetDescription className={undefined}>{editDraft.name || 'Catalog item'}</SheetDescription>
-            </SheetHeader>
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              <div className="mx-auto w-full max-w-3xl flex flex-col gap-4">
-                {editingLodging ? (
-                  <CatalogItemGalleryField
-                    imageUrls={editDraft.imageUrls ?? []}
-                    name={editDraft.name}
-                    disabled={saving}
-                    onChange={(imageUrls) => setEditDraft({ ...editDraft, imageUrls, imageUrl: imageUrls[0] ?? '' })}
-                  />
-                ) : (
-                  <CatalogItemImageField
-                    imageUrl={editDraft.imageUrl}
-                    category={editDraft.category}
-                    name={editDraft.name}
-                    disabled={saving}
-                    onChange={(imageUrl) => setEditDraft({ ...editDraft, imageUrl: imageUrl ?? '' })}
-                  />
-                )}
-                {editingLodging ? (
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="edit-kind">Type</Label>
-                    <Select
-                      value={editDraft.itemKind ?? 'ROOM'}
-                      onValueChange={(value) =>
-                        setEditDraft({
-                          ...editDraft,
-                          itemKind: value as CatalogItemKind,
-                          category: value === 'SUITE' ? 'Suites' : 'Rooms',
-                        })
-                      }
-                    >
-                      <SelectTrigger id="edit-kind"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ROOM">Room</SelectItem>
-                        <SelectItem value="SUITE">Suite</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
-                <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-name">Name</Label>
-                  <Input className="" id="edit-name" value={editDraft.name ?? ''} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} type={undefined} />
-                </div>
-                <div className="grid gap-1.5">
-                  <CategoryField
-                    id="edit-category"
-                    categories={categories}
-                    value={editDraft.category ?? ''}
-                    onChange={(category) => setEditDraft({ ...editDraft, category })}
-                    onAddCategory={onAddCategory}
-                    disabled={saving}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-price">{editingLodging ? 'Price per night (UGX)' : 'Price (UGX)'}</Label>
-                  <Input className="" id="edit-price" type="number" min="0" value={editDraft.price ?? ''} onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value as unknown as number })} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-discount">Discount (%)</Label>
-                  <Input
-                    className=""
-                    id="edit-discount"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={editDraft.discountPercent ?? 0}
-                    onChange={(e) => setEditDraft({
-                      ...editDraft,
-                      discountPercent: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0))),
-                    })}
-                  />
-                  {discountPercentOf(editDraft) > 0 && Number(editDraft.price) > 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Now <strong className="text-foreground">{currency(effectivePrice(Number(editDraft.price) || 0, discountPercentOf(editDraft)))}</strong>
-                      {' '}
-                      <span className="line-through">{currency(Number(editDraft.price) || 0)}</span>
-                    </p>
-                  ) : null}
-                </div>
-                {editingLodging ? (
-                  <>
-                    <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-3">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="edit-capacity">Max guests</Label>
-                        <Input
-                          id="edit-capacity"
-                          type="number"
-                          min="1"
-                          value={editDraft.capacity ?? 1}
-                          onChange={(e) => setEditDraft({ ...editDraft, capacity: Number(e.target.value) || 1 })}
-                        />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="edit-units">Units available</Label>
-                        <Input
-                          id="edit-units"
-                          type="number"
-                          min="1"
-                          value={editDraft.unitsAvailable ?? 1}
-                          onChange={(e) => setEditDraft({ ...editDraft, unitsAvailable: Number(e.target.value) || 1 })}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid gap-1.5">
-                      <Label htmlFor="edit-amenities">Amenities (comma-separated)</Label>
-                      <Input
-                        id="edit-amenities"
-                        value={editDraft.amenitiesText ?? ''}
-                        onChange={(e) => setEditDraft({ ...editDraft, amenitiesText: e.target.value })}
-                      />
-                    </div>
-                  </>
-                ) : null}
-                <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-description">Short description</Label>
-                  <Textarea className="" id="edit-description" rows={2} value={editDraft.description ?? ''} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="" htmlFor="edit-details">{editingLodging ? 'Full details' : 'Combo details'}</Label>
-                  <Textarea className="" id="edit-details" rows={4} value={editDraft.details ?? ''} onChange={(e) => setEditDraft({ ...editDraft, details: e.target.value })} />
-                </div>
-                {!editingLodging ? (
-                  <IngredientsEditor
-                    id="edit-ingredients"
-                    value={editDraft.ingredients ?? []}
-                    disabled={saving}
-                    onChange={(ingredients) => setEditDraft({ ...editDraft, ingredients })}
-                  />
-                ) : null}
-                <div className="flex items-center gap-2">
-                  <input id="edit-available" type="checkbox" checked={editDraft.available ?? true} onChange={(e) => setEditDraft({ ...editDraft, available: e.target.checked })} className="size-4 rounded border-border accent-primary" />
-                  <Label htmlFor="edit-available" className="cursor-pointer font-normal">Available to customers</Label>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-border px-6 py-4 flex items-center gap-2 shrink-0">
-              <div className="mx-auto w-full max-w-3xl flex items-center gap-2">
-                <Button className="flex-1" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
-                <Button className="" variant="outline" onClick={cancelEdit} disabled={saving}>Cancel</Button>
-                <Button className="" variant="destructive" size="icon" onClick={() => removeItem(editingId!)} title="Delete item" disabled={saving}>
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
       </section>
     )
 }
 
-function OrderActionMenu({ onViewDetails }: { onViewDetails: () => void }) {
+function OrderActionMenu({
+  onViewDetails,
+  onPrint,
+}: {
+  onViewDetails: () => void
+  onPrint?: () => void
+}) {
   return (
     <Button
       variant="ghost"
@@ -2296,6 +2196,18 @@ function Dashboard({
                     <span className="text-sm font-bold font-mono text-foreground">{currency(merchantPayoutOf(detailOrder))}</span>
                   </div>
                 </div>
+
+                {detailOrder.paymentStatus !== 'Paid' ? (
+                  <>
+                    <Separator className="" />
+                    <SplitBillPanel
+                      businessId={business.id}
+                      orderId={detailOrder.id}
+                      orderTotal={detailOrder.total}
+                      onOrderMaybePaid={() => setReloadToken((n) => n + 1)}
+                    />
+                  </>
+                ) : null}
               </div>
             </>
           )}

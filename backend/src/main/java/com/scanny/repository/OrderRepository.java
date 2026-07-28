@@ -46,6 +46,11 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     @EntityGraph(attributePaths = "items")
     Optional<Order> findWithItemsByPublicId(UUID publicId);
 
+    @EntityGraph(attributePaths = "items")
+    List<Order> findByBusinessIdAndStatusInOrderByCreatedAtAsc(String businessId, List<OrderStatus> statuses);
+
+    List<Order> findByTableSessionIdIn(List<UUID> tableSessionIds);
+
     long countByCreatedAtAfter(Instant cutoff);
 
     long countByCreatedAtGreaterThanEqualAndCreatedAtBefore(Instant start, Instant end);

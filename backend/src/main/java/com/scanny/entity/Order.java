@@ -92,6 +92,18 @@ public class Order {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Column(name = "table_id")
+    private String tableId;
+
+    @Column(name = "table_session_id")
+    private UUID tableSessionId;
+
+    @Column(name = "split_group_id")
+    private UUID splitGroupId;
+
+    @Column(name = "kitchen_notes", nullable = false)
+    private String kitchenNotes = "";
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("id ASC")
     private List<OrderLineItem> items = new ArrayList<>();
@@ -270,6 +282,38 @@ public class Order {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getTableId() {
+        return tableId;
+    }
+
+    public void setTableId(String tableId) {
+        this.tableId = tableId;
+    }
+
+    public UUID getTableSessionId() {
+        return tableSessionId;
+    }
+
+    public void setTableSessionId(UUID tableSessionId) {
+        this.tableSessionId = tableSessionId;
+    }
+
+    public UUID getSplitGroupId() {
+        return splitGroupId;
+    }
+
+    public void setSplitGroupId(UUID splitGroupId) {
+        this.splitGroupId = splitGroupId;
+    }
+
+    public String getKitchenNotes() {
+        return kitchenNotes;
+    }
+
+    public void setKitchenNotes(String kitchenNotes) {
+        this.kitchenNotes = kitchenNotes != null ? kitchenNotes : "";
     }
 
     public List<OrderLineItem> getItems() {

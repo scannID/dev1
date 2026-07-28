@@ -22,8 +22,44 @@ public class Business {
     @Id
     private String id;
 
-    @Column(name = "merchant_id", nullable = false, unique = true)
+    @Column(name = "merchant_id", nullable = false)
     private String merchantId;
+
+    @Column(name = "branch_label", nullable = false)
+    private String branchLabel = "Main";
+
+    @Column(name = "is_primary", nullable = false)
+    private boolean primary = true;
+
+    @Column(nullable = false)
+    private String address = "";
+
+    @Column(name = "accepting_orders", nullable = false)
+    private boolean acceptingOrders = true;
+
+    @Column(name = "busy_mode", nullable = false)
+    private boolean busyMode = false;
+
+    @Column(name = "busy_eta_minutes", nullable = false)
+    private int busyEtaMinutes = 0;
+
+    @Column(name = "pause_message", nullable = false)
+    private String pauseMessage = "";
+
+    @Column(name = "whatsapp_notifications_enabled", nullable = false)
+    private boolean whatsappNotificationsEnabled = false;
+
+    @Column(name = "whatsapp_business_phone", nullable = false)
+    private String whatsappBusinessPhone = "";
+
+    @Column(name = "daily_digest_enabled", nullable = false)
+    private boolean dailyDigestEnabled = false;
+
+    @Column(name = "daily_digest_channel", nullable = false)
+    private String dailyDigestChannel = "email";
+
+    @Column(name = "daily_digest_email", nullable = false)
+    private String dailyDigestEmail = "";
 
     @Column(name = "qr_token", nullable = false, unique = true)
     private String qrToken;
@@ -75,6 +111,102 @@ public class Business {
 
     public void setMerchantId(String merchantId) {
         this.merchantId = merchantId;
+    }
+
+    public String getBranchLabel() {
+        return branchLabel;
+    }
+
+    public void setBranchLabel(String branchLabel) {
+        this.branchLabel = branchLabel != null ? branchLabel : "Main";
+    }
+
+    public boolean isPrimary() {
+        return primary;
+    }
+
+    public void setPrimary(boolean primary) {
+        this.primary = primary;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address != null ? address : "";
+    }
+
+    public boolean isAcceptingOrders() {
+        return acceptingOrders;
+    }
+
+    public void setAcceptingOrders(boolean acceptingOrders) {
+        this.acceptingOrders = acceptingOrders;
+    }
+
+    public boolean isBusyMode() {
+        return busyMode;
+    }
+
+    public void setBusyMode(boolean busyMode) {
+        this.busyMode = busyMode;
+    }
+
+    public int getBusyEtaMinutes() {
+        return busyEtaMinutes;
+    }
+
+    public void setBusyEtaMinutes(int busyEtaMinutes) {
+        this.busyEtaMinutes = Math.max(0, busyEtaMinutes);
+    }
+
+    public String getPauseMessage() {
+        return pauseMessage;
+    }
+
+    public void setPauseMessage(String pauseMessage) {
+        this.pauseMessage = pauseMessage != null ? pauseMessage : "";
+    }
+
+    public boolean isWhatsappNotificationsEnabled() {
+        return whatsappNotificationsEnabled;
+    }
+
+    public void setWhatsappNotificationsEnabled(boolean whatsappNotificationsEnabled) {
+        this.whatsappNotificationsEnabled = whatsappNotificationsEnabled;
+    }
+
+    public String getWhatsappBusinessPhone() {
+        return whatsappBusinessPhone;
+    }
+
+    public void setWhatsappBusinessPhone(String whatsappBusinessPhone) {
+        this.whatsappBusinessPhone = whatsappBusinessPhone != null ? whatsappBusinessPhone : "";
+    }
+
+    public boolean isDailyDigestEnabled() {
+        return dailyDigestEnabled;
+    }
+
+    public void setDailyDigestEnabled(boolean dailyDigestEnabled) {
+        this.dailyDigestEnabled = dailyDigestEnabled;
+    }
+
+    public String getDailyDigestChannel() {
+        return dailyDigestChannel;
+    }
+
+    public void setDailyDigestChannel(String dailyDigestChannel) {
+        this.dailyDigestChannel = dailyDigestChannel != null ? dailyDigestChannel : "email";
+    }
+
+    public String getDailyDigestEmail() {
+        return dailyDigestEmail;
+    }
+
+    public void setDailyDigestEmail(String dailyDigestEmail) {
+        this.dailyDigestEmail = dailyDigestEmail != null ? dailyDigestEmail : "";
     }
 
     public String getQrToken() {

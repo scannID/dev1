@@ -66,6 +66,12 @@ public class CatalogItem {
     @Column(name = "units_available", nullable = false)
     private int unitsAvailable = 0;
 
+    @Column(name = "low_stock_threshold", nullable = false)
+    private int lowStockThreshold = 0;
+
+    @Column(name = "track_stock", nullable = false)
+    private boolean trackStock = false;
+
     public String getId() {
         return id;
     }
@@ -192,6 +198,26 @@ public class CatalogItem {
 
     public void setUnitsAvailable(int unitsAvailable) {
         this.unitsAvailable = Math.max(0, unitsAvailable);
+    }
+
+    public int getLowStockThreshold() {
+        return lowStockThreshold;
+    }
+
+    public void setLowStockThreshold(int lowStockThreshold) {
+        this.lowStockThreshold = Math.max(0, lowStockThreshold);
+    }
+
+    public boolean isTrackStock() {
+        return trackStock;
+    }
+
+    public void setTrackStock(boolean trackStock) {
+        this.trackStock = trackStock;
+    }
+
+    public boolean isLowStock() {
+        return trackStock && unitsAvailable <= lowStockThreshold;
     }
 
     public boolean isLodging() {

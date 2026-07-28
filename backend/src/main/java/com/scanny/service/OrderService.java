@@ -55,6 +55,7 @@ public class OrderService {
     private final OutboxService outboxService;
     private final FeeService feeService;
     private final MerchantRepository merchantRepository;
+    private final TableService tableService;
 
     public OrderService(
             BusinessService businessService,
@@ -64,7 +65,8 @@ public class OrderService {
             MerchantAccessService merchantAccessService,
             OutboxService outboxService,
             FeeService feeService,
-            MerchantRepository merchantRepository
+            MerchantRepository merchantRepository,
+            TableService tableService
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -74,6 +76,7 @@ public class OrderService {
         this.outboxService = outboxService;
         this.feeService = feeService;
         this.merchantRepository = merchantRepository;
+        this.tableService = tableService;
     }
 
     @Transactional(readOnly = true)
@@ -162,6 +165,13 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(String businessId, CreateOrderRequest request) {
         Business business = businessService.requireBusinessLight(businessId);
+
+        if (!business.isAcceptingOrders()) {
+            String message = business.getPauseMessage().isBlank()
+                    ? "This location is not accepting orders right now."
+                    : business.getPauseMessage();
+            throw new ApiException(503, message);
+        }
 
         String customerName = request.customer().name() != null ? request.customer().name().trim() : "";
         if (customerName.isBlank()) {
@@ -281,7 +291,40 @@ public class OrderService {
         order.setCreatedAt(Instant.now());
         lines.forEach(order::addItem);
 
-        OrderResponse response = OrderResponse.from(orderRepository.save(order));
+        if (request.tableId() != null || request.tableQrToken() != null) {
+            try {
+                var table = tableService.resolveTableForScan(businessId, request.tableId(), request.tableQrToken());
+                var session = tableService.openSession(table);
+                order.setTableId(table.getId());
+                order.setTableSessionId(session.getId());
+                if (order.getCustomerLocation().isBlank()) {
+                    order.setCustomerLocation(table.getLabel());
+                }
+            } catch (ApiException ex) {
+                // Don't block checkout — table linking is optional.
+                logger.warn(
+                        "Skipping table link for order on business {}: {}",
+                        businessId,
+                        ex.getMessage()
+                );
+            }
+        }
+
+        Order saved = orderRepository.save(order);
+        decrementStock(itemsById, lines);
+        if (saved.getTableSessionId() != null) {
+            tableService.linkOrderToSession(saved.getTableSessionId(), saved.getId());
+        }
+
+        OrderResponse response = OrderResponse.from(saved);
+        if (business.isWhatsappNotificationsEnabled()
+                && saved.getCustomerPhone() != null
+                && !saved.getCustomerPhone().isBlank()) {
+            outboxService.enqueueWhatsapp(
+                    saved.getCustomerPhone(),
+                    business.getName() + ": we received your order " + saved.getId() + "."
+            );
+        }
         outboxService.enqueueRealtime("orders:" + businessId, "ORDER_CREATED", businessId, response);
         outboxService.enqueueRealtime(
                 "admin:metrics",
@@ -295,6 +338,7 @@ public class OrderService {
     @Transactional
     public OrderResponse updateOrder(String orderId, UpdateOrderRequest request) {
         Order order = requireOwnedOrder(orderId);
+        OrderStatus previousStatus = order.getStatus();
 
         if (request.status() != null) {
             order.setStatus(request.status());
@@ -305,6 +349,9 @@ public class OrderService {
         order.setUpdatedAt(Instant.now());
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
+        if (request.status() != null && request.status() != previousStatus) {
+            notifyOrderStatusChange(order, request.status());
+        }
         outboxService.enqueueRealtime("orders:" + order.getBusiness().getId(), "ORDER_UPDATED", order.getBusiness().getId(), response);
         outboxService.enqueueRealtime(
                 "admin:metrics",
@@ -322,11 +369,26 @@ public class OrderService {
     @Transactional
     public OrderResponse updateOrderStatus(String orderId, OrderStatus status) {
         Order order = requireOwnedOrder(orderId);
+        return applyOrderStatus(order, status);
+    }
 
+    /** Status update after merchant-or-staff access has already been verified for this business. */
+    @Transactional
+    public OrderResponse updateOrderStatusForBusiness(String businessId, String orderId, OrderStatus status) {
+        Order order = orderRepository.findWithItemsById(orderId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+        if (!order.getBusiness().getId().equals(businessId)) {
+            throw new ApiException(404, "Order was not found.");
+        }
+        return applyOrderStatus(order, status);
+    }
+
+    private OrderResponse applyOrderStatus(Order order, OrderStatus status) {
         order.setStatus(status);
         order.setUpdatedAt(Instant.now());
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
+        notifyOrderStatusChange(order, status);
         outboxService.enqueueRealtime(
                 "orders:" + order.getBusiness().getId(),
                 "ORDER_STATUS_UPDATED",
@@ -359,7 +421,16 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
+            tableService.markAllSplitsPaidForOrder(savedOrder.getId());
             outboxService.enqueueReceipt(savedOrder.getId());
+            if (savedOrder.getBusiness().isWhatsappNotificationsEnabled()
+                    && savedOrder.getCustomerPhone() != null
+                    && !savedOrder.getCustomerPhone().isBlank()) {
+                outboxService.enqueueWhatsapp(
+                        savedOrder.getCustomerPhone(),
+                        savedOrder.getBusinessName() + ": payment received for order " + savedOrder.getId() + "."
+                );
+            }
         }
 
         OrderResponse response = OrderResponse.from(savedOrder);
@@ -548,6 +619,51 @@ public class OrderService {
             return java.time.LocalDate.parse(raw.trim());
         } catch (java.time.format.DateTimeParseException ex) {
             throw new ApiException(400, label + " must be YYYY-MM-DD.");
+        }
+    }
+
+    private void notifyOrderStatusChange(Order order, OrderStatus status) {
+        Business business = order.getBusiness();
+        if (!business.isWhatsappNotificationsEnabled()) {
+            return;
+        }
+        String phone = order.getCustomerPhone();
+        if (phone == null || phone.isBlank()) {
+            return;
+        }
+        outboxService.enqueueOrderStatusWhatsapp(
+                order.getId(),
+                phone,
+                business.getName(),
+                status.name()
+        );
+    }
+
+    private void decrementStock(Map<String, CatalogItem> itemsById, List<OrderLineItem> lines) {
+        for (OrderLineItem line : lines) {
+            CatalogItem item = itemsById.get(line.getItemId());
+            if (item == null || !item.isTrackStock()) {
+                continue;
+            }
+            int next = Math.max(0, item.getUnitsAvailable() - line.getQuantity());
+            item.setUnitsAvailable(next);
+            if (next == 0) {
+                item.setAvailable(false);
+            }
+            catalogItemRepository.save(item);
+            if (item.isLowStock()) {
+                outboxService.enqueueRealtime(
+                        "orders:" + item.getBusiness().getId(),
+                        "LOW_STOCK_ALERT",
+                        item.getBusiness().getId(),
+                        Map.of(
+                                "itemId", item.getId(),
+                                "name", item.getName(),
+                                "unitsAvailable", item.getUnitsAvailable(),
+                                "lowStockThreshold", item.getLowStockThreshold()
+                        )
+                );
+            }
         }
     }
 }

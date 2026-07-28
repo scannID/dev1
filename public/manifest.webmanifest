@@ -1,0 +1,16 @@
+{
+  "name": "Kode Merchant",
+  "short_name": "Kode",
+  "description": "QR-powered ordering for restaurants, bars, and events",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/qrcode1.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

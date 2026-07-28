@@ -82,14 +82,6 @@
   background: color-mix(in srgb, var(--primary, #ea580c) 88%, #000);
 }
 
-.cookie-consent--customer .cookie-consent-panel {
-  border-color: color-mix(in srgb, var(--cm-orange, #e86a17) 22%, transparent);
-}
-
-.cookie-consent--customer {
-  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-}
-
 @keyframes cookie-consent-in {
   from {
     opacity: 0;

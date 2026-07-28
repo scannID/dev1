@@ -88,10 +88,35 @@ async function fetchApi<T>(
 export const api = {
   get: <T>(endpoint: string) => fetchApi<T>(endpoint),
 
-  post: <T>(endpoint: string, data?: unknown) =>
+  getText: async (endpoint: string) => {
+    const url = `${API_BASE_URL}${endpoint}`
+    const authHeaders = await getAuthHeaders()
+    const response = await fetch(url, { headers: authHeaders })
+    if (!response.ok) {
+      throw new ApiError(`HTTP ${response.status}`, response.status)
+    }
+    return response.text()
+  },
+
+  getPublic: <T>(endpoint: string, options?: RequestInit) =>
+    fetchApi<T>(endpoint, { ...options, headers: { ...(options?.headers ?? {}) } }),
+
+  postPublic: <T>(endpoint: string, data?: unknown) =>
     fetchApi<T>(endpoint, {
       method: 'POST',
       body: data !== undefined ? JSON.stringify(data) : undefined,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+
+  post: <T>(endpoint: string, data?: unknown, options?: RequestInit) =>
+    fetchApi<T>(endpoint, {
+      method: 'POST',
+      body: data !== undefined ? (typeof data === 'string' ? data : JSON.stringify(data)) : undefined,
+      ...options,
+      headers: {
+        ...(typeof data === 'string' ? { 'Content-Type': 'text/plain' } : { 'Content-Type': 'application/json' }),
+        ...options?.headers,
+      },
     }),
 
   patch: <T>(endpoint: string, data: unknown) =>

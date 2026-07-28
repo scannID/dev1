@@ -24,7 +24,9 @@ public final class RequestDtos {
 
     public record CreateOrderRequest(
             @Valid @NotNull CustomerRequest customer,
-            @NotEmpty List<@Valid OrderItemRequest> items
+            @NotEmpty List<@Valid OrderItemRequest> items,
+            String tableId,
+            String tableQrToken
     ) {
     }
 

@@ -44,6 +44,11 @@ export interface Business {
   createdAt?: string
   items: CatalogItem[]
   categories?: string[]
+  acceptingOrders?: boolean
+  busyMode?: boolean
+  busyEtaMinutes?: number
+  pauseMessage?: string
+  branchLabel?: string
 }
 
 export interface CreateBusinessRequest {
@@ -204,6 +209,8 @@ export interface CreateOrderRequest {
     checkInDate?: string
     checkOutDate?: string
   }>
+  tableId?: string
+  tableQrToken?: string
 }
 
 export interface UpdateOrderStatusRequest {
@@ -569,7 +576,7 @@ export interface QuickPayInitiateResponse {
   transactionRef: string | null
 }
 
-export type PaymentContext = 'ORDER' | 'QUICK_PAY' | 'TICKET'
+export type PaymentContext = 'ORDER' | 'ORDER_SPLIT' | 'QUICK_PAY' | 'TICKET'
 
 export type PaymentIntentStatus = 'Pending' | 'Processing' | 'Paid' | 'Failed' | 'Cancelled'
 

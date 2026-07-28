@@ -48,4 +48,6 @@ public interface CatalogItemRepository extends JpaRepository<CatalogItem, String
     );
 
     List<CatalogItem> findByBusiness_IdAndAvailableTrue(String businessId);
+
+    List<CatalogItem> findByBusiness_IdOrderByNameAsc(String businessId);
 }

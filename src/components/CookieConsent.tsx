@@ -8,12 +8,7 @@ import {
 import { api } from '../api/client'
 import './CookieConsent.css'
 
-type CookieConsentProps = {
-  /** Customer menu uses the orange accent shell. */
-  variant?: 'default' | 'customer'
-}
-
-export function CookieConsent({ variant = 'default' }: CookieConsentProps) {
+export function CookieConsent() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -37,7 +32,7 @@ export function CookieConsent({ variant = 'default' }: CookieConsentProps) {
 
   return (
     <div
-      className={`cookie-consent${variant === 'customer' ? ' cookie-consent--customer' : ''}`}
+      className="cookie-consent"
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"

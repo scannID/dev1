@@ -18,6 +18,7 @@ public class OutboxService {
     public static final String TYPE_PAYMENT_PAID = "PAYMENT_PAID";
     public static final String TYPE_RECEIPT = "RECEIPT";
     public static final String TYPE_AUDIT = "AUDIT";
+    public static final String TYPE_WHATSAPP = "WHATSAPP";
 
     private static final Logger log = LoggerFactory.getLogger(OutboxService.class);
 
@@ -56,6 +57,25 @@ public class OutboxService {
                 "resourceType", resourceType != null ? resourceType : "",
                 "resourceId", resourceId != null ? resourceId : "",
                 "details", details != null ? details : Map.of()
+        ));
+    }
+
+    @Transactional
+    public void enqueueWhatsapp(String toPhone, String message) {
+        enqueue(TYPE_WHATSAPP, toPhone != null ? toPhone : "", "", Map.of(
+                "to", toPhone != null ? toPhone : "",
+                "message", message != null ? message : ""
+        ));
+    }
+
+    @Transactional
+    public void enqueueOrderStatusWhatsapp(String orderId, String toPhone, String businessName, String status) {
+        enqueue(TYPE_WHATSAPP, toPhone != null ? toPhone : "", orderId != null ? orderId : "", Map.of(
+                "to", toPhone != null ? toPhone : "",
+                "message", businessName + ": your order " + orderId + " is now " + status + ".",
+                "orderId", orderId != null ? orderId : "",
+                "businessName", businessName != null ? businessName : "",
+                "status", status != null ? status : ""
         ));
     }
 

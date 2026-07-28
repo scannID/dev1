@@ -92,6 +92,13 @@ scanny:
     # Placeholder service fee; PSO % of this fee, remainder to Scanny. Merchant gets subtotal only.
     service-fee-ugx: ${SCANNY_SERVICE_FEE_UGX:700}
     pso-percent: ${SCANNY_PSO_PERCENT:0.30}
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:false}
+    api-url: ${WHATSAPP_API_URL:}
+    api-token: ${WHATSAPP_API_TOKEN:}
+    from-number: ${WHATSAPP_FROM_NUMBER:}
+  digest:
+    cron: ${DAILY_DIGEST_CRON:0 0 21 * * *}
   payments:
     default-provider: stub
     fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:true}

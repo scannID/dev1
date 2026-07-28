@@ -149,6 +149,9 @@ public class MerchantService {
         
         merchantRepository.save(merchant);
 
+        // Local demo accounts (e.g. pentagon@) were historically forced to RESTAURANT — correct them.
+        merchant = applyLocalDemoTypeOverrides(merchant);
+
         // Bridge Merchant → Business for catalog/orders
         BusinessResponse business = businessService.ensureBusinessForMerchant(merchant);
         // Keep merchant QR URL aligned with customer deep link
@@ -206,7 +209,7 @@ public class MerchantService {
         merchant.setKeycloakUserId(keycloakUserId);
         merchant.setEmail(email);
         merchant.setBusinessName(businessName);
-        merchant.setBusinessType(Merchant.BusinessType.RESTAURANT);
+        merchant.setBusinessType(resolveLocalDemoBusinessType(email, businessName));
         merchant.setPhoneNumber("");
         merchant.setPaymentType(Merchant.PaymentType.MOBILE_MONEY);
         merchant.setPaymentProvider("MTN");
@@ -224,6 +227,41 @@ public class MerchantService {
         // via foreign key within the same transaction.
         merchant = merchantRepository.saveAndFlush(merchant);
         logger.info("Auto-provisioned merchant {} ({}) for Keycloak user {}", businessName, email, keycloakUserId);
+        return merchant;
+    }
+
+    /**
+     * Local Keycloak demo accounts are always provisioned without a signup form,
+     * so map known emails/names to the right venue type (e.g. Pentagon = Hotel).
+     */
+    static Merchant.BusinessType resolveLocalDemoBusinessType(String email, String businessName) {
+        String e = email == null ? "" : email.toLowerCase(java.util.Locale.ROOT).trim();
+        String n = businessName == null ? "" : businessName.toLowerCase(java.util.Locale.ROOT).trim();
+        if (e.startsWith("pentagon@") || n.contains("pentagon") || n.contains("hotel") || n.contains("suite")) {
+            return Merchant.BusinessType.HOTEL;
+        }
+        if (e.startsWith("city-lounge@") || n.contains("lounge") || n.contains(" bar")) {
+            return Merchant.BusinessType.BAR;
+        }
+        return Merchant.BusinessType.RESTAURANT;
+    }
+
+    /** Keep already-provisioned local demo merchants on the intended type. */
+    @Transactional
+    public Merchant applyLocalDemoTypeOverrides(Merchant merchant) {
+        if (merchant == null || merchant.getEmail() == null) {
+            return merchant;
+        }
+        Merchant.BusinessType intended = resolveLocalDemoBusinessType(merchant.getEmail(), merchant.getBusinessName());
+        if (intended == Merchant.BusinessType.HOTEL && merchant.getBusinessType() != Merchant.BusinessType.HOTEL) {
+            merchant.setBusinessType(Merchant.BusinessType.HOTEL);
+            if (merchant.getBusinessName() != null
+                    && !merchant.getBusinessName().toLowerCase(java.util.Locale.ROOT).contains("hotel")) {
+                merchant.setBusinessName(merchant.getBusinessName().trim() + " Hotel");
+            }
+            merchant = merchantRepository.save(merchant);
+            logger.info("Corrected local demo merchant {} to HOTEL", merchant.getEmail());
+        }
         return merchant;
     }
 

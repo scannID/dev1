@@ -22,7 +22,12 @@ public record BusinessResponse(
         String customerUrl,
         Instant createdAt,
         List<CatalogItemResponse> items,
-        List<String> categories
+        List<String> categories,
+        Boolean acceptingOrders,
+        Boolean busyMode,
+        Integer busyEtaMinutes,
+        String pauseMessage,
+        String branchLabel
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
         return from(business, scanBaseUrl, includeItems, null, null);
@@ -58,7 +63,12 @@ public record BusinessResponse(
                 scanBaseUrl + "/b/" + business.getId() + "?qr=" + business.getQrToken(),
                 business.getCreatedAt(),
                 items,
-                categories
+                categories,
+                business.isAcceptingOrders(),
+                business.isBusyMode(),
+                business.getBusyEtaMinutes(),
+                business.getPauseMessage(),
+                business.getBranchLabel()
         );
     }
 }

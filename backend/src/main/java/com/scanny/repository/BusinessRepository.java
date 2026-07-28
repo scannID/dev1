@@ -28,6 +28,10 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
 
     Optional<Business> findByMerchantId(String merchantId);
 
+    List<Business> findByMerchantIdOrderByPrimaryDescBranchLabelAsc(String merchantId);
+
+    long countByMerchantId(String merchantId);
+
     boolean existsById(String id);
 
     long countByCreatedAtAfter(Instant cutoff);

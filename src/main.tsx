@@ -21,8 +21,20 @@ import { applyDarkMode, initThemeFromStorage, persistDarkMode, readDarkMode } fr
 import { DanceLoader } from './components/DanceLoader'
 import { WaveLoader } from './components/WaveLoader'
 import { CookieConsent } from './components/CookieConsent'
+import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
 
 initThemeFromStorage()
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
+function resolveKitchenRoute(): string | null {
+  const match = window.location.pathname.match(/^\/kitchen\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
 
 function resolveCustomerRoute(): { businessId: string; qrToken: string | null } | null {
   const url = new URL(window.location.href)
@@ -71,14 +83,66 @@ function goToLanding() {
 }
 
 const customerRoute = resolveCustomerRoute()
+const kitchenBusinessId = resolveKitchenRoute()
 const payToken = resolvePayRoute()
 const trackNumber = resolveTrackRoute()
 const ticketViewToken = resolveTicketViewRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
 const createEventRoute = resolveCreateEventRoute()
 
-if (customerRoute) {
+if (kitchenBusinessId) {
+  function KitchenRoot() {
+    const [ready, setReady] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+      let cancelled = false
+      waitForKeycloak()
+        .then((authenticated) => {
+          if (cancelled) return
+          if (authenticated && keycloak.token) {
+            setReady(true)
+            return
+          }
+          setError('Sign in to the merchant app first, then open Kitchen.')
+        })
+        .catch(() => {
+          if (!cancelled) setError('Could not restore merchant session for kitchen.')
+        })
+      return () => {
+        cancelled = true
+      }
+    }, [])
+
+    if (error) {
+      return (
+        <main className="kitchen-shell">
+          <p className="kitchen-empty">{error}</p>
+        </main>
+      )
+    }
+    if (!ready) {
+      return (
+        <main className="kitchen-shell">
+          <DanceLoader label="Loading kitchen…" />
+        </main>
+      )
+    }
+    return <KitchenDisplayPage businessId={kitchenBusinessId} />
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <>
+        <KitchenRoot />
+        <CookieConsent />
+      </>
+    </StrictMode>,
+  )
+} else if (customerRoute) {
   document.documentElement.classList.add('cm-app')
+  // Customer UI stays light + white — never inherit merchant dark mode / green-purple tokens.
+  applyDarkMode(false)
   const viewport = document.querySelector('meta[name="viewport"]')
   if (viewport) {
     viewport.setAttribute(
@@ -88,10 +152,7 @@ if (customerRoute) {
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <>
-        <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
-        <CookieConsent variant="customer" />
-      </>
+      <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
     </StrictMode>
   )
 } else if (createEventRoute) {
@@ -109,37 +170,25 @@ if (customerRoute) {
 } else if (ticketViewToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <>
-        <TicketViewPage accessToken={ticketViewToken} />
-        <CookieConsent />
-      </>
+      <TicketViewPage accessToken={ticketViewToken} />
     </StrictMode>
   )
 } else if (ticketMasterToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <>
-        <TicketPurchasePage masterQrToken={ticketMasterToken} />
-        <CookieConsent />
-      </>
+      <TicketPurchasePage masterQrToken={ticketMasterToken} />
     </StrictMode>
   )
 } else if (payToken) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <>
-        <QuickPayCustomer qrToken={payToken} />
-        <CookieConsent />
-      </>
+      <QuickPayCustomer qrToken={payToken} />
     </StrictMode>
   )
 } else if (trackNumber) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <>
-        <QuickPayTrack trackingNumber={trackNumber} onBack={goToLanding} />
-        <CookieConsent />
-      </>
+      <QuickPayTrack trackingNumber={trackNumber} onBack={goToLanding} />
     </StrictMode>
   )
 } else {
