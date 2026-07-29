@@ -93,7 +93,12 @@ public class StaffService {
         staff.setSessionExpiresAt(expires);
         staff.setUpdatedAt(Instant.now());
         staffRepository.save(staff);
-        return new OperationsDtos.StaffSessionResponse(token, expires, OperationsDtos.StaffResponse.from(staff));
+        return new OperationsDtos.StaffSessionResponse(
+                token,
+                expires,
+                OperationsDtos.StaffResponse.from(staff),
+                staff.getBusiness().getId()
+        );
     }
 
     @Transactional(readOnly = true)

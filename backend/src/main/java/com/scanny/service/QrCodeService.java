@@ -68,7 +68,7 @@ public class QrCodeService {
         String qrToken = generateUniqueToken();
 
         // Prefer deep link that the Vite customer menu understands
-        String businessId = businessRepository.findByMerchantId(merchantId.toString())
+        String businessId = businessRepository.findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId.toString())
                 .map(b -> b.getId())
                 .orElse(null);
         String qrCodeUrl = businessId != null
@@ -91,7 +91,7 @@ public class QrCodeService {
         merchantRepository.save(merchant);
 
         // Keep ordering business QR in sync when it already exists
-        businessRepository.findByMerchantId(merchantId.toString()).ifPresent(business -> {
+        businessRepository.findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId.toString()).ifPresent(business -> {
             business.setQrToken(qrToken);
             businessRepository.save(business);
             merchant.setQrCodeUrl(scanBaseUrl + "/b/" + business.getId() + "?qr=" + qrToken);

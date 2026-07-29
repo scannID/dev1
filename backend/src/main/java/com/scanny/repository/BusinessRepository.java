@@ -23,10 +23,12 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
 
     Optional<Business> findByQrToken(String qrToken);
 
+    /** Primary branch first — safe when a merchant has multiple businesses. */
     @EntityGraph(attributePaths = "items")
-    Optional<Business> findWithItemsByMerchantId(String merchantId);
+    Optional<Business> findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(String merchantId);
 
-    Optional<Business> findByMerchantId(String merchantId);
+    @EntityGraph(attributePaths = "items")
+    List<Business> findWithItemsByMerchantIdOrderByPrimaryDescBranchLabelAsc(String merchantId);
 
     List<Business> findByMerchantIdOrderByPrimaryDescBranchLabelAsc(String merchantId);
 

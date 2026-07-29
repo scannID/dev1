@@ -4,6 +4,7 @@ import com.scanny.entity.BusinessStaff;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BusinessStaffRepository extends JpaRepository<BusinessStaff, UUID> {
@@ -12,5 +13,6 @@ public interface BusinessStaffRepository extends JpaRepository<BusinessStaff, UU
 
     Optional<BusinessStaff> findByBusinessIdAndEmailIgnoreCase(String businessId, String email);
 
+    @EntityGraph(attributePaths = "business")
     Optional<BusinessStaff> findBySessionTokenAndSessionExpiresAtAfter(String sessionToken, java.time.Instant now);
 }

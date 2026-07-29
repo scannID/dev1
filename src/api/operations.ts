@@ -27,6 +27,12 @@ export interface Branch {
   type: string
 }
 
+export interface BuildCatalogResult {
+  built: boolean
+  itemsAdded: number
+  existingItems: number
+}
+
 export interface StaffMember {
   id: string
   email: string
@@ -123,6 +129,14 @@ export const operationsApi = {
   createBranch: (businessId: string, data: { name: string; branchLabel: string; address?: string; phone?: string }) =>
     api.post<{ branch: Branch }>(`/businesses/${businessId}/operations/branches`, data).then((r) => r.branch),
 
+  staffLogin: (businessId: string, data: { email: string; pin: string }) =>
+    api.postPublic<{
+      sessionToken: string
+      expiresAt: string
+      staff: StaffMember
+      businessId: string
+    }>(`/businesses/${businessId}/operations/staff/login`, data),
+
   listStaff: (businessId: string) =>
     api.get<{ staff: StaffMember[] }>(`/businesses/${businessId}/operations/staff`).then((r) => r.staff),
 
@@ -195,6 +209,9 @@ export const operationsApi = {
     api.post<{ imported: number }>(`/businesses/${businessId}/operations/catalog/import.csv`, csv, {
       headers: { 'Content-Type': 'text/plain' },
     }),
+
+  buildCatalog: (businessId: string) =>
+    api.post<{ result: BuildCatalogResult }>(`/businesses/${businessId}/operations/catalog/build`, {}).then((r) => r.result),
 
   publicStatus: (businessId: string) =>
     api.getPublic<{

@@ -54,6 +54,12 @@ public final class OperationsDtos {
         }
     }
 
+    public record BuildCatalogResponse(
+            boolean built,
+            int itemsAdded,
+            int existingItems
+    ) {}
+
     public record CreateBranchRequest(
             @NotBlank @Size(max = 255) String name,
             @NotBlank @Size(max = 128) String branchLabel,
@@ -141,7 +147,8 @@ public final class OperationsDtos {
     public record StaffSessionResponse(
             String sessionToken,
             Instant expiresAt,
-            StaffResponse staff
+            StaffResponse staff,
+            String businessId
     ) {}
 
     public record TableResponse(

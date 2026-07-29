@@ -2,6 +2,7 @@ package com.scanny.config;
 
 import com.scanny.api.ApiErrorWriter;
 import com.scanny.api.ErrorCode;
+import com.scanny.security.StaffSessionAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -43,9 +45,11 @@ public class SecurityConfig {
     private String contentSecurityPolicy;
 
     private final ApiErrorWriter apiErrorWriter;
+    private final StaffSessionAuthFilter staffSessionAuthFilter;
 
-    public SecurityConfig(ApiErrorWriter apiErrorWriter) {
+    public SecurityConfig(ApiErrorWriter apiErrorWriter, StaffSessionAuthFilter staffSessionAuthFilter) {
         this.apiErrorWriter = apiErrorWriter;
+        this.staffSessionAuthFilter = staffSessionAuthFilter;
     }
 
     @Bean
@@ -124,10 +128,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/businesses/*/operations/low-stock").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/businesses/*/operations/reservations").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/businesses/*/operations/reservations/**").permitAll()
-                .requestMatchers("/api/businesses/**").hasRole("MERCHANT")
-                .requestMatchers("/api/catalog/**").hasRole("MERCHANT")
-                .requestMatchers("/api/orders/**").hasAnyRole("MERCHANT", "ADMIN")
-                .requestMatchers("/api/receipts/**").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers("/api/businesses/*/operations/branches").hasRole("MERCHANT")
+                .requestMatchers("/api/businesses/**").hasAnyRole("MERCHANT", "STAFF_MANAGER")
+                .requestMatchers("/api/catalog/**").hasAnyRole("MERCHANT", "STAFF_MANAGER")
+                .requestMatchers("/api/orders/**").hasAnyRole("MERCHANT", "ADMIN", "STAFF_MANAGER")
+                .requestMatchers("/api/receipts/**").hasAnyRole("MERCHANT", "ADMIN", "STAFF_MANAGER")
                 .requestMatchers("/api/quick-payments/**").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers("/api/devices/**").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -145,7 +150,8 @@ public class SecurityConfig {
                         apiErrorWriter.write(request, response, ErrorCode.UNAUTHORIZED))
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                         apiErrorWriter.write(request, response, ErrorCode.FORBIDDEN))
-            );
+            )
+            .addFilterAfter(staffSessionAuthFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }

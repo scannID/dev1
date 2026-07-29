@@ -1,8 +1,10 @@
 package com.scanny.security;
 
 import com.scanny.entity.Business;
+import com.scanny.entity.BusinessStaff;
 import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
+import com.scanny.model.enums.StaffRole;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.MerchantRepository;
 import org.springframework.security.core.Authentication;
@@ -95,10 +97,38 @@ public class MerchantAccessService {
         if (isAdmin()) {
             return;
         }
+        BusinessStaff staff = StaffSessionHolder.get();
+        if (staff != null) {
+            if (staff.getRole() != StaffRole.MANAGER) {
+                throw new ApiException(403, "Your staff role cannot access this.");
+            }
+            if (staff.getBusiness() == null || !staff.getBusiness().getId().equals(business.getId())) {
+                throw new ApiException(403, "You do not have access to this business.");
+            }
+            return;
+        }
         Merchant merchant = requireCurrentMerchant();
         if (!merchant.getId().toString().equals(business.getMerchantId())) {
             throw new ApiException(403, "You do not have access to this business.");
         }
+    }
+
+    /** Merchant owner only — branch managers cannot create/list sibling branches. */
+    public void requireMerchantOwner(String businessId) {
+        if (StaffSessionHolder.get() != null) {
+            throw new ApiException(403, "Only the business owner can manage branches.");
+        }
+        requireOwnedBusiness(businessId);
+    }
+
+    public boolean isStaffManager() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_STAFF_MANAGER"));
     }
 
     public void assertOwnsBusinessId(String businessId) {

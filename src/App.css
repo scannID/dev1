@@ -3309,6 +3309,15 @@ button:disabled {
   white-space: normal;
 }
 
+.sidebar-profile-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.sidebar-profile-branch,
 .sidebar-profile-logout {
   flex-shrink: 0;
   display: flex;
@@ -3322,6 +3331,13 @@ button:disabled {
   color: var(--muted-foreground);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.sidebar-profile-branch:hover,
+.sidebar-profile-branch[data-state="open"] {
+  background: oklch(from var(--foreground) l c h / 8%);
+  border-color: var(--border);
+  color: var(--foreground);
 }
 
 .sidebar-profile-logout:hover {

@@ -49,6 +49,8 @@ export interface Business {
   busyEtaMinutes?: number
   pauseMessage?: string
   branchLabel?: string
+  primary?: boolean
+  address?: string
 }
 
 export interface CreateBusinessRequest {
@@ -318,6 +320,7 @@ export interface OnboardingStatusResponse {
 export interface MerchantMeResponse {
   merchant: MerchantProfile
   business: Business
+  businesses?: Business[]
   onboarding: OnboardingStatusResponse
 }
 

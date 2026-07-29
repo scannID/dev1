@@ -1,7 +1,10 @@
 ﻿// API Client for Scanny Backend
-// Attaches Keycloak JWT when available
+// Attaches Keycloak JWT or staff session when available
 
 import keycloak from '../keycloak'
+
+const STAFF_SESSION_KEY = 'scanny-staff-session'
+const STAFF_BUSINESS_KEY = 'scanny-staff-business-id'
 
 /** Use same host as the page (works on phone via LAN IP, not only localhost). */
 function resolveApiBaseUrl(): string {
@@ -25,6 +28,45 @@ export class ApiError extends Error {
   }
 }
 
+export type StaffSessionStored = {
+  token: string
+  businessId: string
+  email: string
+  displayName: string
+  role: string
+  expiresAt: string
+}
+
+export function getStaffSession(): StaffSessionStored | null {
+  try {
+    const raw = localStorage.getItem(STAFF_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StaffSessionStored
+    if (!parsed.token || !parsed.businessId) return null
+    if (parsed.expiresAt && Date.parse(parsed.expiresAt) < Date.now()) {
+      clearStaffSession()
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function setStaffSession(session: StaffSessionStored) {
+  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session))
+  localStorage.setItem(STAFF_BUSINESS_KEY, session.businessId)
+}
+
+export function clearStaffSession() {
+  localStorage.removeItem(STAFF_SESSION_KEY)
+  localStorage.removeItem(STAFF_BUSINESS_KEY)
+}
+
+export function isStaffAuthenticated(): boolean {
+  return getStaffSession() !== null
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -38,6 +80,11 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     }
     if (keycloak.token) {
       headers.Authorization = `Bearer ${keycloak.token}`
+    }
+  } else {
+    const staff = getStaffSession()
+    if (staff?.token) {
+      headers['X-Staff-Session'] = staff.token
     }
   }
 

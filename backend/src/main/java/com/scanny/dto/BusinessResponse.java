@@ -27,7 +27,9 @@ public record BusinessResponse(
         Boolean busyMode,
         Integer busyEtaMinutes,
         String pauseMessage,
-        String branchLabel
+        String branchLabel,
+        Boolean primary,
+        String address
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
         return from(business, scanBaseUrl, includeItems, null, null);
@@ -68,7 +70,9 @@ public record BusinessResponse(
                 business.isBusyMode(),
                 business.getBusyEtaMinutes(),
                 business.getPauseMessage(),
-                business.getBranchLabel()
+                business.getBranchLabel(),
+                business.isPrimary(),
+                business.getAddress()
         );
     }
 }

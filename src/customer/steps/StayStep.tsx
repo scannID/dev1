@@ -3,6 +3,7 @@ import { ArrowLeft, Bath, BedDouble, Users } from 'lucide-react'
 import type { CatalogItem } from '../../api/types'
 import { isLodgingItem, nightsBetween } from '../../lib/catalogCart'
 import { discountPercentOf, effectivePrice } from '../../lib/catalogPricing'
+import { getCategoryImage } from '../../lib/categoryImages'
 import { currency, usdEquiv } from '../utils'
 
 function todayIso() {
@@ -214,7 +215,7 @@ export function StayStep({
       ) : (
         <div className="cm-stay-grid">
           {lodging.map((item) => {
-            const thumb = item.imageUrl || item.imageUrls?.[0]
+            const thumb = item.imageUrl || item.imageUrls?.[0] || getCategoryImage(item.category)
             const nightly = effectivePrice(item)
             return (
               <button key={item.id} type="button" className="cm-stay-card" onClick={() => openItem(item)}>

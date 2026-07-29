@@ -75,6 +75,11 @@ public class OperationsController {
         return Map.of("branch", operationsService.createBranch(businessId, request));
     }
 
+    @PostMapping("/catalog/build")
+    public Map<String, OperationsDtos.BuildCatalogResponse> buildCatalog(@PathVariable String businessId) {
+        return Map.of("result", operationsService.buildCatalog(businessId));
+    }
+
     @GetMapping("/settings")
     public Map<String, OperationsDtos.OperationsSettingsResponse> getSettings(@PathVariable String businessId) {
         return Map.of("settings", operationsService.getSettings(businessId));

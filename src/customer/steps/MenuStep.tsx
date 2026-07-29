@@ -11,6 +11,10 @@ function UsdHint({ amount }: { amount: number }) {
   return usd ? <span className="cm-usd">{usd}</span> : null
 }
 
+function itemThumb(item: CatalogItem): string {
+  return item.imageUrl || item.imageUrls?.[0] || getCategoryImage(item.category)
+}
+
 const PAGE_SIZE = 20
 
 function PriceBlock({ item, className }: { item: CatalogItem; className?: string }) {
@@ -198,7 +202,7 @@ export function MenuStep({
 
           <div className="cm-offers-rail" key={activeSpotlight}>
             {spotlightItems.map((item, index) => {
-              const thumb = item.imageUrl || getCategoryImage(item.category)
+              const thumb = itemThumb(item)
               const off = discountPercentOf(item)
               const sale = effectivePrice(item)
               const isOfferTab = activeSpotlight === 'offers'
@@ -291,7 +295,7 @@ export function MenuStep({
       <div className="cm-menu-grid">
         {pageItems.map((item) => {
           const qty = itemQty(item.id)
-          const thumb = item.imageUrl || getCategoryImage(item.category)
+          const thumb = itemThumb(item)
           const hasCustom = (item.ingredients ?? []).length > 0
           const off = discountPercentOf(item)
 
@@ -427,7 +431,7 @@ function ItemDetailSheet({
   onAdd: () => void
   onUpdateQty: (delta: number) => void
 }) {
-  const thumb = item.imageUrl || getCategoryImage(item.category)
+  const thumb = itemThumb(item)
   const ingredients = item.ingredients ?? []
   const details = item.details || item.description
   const sale = effectivePrice(item)

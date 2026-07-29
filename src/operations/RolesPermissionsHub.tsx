@@ -314,6 +314,43 @@ export function RolesPermissionsHub({ businessId }: { businessId: string }) {
     }
   }
 
+  function generatePin(): string {
+    // 6-digit PIN keeps it simple; backend validates 4–8 digits.
+    return String(Math.floor(100000 + Math.random() * 900000))
+  }
+
+  async function handleInviteManager() {
+    const email = staffForm.email.trim().toLowerCase()
+    const displayName = staffForm.displayName.trim()
+    if (!email || !displayName) {
+      toast.error('Fill email and display name')
+      return
+    }
+
+    const pin = generatePin()
+    setSavingStaff(true)
+    try {
+      const created = await operationsApi.createStaff(businessId, {
+        email,
+        displayName,
+        role: 'MANAGER',
+        pin,
+      })
+      setStaff((current) => [created, ...current])
+      setStaffForm(emptyStaffForm)
+      setStaffSheetOpen(false)
+
+      const link = `${window.location.origin}/?staff=1&business=${encodeURIComponent(businessId)}`
+      const message = `Branch manager invite\nLink: ${link}\nEmail: ${email}\nPIN: ${pin}`
+      await navigator.clipboard.writeText(message)
+      toast.success('Invite copied (link + PIN)')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to invite manager')
+    } finally {
+      setSavingStaff(false)
+    }
+  }
+
   return (
     <div className="roles-hub">
       <div className="roles-hub-header">
@@ -939,6 +976,16 @@ export function RolesPermissionsHub({ businessId }: { businessId: string }) {
           </form>
 
           <SheetFooter className="roles-sheet-footer">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleInviteManager()}
+              disabled={savingStaff}
+              className="roles-hub-btn gap-2"
+            >
+              <Copy className="size-4" />
+              {savingStaff ? 'Inviting…' : 'Invite Manager'}
+            </Button>
             <Button
               variant="outline"
               onClick={() => setStaffSheetOpen(false)}

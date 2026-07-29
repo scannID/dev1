@@ -6,10 +6,13 @@ import com.scanny.model.enums.BusinessType;
 import com.scanny.model.enums.ItemKind;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.CatalogItemRepository;
+import com.scanny.service.BusinessService;
+import com.scanny.service.OperationsService;
 import com.scanny.service.StarterCatalogService;
 import com.scanny.service.StarterCatalogService.FoodSpec;
 import com.scanny.service.StarterCatalogService.LodgingSpec;
 import com.scanny.util.CatalogCategories;
+import com.scanny.util.JsonLists;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -37,15 +40,21 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
     private final BusinessRepository businessRepository;
     private final CatalogItemRepository catalogItemRepository;
     private final StarterCatalogService starterCatalogService;
+    private final BusinessService businessService;
+    private final OperationsService operationsService;
 
     public DevCatalogEnrichmentRunner(
             BusinessRepository businessRepository,
             CatalogItemRepository catalogItemRepository,
-            StarterCatalogService starterCatalogService
+            StarterCatalogService starterCatalogService,
+            BusinessService businessService,
+            OperationsService operationsService
     ) {
         this.businessRepository = businessRepository;
         this.catalogItemRepository = catalogItemRepository;
         this.starterCatalogService = starterCatalogService;
+        this.businessService = businessService;
+        this.operationsService = operationsService;
     }
 
     @Override
@@ -53,6 +62,9 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         int added = 0;
         for (Business business : businessRepository.findAll()) {
+            if (!business.isPrimary()) {
+                continue;
+            }
             added += enrich(business);
         }
         // Demo hotel if none exists yet
@@ -61,9 +73,109 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
         if (!hasHotel) {
             added += seedDemoHotel();
         }
+        int restored = restoreMerchantUploadedCovers();
+        int synced = 0;
+        Set<String> merchantIds = new HashSet<>();
+        for (Business business : businessRepository.findAll()) {
+            if (business.getMerchantId() != null && !business.getMerchantId().isBlank()) {
+                merchantIds.add(business.getMerchantId());
+            }
+        }
+        for (String merchantId : merchantIds) {
+            synced += operationsService.syncAllBranchMediaFromMain(merchantId);
+        }
         if (added > 0) {
             log.info("Enriched local catalogs with {} high-end items", added);
         }
+        if (restored > 0) {
+            log.info("Restored merchant-uploaded covers on {} catalog items (removed stock placeholders)", restored);
+        }
+        if (synced > 0) {
+            log.info("Synced {} item photos from Main onto sibling branch catalogs", synced);
+        }
+    }
+
+    /**
+     * Undo stock Unsplash covers. Prefer a merchant-uploaded gallery image
+     * (data:image or non-unsplash URL); otherwise clear so the UI can fall back cleanly.
+     */
+    private int restoreMerchantUploadedCovers() {
+        int updated = 0;
+        Set<String> touchedBusinesses = new HashSet<>();
+        for (CatalogItem item : catalogItemRepository.findAll()) {
+            String cover = item.getImageUrl();
+            List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson());
+            String uploaded = firstUploadedImage(gallery);
+            if (uploaded == null && isUploadedImage(cover)) {
+                continue;
+            }
+            if (!isStockImage(cover) && uploaded == null) {
+                continue;
+            }
+
+            String nextCover = uploaded;
+            if (nextCover == null && isUploadedImage(cover)) {
+                nextCover = cover;
+            }
+            // Drop stock URLs from gallery so menu never prefers them again.
+            List<String> cleanedGallery = gallery.stream().filter(this::isUploadedImage).toList();
+            if (nextCover != null && cleanedGallery.isEmpty()) {
+                cleanedGallery = List.of(nextCover);
+            }
+
+            boolean changed = false;
+            if (nextCover == null || !nextCover.equals(cover)) {
+                item.setImageUrl(nextCover);
+                changed = true;
+            }
+            String nextGalleryJson = JsonLists.writeStringList(cleanedGallery);
+            if (!nextGalleryJson.equals(item.getImageUrlsJson() == null ? "[]" : item.getImageUrlsJson())) {
+                item.setImageUrlsJson(nextGalleryJson);
+                changed = true;
+            }
+            if (!changed) {
+                continue;
+            }
+            catalogItemRepository.save(item);
+            updated++;
+            if (item.getBusiness() != null && item.getBusiness().getId() != null) {
+                touchedBusinesses.add(item.getBusiness().getId());
+            }
+        }
+        for (String businessId : touchedBusinesses) {
+            businessService.evictMenuCache(businessId);
+        }
+        return updated;
+    }
+
+    private String firstUploadedImage(List<String> urls) {
+        if (urls == null) {
+            return null;
+        }
+        for (String url : urls) {
+            if (isUploadedImage(url)) {
+                return url;
+            }
+        }
+        return null;
+    }
+
+    private boolean isStockImage(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.contains("images.unsplash.com") || lower.contains("source.unsplash.com");
+    }
+
+    private boolean isUploadedImage(String url) {
+        if (url == null || url.isBlank() || isStockImage(url)) {
+            return false;
+        }
+        String trimmed = url.trim();
+        return trimmed.startsWith("data:image/")
+                || trimmed.startsWith("http://")
+                || trimmed.startsWith("https://");
     }
 
     private int enrich(Business business) {

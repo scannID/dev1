@@ -110,9 +110,12 @@ public class MerchantService {
     public MerchantMeResponse getMe(Jwt jwt) {
         UUID keycloakUserId = UUID.fromString(jwt.getSubject());
         MerchantProfile profile = handleLogin(jwt, keycloakUserId);
-        BusinessResponse business = businessService.getBusinessForMerchant(profile.id().toString());
+        var businesses = businessService.listBusinessesForMerchant(profile.id().toString());
+        BusinessResponse business = businesses.isEmpty()
+                ? businessService.getBusinessForMerchant(profile.id().toString())
+                : businesses.get(0);
         OnboardingStatusResponse onboarding = getOnboardingStatus(profile.id());
-        return new MerchantMeResponse(profile, business, onboarding);
+        return new MerchantMeResponse(profile, business, businesses, onboarding);
     }
 
     /**

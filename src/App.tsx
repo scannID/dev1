@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, BarChart3, Bell, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed } from 'lucide-react'
+import { Banknote, BarChart3, Bell, Check, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -51,6 +51,13 @@ import {
 } from '@/components/ui/table'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useBusinessData } from './hooks/useBusinessData'
 import { useCatalog } from './hooks/useCatalog'
 import { useOrders } from './hooks/useOrders'
@@ -258,6 +265,8 @@ function App({
 }) {
   const {
     businesses,
+    selectedBusiness,
+    selectBusiness,
     orders,
     merchant,
     loading: sessionLoading,
@@ -267,6 +276,9 @@ function App({
     loadOrders,
     setOrders,
     updateLocalItems,
+    staffMode,
+    staffName,
+    logoutStaff,
   } = useBusinessData()
 
   const [view, setView] = useState('account')
@@ -278,8 +290,13 @@ function App({
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const [actionError, setActionError] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
+  const [branchOverviewCounts, setBranchOverviewCounts] = useState<Record<string, { openOrders: number; kitchenOrders: number }>>({})
+  const [branchOverviewLoading, setBranchOverviewLoading] = useState(false)
 
-  const business = businesses[0] ?? emptyBusiness
+  const business = selectedBusiness ?? emptyBusiness
+  const hourOfDay = new Date().getHours()
+  const timeGreeting = hourOfDay < 12 ? 'Good morning' : hourOfDay < 18 ? 'Good afternoon' : 'Good evening'
+  const welcomeName = business.branchLabel || business.name || merchant?.businessName || business.ownerName || 'Merchant'
   const catalogHook = useCatalog(business.id)
   const ordersHook = useOrders(business.id)
 
@@ -330,6 +347,77 @@ function App({
     applyDarkMode(darkMode)
   }, [darkMode])
 
+  const loadBranchOverviewCounts = useCallback(async () => {
+    const pairs = await Promise.all(
+      businesses.map(async (b) => {
+        try {
+          const branchOrders = await scannyApi.orders.list(b.id)
+          const openOrders = branchOrders.filter(
+            (o) => o.status !== 'Completed' && o.status !== 'Cancelled',
+          ).length
+          const kitchenOrders = branchOrders.filter((o) => ['Pending', 'Preparing', 'Ready'].includes(o.status)).length
+          return [b.id, { openOrders, kitchenOrders }] as const
+        } catch {
+          return [b.id, { openOrders: 0, kitchenOrders: 0 }] as const
+        }
+      }),
+    )
+    setBranchOverviewCounts(Object.fromEntries(pairs))
+  }, [businesses])
+
+  // Owner-only: keep branch cards fresh with realtime + polling fallback.
+  useEffect(() => {
+    if (staffMode) return
+    if (view !== 'account') return
+    if (businesses.length <= 1) {
+      setBranchOverviewCounts({})
+      return
+    }
+
+    let cancelled = false
+    let client: { close: () => void } | null = null
+    setBranchOverviewLoading(true)
+
+    ;(async () => {
+      try {
+        await loadBranchOverviewCounts()
+      } finally {
+        if (!cancelled) setBranchOverviewLoading(false)
+      }
+    })()
+
+    async function startRealtime() {
+      const { createRealtimeClient } = await import('./lib/realtime')
+      const keycloak = (await import('./keycloak')).default
+      if (cancelled) return
+      client = createRealtimeClient({
+        channels: businesses.map((b) => `orders:${b.id}`),
+        getToken: async () => {
+          try {
+            await keycloak.updateToken(30)
+            return keycloak.token
+          } catch {
+            return keycloak.token
+          }
+        },
+        poll: loadBranchOverviewCounts,
+        pollIntervalMs: 15000,
+        onEvent: (event) => {
+          if (event.type?.startsWith('ORDER') || event.type === 'ORDERS_CLEARED') {
+            void loadBranchOverviewCounts()
+          }
+        },
+      })
+    }
+
+    void startRealtime()
+
+    return () => {
+      cancelled = true
+      client?.close()
+    }
+  }, [staffMode, view, businesses, loadBranchOverviewCounts])
+
   // Realtime orders with polling fallback
   useEffect(() => {
     if (!business.id) return
@@ -370,6 +458,9 @@ function App({
   const businessOrders = orders.filter((order) => order.businessId === business.id)
   const pendingCount = businessOrders.filter(
     (order) => order.status !== 'Completed' && order.status !== 'Cancelled',
+  ).length
+  const kitchenCount = businessOrders.filter(
+    (order) => order.status === 'Pending' || order.status === 'Preparing' || order.status === 'Ready',
   ).length
   const paidTotal = businessOrders
     .filter((order) => order.paymentStatus === 'Paid')
@@ -527,6 +618,9 @@ function App({
   }
 
   function handleLogout() {
+    if (staffMode) {
+      logoutStaff()
+    }
     if (onLogout) {
       onLogout()
     } else {
@@ -575,7 +669,7 @@ function App({
           />
           <div className="sidebar-brand-text">
             <strong>Kode</strong>
-            <span>Merchant Portal</span>
+            <span>{staffMode ? 'Branch Manager' : 'Merchant Portal'}</span>
           </div>
         </div>
 
@@ -584,7 +678,7 @@ function App({
             { id: 'account', label: 'Overview', icon: Home },
             { id: 'catalog', label: 'Catalog', icon: Package },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount },
-            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed },
+            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount },
             { id: 'operations', label: 'Roles', icon: Settings2 },
             { id: 'reports', label: 'Reports', icon: BarChart3 },
           ].map(({ id, label, icon: Icon, count }) => (
@@ -611,10 +705,14 @@ function App({
 
         <SidebarProfile
           business={business}
+          businesses={businesses}
           businessName={merchant?.businessName || business.name || 'Business'}
           logoUrl={business.logoUrl ?? merchant?.businessLogoUrl}
           onLogoUpload={handleLogoUpload}
           logoUploading={logoUploading}
+          staffMode={staffMode}
+          staffName={staffName}
+          onSelectBranch={selectBusiness}
           onLogoutRequest={() => setShowLogoutDialog(true)}
         />
 
@@ -656,7 +754,7 @@ function App({
                 ? 'Edit room / suite'
                 : 'Edit item')}
               {!editingItem && showAddItem && 'Add item'}
-              {!editingItem && !showAddItem && view === 'account' && `Welcome back, ${merchant?.businessName || business.ownerName || business.name || 'Merchant'}`}
+              {!editingItem && !showAddItem && view === 'account' && `${timeGreeting}, ${welcomeName}`}
               {!editingItem && !showAddItem && view === 'catalog' && 'Catalog'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
@@ -729,6 +827,57 @@ function App({
           <>
             {view === 'account' && (
               <div className="page-content">
+                {!staffMode && businesses.length > 1 ? (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 10, marginBottom: 10 }}>
+                      {branchOverviewLoading ? (
+                        <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</div>
+                      ) : null}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {businesses.map((b) => {
+                        const active = b.id === business.id
+                        const counts = branchOverviewCounts[b.id]
+                        const openOrders = counts?.openOrders ?? 0
+                        const kitchenOrders = counts?.kitchenOrders ?? 0
+                        const status = b.busyMode ? 'Busy' : b.acceptingOrders === false ? 'Paused' : 'Open'
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => void selectBusiness(b.id)}
+                            style={{
+                              borderRadius: 10,
+                              border: active ? '1px solid var(--primary)' : '1px solid var(--border)',
+                              background: active ? 'var(--card)' : 'transparent',
+                              padding: '10px 12px',
+                              minWidth: 190,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                              <div style={{ fontWeight: 800, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {b.branchLabel || b.name}
+                              </div>
+                              <Badge variant={active ? 'secondary' : 'outline'} style={{ fontSize: 10, padding: '4px 6px' } as any}>
+                                {status}
+                              </Badge>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                                Open: <strong>{openOrders}</strong>
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                                Kitchen: <strong>{kitchenOrders}</strong>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
                 <section className="metric-grid overview-metric-grid" aria-label="Overview summary">
                   <div>
                     <span>Open orders</span>
@@ -799,7 +948,13 @@ function App({
 
             {view === 'operations' && (
               <div className="page-content">
-                <OperationsHub businessId={business.id} />
+                <OperationsHub
+                  businessId={business.id}
+                  staffMode={staffMode}
+                  onBranchCreated={(branchId) => {
+                    void refreshBusinesses().then(() => selectBusiness(branchId))
+                  }}
+                />
               </div>
             )}
 
@@ -909,17 +1064,25 @@ function NotificationsPanel({ businessName, orders }: { businessName: string; or
 
 function SidebarProfile({
   business,
+  businesses,
   businessName,
   logoUrl,
   onLogoUpload,
   logoUploading,
+  staffMode,
+  staffName,
+  onSelectBranch,
   onLogoutRequest,
 }: {
   business: Business
+  businesses: Business[]
   businessName: string
   logoUrl?: string | null
   onLogoUpload: (dataUrl: string) => Promise<void>
   logoUploading?: boolean
+  staffMode: boolean
+  staffName: string | null
+  onSelectBranch: (businessId: string) => void | Promise<void>
   onLogoutRequest: () => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -930,6 +1093,8 @@ function SidebarProfile({
     .join('')
     .slice(0, 2)
     .toUpperCase()
+  const branchLabel = business.branchLabel || business.name || 'Branch'
+  const canSwitchBranches = !staffMode && businesses.length > 1
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -961,7 +1126,7 @@ function SidebarProfile({
         style={logoUrl ? undefined : { background: business.accent }}
         title="Tap to upload your logo"
         aria-label="Upload business logo"
-        disabled={logoUploading}
+        disabled={logoUploading || staffMode}
         onClick={() => inputRef.current?.click()}
       >
         {logoUrl ? (
@@ -969,9 +1134,11 @@ function SidebarProfile({
         ) : (
           initials
         )}
-        <span className="sidebar-profile-avatar-badge" aria-hidden="true">
-          <ImagePlus size={10} />
-        </span>
+        {!staffMode ? (
+          <span className="sidebar-profile-avatar-badge" aria-hidden="true">
+            <ImagePlus size={10} />
+          </span>
+        ) : null}
       </button>
       <input
         ref={inputRef}
@@ -979,21 +1146,61 @@ function SidebarProfile({
         accept="image/png,image/jpeg,image/webp,image/gif"
         className="sr-only"
         onChange={handleFileChange}
-        disabled={logoUploading}
+        disabled={logoUploading || staffMode}
       />
       <div className="sidebar-profile-info">
         <strong>{businessName}</strong>
-        <span className="sidebar-profile-type">{business.type || 'Business'}</span>
+        <span className="sidebar-profile-type">
+          {staffMode
+            ? `${branchLabel}${staffName ? ` · ${staffName}` : ''}`
+            : branchLabel}
+        </span>
         {uploadError ? <span className="sidebar-profile-error">{uploadError}</span> : null}
       </div>
-      <button
-        type="button"
-        className="sidebar-profile-logout"
-        title="Log out"
-        onClick={onLogoutRequest}
-      >
-        <LogOut size={16} />
-      </button>
+
+      <div className="sidebar-profile-actions">
+        {canSwitchBranches ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="sidebar-profile-branch"
+                title="Switch branch"
+                aria-label="Switch branch"
+              >
+                <ChevronsUpDown size={15} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="end" sideOffset={8} className="min-w-44">
+              <DropdownMenuLabel>Branches</DropdownMenuLabel>
+              {businesses.map((b) => {
+                const label = `${b.branchLabel || b.name}${b.primary ? ' (Main)' : ''}`
+                const active = b.id === business.id
+                return (
+                  <DropdownMenuItem
+                    key={b.id}
+                    onSelect={() => {
+                      if (!active) void onSelectBranch(b.id)
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>{label}</span>
+                    {active ? <Check size={14} /> : null}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+
+        <button
+          type="button"
+          className="sidebar-profile-logout"
+          title="Log out"
+          onClick={onLogoutRequest}
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </div>
   )
 }

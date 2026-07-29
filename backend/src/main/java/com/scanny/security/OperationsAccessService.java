@@ -26,7 +26,7 @@ public class OperationsAccessService {
     }
 
     public void requireMerchantOwner(String businessId) {
-        merchantAccessService.assertOwnsBusinessId(businessId);
+        merchantAccessService.requireMerchantOwner(businessId);
     }
 
     public BusinessStaff requireMerchantOrStaff(String businessId, String staffSession, StaffRole... allowedRoles) {

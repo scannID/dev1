@@ -209,10 +209,11 @@ public class MerchantDtos {
         Long expiresIn
     ) {}
 
-    // Logged-in merchant + linked ordering business
+    // Logged-in merchant + linked ordering businesses (primary first)
     public record MerchantMeResponse(
         MerchantProfile merchant,
         com.scanny.dto.BusinessResponse business,
+        java.util.List<com.scanny.dto.BusinessResponse> businesses,
         OnboardingStatusResponse onboarding
     ) {}
 

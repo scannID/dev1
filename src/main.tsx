@@ -22,6 +22,8 @@ import { DanceLoader } from './components/DanceLoader'
 import { WaveLoader } from './components/WaveLoader'
 import { CookieConsent } from './components/CookieConsent'
 import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
+import StaffLoginPage from './StaffLoginPage'
+import { clearStaffSession, isStaffAuthenticated } from './api/client'
 
 initThemeFromStorage()
 
@@ -193,15 +195,26 @@ if (kitchenBusinessId) {
   )
 } else {
   const SESSION_KEY = 'scanny-merchant-authenticated'
+  const STAFF_SESSION_FLAG = 'scanny-staff-portal'
   const LOGIN_INTENT_KEY = 'scanny-merchant-login-intent'
   const MERCHANT_REDIRECT_URI = window.location.origin
 
-  type Phase = 'boot' | 'landing' | 'app' | 'redirecting'
+  type Phase = 'boot' | 'landing' | 'app' | 'staff-login' | 'redirecting'
+
+  function staffQuery() {
+    const url = new URL(window.location.href)
+    return url.searchParams.get('staff') === '1'
+      ? { businessId: url.searchParams.get('business') || '' }
+      : null
+  }
 
   function needsAuthRestore() {
     return (
       sessionStorage.getItem(SESSION_KEY) === '1' ||
-      sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
+      sessionStorage.getItem(LOGIN_INTENT_KEY) === '1' ||
+      sessionStorage.getItem(STAFF_SESSION_FLAG) === '1' ||
+      isStaffAuthenticated() ||
+      staffQuery() !== null
     )
   }
 
@@ -227,7 +240,13 @@ if (kitchenBusinessId) {
   }
 
   function Root() {
-    const [phase, setPhase] = useState<Phase>(() => (needsAuthRestore() ? 'boot' : 'landing'))
+    const staffFromUrl = staffQuery()
+    const [phase, setPhase] = useState<Phase>(() => {
+      if (staffFromUrl) return 'staff-login'
+      if (isStaffAuthenticated() || sessionStorage.getItem(STAFF_SESSION_FLAG) === '1') return 'boot'
+      return needsAuthRestore() ? 'boot' : 'landing'
+    })
+    const [staffBusinessId, setStaffBusinessId] = useState(staffFromUrl?.businessId || '')
     const [authError, setAuthError] = useState<string | null>(null)
     const [darkMode, setDarkMode] = useState(() => readDarkMode())
     const [marketingSlug, setMarketingSlug] = useState<MarketingSlug | null>(() =>
@@ -240,9 +259,16 @@ if (kitchenBusinessId) {
       return () => window.removeEventListener('popstate', syncPath)
     }, [])
 
-    // Restore dashboard only after intentional login or an existing merchant session flag.
-    // Ambient Keycloak SSO (e.g. admin logged in) must not open the merchant app.
+    // Restore dashboard only after intentional login or an existing merchant/staff session.
     useEffect(() => {
+      if (phase === 'staff-login') return
+
+      if (isStaffAuthenticated()) {
+        sessionStorage.setItem(STAFF_SESSION_FLAG, '1')
+        setPhase('app')
+        return
+      }
+
       const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
       const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
       if (!hadSession && !hadIntent) {
@@ -277,7 +303,7 @@ if (kitchenBusinessId) {
       return () => {
         cancelled = true
       }
-    }, [])
+    }, [phase])
 
     useEffect(() => {
       function handleKeyPress(e: KeyboardEvent) {
@@ -317,9 +343,20 @@ if (kitchenBusinessId) {
     }
 
     function handleLogout() {
+      const wasStaff =
+        sessionStorage.getItem(STAFF_SESSION_FLAG) === '1' || isStaffAuthenticated()
       setPhase('redirecting')
       sessionStorage.removeItem(SESSION_KEY)
       sessionStorage.removeItem(LOGIN_INTENT_KEY)
+      sessionStorage.removeItem(STAFF_SESSION_FLAG)
+      clearStaffSession()
+      if (wasStaff || !keycloak.authenticated) {
+        window.setTimeout(() => {
+          setPhase('landing')
+          window.history.replaceState({}, '', '/')
+        }, 400)
+        return
+      }
       // Defer Keycloak redirect so React can paint the wave loader first.
       window.setTimeout(() => {
         logoutMerchant(MERCHANT_REDIRECT_URI)
@@ -328,6 +365,8 @@ if (kitchenBusinessId) {
 
     function handleBackToLanding() {
       sessionStorage.removeItem(SESSION_KEY)
+      sessionStorage.removeItem(STAFF_SESSION_FLAG)
+      clearStaffSession()
       setPhase('landing')
     }
 
@@ -337,6 +376,23 @@ if (kitchenBusinessId) {
 
     if (phase === 'boot' || phase === 'redirecting') {
       return <AuthBootScreen mode={phase} />
+    }
+
+    if (phase === 'staff-login') {
+      return (
+        <StaffLoginPage
+          initialBusinessId={staffBusinessId}
+          onBack={() => {
+            window.history.replaceState({}, '', '/')
+            setPhase('landing')
+          }}
+          onSuccess={() => {
+            sessionStorage.setItem(STAFF_SESSION_FLAG, '1')
+            window.history.replaceState({}, '', '/')
+            setPhase('app')
+          }}
+        />
+      )
     }
 
     if (phase === 'app') {

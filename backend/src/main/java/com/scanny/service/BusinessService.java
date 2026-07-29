@@ -253,15 +253,23 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public BusinessResponse getBusinessForMerchant(String merchantId) {
         merchantAccessService.requireMerchantById(UUID.fromString(merchantId));
-        Business business = businessRepository.findWithItemsByMerchantId(merchantId)
+        Business business = businessRepository.findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId)
                 .orElseThrow(() -> new ApiException(404, "Business was not found for this merchant."));
         return toResponse(business, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BusinessResponse> listBusinessesForMerchant(String merchantId) {
+        merchantAccessService.requireMerchantById(UUID.fromString(merchantId));
+        return businessRepository.findWithItemsByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId).stream()
+                .map(business -> toResponse(business, true))
+                .toList();
     }
 
     @Transactional
     public BusinessResponse ensureBusinessForMerchant(Merchant merchant) {
         String merchantId = merchant.getId().toString();
-        Business business = businessRepository.findWithItemsByMerchantId(merchantId).orElse(null);
+        Business business = businessRepository.findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId).orElse(null);
 
         if (business == null) {
             business = new Business();
@@ -389,7 +397,7 @@ public class BusinessService {
 
     @Transactional
     public void syncQrToken(String merchantId, String qrToken) {
-        businessRepository.findByMerchantId(merchantId).ifPresent(business -> {
+        businessRepository.findFirstByMerchantIdOrderByPrimaryDescBranchLabelAsc(merchantId).ifPresent(business -> {
             business.setQrToken(qrToken);
             businessRepository.save(business);
         });

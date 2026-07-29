@@ -2,6 +2,7 @@ package com.scanny.dto;
 
 import com.scanny.entity.CatalogItem;
 import com.scanny.model.enums.ItemKind;
+import com.scanny.util.CatalogItemImages;
 import com.scanny.util.JsonLists;
 import java.util.List;
 
@@ -71,11 +72,10 @@ public class CatalogDtos {
         int unitsAvailable
     ) {
         public static CatalogItemResponse from(CatalogItem item) {
-            List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson());
-            String cover = item.getImageUrl();
-            if ((cover == null || cover.isBlank()) && !gallery.isEmpty()) {
-                cover = gallery.get(0);
-            }
+            List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson()).stream()
+                    .filter(CatalogItemImages::isUsable)
+                    .toList();
+            String cover = CatalogItemImages.pickCover(item.getImageUrl(), gallery);
             return new CatalogItemResponse(
                 item.getId(),
                 item.getName(),
