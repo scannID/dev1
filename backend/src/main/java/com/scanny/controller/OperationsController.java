@@ -123,15 +123,23 @@ public class OperationsController {
     }
 
     @GetMapping("/staff")
-    public Map<String, List<OperationsDtos.StaffResponse>> listStaff(@PathVariable String businessId) {
+    public Map<String, List<OperationsDtos.StaffResponse>> listStaff(
+            @PathVariable String businessId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        operationsAccessService.requireMerchantOrStaff(
+                businessId, staffSession, OperationsAccessService.managerRoles());
         return Map.of("staff", staffService.listStaff(businessId));
     }
 
     @PostMapping("/staff")
     public Map<String, OperationsDtos.StaffResponse> createStaff(
             @PathVariable String businessId,
-            @Valid @RequestBody OperationsDtos.CreateStaffRequest request
+            @Valid @RequestBody OperationsDtos.CreateStaffRequest request,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
     ) {
+        operationsAccessService.requireMerchantOrStaff(
+                businessId, staffSession, OperationsAccessService.managerRoles());
         return Map.of("staff", staffService.createStaff(businessId, request));
     }
 
@@ -139,17 +147,24 @@ public class OperationsController {
     public Map<String, OperationsDtos.StaffResponse> updateStaff(
             @PathVariable String businessId,
             @PathVariable UUID staffId,
-            @Valid @RequestBody OperationsDtos.UpdateStaffRequest request
+            @Valid @RequestBody OperationsDtos.UpdateStaffRequest request,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
     ) {
+        operationsAccessService.requireMerchantOrStaff(
+                businessId, staffSession, OperationsAccessService.managerRoles());
         return Map.of("staff", staffService.updateStaff(businessId, staffId, request));
     }
 
-    @PostMapping("/staff/login")
-    public OperationsDtos.StaffSessionResponse staffLogin(
+    @PostMapping("/staff/{staffId}/resend-invite")
+    public Map<String, String> resendInvite(
             @PathVariable String businessId,
-            @Valid @RequestBody OperationsDtos.StaffLoginRequest request
+            @PathVariable UUID staffId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
     ) {
-        return staffService.login(businessId, request);
+        operationsAccessService.requireMerchantOrStaff(
+                businessId, staffSession, OperationsAccessService.managerRoles());
+        staffService.resendInvite(businessId, staffId);
+        return Map.of("status", "sent");
     }
 
     @GetMapping("/tables")

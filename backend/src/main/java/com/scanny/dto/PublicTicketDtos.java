@@ -68,4 +68,35 @@ public class PublicTicketDtos {
         String viewUrl,
         String qrToken
     ) {}
+
+    /** Public progress for an event creator, keyed by master ticket id (e.g. TKT-FA255B03). */
+    public record EventTrackingMetrics(
+        String ticketId,
+        String eventName,
+        String eventDate,
+        String host,
+        String status,
+        long orderedTickets,
+        long purchasedTickets,
+        long pendingTickets,
+        long redeemedTickets,
+        long totalCollected,
+        String currency,
+        String purchaseUrl,
+        java.time.Instant createdAt,
+        java.util.List<RecentAttendee> recentAttendees
+    ) {}
+
+    public record RecentAttendee(
+        String ticketId,
+        String holderName,
+        String holderEmail,
+        String holderPhone,
+        String ticketType,
+        int price,
+        String currency,
+        String paymentStatus,
+        String status,
+        java.time.Instant createdAt
+    ) {}
 }

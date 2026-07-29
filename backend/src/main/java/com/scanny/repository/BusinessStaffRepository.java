@@ -15,4 +15,13 @@ public interface BusinessStaffRepository extends JpaRepository<BusinessStaff, UU
 
     @EntityGraph(attributePaths = "business")
     Optional<BusinessStaff> findBySessionTokenAndSessionExpiresAtAfter(String sessionToken, java.time.Instant now);
+
+    @EntityGraph(attributePaths = "business")
+    List<BusinessStaff> findByKeycloakUserIdAndActiveTrue(UUID keycloakUserId);
+
+    @EntityGraph(attributePaths = "business")
+    Optional<BusinessStaff> findByKeycloakUserIdAndBusinessIdAndActiveTrue(UUID keycloakUserId, String businessId);
+
+    @EntityGraph(attributePaths = "business")
+    List<BusinessStaff> findByEmailIgnoreCaseAndActiveTrue(String email);
 }

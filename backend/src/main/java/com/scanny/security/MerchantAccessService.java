@@ -4,7 +4,6 @@ import com.scanny.entity.Business;
 import com.scanny.entity.BusinessStaff;
 import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
-import com.scanny.model.enums.StaffRole;
 import com.scanny.repository.BusinessRepository;
 import com.scanny.repository.MerchantRepository;
 import org.springframework.security.core.Authentication;
@@ -93,19 +92,29 @@ public class MerchantAccessService {
         return business;
     }
 
+    public boolean isStaff() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_STAFF") || a.equals("ROLE_STAFF_MANAGER"));
+    }
+
     public void assertOwnsBusiness(Business business) {
         if (isAdmin()) {
             return;
         }
         BusinessStaff staff = StaffSessionHolder.get();
         if (staff != null) {
-            if (staff.getRole() != StaffRole.MANAGER) {
-                throw new ApiException(403, "Your staff role cannot access this.");
-            }
             if (staff.getBusiness() == null || !staff.getBusiness().getId().equals(business.getId())) {
                 throw new ApiException(403, "You do not have access to this business.");
             }
             return;
+        }
+        if (isStaff()) {
+            throw new ApiException(403, "You do not have access to this business.");
         }
         Merchant merchant = requireCurrentMerchant();
         if (!merchant.getId().toString().equals(business.getMerchantId())) {

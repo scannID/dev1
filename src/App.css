@@ -4335,6 +4335,10 @@ button:disabled {
   border-top-color: color-mix(in srgb, var(--primary, #ea580c) 70%, transparent);
 }
 
+.roles-accent-gm {
+  border-top-color: color-mix(in srgb, #0f766e 65%, transparent);
+}
+
 .roles-accent-cashier {
   border-top-color: color-mix(in srgb, #2563eb 55%, transparent);
 }
@@ -4349,6 +4353,75 @@ button:disabled {
 
 .roles-accent-custom {
   border-top-color: color-mix(in srgb, #6366f1 50%, transparent);
+}
+
+.roles-grid-access {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.roles-badge-gm {
+  margin-top: 8px;
+  background: color-mix(in srgb, #0f766e 12%, transparent);
+  color: #0f766e;
+}
+
+.roles-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.roles-invite-role {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary, #ea580c) 6%, transparent);
+}
+
+.roles-invite-role-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--primary, #ea580c);
+}
+
+.roles-invite-role-row strong {
+  display: block;
+  color: var(--foreground, #111827);
+  font-size: 14px;
+}
+
+.roles-invite-role-row p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-foreground, #6b7280);
+}
+
+.roles-gm-callouts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.roles-gm-callout {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: color-mix(in srgb, #0f766e 8%, transparent);
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.roles-search-input-plain {
+  padding-left: 12px;
+}
+
+.roles-staff-muted {
+  color: var(--muted-foreground, #9ca3af);
+  font-size: 13px;
 }
 
 .roles-card-top {

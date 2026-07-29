@@ -462,6 +462,36 @@ export interface AttendeeTicketView {
   qrToken: string
 }
 
+export interface EventTicketRecentAttendee {
+  ticketId: string
+  holderName: string
+  holderEmail: string
+  holderPhone: string
+  ticketType: string
+  price: number
+  currency: string
+  paymentStatus: string
+  status: string
+  createdAt: string
+}
+
+export interface EventTicketTrackingMetrics {
+  ticketId: string
+  eventName: string
+  eventDate: string | null
+  host: string
+  status: string
+  orderedTickets: number
+  purchasedTickets: number
+  pendingTickets: number
+  redeemedTickets: number
+  totalCollected: number
+  currency: string
+  purchaseUrl: string
+  createdAt: string
+  recentAttendees: EventTicketRecentAttendee[]
+}
+
 export interface DevicePaymentMethod {
   id: number
   phoneNumber: string

@@ -27,6 +27,9 @@ public class BusinessStaff {
     @Column(name = "merchant_id", nullable = false)
     private String merchantId;
 
+    @Column(name = "keycloak_user_id")
+    private UUID keycloakUserId;
+
     @Column(nullable = false)
     private String email;
 
@@ -39,6 +42,18 @@ public class BusinessStaff {
 
     @Column(name = "pin_hash")
     private String pinHash;
+
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    @Column(name = "invite_token")
+    private String inviteToken;
+
+    @Column(name = "invite_expires_at")
+    private Instant inviteExpiresAt;
+
+    @Column(name = "password_set_at")
+    private Instant passwordSetAt;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -79,6 +94,14 @@ public class BusinessStaff {
         this.merchantId = merchantId;
     }
 
+    public UUID getKeycloakUserId() {
+        return keycloakUserId;
+    }
+
+    public void setKeycloakUserId(UUID keycloakUserId) {
+        this.keycloakUserId = keycloakUserId;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -109,6 +132,42 @@ public class BusinessStaff {
 
     public void setPinHash(String pinHash) {
         this.pinHash = pinHash;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public String getInviteToken() {
+        return inviteToken;
+    }
+
+    public void setInviteToken(String inviteToken) {
+        this.inviteToken = inviteToken;
+    }
+
+    public Instant getInviteExpiresAt() {
+        return inviteExpiresAt;
+    }
+
+    public void setInviteExpiresAt(Instant inviteExpiresAt) {
+        this.inviteExpiresAt = inviteExpiresAt;
+    }
+
+    public Instant getPasswordSetAt() {
+        return passwordSetAt;
+    }
+
+    public void setPasswordSetAt(Instant passwordSetAt) {
+        this.passwordSetAt = passwordSetAt;
+    }
+
+    public boolean isInvitePending() {
+        return passwordSetAt == null && inviteToken != null;
     }
 
     public boolean isActive() {

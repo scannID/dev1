@@ -28,6 +28,8 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
 
     Optional<Ticket> findByAccessToken(String accessToken);
 
+    List<Ticket> findByMasterTicketIdOrderByCreatedAtDesc(String masterTicketId);
+
     @Query("""
             SELECT t.eventName,
                    COUNT(t),

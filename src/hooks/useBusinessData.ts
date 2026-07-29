@@ -1,10 +1,15 @@
-﻿// Loads merchant session (me) + businesses + orders, or staff branch session
+﻿// Loads merchant or staff session via the same Keycloak login
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { scannyApi } from '../api/services'
-import { clearStaffSession, getStaffSession, isStaffAuthenticated } from '../api/client'
+import { clearStaffSession, getStaffBusinessId, setStaffBusinessId } from '../api/client'
 import { operationsApi } from '../api/operations'
-import keycloak, { waitForKeycloak } from '../keycloak'
+import keycloak, {
+  hasMerchantSession,
+  hasPortalSession,
+  isStaffSession,
+  waitForKeycloak,
+} from '../keycloak'
 import type {
   Business,
   CatalogItem,
@@ -31,6 +36,7 @@ export function useBusinessData() {
   const [onboarding, setOnboarding] = useState<OnboardingStatusResponse | null>(null)
   const [staffMode, setStaffMode] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
+  const [staffRole, setStaffRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,7 +47,23 @@ export function useBusinessData() {
 
   const selectBusiness = useCallback(
     async (businessId: string) => {
-      if (staffMode) return
+      if (staffMode) {
+        setStaffBusinessId(businessId)
+        setSelectedBusinessId(businessId)
+        try {
+          const me = await operationsApi.staffMe(businessId)
+          const withItems = normalizeBusiness(me.business)
+          setBusinesses([withItems])
+          setStaffName(me.staff.displayName || me.staff.email)
+          setStaffRole(me.staff.role)
+          const orderList = await scannyApi.orders.list(businessId)
+          setOrders(orderList)
+        } catch (err) {
+          console.error('Failed to switch staff branch:', err)
+          setError(err instanceof Error ? err.message : 'Failed to switch branch')
+        }
+        return
+      }
       setSelectedBusinessId(businessId)
       if (merchant?.id) {
         localStorage.setItem(storageKeyForMerchant(merchant.id), businessId)
@@ -65,18 +87,22 @@ export function useBusinessData() {
   )
 
   const loadStaffSession = useCallback(async () => {
-    const session = getStaffSession()
-    if (!session) {
+    await waitForKeycloak()
+    if (!isStaffSession() && !hasPortalSession()) {
       throw new Error('Not authenticated')
     }
-    const business = normalizeBusiness(await scannyApi.businesses.get(session.businessId))
+    const preferred = getStaffBusinessId() || undefined
+    const me = await operationsApi.staffMe(preferred)
+    setStaffBusinessId(me.business.id)
     setStaffMode(true)
-    setStaffName(session.displayName || session.email)
+    setStaffName(me.staff.displayName || me.staff.email)
+    setStaffRole(me.staff.role)
     setMerchant(null)
     setOnboarding(null)
-    setBusinesses([business])
-    setSelectedBusinessId(business.id)
-    const orderList = await scannyApi.orders.list(business.id)
+    const withItems = normalizeBusiness(me.business)
+    setBusinesses([withItems])
+    setSelectedBusinessId(withItems.id)
+    const orderList = await scannyApi.orders.list(withItems.id)
     setOrders(orderList)
   }, [])
 
@@ -100,6 +126,7 @@ export function useBusinessData() {
 
     setStaffMode(false)
     setStaffName(null)
+    setStaffRole(null)
     setMerchant(me.merchant)
     setOnboarding(me.onboarding)
     setBusinesses(list)
@@ -109,7 +136,6 @@ export function useBusinessData() {
     if (activeId) {
       const orderList = await scannyApi.orders.list(activeId)
       setOrders(orderList)
-      // Refresh selected branch with fresh items if we only have summaries
       try {
         const full = await scannyApi.businesses.get(activeId)
         const withItems = normalizeBusiness(full)
@@ -124,7 +150,8 @@ export function useBusinessData() {
     try {
       setLoading(true)
       setError(null)
-      if (isStaffAuthenticated() && !keycloak.authenticated) {
+      await waitForKeycloak()
+      if (isStaffSession() || (hasPortalSession() && !hasMerchantSession())) {
         await loadStaffSession()
       } else {
         await loadMerchantSession()
@@ -138,6 +165,8 @@ export function useBusinessData() {
       setOnboarding(null)
       setSelectedBusinessId(null)
       setStaffMode(false)
+      setStaffName(null)
+      setStaffRole(null)
     } finally {
       setLoading(false)
     }
@@ -176,7 +205,6 @@ export function useBusinessData() {
     if (staffMode || !selectedBusiness?.id) return
     try {
       const branches = await operationsApi.listBranches(selectedBusiness.id)
-      // listBranches returns summaries; merge labels onto local list / refetch me
       await loadMerchantSession()
       return branches
     } catch (err) {
@@ -196,6 +224,7 @@ export function useBusinessData() {
     clearStaffSession()
     setStaffMode(false)
     setStaffName(null)
+    setStaffRole(null)
     setBusinesses([])
     setOrders([])
     setSelectedBusinessId(null)
@@ -215,6 +244,7 @@ export function useBusinessData() {
     onboarding,
     staffMode,
     staffName,
+    staffRole,
     loading,
     error,
     refreshBusinesses: loadSession,

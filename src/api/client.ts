@@ -1,9 +1,8 @@
 ﻿// API Client for Scanny Backend
-// Attaches Keycloak JWT or staff session when available
+// Attaches Keycloak JWT (merchant or staff) when available
 
 import keycloak from '../keycloak'
 
-const STAFF_SESSION_KEY = 'scanny-staff-session'
 const STAFF_BUSINESS_KEY = 'scanny-staff-business-id'
 
 /** Use same host as the page (works on phone via LAN IP, not only localhost). */
@@ -28,43 +27,17 @@ export class ApiError extends Error {
   }
 }
 
-export type StaffSessionStored = {
-  token: string
-  businessId: string
-  email: string
-  displayName: string
-  role: string
-  expiresAt: string
+export function getStaffBusinessId(): string | null {
+  return localStorage.getItem(STAFF_BUSINESS_KEY)
 }
 
-export function getStaffSession(): StaffSessionStored | null {
-  try {
-    const raw = localStorage.getItem(STAFF_SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as StaffSessionStored
-    if (!parsed.token || !parsed.businessId) return null
-    if (parsed.expiresAt && Date.parse(parsed.expiresAt) < Date.now()) {
-      clearStaffSession()
-      return null
-    }
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-export function setStaffSession(session: StaffSessionStored) {
-  localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session))
-  localStorage.setItem(STAFF_BUSINESS_KEY, session.businessId)
+export function setStaffBusinessId(businessId: string) {
+  localStorage.setItem(STAFF_BUSINESS_KEY, businessId)
 }
 
 export function clearStaffSession() {
-  localStorage.removeItem(STAFF_SESSION_KEY)
   localStorage.removeItem(STAFF_BUSINESS_KEY)
-}
-
-export function isStaffAuthenticated(): boolean {
-  return getStaffSession() !== null
+  localStorage.removeItem('scanny-staff-session')
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -81,10 +54,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     if (keycloak.token) {
       headers.Authorization = `Bearer ${keycloak.token}`
     }
-  } else {
-    const staff = getStaffSession()
-    if (staff?.token) {
-      headers['X-Staff-Session'] = staff.token
+    const staffBusinessId = getStaffBusinessId()
+    if (staffBusinessId) {
+      headers['X-Staff-Business'] = staffBusinessId
     }
   }
 

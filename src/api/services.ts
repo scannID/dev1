@@ -47,6 +47,7 @@ import type {
   TicketPurchaseResponse,
   TicketEventInfo,
   AttendeeTicketView,
+  EventTicketTrackingMetrics,
   PagedResult,
   PaginationMeta,
   FeeConfig,
@@ -394,6 +395,13 @@ export const publicTicketsApi = {
 
   createEvent: async (data: CreateTicketRequest): Promise<Ticket> => {
     return api.post<Ticket>('/tickets/public/events', data)
+  },
+
+  track: async (ticketId: string): Promise<EventTicketTrackingMetrics> => {
+    const id = ticketId.trim().replace(/^#/, '')
+    return api.get<EventTicketTrackingMetrics>(
+      `/tickets/public/track/${encodeURIComponent(id)}`
+    )
   },
 }
 

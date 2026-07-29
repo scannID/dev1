@@ -111,6 +111,7 @@ public final class OperationsDtos {
             String displayName,
             StaffRole role,
             boolean active,
+            boolean invitePending,
             Instant createdAt
     ) {
         public static StaffResponse from(BusinessStaff staff) {
@@ -120,6 +121,7 @@ public final class OperationsDtos {
                     staff.getDisplayName(),
                     staff.getRole(),
                     staff.isActive(),
+                    staff.isInvitePending(),
                     staff.getCreatedAt()
             );
         }
@@ -128,27 +130,24 @@ public final class OperationsDtos {
     public record CreateStaffRequest(
             @NotBlank @Email String email,
             @NotBlank @Size(max = 255) String displayName,
-            @NotNull StaffRole role,
-            @NotBlank @Size(min = 4, max = 8) String pin
+            @NotNull StaffRole role
     ) {}
 
     public record UpdateStaffRequest(
             @Size(max = 255) String displayName,
             StaffRole role,
-            Boolean active,
-            @Size(min = 4, max = 8) String pin
+            Boolean active
     ) {}
 
-    public record StaffLoginRequest(
-            @NotBlank @Email String email,
-            @NotBlank @Size(min = 4, max = 8) String pin
+    public record StaffBusinessOption(
+            String businessId,
+            String businessName
     ) {}
 
-    public record StaffSessionResponse(
-            String sessionToken,
-            Instant expiresAt,
+    public record StaffMeResponse(
             StaffResponse staff,
-            String businessId
+            BusinessResponse business,
+            List<StaffBusinessOption> businesses
     ) {}
 
     public record TableResponse(

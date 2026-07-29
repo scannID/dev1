@@ -46,6 +46,11 @@ function hasMerchantRole(): boolean {
   return roles.includes('MERCHANT')
 }
 
+function hasStaffRole(): boolean {
+  const roles = (keycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
+  return roles.includes('STAFF')
+}
+
 /** True only for a scanny-client session that includes the MERCHANT realm role. */
 export function hasMerchantSession() {
   return (
@@ -54,6 +59,20 @@ export function hasMerchantSession() {
     Boolean(keycloak.token) &&
     hasMerchantRole()
   )
+}
+
+/** Merchant or staff — same Keycloak login, same client. */
+export function hasPortalSession() {
+  return (
+    keycloak.authenticated &&
+    keycloak.tokenParsed?.azp === MERCHANT_CLIENT_ID &&
+    Boolean(keycloak.token) &&
+    (hasMerchantRole() || hasStaffRole())
+  )
+}
+
+export function isStaffSession() {
+  return hasPortalSession() && hasStaffRole() && !hasMerchantRole()
 }
 
 /** End Keycloak SSO (shared across merchant/admin on the same realm). */

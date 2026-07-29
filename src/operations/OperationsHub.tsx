@@ -8,14 +8,18 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RolesPermissionsHub } from './RolesPermissionsHub'
+import { hasPermission } from './roleCatalog'
+import type { StaffRole } from '../api/operations'
 
 export function OperationsHub({
   businessId,
   staffMode = false,
+  staffRole,
   onBranchCreated,
 }: {
   businessId: string
   staffMode?: boolean
+  staffRole?: string | null
   onBranchCreated?: (branchId: string) => void
 }) {
   const [settings, setSettings] = useState<OperationsSettings | null>(null)
@@ -106,7 +110,9 @@ export function OperationsHub({
       <Tabs defaultValue="roles">
         <TabsList>
           <TabsTrigger value="roles">Roles &amp; staff</TabsTrigger>
-          <TabsTrigger value="settings">Venue</TabsTrigger>
+          {(!staffMode || !staffRole || hasPermission(staffRole as StaffRole, 'venue:settings')) ? (
+            <TabsTrigger value="settings">Venue</TabsTrigger>
+          ) : null}
           {!staffMode ? <TabsTrigger value="branches">Branches</TabsTrigger> : null}
         </TabsList>
 
@@ -165,7 +171,7 @@ export function OperationsHub({
             <div className="operations-panel">
               <p className="text-sm text-muted-foreground" style={{ marginBottom: 16 }}>
                 Create another location under this business. New branches start with an empty catalog.
-                Invite a Manager under Roles while switched into that branch so they can sign in with email + PIN.
+                Invite a Branch Manager under Roles while switched into that branch — they sign in with the same portal login after setting their password from the invite email.
               </p>
 
               <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
@@ -193,17 +199,6 @@ export function OperationsHub({
                       <div style={{ fontSize: 11, fontFamily: 'monospace', marginTop: 4 }}>{branch.id}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const link = `${window.location.origin}/?staff=1&business=${encodeURIComponent(branch.id)}`
-                          void navigator.clipboard.writeText(link)
-                          toast.success('Staff login link copied')
-                        }}
-                      >
-                        Copy staff link
-                      </Button>
                       {!branch.primary ? (
                         <Button
                           variant="secondary"
@@ -238,12 +233,6 @@ export function OperationsHub({
               <Button disabled={creatingBranch} onClick={() => void createBranch()}>
                 {creatingBranch ? 'Creating…' : 'Create branch'}
               </Button>
-
-              {staffLoginHint ? (
-                <p className="text-xs text-muted-foreground" style={{ marginTop: 16 }}>
-                  Current branch staff login: <code>{staffLoginHint}</code>
-                </p>
-              ) : null}
             </div>
           </TabsContent>
         ) : null}

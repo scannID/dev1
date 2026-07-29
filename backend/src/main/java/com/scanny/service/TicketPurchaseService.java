@@ -212,6 +212,81 @@ public class TicketPurchaseService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PublicTicketDtos.EventTrackingMetrics getEventTrackingMetrics(String rawTicketId) {
+        String ticketId = normalizeTicketId(rawTicketId);
+        Ticket seed = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new ApiException(404, "No event found for that ticket ID"));
+
+        Ticket master;
+        if (seed.isEventTemplate()) {
+            master = seed;
+        } else if (seed.isAttendeeTicket() && seed.getMasterTicketId() != null) {
+            master = ticketRepository.findById(seed.getMasterTicketId())
+                .orElseThrow(() -> new ApiException(404, "No event found for that ticket ID"));
+        } else {
+            throw new ApiException(400, "That ticket ID is not an event tracking code");
+        }
+
+        List<Ticket> attendees = ticketRepository.findByMasterTicketIdOrderByCreatedAtDesc(master.getId());
+        long ordered = attendees.size();
+        long purchased = attendees.stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Paid).count();
+        long pending = attendees.stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Unpaid).count();
+        long redeemed = attendees.stream().filter(t -> t.getStatus() == TicketStatus.Redeemed).count();
+        long totalCollected = attendees.stream()
+            .filter(t -> t.getPaymentStatus() == PaymentStatus.Paid)
+            .mapToLong(Ticket::getPrice)
+            .sum();
+
+        Map<String, Object> meta = parseMetadata(master.getMetadata());
+        List<PublicTicketDtos.RecentAttendee> recent = attendees.stream()
+            .limit(25)
+            .map(t -> new PublicTicketDtos.RecentAttendee(
+                t.getId(),
+                t.getHolderName(),
+                t.getHolderEmail(),
+                t.getHolderPhone(),
+                t.getTicketType(),
+                t.getPrice(),
+                t.getCurrency(),
+                t.getPaymentStatus().name(),
+                t.getStatus().name(),
+                t.getCreatedAt()
+            ))
+            .toList();
+
+        return new PublicTicketDtos.EventTrackingMetrics(
+            master.getId(),
+            master.getEventName(),
+            master.getEventDate() != null ? master.getEventDate().toString() : null,
+            stringMeta(meta, "host", ""),
+            master.getStatus().name(),
+            ordered,
+            purchased,
+            pending,
+            redeemed,
+            totalCollected,
+            master.getCurrency() != null ? master.getCurrency() : "UGX",
+            customerUrl + "/ticket/" + master.getQrToken(),
+            master.getCreatedAt(),
+            recent
+        );
+    }
+
+    private String normalizeTicketId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new ApiException(400, "Ticket ID is required");
+        }
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("#")) {
+            normalized = normalized.substring(1).trim();
+        }
+        if (normalized.isBlank()) {
+            throw new ApiException(400, "Ticket ID is required");
+        }
+        return normalized;
+    }
+
     private Ticket requireEventTemplate(String qrToken) {
         Ticket ticket = ticketRepository.findByQrToken(qrToken.trim())
             .orElseThrow(() -> new ApiException(404, "Event not found"));

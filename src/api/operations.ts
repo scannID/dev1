@@ -39,6 +39,7 @@ export interface StaffMember {
   displayName: string
   role: StaffRole
   active: boolean
+  invitePending: boolean
   createdAt: string
 }
 
@@ -116,6 +117,12 @@ export interface TableSession {
   paymentStatus: string
 }
 
+export interface StaffMeResponse {
+  staff: StaffMember
+  business: import('./types').Business
+  businesses: Array<{ businessId: string; businessName: string }>
+}
+
 export const operationsApi = {
   getSettings: (businessId: string) =>
     api.get<{ settings: OperationsSettings }>(`/businesses/${businessId}/operations/settings`).then((r) => r.settings),
@@ -129,20 +136,20 @@ export const operationsApi = {
   createBranch: (businessId: string, data: { name: string; branchLabel: string; address?: string; phone?: string }) =>
     api.post<{ branch: Branch }>(`/businesses/${businessId}/operations/branches`, data).then((r) => r.branch),
 
-  staffLogin: (businessId: string, data: { email: string; pin: string }) =>
-    api.postPublic<{
-      sessionToken: string
-      expiresAt: string
-      staff: StaffMember
-      businessId: string
-    }>(`/businesses/${businessId}/operations/staff/login`, data),
+  staffMe: (businessId?: string) =>
+    api.get<StaffMeResponse>(
+      `/auth/staff/me${businessId ? `?businessId=${encodeURIComponent(businessId)}` : ''}`,
+    ),
+
+  resendInvite: (businessId: string, staffId: string) =>
+    api.post<{ status: string }>(`/businesses/${businessId}/operations/staff/${staffId}/resend-invite`),
 
   listStaff: (businessId: string) =>
     api.get<{ staff: StaffMember[] }>(`/businesses/${businessId}/operations/staff`).then((r) => r.staff),
 
   createStaff: (
     businessId: string,
-    data: { email: string; displayName: string; role: StaffRole; pin: string },
+    data: { email: string; displayName: string; role: StaffRole },
   ) => api.post<{ staff: StaffMember }>(`/businesses/${businessId}/operations/staff`, data).then((r) => r.staff),
 
   listTables: (businessId: string) =>

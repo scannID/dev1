@@ -43,4 +43,10 @@ public class PublicTicketController {
     public ResponseEntity<TicketResponse> createEvent(@RequestBody TicketDtos.CreateTicketRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketPurchaseService.createPublicEvent(request));
     }
+
+    /** Public sales progress by master ticket id (e.g. TKT-FA255B03 or #TKT-FA255B03). */
+    @GetMapping("/track/{ticketId}")
+    public ResponseEntity<PublicTicketDtos.EventTrackingMetrics> track(@PathVariable String ticketId) {
+        return ResponseEntity.ok(ticketPurchaseService.getEventTrackingMetrics(ticketId));
+    }
 }

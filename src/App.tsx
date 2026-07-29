@@ -78,6 +78,8 @@ import { OperationsHub } from './operations/OperationsHub'
 import { SplitBillPanel } from './operations/SplitBillPanel'
 import { openPrintReceipt } from './lib/printReceipt'
 import { operationsApi } from './api/operations'
+import { hasPermission, type PermissionId } from './operations/roleCatalog'
+import type { StaffRole } from './api/operations'
 import { resizeImageFile } from './lib/resizeImage'
 import { buildReportData, dailySeries } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
@@ -278,6 +280,7 @@ function App({
     updateLocalItems,
     staffMode,
     staffName,
+    staffRole,
     logoutStaff,
   } = useBusinessData()
 
@@ -292,6 +295,29 @@ function App({
   const [logoUploading, setLogoUploading] = useState(false)
   const [branchOverviewCounts, setBranchOverviewCounts] = useState<Record<string, { openOrders: number; kitchenOrders: number }>>({})
   const [branchOverviewLoading, setBranchOverviewLoading] = useState(false)
+
+  // Block disallowed views for staff (Overview + Reports are owner / general manager only)
+  useEffect(() => {
+    if (!staffMode || !staffRole) return
+    const merchantOnlyViews = new Set(['account', 'operations', 'reports'])
+    const viewPermMap: Record<string, PermissionId> = {
+      catalog: 'catalog:read',
+      dashboard: 'orders:read',
+      kitchen: 'kitchen:view',
+    }
+    const blocked =
+      merchantOnlyViews.has(view) ||
+      (viewPermMap[view] != null && !hasPermission(staffRole as StaffRole, viewPermMap[view]))
+    if (!blocked) return
+
+    const fallbacks: Array<{ id: string; perm: PermissionId }> = [
+      { id: 'dashboard', perm: 'orders:read' },
+      { id: 'kitchen', perm: 'kitchen:view' },
+      { id: 'catalog', perm: 'catalog:read' },
+    ]
+    const next = fallbacks.find((f) => hasPermission(staffRole as StaffRole, f.perm))
+    setView(next?.id ?? 'dashboard')
+  }, [view, staffMode, staffRole])
 
   const business = selectedBusiness ?? emptyBusiness
   const hourOfDay = new Date().getHours()
@@ -669,19 +695,24 @@ function App({
           />
           <div className="sidebar-brand-text">
             <strong>Kode</strong>
-            <span>{staffMode ? 'Branch Manager' : 'Merchant Portal'}</span>
+            <span>{staffMode ? (staffRole ?? 'Staff') + ' Portal' : 'Merchant Portal'}</span>
           </div>
         </div>
 
         <nav className="side-nav" aria-label="Workspace sections">
-          {[
-            { id: 'account', label: 'Overview', icon: Home },
-            { id: 'catalog', label: 'Catalog', icon: Package },
-            { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount },
-            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount },
-            { id: 'operations', label: 'Roles', icon: Settings2 },
-            { id: 'reports', label: 'Reports', icon: BarChart3 },
-          ].map(({ id, label, icon: Icon, count }) => (
+          {([
+            { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
+            { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId },
+            { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
+            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
+            { id: 'operations', label: 'Roles', icon: Settings2, perm: 'staff:manage' as PermissionId, merchantOnly: true },
+            { id: 'reports', label: 'Reports', icon: BarChart3, merchantOnly: true },
+          ] as Array<{ id: string; label: string; icon: typeof Home; count?: number; perm?: PermissionId; merchantOnly?: boolean }>)
+          .filter(({ perm, merchantOnly }) => {
+            if (staffMode && merchantOnly) return false
+            return !staffMode || !perm || hasPermission(staffRole as StaffRole, perm)
+          })
+          .map(({ id, label, icon: Icon, count }) => (
             <button
               type="button"
               className={!showAddItem && !editingItem && view === id ? 'active' : ''}
@@ -951,6 +982,7 @@ function App({
                 <OperationsHub
                   businessId={business.id}
                   staffMode={staffMode}
+                  staffRole={staffRole}
                   onBranchCreated={(branchId) => {
                     void refreshBusinesses().then(() => selectBusiness(branchId))
                   }}

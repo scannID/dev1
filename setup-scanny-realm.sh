@@ -89,6 +89,22 @@ else
     echo -e "${YELLOW}⚠ ADMIN role status: $ADMIN_ROLE${NC}\n"
 fi
 
+# Step 5b: Create STAFF role (if doesn't exist)
+echo -e "${YELLOW}Step 5b: Creating STAFF role...${NC}"
+STAFF_ROLE=$(curl -s -X POST "$KEYCLOAK_URL/admin/realms/$REALM_NAME/roles" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "STAFF",
+    "description": "Branch staff invited by a merchant"
+  }' -w "%{http_code}" -o /dev/null)
+
+if [ "$STAFF_ROLE" == "201" ] || [ "$STAFF_ROLE" == "409" ]; then
+    echo -e "${GREEN}✓ STAFF role ready${NC}\n"
+else
+    echo -e "${YELLOW}⚠ STAFF role status: $STAFF_ROLE${NC}\n"
+fi
+
 # Step 6: Create backend client (if doesn't exist)
 echo -e "${YELLOW}Step 6: Creating scanny-backend client...${NC}"
 BACKEND_CLIENT=$(curl -s -X POST "$KEYCLOAK_URL/admin/realms/$REALM_NAME/clients" \

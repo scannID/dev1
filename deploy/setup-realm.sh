@@ -65,7 +65,7 @@ else
   exit 1
 fi
 
-for role in MERCHANT ADMIN CUSTOMER; do
+for role in MERCHANT ADMIN CUSTOMER STAFF; do
   code="$(curl -sS -o /tmp/scanny-role.json -w '%{http_code}' "${AUTH[@]}" \
     -X POST "$KC_URL/admin/realms/$REALM/roles" \
     -d "{\"name\":\"$role\"}")"

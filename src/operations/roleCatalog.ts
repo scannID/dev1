@@ -53,73 +53,79 @@ export const AVAILABLE_PERMISSIONS: PermissionMeta[] = [
   { id: 'reports:read', label: 'View reports', group: 'Reports' },
 ]
 
-export const SYSTEM_ROLES: RoleDefinition[] = [
+/** Branch ops permissions — Overview / Reports stay with the owner (general manager). */
+export const BRANCH_MANAGER_PERMISSIONS: PermissionId[] = [
+  'catalog:read',
+  'catalog:manage',
+  'orders:read',
+  'orders:pay',
+  'orders:split',
+  'orders:receipt',
+  'kitchen:view',
+  'kitchen:advance',
+  'floor:tables',
+  'floor:qr',
+  'floor:status',
+  'venue:busy',
+  'venue:settings',
+]
+
+/** Owner-only capabilities shown on the Roles page (not a staff enum). */
+export const GENERAL_MANAGER_PERMISSIONS: PermissionId[] = [
+  ...BRANCH_MANAGER_PERMISSIONS,
+  'staff:manage',
+  'reports:read',
+]
+
+/** Display cards for the Roles page — only Branch Manager is inviteable. */
+export const ACCESS_LEVELS: RoleDefinition[] = [
+  {
+    id: 'GENERAL_MANAGER',
+    label: 'General Manager',
+    description:
+      'Business owner — Overview, Reports, Roles, and every branch. Not invited as staff; this is your merchant login.',
+    staffRole: null,
+    system: true,
+    accentClass: 'roles-accent-gm',
+    permissions: GENERAL_MANAGER_PERMISSIONS,
+  },
   {
     id: 'MANAGER',
-    label: 'Manager',
-    description: 'Full merchant access — catalog, staff, venue controls, and kitchen.',
+    label: 'Branch Manager',
+    description:
+      'Runs one branch — orders, kitchen, catalog, floor, and venue. Invite them while switched into that branch.',
     staffRole: 'MANAGER',
     system: true,
     accentClass: 'roles-accent-manager',
-    permissions: [
-      'catalog:read',
-      'catalog:manage',
-      'orders:read',
-      'orders:pay',
-      'orders:split',
-      'orders:receipt',
-      'kitchen:view',
-      'kitchen:advance',
-      'floor:tables',
-      'floor:qr',
-      'floor:status',
-      'staff:manage',
-      'venue:busy',
-      'venue:settings',
-      'reports:read',
-    ],
-  },
-  {
-    id: 'CASHIER',
-    label: 'Cashier',
-    description: 'Orders, payments, receipts, and table sessions at the counter.',
-    staffRole: 'CASHIER',
-    system: true,
-    accentClass: 'roles-accent-cashier',
-    permissions: [
-      'orders:read',
-      'orders:pay',
-      'orders:split',
-      'orders:receipt',
-      'floor:tables',
-      'kitchen:view',
-    ],
-  },
-  {
-    id: 'WAITER',
-    label: 'Waiter',
-    description: 'Floor service — tables, QR links, and order status on the floor.',
-    staffRole: 'WAITER',
-    system: true,
-    accentClass: 'roles-accent-waiter',
-    permissions: [
-      'floor:tables',
-      'floor:qr',
-      'floor:status',
-      'orders:read',
-      'kitchen:view',
-    ],
-  },
-  {
-    id: 'KITCHEN',
-    label: 'Kitchen',
-    description: 'Kitchen display only — advance Pending → Preparing → Ready.',
-    staffRole: 'KITCHEN',
-    system: true,
-    accentClass: 'roles-accent-kitchen',
-    permissions: ['kitchen:view', 'kitchen:advance'],
+    permissions: BRANCH_MANAGER_PERMISSIONS,
   },
 ]
+
+/** Only assignable system role for staff invites. */
+export const SYSTEM_ROLES: RoleDefinition[] = ACCESS_LEVELS.filter(
+  (role) => role.staffRole === 'MANAGER',
+)
+
+/** Labels for legacy DB roles that can no longer be assigned. */
+const LEGACY_ROLE_LABELS: Partial<Record<StaffRole, string>> = {
+  CASHIER: 'Cashier',
+  WAITER: 'Waiter',
+  KITCHEN: 'Kitchen',
+}
+
+/** Keep existing legacy staff accounts usable until reassigned. */
+const LEGACY_ROLE_PERMISSIONS: Partial<Record<StaffRole, PermissionId[]>> = {
+  CASHIER: [
+    'orders:read',
+    'orders:pay',
+    'orders:split',
+    'orders:receipt',
+    'floor:tables',
+    'kitchen:view',
+  ],
+  WAITER: ['floor:tables', 'floor:qr', 'floor:status', 'orders:read', 'kitchen:view'],
+  KITCHEN: ['kitchen:view', 'kitchen:advance'],
+}
 
 export function permissionLabel(id: PermissionId): string {
   return AVAILABLE_PERMISSIONS.find((p) => p.id === id)?.label ?? id
@@ -130,7 +136,11 @@ export function permissionGroup(id: PermissionId): string {
 }
 
 export function formatStaffRoleLabel(role: StaffRole): string {
-  return SYSTEM_ROLES.find((r) => r.staffRole === role)?.label ?? role
+  return (
+    SYSTEM_ROLES.find((r) => r.staffRole === role)?.label ??
+    LEGACY_ROLE_LABELS[role] ??
+    role
+  )
 }
 
 const CUSTOM_ROLES_KEY = (businessId: string) => `kode-custom-roles:${businessId}`
@@ -158,6 +168,18 @@ export function saveCustomRoles(businessId: string, roles: RoleDefinition[]) {
   } catch {
     /* private mode */
   }
+}
+
+export function permissionsForRole(role: StaffRole): PermissionId[] {
+  return (
+    SYSTEM_ROLES.find((r) => r.staffRole === role)?.permissions ??
+    LEGACY_ROLE_PERMISSIONS[role] ??
+    []
+  )
+}
+
+export function hasPermission(role: StaffRole, permission: PermissionId): boolean {
+  return permissionsForRole(role).includes(permission)
 }
 
 export function getInitials(name: string): string {

@@ -143,7 +143,7 @@ try {
 }
 
 # 2) Realm roles
-foreach ($r in 'MERCHANT', 'ADMIN', 'CUSTOMER') {
+foreach ($r in 'MERCHANT', 'ADMIN', 'CUSTOMER', 'STAFF') {
   try {
     Invoke-RestMethod -Method Post -Uri "$kc/admin/realms/$realm/roles" -Headers $H -ContentType 'application/json' -Body (@{ name = $r } | ConvertTo-Json) | Out-Null
     Write-Output "Role $r created"

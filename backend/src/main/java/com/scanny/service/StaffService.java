@@ -1,5 +1,6 @@
 package com.scanny.service;
 
+import com.scanny.dto.BusinessResponse;
 import com.scanny.dto.OperationsDtos;
 import com.scanny.entity.Business;
 import com.scanny.entity.BusinessStaff;
@@ -7,12 +8,10 @@ import com.scanny.exception.ApiException;
 import com.scanny.model.enums.StaffRole;
 import com.scanny.repository.BusinessStaffRepository;
 import com.scanny.security.MerchantAccessService;
-import com.scanny.util.CodeUtils;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,16 +20,19 @@ public class StaffService {
 
     private final BusinessStaffRepository staffRepository;
     private final MerchantAccessService merchantAccessService;
-    private final PasswordEncoder passwordEncoder;
+    private final KeycloakAdminService keycloakAdminService;
+    private final BusinessService businessService;
 
     public StaffService(
             BusinessStaffRepository staffRepository,
             MerchantAccessService merchantAccessService,
-            PasswordEncoder passwordEncoder
+            KeycloakAdminService keycloakAdminService,
+            BusinessService businessService
     ) {
         this.staffRepository = staffRepository;
         this.merchantAccessService = merchantAccessService;
-        this.passwordEncoder = passwordEncoder;
+        this.keycloakAdminService = keycloakAdminService;
+        this.businessService = businessService;
     }
 
     @Transactional(readOnly = true)
@@ -44,19 +46,36 @@ public class StaffService {
     @Transactional
     public OperationsDtos.StaffResponse createStaff(String businessId, OperationsDtos.CreateStaffRequest request) {
         Business business = merchantAccessService.requireOwnedBusiness(businessId);
-        if (staffRepository.findByBusinessIdAndEmailIgnoreCase(businessId, request.email()).isPresent()) {
+        String email = request.email().trim().toLowerCase();
+        if (staffRepository.findByBusinessIdAndEmailIgnoreCase(businessId, email).isPresent()) {
             throw new ApiException(409, "Staff member with this email already exists.");
         }
+
+        UUID keycloakUserId = keycloakAdminService.createOrInviteStaffUser(email, request.displayName().trim());
 
         BusinessStaff staff = new BusinessStaff();
         staff.setBusiness(business);
         staff.setMerchantId(business.getMerchantId());
-        staff.setEmail(request.email().trim().toLowerCase());
+        staff.setKeycloakUserId(keycloakUserId);
+        staff.setEmail(email);
         staff.setDisplayName(request.displayName().trim());
         staff.setRole(request.role());
-        staff.setPinHash(passwordEncoder.encode(request.pin()));
         staff.setActive(true);
         return OperationsDtos.StaffResponse.from(staffRepository.save(staff));
+    }
+
+    @Transactional
+    public void resendInvite(String businessId, UUID staffId) {
+        merchantAccessService.assertOwnsBusinessId(businessId);
+        BusinessStaff staff = requireStaff(businessId, staffId);
+        if (staff.getKeycloakUserId() == null) {
+            UUID keycloakUserId = keycloakAdminService.createOrInviteStaffUser(staff.getEmail(), staff.getDisplayName());
+            staff.setKeycloakUserId(keycloakUserId);
+            staff.setUpdatedAt(Instant.now());
+            staffRepository.save(staff);
+            return;
+        }
+        keycloakAdminService.resendPasswordSetupEmail(staff.getKeycloakUserId());
     }
 
     @Transactional
@@ -71,33 +90,51 @@ public class StaffService {
         }
         if (request.active() != null) {
             staff.setActive(request.active());
-        }
-        if (request.pin() != null && !request.pin().isBlank()) {
-            staff.setPinHash(passwordEncoder.encode(request.pin()));
+            if (staff.getKeycloakUserId() != null) {
+                if (Boolean.FALSE.equals(request.active())) {
+                    keycloakAdminService.disableUser(staff.getKeycloakUserId().toString());
+                } else {
+                    keycloakAdminService.enableUser(staff.getKeycloakUserId().toString());
+                }
+            }
         }
         staff.setUpdatedAt(Instant.now());
         return OperationsDtos.StaffResponse.from(staffRepository.save(staff));
     }
 
     @Transactional
-    public OperationsDtos.StaffSessionResponse login(String businessId, OperationsDtos.StaffLoginRequest request) {
-        BusinessStaff staff = staffRepository.findByBusinessIdAndEmailIgnoreCase(businessId, request.email())
-                .filter(BusinessStaff::isActive)
-                .orElseThrow(() -> new ApiException(401, "Invalid staff credentials."));
-        if (staff.getPinHash() == null || !passwordEncoder.matches(request.pin(), staff.getPinHash())) {
-            throw new ApiException(401, "Invalid staff credentials.");
+    public OperationsDtos.StaffMeResponse getMe(Jwt jwt, String preferredBusinessId) {
+        UUID keycloakUserId = UUID.fromString(jwt.getSubject());
+        List<BusinessStaff> matches = staffRepository.findByKeycloakUserIdAndActiveTrue(keycloakUserId);
+        if (matches.isEmpty()) {
+            throw new ApiException(404, "No staff profile found for this account.");
         }
-        String token = CodeUtils.randomToken(32);
-        Instant expires = Instant.now().plus(12, ChronoUnit.HOURS);
-        staff.setSessionToken(token);
-        staff.setSessionExpiresAt(expires);
-        staff.setUpdatedAt(Instant.now());
-        staffRepository.save(staff);
-        return new OperationsDtos.StaffSessionResponse(
-                token,
-                expires,
-                OperationsDtos.StaffResponse.from(staff),
-                staff.getBusiness().getId()
+
+        BusinessStaff selected = matches.stream()
+                .filter(s -> preferredBusinessId != null && preferredBusinessId.equals(s.getBusiness().getId()))
+                .findFirst()
+                .orElse(matches.get(0));
+
+        if (selected.getPasswordSetAt() == null) {
+            selected.setPasswordSetAt(Instant.now());
+            selected.setUpdatedAt(Instant.now());
+            staffRepository.save(selected);
+        }
+
+        // Ensure ownership checks see this staff row for the selected branch
+        com.scanny.security.StaffSessionHolder.set(selected);
+        BusinessResponse business = businessService.getBusiness(selected.getBusiness().getId());
+        List<OperationsDtos.StaffBusinessOption> options = matches.stream()
+                .map(s -> new OperationsDtos.StaffBusinessOption(
+                        s.getBusiness().getId(),
+                        s.getBusiness().getName()
+                ))
+                .toList();
+
+        return new OperationsDtos.StaffMeResponse(
+                OperationsDtos.StaffResponse.from(selected),
+                business,
+                options
         );
     }
 
@@ -112,6 +149,17 @@ public class StaffService {
             throw new ApiException(403, "Staff account is inactive.");
         }
         return staff;
+    }
+
+    @Transactional(readOnly = true)
+    public BusinessStaff requireByKeycloakUser(UUID keycloakUserId, String businessId) {
+        return staffRepository.findByKeycloakUserIdAndBusinessIdAndActiveTrue(keycloakUserId, businessId)
+                .orElseThrow(() -> new ApiException(403, "You do not have access to this business."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BusinessStaff> listByKeycloakUser(UUID keycloakUserId) {
+        return staffRepository.findByKeycloakUserIdAndActiveTrue(keycloakUserId);
     }
 
     public boolean roleCanAccessKitchen(StaffRole role) {

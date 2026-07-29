@@ -12,7 +12,7 @@ import TicketPurchasePage from './tickets/TicketPurchasePage'
 import TicketViewPage from './tickets/TicketViewPage'
 import EventTicketPage from './EventTicket'
 import keycloak, {
-  hasMerchantSession,
+  hasPortalSession,
   initKeycloak,
   logoutMerchant,
   waitForKeycloak,
@@ -22,8 +22,7 @@ import { DanceLoader } from './components/DanceLoader'
 import { WaveLoader } from './components/WaveLoader'
 import { CookieConsent } from './components/CookieConsent'
 import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
-import StaffLoginPage from './StaffLoginPage'
-import { clearStaffSession, isStaffAuthenticated } from './api/client'
+import { clearStaffSession } from './api/client'
 
 initThemeFromStorage()
 
@@ -195,26 +194,15 @@ if (kitchenBusinessId) {
   )
 } else {
   const SESSION_KEY = 'scanny-merchant-authenticated'
-  const STAFF_SESSION_FLAG = 'scanny-staff-portal'
   const LOGIN_INTENT_KEY = 'scanny-merchant-login-intent'
   const MERCHANT_REDIRECT_URI = window.location.origin
 
-  type Phase = 'boot' | 'landing' | 'app' | 'staff-login' | 'redirecting'
-
-  function staffQuery() {
-    const url = new URL(window.location.href)
-    return url.searchParams.get('staff') === '1'
-      ? { businessId: url.searchParams.get('business') || '' }
-      : null
-  }
+  type Phase = 'boot' | 'landing' | 'app' | 'redirecting'
 
   function needsAuthRestore() {
     return (
       sessionStorage.getItem(SESSION_KEY) === '1' ||
-      sessionStorage.getItem(LOGIN_INTENT_KEY) === '1' ||
-      sessionStorage.getItem(STAFF_SESSION_FLAG) === '1' ||
-      isStaffAuthenticated() ||
-      staffQuery() !== null
+      sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
     )
   }
 
@@ -240,13 +228,7 @@ if (kitchenBusinessId) {
   }
 
   function Root() {
-    const staffFromUrl = staffQuery()
-    const [phase, setPhase] = useState<Phase>(() => {
-      if (staffFromUrl) return 'staff-login'
-      if (isStaffAuthenticated() || sessionStorage.getItem(STAFF_SESSION_FLAG) === '1') return 'boot'
-      return needsAuthRestore() ? 'boot' : 'landing'
-    })
-    const [staffBusinessId, setStaffBusinessId] = useState(staffFromUrl?.businessId || '')
+    const [phase, setPhase] = useState<Phase>(() => (needsAuthRestore() ? 'boot' : 'landing'))
     const [authError, setAuthError] = useState<string | null>(null)
     const [darkMode, setDarkMode] = useState(() => readDarkMode())
     const [marketingSlug, setMarketingSlug] = useState<MarketingSlug | null>(() =>
@@ -259,16 +241,8 @@ if (kitchenBusinessId) {
       return () => window.removeEventListener('popstate', syncPath)
     }, [])
 
-    // Restore dashboard only after intentional login or an existing merchant/staff session.
+    // Restore dashboard after intentional login or an existing Keycloak portal session.
     useEffect(() => {
-      if (phase === 'staff-login') return
-
-      if (isStaffAuthenticated()) {
-        sessionStorage.setItem(STAFF_SESSION_FLAG, '1')
-        setPhase('app')
-        return
-      }
-
       const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
       const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
       if (!hadSession && !hadIntent) {
@@ -281,15 +255,15 @@ if (kitchenBusinessId) {
         .then((authenticated) => {
           if (cancelled) return
           sessionStorage.removeItem(LOGIN_INTENT_KEY)
-          if (authenticated && hasMerchantSession()) {
+          if (authenticated && hasPortalSession()) {
             sessionStorage.setItem(SESSION_KEY, '1')
             setAuthError(null)
             setPhase('app')
             return
           }
           sessionStorage.removeItem(SESSION_KEY)
-          if (hadIntent && authenticated && !hasMerchantSession()) {
-            setAuthError('This account is not a merchant. Use a MERCHANT user, or open the admin console.')
+          if (hadIntent && authenticated && !hasPortalSession()) {
+            setAuthError('This account cannot open the portal. Ask your owner to invite you, or use a merchant account.')
           }
           setPhase('landing')
         })
@@ -343,21 +317,10 @@ if (kitchenBusinessId) {
     }
 
     function handleLogout() {
-      const wasStaff =
-        sessionStorage.getItem(STAFF_SESSION_FLAG) === '1' || isStaffAuthenticated()
       setPhase('redirecting')
       sessionStorage.removeItem(SESSION_KEY)
       sessionStorage.removeItem(LOGIN_INTENT_KEY)
-      sessionStorage.removeItem(STAFF_SESSION_FLAG)
       clearStaffSession()
-      if (wasStaff || !keycloak.authenticated) {
-        window.setTimeout(() => {
-          setPhase('landing')
-          window.history.replaceState({}, '', '/')
-        }, 400)
-        return
-      }
-      // Defer Keycloak redirect so React can paint the wave loader first.
       window.setTimeout(() => {
         logoutMerchant(MERCHANT_REDIRECT_URI)
       }, 650)
@@ -365,7 +328,6 @@ if (kitchenBusinessId) {
 
     function handleBackToLanding() {
       sessionStorage.removeItem(SESSION_KEY)
-      sessionStorage.removeItem(STAFF_SESSION_FLAG)
       clearStaffSession()
       setPhase('landing')
     }
@@ -376,23 +338,6 @@ if (kitchenBusinessId) {
 
     if (phase === 'boot' || phase === 'redirecting') {
       return <AuthBootScreen mode={phase} />
-    }
-
-    if (phase === 'staff-login') {
-      return (
-        <StaffLoginPage
-          initialBusinessId={staffBusinessId}
-          onBack={() => {
-            window.history.replaceState({}, '', '/')
-            setPhase('landing')
-          }}
-          onSuccess={() => {
-            sessionStorage.setItem(STAFF_SESSION_FLAG, '1')
-            window.history.replaceState({}, '', '/')
-            setPhase('app')
-          }}
-        />
-      )
     }
 
     if (phase === 'app') {
@@ -442,12 +387,12 @@ if (kitchenBusinessId) {
     )
   }
 
-  // Complete OAuth redirect via check-sso; do not promote ambient SSO into a merchant session.
+  // Complete OAuth redirect via check-sso; do not promote ambient SSO into a portal session.
   initKeycloak()
     .then((authenticated) => {
       const hadSession = sessionStorage.getItem(SESSION_KEY) === '1'
       const hadIntent = sessionStorage.getItem(LOGIN_INTENT_KEY) === '1'
-      if (authenticated && hasMerchantSession() && (hadSession || hadIntent)) {
+      if (authenticated && hasPortalSession() && (hadSession || hadIntent)) {
         sessionStorage.setItem(SESSION_KEY, '1')
         return
       }

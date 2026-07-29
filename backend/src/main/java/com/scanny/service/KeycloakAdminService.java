@@ -87,6 +87,96 @@ public class KeycloakAdminService {
     }
 
     /**
+     * Create a staff user (or reuse existing by email) and email Keycloak's
+     * UPDATE_PASSWORD + VERIFY_EMAIL actions so they set up credentials.
+     */
+    public UUID createOrInviteStaffUser(String email, String displayName) {
+        try {
+            RealmResource realmResource = keycloak.realm(keycloakConfig.getRealm());
+            UsersResource usersResource = realmResource.users();
+
+            String trimmedEmail = email.trim().toLowerCase();
+            List<UserRepresentation> existing = usersResource.searchByEmail(trimmedEmail, true);
+            String userId;
+            if (!existing.isEmpty()) {
+                userId = existing.get(0).getId();
+                ensureRealmRole(userId, "STAFF");
+            } else {
+                String firstName = displayName;
+                String lastName = "";
+                String[] parts = displayName.trim().split("\\s+", 2);
+                if (parts.length >= 1 && !parts[0].isBlank()) {
+                    firstName = parts[0];
+                }
+                if (parts.length == 2) {
+                    lastName = parts[1];
+                }
+
+                UserRepresentation user = new UserRepresentation();
+                user.setEmail(trimmedEmail);
+                user.setUsername(trimmedEmail);
+                user.setFirstName(firstName);
+                user.setLastName(lastName);
+                user.setEnabled(true);
+                user.setEmailVerified(false);
+
+                Response response = usersResource.create(user);
+                if (response.getStatus() != 201) {
+                    String error = response.readEntity(String.class);
+                    logger.error("Failed to create Keycloak staff user: {}", error);
+                    throw new ApiException(500, "Failed to create staff user in Keycloak: " + error);
+                }
+                String locationHeader = response.getHeaderString("Location");
+                userId = locationHeader.substring(locationHeader.lastIndexOf('/') + 1);
+                response.close();
+                assignRoleToUser(userId, "STAFF");
+            }
+
+            sendPasswordSetupEmail(userId);
+            logger.info("Invited Keycloak staff user: {}", trimmedEmail);
+            return UUID.fromString(userId);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error creating Keycloak staff user", e);
+            throw new ApiException(500, "Failed to invite staff: " + e.getMessage());
+        }
+    }
+
+    public void resendPasswordSetupEmail(UUID keycloakUserId) {
+        sendPasswordSetupEmail(keycloakUserId.toString());
+    }
+
+    private void ensureRealmRole(String userId, String roleName) {
+        try {
+            RealmResource realmResource = keycloak.realm(keycloakConfig.getRealm());
+            UserResource userResource = realmResource.users().get(userId);
+            boolean hasRole = userResource.roles().realmLevel().listAll().stream()
+                    .anyMatch(r -> roleName.equalsIgnoreCase(r.getName()));
+            if (!hasRole) {
+                assignRoleToUser(userId, roleName);
+            }
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Failed to ensure role {} for user {}", roleName, userId, e);
+            throw new ApiException(500, "Failed to assign staff role: " + e.getMessage());
+        }
+    }
+
+    private void sendPasswordSetupEmail(String userId) {
+        try {
+            RealmResource realmResource = keycloak.realm(keycloakConfig.getRealm());
+            UserResource userResource = realmResource.users().get(userId);
+            userResource.executeActionsEmail(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+            logger.info("Sent Keycloak password-setup email to user {}", userId);
+        } catch (Exception e) {
+            logger.warn("Failed to send Keycloak password-setup email for {}", userId, e);
+            // Don't fail invite if email sending fails — merchant can resend
+        }
+    }
+
+    /**
      * Assign a role to a user
      */
     private void assignRoleToUser(String userId, String roleName) {

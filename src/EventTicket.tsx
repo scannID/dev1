@@ -1,9 +1,8 @@
-import { getWsBaseUrl } from './lib/realtime'
-import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { ticketsApi, publicTicketsApi, imagesApi } from './api/services'
-import type { ImageSearchResult, TicketStats } from './api/types'
+import type { EventTicketTrackingMetrics, ImageSearchResult } from './api/types'
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
 import { resizeImageFile } from './lib/resizeImage'
 /* ─── Theme tokens (follow app light / dark via CSS vars) ───────────── */
@@ -394,24 +393,6 @@ function fieldStyle(hasError?: boolean): CSSProperties {
   }
 }
 
-function FieldLabel({ children }: { children: string }) {
-  return (
-    <span
-      style={{
-        display: 'block',
-        fontSize: 14,
-        fontWeight: 800,
-        letterSpacing: 0,
-        textTransform: 'none',
-        color: '#374151',
-        margin: '0 0 6px',
-      }}
-    >
-      {children}
-    </span>
-  )
-}
-
 function tintTealBtn(extra?: CSSProperties): CSSProperties {
   return {
     display: 'inline-flex',
@@ -615,6 +596,131 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
 /* ─── Step 3: Ticket Generated ──────────────────────────────────────── */
 const CONFIRM = CREATE
 
+function moneyUgx(amount: number, currency = 'UGX') {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: currency || 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+function normalizeTrackQuery(raw: string) {
+  return raw.trim().replace(/^#/, '').toUpperCase()
+}
+
+function EventProgressCard({
+  metrics,
+  compact = false,
+}: {
+  metrics: EventTicketTrackingMetrics
+  compact?: boolean
+}) {
+  const stats = [
+    { label: 'Ordered', value: metrics.orderedTickets },
+    { label: 'Bought', value: metrics.purchasedTickets },
+    { label: 'Pending', value: metrics.pendingTickets },
+    { label: 'Redeemed', value: metrics.redeemedTickets },
+  ]
+
+  return (
+    <div
+      style={{
+        background: CREATE.card,
+        borderRadius: 12,
+        border: `0.5px solid ${CREATE.line}`,
+        padding: compact ? '14px 14px 12px' : '16px 16px 14px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 12 }}>
+        <div>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: CREATE.muted }}>
+            Sales progress
+          </p>
+          {!compact ? (
+            <p style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 600, color: CREATE.ink }}>{metrics.eventName}</p>
+          ) : null}
+        </div>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 500, fontFamily: SCANN_MONO, color: CREATE.muted }}>
+          #{metrics.ticketId}
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            style={{
+              background: CREATE.fieldBg,
+              borderRadius: 10,
+              padding: '10px 8px',
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: CREATE.ink, fontFamily: SCANN_MONO, lineHeight: 1.1 }}>
+              {s.value}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: CREATE.muted }}>
+              {s.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p style={{ margin: 0, fontSize: 13, color: CREATE.ink }}>
+        Collected{' '}
+        <strong style={{ fontWeight: 700 }}>{moneyUgx(metrics.totalCollected, metrics.currency)}</strong>
+        {metrics.host ? <span style={{ color: CREATE.muted }}> · Host {metrics.host}</span> : null}
+      </p>
+
+      {!compact && metrics.recentAttendees.length > 0 ? (
+        <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.muted }}>
+            Recent cards
+          </p>
+          {metrics.recentAttendees.slice(0, 8).map((a) => (
+            <div
+              key={a.ticketId}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '8px 0',
+                borderTop: `0.5px solid ${CREATE.line}`,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: CREATE.ink }}>
+                  {a.holderName || 'Guest'} · {a.ticketType}
+                </p>
+                <p style={{ margin: '3px 0 0', fontSize: 11.5, fontFamily: SCANN_MONO, color: CREATE.muted }}>
+                  #{a.ticketId}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{moneyUgx(a.price, a.currency)}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 11.5, color: CREATE.muted }}>{a.paymentStatus}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {!compact && metrics.recentAttendees.length === 0 ? (
+        <p style={{ margin: '12px 0 0', fontSize: 13, color: CREATE.muted }}>
+          No cards ordered yet. Share your QR to start selling.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function hostInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'SC'
@@ -629,6 +735,7 @@ function TicketOutput({
   onRevoke,
   revoking,
   revokeMessage,
+  metrics,
 }: {
   data: TicketData
   qr: string
@@ -636,6 +743,7 @@ function TicketOutput({
   onRevoke: (ticketId: string) => Promise<void>
   revoking: boolean
   revokeMessage: string | null
+  metrics: EventTicketTrackingMetrics | null
 }) {
   const purchaseUrl = data.purchaseUrl || ''
   const hostName = data.host?.trim() || 'Kode Events'
@@ -1000,6 +1108,16 @@ function TicketOutput({
               Distribute & manage
             </p>
 
+            {metrics ? (
+              <div style={{ marginBottom: 14 }}>
+                <EventProgressCard metrics={metrics} compact />
+              </div>
+            ) : (
+              <p style={{ margin: '0 0 14px 4px', fontSize: 12.5, color: CONFIRM.muted }}>
+                Sales progress will appear here as cards are ordered.
+              </p>
+            )}
+
             <div
               style={{
                 background: CONFIRM.card,
@@ -1137,9 +1255,11 @@ function formatPaymentDetails(form: FormState): string {
 function TicketForm({
   onGenerate,
   onBack,
+  onTrackLookup,
 }: {
   onGenerate: (d: TicketData) => Promise<void>
   onBack: () => void
+  onTrackLookup: (ticketId: string) => Promise<void>
 }) {
   const [form, setForm] = useState<FormState>({
     eventName: '',
@@ -1169,9 +1289,26 @@ function TicketForm({
   const [imageSelectedId, setImageSelectedId] = useState<string | null>(null)
   const [imageResults, setImageResults] = useState<ImageSearchResult[]>([])
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [trackQuery, setTrackQuery] = useState('')
+  const [trackBusy, setTrackBusy] = useState(false)
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
+  }
+
+  async function handleTrackSubmit(e: FormEvent) {
+    e.preventDefault()
+    const id = normalizeTrackQuery(trackQuery)
+    if (!id) {
+      toast.message('Enter a ticket ID like #TKT-FA255B03')
+      return
+    }
+    try {
+      setTrackBusy(true)
+      await onTrackLookup(id)
+    } finally {
+      setTrackBusy(false)
+    }
   }
 
   async function onEventImage(event: ChangeEvent<HTMLInputElement>) {
@@ -1356,6 +1493,16 @@ function TicketForm({
           -ms-overflow-style: none;
         }
         .et-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+        input::placeholder,
+        textarea::placeholder {
+          color: ${CREATE.muted};
+          opacity: 0.85;
+          font-weight: 400;
+        }
+        select:invalid,
+        select option[value=""] {
+          color: ${CREATE.muted};
+        }
       `}</style>
 
       <div style={{ maxWidth: 760, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1391,6 +1538,57 @@ function TicketForm({
           />
         </div>
 
+        <form
+          onSubmit={(e) => void handleTrackSubmit(e)}
+          style={{
+            flexShrink: 0,
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            gap: 8,
+            margin: '10px 0 18px',
+            padding: 10,
+            borderRadius: 12,
+            border: `0.5px solid ${CREATE.line}`,
+            background: CREATE.card,
+          }}
+        >
+          <input
+            type="search"
+            value={trackQuery}
+            onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
+            placeholder="Track event · #TKT-FA255B03"
+            aria-label="Track event by ticket ID"
+            spellCheck={false}
+            style={{
+              ...fieldStyle(),
+              fontFamily: SCANN_MONO,
+              fontSize: 13,
+              letterSpacing: '0.02em',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={trackBusy}
+            style={{
+              minHeight: 42,
+              height: 42,
+              padding: '0 16px',
+              borderRadius: 6,
+              border: 'none',
+              background: CREATE.tealDeep,
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: trackBusy ? 'wait' : 'pointer',
+              fontFamily: 'inherit',
+              opacity: trackBusy ? 0.75 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {trackBusy ? 'Looking…' : 'Track'}
+          </button>
+        </form>
+
         {step === 1 ? (
         <div className="et-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <h1
@@ -1411,7 +1609,6 @@ function TicketForm({
 
           <div style={{ display: 'grid', gap: 0, flex: 1, minHeight: 0, alignContent: 'start', paddingBottom: 8 }}>
             <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Event name</FieldLabel>
               <input
                 style={fieldStyle(Boolean(touched && errors.eventName))}
                 type="text"
@@ -1425,7 +1622,6 @@ function TicketForm({
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <FieldLabel>Date</FieldLabel>
                 <input
                   style={fieldStyle(Boolean(touched && errors.date))}
                   type="date"
@@ -1437,7 +1633,6 @@ function TicketForm({
                 {touched && errors.date && <span style={errStyle}>{errors.date}</span>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <FieldLabel>Time</FieldLabel>
                 <input
                   style={fieldStyle()}
                   type="time"
@@ -1448,7 +1643,6 @@ function TicketForm({
                 />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <FieldLabel>Location</FieldLabel>
                 <input
                   style={fieldStyle(Boolean(touched && errors.location))}
                   type="text"
@@ -1462,7 +1656,6 @@ function TicketForm({
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Host</FieldLabel>
               <input
                 style={fieldStyle(Boolean(touched && errors.host))}
                 type="text"
@@ -1769,7 +1962,6 @@ function TicketForm({
                     </button>
                   </div>
                   <div>
-                    <FieldLabel>Mobile money number</FieldLabel>
                     <input
                       style={fieldStyle(Boolean(touched && errors.mobileNumber))}
                       type="tel"
@@ -1788,7 +1980,6 @@ function TicketForm({
               {form.paymentMethod === 'BANK_ACCOUNT' ? (
                 <>
                   <div>
-                    <FieldLabel>Bank</FieldLabel>
                     <select
                       style={fieldStyle(Boolean(touched && errors.bankName))}
                       value={form.bankName}
@@ -1807,7 +1998,6 @@ function TicketForm({
                     )}
                   </div>
                   <div>
-                    <FieldLabel>Account number</FieldLabel>
                     <input
                       style={fieldStyle(Boolean(touched && errors.bankAccountNumber))}
                       type="text"
@@ -2129,10 +2319,13 @@ function TicketForm({
 export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [qr, setQr] = useState('')
-  const [stats, setStats] = useState<TicketStats[]>([])
   const [revoking, setRevoking] = useState(false)
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null)
-  const [lastCreatedEventName, setLastCreatedEventName] = useState<string | null>(null)
+  const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
+  const [trackingOnly, setTrackingOnly] = useState(false)
+  const [trackedTicketId, setTrackedTicketId] = useState<string | null>(null)
+  const [trackQuery, setTrackQuery] = useState('')
+  const [trackBusy, setTrackBusy] = useState(false)
 
   useEffect(() => {
     // Create-ticket page defaults to light; restore prior preference on leave.
@@ -2145,40 +2338,27 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
     }
   }, [])
 
-  async function loadStats(search?: string) {
-    try {
-      const data = await ticketsApi.getStats(search)
-      setStats(data)
-    } catch {
-      setStats([])
-    }
+  async function refreshMetrics(ticketId: string) {
+    const data = await publicTicketsApi.track(ticketId)
+    setMetrics(data)
+    setTrackedTicketId(data.ticketId)
+    return data
   }
 
   useEffect(() => {
-    loadStats().catch(() => undefined)
-  }, [])
-
-  useEffect(() => {
-    const ws = new WebSocket(`${getWsBaseUrl()}/ws/tickets/stats`)
-    ws.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data) as { type?: string; stats?: TicketStats[] }
-        if (parsed.type === 'TICKET_STATS_UPDATED' && Array.isArray(parsed.stats)) {
-          setStats(parsed.stats)
-        }
-      } catch {
-        // ignore
-      }
+    if (!trackedTicketId) return
+    const poll = () => {
+      publicTicketsApi.track(trackedTicketId).then(setMetrics).catch(() => undefined)
     }
-    return () => ws.close()
-  }, [])
-
-  // Keep stats subscription active for live updates without cluttering the new UI.
-  void stats
+    poll()
+    const timer = window.setInterval(poll, 10000)
+    return () => window.clearInterval(timer)
+  }, [trackedTicketId])
 
   async function handleGenerate(data: TicketData) {
     try {
       setRevokeMessage(null)
+      setTrackingOnly(false)
       const createdTicket = await publicTicketsApi.createEvent({
         ticketType: data.ticketClasses[0]?.name || 'EVENT',
         eventName: data.eventName,
@@ -2203,13 +2383,16 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       const purchaseLink = rewriteScanUrl(createdTicket.qrCodeUrl)
       const url = await makeEventQrDataUrl(purchaseLink, 320)
       setQr(url)
-      setLastCreatedEventName(data.eventName)
       setTicket({
         ...data,
         ticketId: createdTicket.id,
         purchaseUrl: purchaseLink,
       })
-      await loadStats(data.eventName)
+      try {
+        await refreshMetrics(createdTicket.id)
+      } catch {
+        setMetrics(null)
+      }
       toast.success('Event ticket QR created successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create ticket'
@@ -2225,13 +2408,30 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       await ticketsApi.updateStatus(ticketId, 'Cancelled')
       setRevokeMessage('Ticket revoked successfully. This QR is now disabled.')
       toast.success('Ticket revoked successfully')
-      await loadStats(lastCreatedEventName ?? undefined)
+      await refreshMetrics(ticketId).catch(() => undefined)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign in as a merchant to revoke event QRs.'
       setRevokeMessage(message)
       toast.error(message)
     } finally {
       setRevoking(false)
+    }
+  }
+
+  async function handleTrackLookup(ticketId: string) {
+    try {
+      setTrackBusy(true)
+      const data = await refreshMetrics(ticketId)
+      setTrackQuery(data.ticketId)
+      setTrackingOnly(true)
+      setTicket(null)
+      setQr('')
+      toast.success(`Tracking ${data.eventName}`)
+    } catch (err) {
+      setMetrics(null)
+      toast.error(err instanceof Error ? err.message : 'No event found for that ticket ID')
+    } finally {
+      setTrackBusy(false)
     }
   }
 
@@ -2244,13 +2444,122 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           setTicket(null)
           setQr('')
           setRevokeMessage(null)
+          setMetrics(null)
+          setTrackedTicketId(null)
+          setTrackingOnly(false)
         }}
         onRevoke={handleRevoke}
         revoking={revoking}
         revokeMessage={revokeMessage}
+        metrics={metrics}
       />
     )
   }
 
-  return <TicketForm onGenerate={handleGenerate} onBack={onBack} />
+  if (trackingOnly && metrics) {
+    return (
+      <div
+        style={{
+          height: '100svh',
+          width: '100%',
+          background: CREATE.paper,
+          color: CREATE.ink,
+          fontFamily: SCANN_FONT,
+          padding: '32px 24px',
+          boxSizing: 'border-box',
+          overflow: 'auto',
+        }}
+      >
+        <div style={{ maxWidth: 640, width: '100%', margin: '0 auto' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setTrackingOnly(false)
+              setMetrics(null)
+              setTrackedTicketId(null)
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: CREATE.muted,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              padding: 0,
+              marginBottom: 18,
+            }}
+          >
+            ← Back to create event
+          </button>
+
+          <h1 style={{ margin: '0 0 6px', fontFamily: SCANN_FONT, fontWeight: 600, fontSize: 30, letterSpacing: '-0.01em' }}>
+            Event tracking
+          </h1>
+          <p style={{ margin: '0 0 18px', color: CREATE.muted, fontSize: 14.5, lineHeight: 1.4 }}>
+            Look up sales by master ticket ID. Progress refreshes automatically.
+          </p>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleTrackLookup(normalizeTrackQuery(trackQuery))
+            }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              gap: 8,
+              marginBottom: 18,
+            }}
+          >
+            <input
+              type="search"
+              value={trackQuery}
+              onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
+              placeholder="#TKT-FA255B03"
+              spellCheck={false}
+              aria-label="Ticket ID"
+              style={{ ...fieldStyle(), fontFamily: SCANN_MONO }}
+            />
+            <button
+              type="submit"
+              disabled={trackBusy}
+              style={{
+                minHeight: 42,
+                height: 42,
+                padding: '0 16px',
+                borderRadius: 6,
+                border: 'none',
+                background: CREATE.tealDeep,
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: trackBusy ? 'wait' : 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              {trackBusy ? 'Looking…' : 'Track'}
+            </button>
+          </form>
+
+          <EventProgressCard metrics={metrics} />
+
+          {metrics.purchaseUrl ? (
+            <p style={{ margin: '14px 0 0', fontSize: 13 }}>
+              <a href={metrics.purchaseUrl} style={{ color: CREATE.teal, fontWeight: 600 }}>
+                Open purchase link
+              </a>
+            </p>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <TicketForm
+      onGenerate={handleGenerate}
+      onBack={onBack}
+      onTrackLookup={handleTrackLookup}
+    />
+  )
 }
