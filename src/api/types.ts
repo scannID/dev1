@@ -444,7 +444,7 @@ export interface TicketPurchaseRequest {
   masterQrToken: string
   ticketClass: string
   holderName: string
-  holderEmail: string
+  holderEmail?: string
   holderPhone: string
   provider?: string
 }
@@ -464,6 +464,7 @@ export interface AttendeeTicketView {
   eventDate: string | null
   holderName: string
   holderEmail: string
+  holderPhone: string
   price: number
   currency: string
   status: string

@@ -11,6 +11,7 @@ import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TicketStatus;
 import com.scanny.payment.PaymentIntentStatus;
 import com.scanny.repository.TicketRepository;
+import com.scanny.util.PhoneUtils;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,22 +34,25 @@ public class TicketPurchaseService {
     );
 
     private final TicketRepository ticketRepository;
-    private final TicketMailService ticketMailService;
+    private final WhatsAppNotificationService whatsAppNotificationService;
     private final TicketService ticketService;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
 
     public TicketPurchaseService(
             TicketRepository ticketRepository,
-            TicketMailService ticketMailService,
+            WhatsAppNotificationService whatsAppNotificationService,
             TicketService ticketService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            Environment environment) {
         this.ticketRepository = ticketRepository;
-        this.ticketMailService = ticketMailService;
+        this.whatsAppNotificationService = whatsAppNotificationService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
+        this.environment = environment;
     }
 
     @Transactional
@@ -96,14 +101,20 @@ public class TicketPurchaseService {
     @Transactional
     public PublicTicketDtos.PurchaseResponse startPurchase(PublicTicketDtos.PurchaseRequest request) {
         Ticket master = requireEventTemplate(request.masterQrToken());
-        String email = requireEmail(request.holderEmail());
+        String email = optionalEmail(request.holderEmail());
         String name = requireText(request.holderName(), "Your name is required");
-        String phone = optionalText(request.holderPhone());
+        String phone = requirePhone(request.holderPhone());
         String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
+        org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                .info("Ticket purchase start phone={} event={}", phone, master.getEventName());
 
-        if (ticketRepository.existsByEventNameAndHolderEmailIgnoreCaseAndPaymentStatusAndMasterTicketIdIsNotNull(
-                master.getEventName(), email, PaymentStatus.Paid)) {
-            throw new ApiException(409, "This email already has a paid ticket for this event. Check your inbox or use a different email.");
+        if (ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
+                master.getEventName(), phone, PaymentStatus.Paid)) {
+            // Local H2 retests: allow repurchase so WhatsApp delivery can be tried again.
+            // Production/dev Postgres keeps one paid ticket per phone per event.
+            if (!h2ProfileActive()) {
+                throw new ApiException(409, "This WhatsApp number already has a paid ticket for this event. Check WhatsApp or use a different number.");
+            }
         }
 
         Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
@@ -142,15 +153,16 @@ public class TicketPurchaseService {
         attendee.setUpdatedAt(Instant.now());
         ticketRepository.save(attendee);
 
-        ticketMailService.sendAttendeeTicket(attendee, buildViewUrl(attendee.getAccessToken()));
+        String viewUrl = buildViewUrl(attendee.getAccessToken());
+        String ticketId = attendee.getId();
         ticketService.refreshStatsBroadcast();
 
         return new PublicTicketDtos.PurchaseResponse(
-            attendee.getId(),
+            ticketId,
             paymentId,
             PaymentIntentStatus.Paid,
             "Ticket created and marked paid",
-            buildViewUrl(attendee.getAccessToken())
+            viewUrl
         );
     }
 
@@ -171,8 +183,23 @@ public class TicketPurchaseService {
         ticket.setUpdatedAt(Instant.now());
         ticketRepository.save(ticket);
 
-        ticketMailService.sendAttendeeTicket(ticket, buildViewUrl(ticket.getAccessToken()));
         ticketService.refreshStatsBroadcast();
+    }
+
+    /** Call after purchase transaction commits (from controller). */
+    public void deliverTicketWhatsApp(String attendeeTicketId, String viewUrl) {
+        try {
+            Ticket ticket = ticketRepository.findById(attendeeTicketId).orElse(null);
+            if (ticket == null) {
+                org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                        .warn("WhatsApp skipped — ticket {} not found", attendeeTicketId);
+                return;
+            }
+            whatsAppNotificationService.sendAttendeeTicket(ticket, viewUrl, buildGateQrPayload(ticket));
+        } catch (Exception ex) {
+            org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                    .warn("WhatsApp delivery error for {}: {}", attendeeTicketId, ex.toString());
+        }
     }
 
     @Transactional(readOnly = true)
@@ -192,6 +219,7 @@ public class TicketPurchaseService {
             ticket.getEventDate() != null ? ticket.getEventDate().toString() : null,
             ticket.getHolderName(),
             ticket.getHolderEmail(),
+            ticket.getHolderPhone(),
             ticket.getPrice(),
             ticket.getCurrency(),
             ticket.getStatus().name(),
@@ -432,10 +460,21 @@ public class TicketPurchaseService {
         return value == null ? fallback : String.valueOf(value);
     }
 
-    private static String requireEmail(String email) {
-        String normalized = requireText(email, "Email is required").trim().toLowerCase(Locale.ROOT);
+    private static String optionalEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "";
+        }
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
         if (!EMAIL_PATTERN.matcher(normalized).matches()) {
             throw new ApiException(400, "Enter a valid email address");
+        }
+        return normalized;
+    }
+
+    private static String requirePhone(String phone) {
+        String normalized = PhoneUtils.normalize(phone);
+        if (normalized.isBlank() || normalized.length() < 9) {
+            throw new ApiException(400, "WhatsApp number is required");
         }
         return normalized;
     }
@@ -447,11 +486,13 @@ public class TicketPurchaseService {
         return value.trim();
     }
 
-    private static String optionalText(String value) {
-        if (value == null || value.isBlank()) {
-            return "";
+    private boolean h2ProfileActive() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("h2".equalsIgnoreCase(profile)) {
+                return true;
+            }
         }
-        return value.trim();
+        return false;
     }
 
     private static String generateTicketId() {

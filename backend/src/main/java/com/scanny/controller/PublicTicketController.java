@@ -31,7 +31,10 @@ public class PublicTicketController {
 
     @PostMapping("/purchase")
     public ResponseEntity<PublicTicketDtos.PurchaseResponse> purchase(@Valid @RequestBody PublicTicketDtos.PurchaseRequest request) {
-        return ResponseEntity.ok(ticketPurchaseService.startPurchase(request));
+        PublicTicketDtos.PurchaseResponse response = ticketPurchaseService.startPurchase(request);
+        // Outside the purchase transaction so Meta I/O cannot block/rollback the ticket.
+        ticketPurchaseService.deliverTicketWhatsApp(response.attendeeTicketId(), response.viewUrl());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/view/{accessToken}")

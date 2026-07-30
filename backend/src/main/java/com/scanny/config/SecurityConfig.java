@@ -117,6 +117,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/tickets/qr/*/scan").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/tickets/scan").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/tickets/stats").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/tickets/events").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers("/ws/**").permitAll()

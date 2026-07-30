@@ -144,22 +144,30 @@ if (-not $SkipBackend) {
         Write-Host 'Backend already listening on :4000' -ForegroundColor Yellow
     } else {
         Write-Host 'Starting backend API on :4000 (profile: h2)...'
-        $pexelsKey = $env:PEXELS_API_KEY
-        if (-not $pexelsKey) {
-            $dotenv = Join-Path $Root '.env'
-            if (Test-Path $dotenv) {
-                $line = Get-Content $dotenv | Where-Object { $_ -match '^\s*PEXELS_API_KEY\s*=' } | Select-Object -First 1
-                if ($line) {
-                    $pexelsKey = ($line -replace '^\s*PEXELS_API_KEY\s*=\s*', '').Trim().Trim('"').Trim("'")
-                }
-            }
+        $dotenv = Join-Path $Root '.env'
+        function Get-DotEnvValue([string]$Key) {
+            $fromEnv = [Environment]::GetEnvironmentVariable($Key)
+            if ($fromEnv) { return $fromEnv }
+            if (-not (Test-Path $dotenv)) { return '' }
+            $line = Get-Content $dotenv | Where-Object { $_ -match ("^\s*" + [regex]::Escape($Key) + "\s*=") } | Select-Object -First 1
+            if (-not $line) { return '' }
+            return ($line -replace ("^\s*" + [regex]::Escape($Key) + "\s*=\s*"), '').Trim().Trim('"').Trim("'")
         }
-        $pexelsLine = if ($pexelsKey) { "`$env:PEXELS_API_KEY = '$pexelsKey'" } else { "`$env:PEXELS_API_KEY = ''" }
+        $pexelsKey = Get-DotEnvValue 'PEXELS_API_KEY'
+        $waEnabled = Get-DotEnvValue 'WHATSAPP_ENABLED'
+        if (-not $waEnabled) { $waEnabled = 'false' }
+        $waUrl = Get-DotEnvValue 'WHATSAPP_API_URL'
+        $waToken = Get-DotEnvValue 'WHATSAPP_API_TOKEN'
+        $waFrom = Get-DotEnvValue 'WHATSAPP_FROM_NUMBER'
         Start-DevWindow -Name 'backend' -Title 'Kode Backend' -WorkingDirectory $BackendDir -Lines @(
             "`$env:JAVA_HOME = '$JavaHome'"
             "`$env:Path = `"`$env:JAVA_HOME\bin;$MavenBin;`$env:Path`""
             "`$env:SCAN_BASE_URL = '$ScanBaseUrl'"
-            $pexelsLine
+            "`$env:PEXELS_API_KEY = '$pexelsKey'"
+            "`$env:WHATSAPP_ENABLED = '$waEnabled'"
+            "`$env:WHATSAPP_API_URL = '$waUrl'"
+            "`$env:WHATSAPP_API_TOKEN = '$waToken'"
+            "`$env:WHATSAPP_FROM_NUMBER = '$waFrom'"
             '.\mvnw.cmd -q -DskipTests spring-boot:run "-Dspring-boot.run.profiles=h2"'
         )
         Wait-HttpReady -Url 'http://localhost:4000/health' -Label 'API :4000/health' -TimeoutSec 240 | Out-Null

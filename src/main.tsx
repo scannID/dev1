@@ -185,13 +185,14 @@ if (kitchenBusinessId) {
     </StrictMode>
   )
 } else if (gateScanRoute) {
-  const gatePayload = new URL(window.location.href).searchParams.get('p')
-    || new URL(window.location.href).searchParams.get('payload')
+  const gateParams = new URL(window.location.href).searchParams
+  const gatePayload = gateParams.get('p') || gateParams.get('payload')
+  const gateEventId = gateParams.get('event') || gateParams.get('eventId')
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <>
-        <GateScanPage initialPayload={gatePayload} />
+        <GateScanPage initialPayload={gatePayload} initialEventId={gateEventId} />
         <CookieConsent />
       </>
     </StrictMode>

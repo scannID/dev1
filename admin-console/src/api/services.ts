@@ -21,6 +21,7 @@ import type {
   RevenueTransaction,
   ReportsOverview,
   TicketEventStats,
+  CreatedEventSummary,
   AdminTicket,
   AllConfigsResponse,
   ConfigSection,
@@ -187,6 +188,11 @@ export const ticketsApi = {
   getStats: async (search?: string): Promise<TicketEventStats[]> => {
     const suffix = search ? `?search=${encodeURIComponent(search)}` : ''
     return api.get<TicketEventStats[]>(`/tickets/stats${suffix}`)
+  },
+
+  listCreatedEvents: async (search?: string): Promise<CreatedEventSummary[]> => {
+    const suffix = search ? `?search=${encodeURIComponent(search)}` : ''
+    return api.get<CreatedEventSummary[]>(`/tickets/events${suffix}`)
   },
 
   list: async (eventName?: string): Promise<AdminTicket[]> => {

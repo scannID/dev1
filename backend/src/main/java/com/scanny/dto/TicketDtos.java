@@ -39,7 +39,9 @@ public class TicketDtos {
         String payload,
         String scannedBy,
         String scanLocation,
-        String deviceInfo
+        String deviceInfo,
+        /** Optional gate session event ref (master ticket id). Must match ticket when set. */
+        String eventId
     ) {}
 
     public record UpdateTicketStatusRequest(
@@ -74,6 +76,22 @@ public class TicketDtos {
         String eventName,
         long totalTickets,
         long purchasedTickets
+    ) {}
+
+    /** Master event templates created by managers, with live ticket counts. */
+    public record CreatedEventSummary(
+        String eventId,
+        String eventName,
+        Instant eventDate,
+        Instant createdAt,
+        Instant autoDeleteAt,
+        String status,
+        String host,
+        String location,
+        String purchaseUrl,
+        long attendeeTickets,
+        long paidTickets,
+        long redeemedTickets
     ) {}
 
     public record TicketStatsUpdate(

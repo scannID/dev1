@@ -289,6 +289,21 @@ export interface TicketEventStats {
   purchasedTickets: number
 }
 
+export interface CreatedEventSummary {
+  eventId: string
+  eventName: string
+  eventDate: string | null
+  createdAt: string
+  autoDeleteAt: string | null
+  status: string
+  host: string
+  location: string
+  purchaseUrl: string
+  attendeeTickets: number
+  paidTickets: number
+  redeemedTickets: number
+}
+
 export interface AdminTicket {
   id: string
   qrToken: string

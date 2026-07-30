@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,9 +27,24 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
         com.scanny.model.enums.PaymentStatus paymentStatus
     );
 
+    boolean existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
+        String eventName,
+        String holderPhone,
+        com.scanny.model.enums.PaymentStatus paymentStatus
+    );
+
     Optional<Ticket> findByAccessToken(String accessToken);
 
     List<Ticket> findByMasterTicketIdOrderByCreatedAtDesc(String masterTicketId);
+
+    List<Ticket> findByMasterTicketIdIsNullAndUsageLimitGreaterThan(int usageLimit);
+
+    @Query("""
+            SELECT t FROM Ticket t
+            WHERE t.eventDate IS NOT NULL
+              AND t.eventDate < :cutoff
+            """)
+    List<Ticket> findPastEventDateCutoff(@Param("cutoff") Instant cutoff);
 
     @Query("""
             SELECT t.eventName,

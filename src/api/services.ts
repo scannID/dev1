@@ -423,6 +423,7 @@ export const publicTicketsApi = {
 
   validate: async (data: {
     payload: string
+    eventId?: string
     scannedBy?: string
     scanLocation?: string
     deviceInfo?: string

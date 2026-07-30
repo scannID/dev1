@@ -217,7 +217,7 @@ export default function TicketViewPage({ accessToken }: Props) {
           )}
           {paid ? (
             <p className="tk-status-note">
-              Emailed to <strong>{ticket.holderEmail}</strong>
+              Sent via WhatsApp to <strong>{ticket.holderPhone || '—'}</strong>
             </p>
           ) : (
             <p className="tk-status-note">

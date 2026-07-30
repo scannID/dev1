@@ -378,6 +378,65 @@ html.cm-app #root {
   gap: 8px;
 }
 
+.cm-receipt-delete-trigger {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--cm-danger) 35%, var(--cm-border));
+  background: var(--cm-danger-bg);
+  color: var(--cm-danger);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cm-receipt-delete-confirm {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cm-danger) 35%, var(--cm-border));
+  background: var(--cm-danger-bg);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.cm-receipt-delete-confirm p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--cm-danger);
+}
+
+.cm-receipt-delete-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cm-receipt-keep-btn,
+.cm-receipt-delete-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cm-receipt-keep-btn {
+  border: 1px solid var(--cm-border);
+  background: var(--cm-bg);
+  color: inherit;
+}
+
+.cm-receipt-delete-btn {
+  border: 1px solid color-mix(in srgb, var(--cm-danger) 50%, var(--cm-border));
+  background: var(--cm-danger);
+  color: #fff;
+}
+
 .cm-offers {
   padding: 10px 0 2px;
 }
@@ -1819,15 +1878,46 @@ html.cm-app #root {
 }
 
 .cm-receipt-card {
+  position: relative;
   width: 100%;
-  text-align: left;
   border: 1px solid var(--cm-border);
   background: var(--cm-bg);
   border-radius: 14px;
+  overflow: hidden;
+}
+
+.cm-receipt-card-open {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
   padding: 12px;
   cursor: pointer;
   font: inherit;
   color: inherit;
+}
+
+.cm-receipt-card-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--cm-danger) 30%, var(--cm-border));
+  background: color-mix(in srgb, var(--cm-bg) 88%, var(--cm-danger-bg));
+  color: var(--cm-danger);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.cm-receipt-card-delete:active {
+  transform: scale(0.96);
 }
 
 .cm-receipt-card-top {
@@ -1872,6 +1962,10 @@ html.cm-app #root {
 .cm-receipt-card-total {
   font-size: 14px;
   white-space: nowrap;
+}
+
+.cm-receipt-card-total.has-delete {
+  padding-right: 34px;
 }
 
 .cm-receipt-card-meta {

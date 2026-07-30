@@ -1,4 +1,4 @@
-import { ArrowLeft, Receipt, RotateCcw, X } from 'lucide-react'
+import { ArrowLeft, Receipt, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { KodeMark } from './KodeMark'
 import {
@@ -12,35 +12,54 @@ import { formatRemovedIngredients } from '../lib/catalogCart'
 function ReceiptCard({
   receipt,
   onOpen,
+  onDelete,
 }: {
   receipt: CustomerReceipt
   onOpen: () => void
+  onDelete?: () => void
 }) {
   return (
-    <button type="button" className="cm-receipt-card" onClick={onOpen}>
-      <div className="cm-receipt-card-top">
-        <div className="cm-receipt-card-brand">
-          {receipt.businessLogoUrl ? (
-            <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-card-logo" />
-          ) : (
-            <span className="cm-receipt-card-mark">
-              <KodeMark size={22} />
-            </span>
-          )}
-          <div>
-            <strong>{receipt.businessName}</strong>
-            <span>{formatReceiptDay(receipt.paidAt)}</span>
+    <div className="cm-receipt-card">
+      <button type="button" className="cm-receipt-card-open" onClick={onOpen}>
+        <div className="cm-receipt-card-top">
+          <div className="cm-receipt-card-brand">
+            {receipt.businessLogoUrl ? (
+              <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-card-logo" />
+            ) : (
+              <span className="cm-receipt-card-mark">
+                <KodeMark size={22} />
+              </span>
+            )}
+            <div>
+              <strong>{receipt.businessName}</strong>
+              <span>{formatReceiptDay(receipt.paidAt)}</span>
+            </div>
           </div>
+          <strong className={`cm-receipt-card-total${onDelete ? ' has-delete' : ''}`}>
+            {currency(receipt.total)}
+          </strong>
         </div>
-        <strong className="cm-receipt-card-total">{currency(receipt.total)}</strong>
-      </div>
-      <div className="cm-receipt-card-meta">
-        <span>{receipt.orderId}</span>
-        <span>
-          {receipt.items.length} item{receipt.items.length === 1 ? '' : 's'} · {receipt.paymentProvider}
-        </span>
-      </div>
-    </button>
+        <div className="cm-receipt-card-meta">
+          <span>{receipt.orderId}</span>
+          <span>
+            {receipt.items.length} item{receipt.items.length === 1 ? '' : 's'} · {receipt.paymentProvider}
+          </span>
+        </div>
+      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          className="cm-receipt-card-delete"
+          aria-label="Delete receipt"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -49,12 +68,16 @@ function ReceiptDetail({
   canReorder,
   onBack,
   onReorder,
+  onDelete,
 }: {
   receipt: CustomerReceipt
   canReorder: boolean
   onBack: () => void
   onReorder?: (receipt: CustomerReceipt) => void
+  onDelete?: () => void
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   return (
     <div className="cm-receipt-detail">
       <button type="button" className="cm-receipt-back" onClick={onBack}>
@@ -150,6 +173,34 @@ function ReceiptDetail({
           </button>
         ) : null}
 
+        {onDelete ? (
+          confirmDelete ? (
+            <div className="cm-receipt-delete-confirm">
+              <p>Remove this receipt from this device?</p>
+              <div className="cm-receipt-delete-actions">
+                <button
+                  type="button"
+                  className="cm-receipt-keep-btn"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Keep
+                </button>
+                <button type="button" className="cm-receipt-delete-btn" onClick={onDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="cm-receipt-delete-trigger"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 size={16} /> Delete from this device
+            </button>
+          )
+        ) : null}
+
         <p className="cm-receipt-footnote">
           Saved on this device only. Other phones won&apos;t see these receipts.
         </p>
@@ -163,12 +214,14 @@ export function ReceiptsPanel({
   receipts,
   currentBusinessId,
   onReorder,
+  onDelete,
   onClose,
 }: {
   open: boolean
   receipts: CustomerReceipt[]
   currentBusinessId?: string
   onReorder?: (receipt: CustomerReceipt) => void
+  onDelete?: (receiptId: string) => void
   onClose: () => void
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -181,6 +234,11 @@ export function ReceiptsPanel({
     () => receipts.find((receipt) => receipt.id === selectedId) ?? null,
     [receipts, selectedId],
   )
+
+  const handleDelete = (receiptId: string) => {
+    onDelete?.(receiptId)
+    setSelectedId((current) => (current === receiptId ? null : current))
+  }
 
   if (!open) return null
 
@@ -208,6 +266,7 @@ export function ReceiptsPanel({
             canReorder={Boolean(currentBusinessId && selected.businessId === currentBusinessId && onReorder)}
             onBack={() => setSelectedId(null)}
             onReorder={onReorder}
+            onDelete={onDelete ? () => handleDelete(selected.id) : undefined}
           />
         ) : receipts.length === 0 ? (
           <div className="cm-receipts-empty">
@@ -226,6 +285,19 @@ export function ReceiptsPanel({
                 key={receipt.id}
                 receipt={receipt}
                 onOpen={() => setSelectedId(receipt.id)}
+                onDelete={
+                  onDelete
+                    ? () => {
+                        if (
+                          window.confirm(
+                            `Delete receipt from ${receipt.businessName}? It will be removed from this device only.`,
+                          )
+                        ) {
+                          handleDelete(receipt.id)
+                        }
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>

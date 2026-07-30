@@ -58,6 +58,7 @@ public class PublicTicketDtos {
         String eventDate,
         String holderName,
         String holderEmail,
+        String holderPhone,
         int price,
         String currency,
         String status,

@@ -60,6 +60,17 @@ public class TicketController {
         }
     }
 
+    @GetMapping("/events")
+    public ResponseEntity<List<TicketDtos.CreatedEventSummary>> getCreatedEvents(
+        @RequestParam(required = false) String search
+    ) {
+        try {
+            return ResponseEntity.ok(ticketService.getCreatedEvents(search));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @GetMapping("/{ticketId}")
     public ResponseEntity<TicketResponse> getTicket(@PathVariable String ticketId) {
         try {

@@ -38,6 +38,7 @@ import {
 import { effectivePrice } from '../lib/catalogPricing'
 import {
   buildReceipt,
+  deleteReceipt,
   getReceiptCount,
   loadReceipts,
   saveReceipt,
@@ -448,6 +449,13 @@ export default function CustomerApp({
       const { [lineKey]: _, ...rest } = prev
       return rest
     })
+  }, [])
+
+  const removeReceipt = useCallback((receiptId: string) => {
+    const next = deleteReceipt(receiptId)
+    setReceipts(next)
+    setReceiptCount(next.length)
+    toast.success('Receipt deleted')
   }, [])
 
   const reorderFromReceipt = useCallback(
@@ -1350,6 +1358,7 @@ export default function CustomerApp({
         receipts={receipts}
         currentBusinessId={business.id}
         onReorder={reorderFromReceipt}
+        onDelete={removeReceipt}
         onClose={() => setShowReceipts(false)}
       />
 

@@ -32,7 +32,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
-  const [holderEmail, setHolderEmail] = useState('')
+  const [holderPhone, setHolderPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -79,8 +79,8 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         masterQrToken,
         ticketClass,
         holderName: holderName.trim(),
-        holderEmail: holderEmail.trim(),
-        holderPhone: '',
+        holderEmail: '',
+        holderPhone: holderPhone.trim(),
       })
       window.location.href = result.viewUrl
     } catch (err) {
@@ -239,18 +239,18 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </label>
 
             <label className="tk-field">
-              Email
+              WhatsApp number
               <input
-                type="email"
-                value={holderEmail}
-                onChange={(e) => setHolderEmail(e.target.value)}
-                placeholder="you@email.com"
-                autoComplete="email"
+                type="tel"
+                value={holderPhone}
+                onChange={(e) => setHolderPhone(e.target.value)}
+                placeholder="e.g. 0700 000 000"
+                autoComplete="tel"
                 required
                 disabled={submitting}
               />
               <p className="tk-hint">
-                Ticket is emailed here instantly — one purchase per email for this event.
+                Use your WhatsApp number with country code, e.g. 07… or +2567… — ticket + QR are sent here.
               </p>
             </label>
           </div>

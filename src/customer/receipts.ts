@@ -71,6 +71,13 @@ export function saveReceipt(receipt: CustomerReceipt): CustomerReceipt[] {
   return next
 }
 
+/** Removes a device-local receipt by id (order id). */
+export function deleteReceipt(receiptId: string): CustomerReceipt[] {
+  const next = readAll().filter((entry) => entry.id !== receiptId)
+  writeAll(next)
+  return loadReceipts()
+}
+
 export function buildReceipt(input: {
   orderId: string
   businessId: string

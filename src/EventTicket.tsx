@@ -11,6 +11,11 @@ import type {
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
 import { buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
+import {
+  loadCreatedEvents,
+  saveCreatedEvent,
+  type LocalCreatedEvent,
+} from './tickets/createdEventsLocal'
 /* ─── Theme tokens (follow app light / dark via CSS vars) ───────────── */
 const G = {
   bg: 'var(--background)',
@@ -130,6 +135,145 @@ async function makeEventQrDataUrl(link: string, size = 320) {
     width: size,
     errorCorrectionLevel: 'H',
   })
+}
+
+function CreatedEventsQrSection({
+  onOpen,
+}: {
+  onOpen: (event: LocalCreatedEvent) => void
+}) {
+  const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadCreatedEvents())
+  const [qrMap, setQrMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const refresh = () => setEvents(loadCreatedEvents())
+    refresh()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('kode-created-events', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('kode-created-events', refresh)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const missing = events.filter((e) => e.purchaseUrl && !qrMap[e.eventId])
+    if (missing.length === 0) return
+    void Promise.all(
+      missing.map(async (event) => {
+        try {
+          const dataUrl = await makeEventQrDataUrl(event.purchaseUrl, 200)
+          return [event.eventId, dataUrl] as const
+        } catch {
+          return null
+        }
+      }),
+    ).then((rows) => {
+      if (cancelled) return
+      setQrMap((prev) => {
+        const next = { ...prev }
+        for (const row of rows) {
+          if (row) next[row[0]] = row[1]
+        }
+        return next
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [events, qrMap])
+
+  if (events.length === 0) return null
+
+  return (
+    <section
+      style={{
+        flexShrink: 0,
+        margin: '0 0 22px',
+        padding: 14,
+        borderRadius: 14,
+        border: `0.5px solid ${CREATE.line}`,
+        background: CREATE.card,
+      }}
+    >
+      <div style={{ marginBottom: 12 }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            color: CREATE.ink,
+          }}
+        >
+          Created events
+        </h2>
+        <p style={{ margin: '4px 0 0', fontSize: 12.5, color: CREATE.muted }}>
+          Purchase QRs from this device. Tap a code to open tracking.
+        </p>
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {events.map((event) => {
+          const qr = qrMap[event.eventId]
+          return (
+            <button
+              key={event.eventId}
+              type="button"
+              onClick={() => onOpen(event)}
+              title={event.eventName}
+              aria-label={`Open ${event.eventName}`}
+              style={{
+                display: 'block',
+                padding: 10,
+                borderRadius: 12,
+                border: `0.5px solid ${CREATE.line}`,
+                background: '#fff',
+                cursor: 'pointer',
+                font: 'inherit',
+                color: 'inherit',
+              }}
+            >
+              {qr ? (
+                <img
+                  src={qr}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1',
+                    borderRadius: 8,
+                    display: 'block',
+                    background: '#fff',
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1',
+                    borderRadius: 8,
+                    border: `0.5px dashed ${CREATE.line}`,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: CREATE.muted,
+                    fontSize: 11,
+                  }}
+                >
+                  QR
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 function uid() {
@@ -1827,6 +1971,12 @@ function TicketForm({
           </button>
         </form>
 
+        <CreatedEventsQrSection
+          onOpen={(event) => {
+            void onTrackLookup(event.eventId)
+          }}
+        />
+
         {step === 1 ? (
         <div className="et-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <h1
@@ -2626,6 +2776,16 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         ticketId: createdTicket.id,
         purchaseUrl: purchaseLink,
       })
+      saveCreatedEvent({
+        eventId: createdTicket.id,
+        eventName: data.eventName,
+        purchaseUrl: purchaseLink,
+        eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
+        location: data.location,
+        host: data.host,
+        createdAt: new Date().toISOString(),
+      })
+      window.dispatchEvent(new Event('kode-created-events'))
       try {
         await refreshMetrics(createdTicket.id)
       } catch {
@@ -2793,6 +2953,14 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               </a>
             </p>
           ) : null}
+          <p style={{ margin: metrics.purchaseUrl ? '8px 0 0' : '14px 0 0', fontSize: 13 }}>
+            <a
+              href={`/ticket/gate?event=${encodeURIComponent(metrics.ticketId)}`}
+              style={{ color: CREATE.teal, fontWeight: 600 }}
+            >
+              Open gate scanner
+            </a>
+          </p>
         </div>
       </div>
     )

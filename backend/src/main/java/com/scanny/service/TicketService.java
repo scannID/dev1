@@ -14,7 +14,6 @@ import com.scanny.repository.TicketRepository;
 import com.scanny.repository.TicketScanRepository;
 import com.scanny.websocket.RealtimeEventPublisher;
 import com.scanny.websocket.TicketStatsWebSocketHandler;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +37,9 @@ public class TicketService {
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
+
+    @Value("${scanny.tickets.auto-delete-hours-after-event:24}")
+    private long autoDeleteHoursAfterEvent;
 
     public TicketService(
         TicketRepository ticketRepository,
@@ -130,6 +132,65 @@ public class TicketService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<TicketDtos.CreatedEventSummary> getCreatedEvents(String search) {
+        String needle = search == null ? "" : search.trim().toLowerCase();
+        return ticketRepository.findByMasterTicketIdIsNullAndUsageLimitGreaterThan(1_000_000).stream()
+            .filter(Ticket::isEventTemplate)
+            .filter(master -> {
+                if (needle.isBlank()) return true;
+                return master.getEventName().toLowerCase().contains(needle)
+                    || master.getId().toLowerCase().contains(needle);
+            })
+            .sorted(Comparator.comparing(Ticket::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+            .map(this::toCreatedEventSummary)
+            .toList();
+    }
+
+    private TicketDtos.CreatedEventSummary toCreatedEventSummary(Ticket master) {
+        List<Ticket> attendees = ticketRepository.findByMasterTicketIdOrderByCreatedAtDesc(master.getId());
+        long paid = attendees.stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Paid).count();
+        long redeemed = attendees.stream().filter(t -> t.getStatus() == TicketStatus.Redeemed).count();
+        Map<String, Object> meta = parseMetadata(master.getMetadata());
+        String host = stringMeta(meta, "host");
+        String location = stringMeta(meta, "location");
+        Instant eventDate = master.getEventDate();
+        long hours = Math.max(1, autoDeleteHoursAfterEvent);
+        Instant autoDeleteAt = eventDate != null
+            ? eventDate.plus(hours, java.time.temporal.ChronoUnit.HOURS)
+            : null;
+        return new TicketDtos.CreatedEventSummary(
+            master.getId(),
+            master.getEventName(),
+            eventDate,
+            master.getCreatedAt(),
+            autoDeleteAt,
+            master.getStatus() != null ? master.getStatus().name() : "Active",
+            host,
+            location,
+            customerUrl + "/ticket/" + master.getQrToken(),
+            attendees.size(),
+            paid,
+            redeemed
+        );
+    }
+
+    private Map<String, Object> parseMetadata(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(raw, new TypeReference<>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    private static String stringMeta(Map<String, Object> meta, String key) {
+        Object value = meta.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
     @Transactional
     public TicketDtos.ScanValidationResponse scanTicket(String qrToken, TicketDtos.ScanTicketRequest request) {
         Ticket ticket = ticketRepository.findByQrToken(qrToken)
@@ -146,12 +207,24 @@ public class TicketService {
         if (!ticket.isAttendeeTicket()) {
             throw new ApiException(400, "Only attendee tickets can be scanned at the gate");
         }
+        String masterId = nullToEmpty(ticket.getMasterTicketId());
+        String payloadEventId = nullToEmpty(payload.eventId());
+        String gateEventId = request.eventId() != null ? request.eventId().trim() : "";
+        if (!payloadEventId.isBlank() && !masterId.isBlank()
+                && !payloadEventId.equalsIgnoreCase(masterId)) {
+            throw new ApiException(400, "Ticket event does not match payload");
+        }
+        if (!gateEventId.isBlank() && !payloadEventId.isBlank()
+                && !gateEventId.equalsIgnoreCase(payloadEventId)) {
+            throw new ApiException(400, "Ticket is for a different event");
+        }
+        String expectedEventId = !gateEventId.isBlank() ? gateEventId : payloadEventId;
         return validateAndRecordScan(
             ticket,
             request.scannedBy(),
             request.scanLocation(),
             request.deviceInfo(),
-            payload.eventId(),
+            expectedEventId,
             payload.paymentId(),
             payload.qrToken()
         );

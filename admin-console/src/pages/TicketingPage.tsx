@@ -13,7 +13,7 @@ import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
 import { usePagination } from '../hooks/usePagination'
 import { loadEventTickets, useTicketing } from '../hooks/useTicketing'
-import type { AdminTicket, TicketEventStats } from '../api/types'
+import type { AdminTicket, CreatedEventSummary } from '../api/types'
 
 function currency(amount: number, currencyCode = 'UGX') {
   return new Intl.NumberFormat('en-UG', {
@@ -33,7 +33,7 @@ function parseMeta(raw?: string): Record<string, unknown> {
   }
 }
 
-function formatDate(iso?: string) {
+function formatDate(iso?: string | null) {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
@@ -44,6 +44,18 @@ function formatDate(iso?: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function autoDeleteLabel(iso?: string | null) {
+  if (!iso) return '—'
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return '—'
+  const ms = at.getTime() - Date.now()
+  if (ms <= 0) return 'Due for cleanup'
+  const hours = Math.ceil(ms / (60 * 60 * 1000))
+  if (hours < 48) return `in ${hours}h`
+  const days = Math.ceil(hours / 24)
+  return `in ${days}d`
 }
 
 const STATUS_CLASS: Record<string, string> = {
@@ -57,18 +69,23 @@ const STATUS_CLASS: Record<string, string> = {
 }
 
 export default function TicketingPage() {
-  const { events, analytics, loading, error } = useTicketing()
+  const { createdEvents, analytics, loading, error } = useTicketing()
   const [q, setQ] = useState('')
-  const [selected, setSelected] = useState<TicketEventStats | null>(null)
+  const [selected, setSelected] = useState<CreatedEventSummary | null>(null)
   const [detailTickets, setDetailTickets] = useState<AdminTicket[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return events
-    return events.filter((e) => e.eventName.toLowerCase().includes(needle))
-  }, [events, q])
+    if (!needle) return createdEvents
+    return createdEvents.filter(
+      (e) =>
+        e.eventName.toLowerCase().includes(needle) ||
+        e.eventId.toLowerCase().includes(needle) ||
+        e.host.toLowerCase().includes(needle),
+    )
+  }, [createdEvents, q])
   const eventsPagination = usePagination(filtered, {
     initialPageSize: 20,
     resetKey: q,
@@ -78,10 +95,10 @@ export default function TicketingPage() {
     { label: 'Total tickets', value: analytics?.summary.totalTickets ?? 0 },
     { label: 'Active', value: analytics?.summary.activeTickets ?? 0 },
     { label: 'Redeemed', value: analytics?.summary.redeemedTickets ?? 0 },
-    { label: 'Events', value: events.length },
+    { label: 'Created events', value: createdEvents.length },
   ]
 
-  async function openEvent(event: TicketEventStats) {
+  async function openEvent(event: CreatedEventSummary) {
     setSelected(event)
     setDetailLoading(true)
     setDetailError(null)
@@ -98,24 +115,24 @@ export default function TicketingPage() {
 
   const master = detailTickets.find((t) => {
     const meta = parseMeta(t.metadata)
-    return meta.reusable === true || t.usageLimit >= 1_000_000
+    return meta.reusable === true || t.usageLimit >= 1_000_000 || t.id === selected?.eventId
   })
   const attendees = detailTickets.filter((t) => t.id !== master?.id)
   const attendeesPagination = usePagination(attendees, {
     initialPageSize: 20,
-    resetKey: selected?.eventName ?? '',
+    resetKey: selected?.eventId ?? '',
   })
-  const sold = attendees.filter((t) => t.paymentStatus === 'Paid').length
+  const sold = selected?.paidTickets ?? attendees.filter((t) => t.paymentStatus === 'Paid').length
   const unpaid = attendees.filter((t) => t.paymentStatus !== 'Paid').length
-  const redeemed = attendees.filter((t) => t.status === 'Redeemed').length
+  const redeemed = selected?.redeemedTickets ?? attendees.filter((t) => t.status === 'Redeemed').length
   const revenue = attendees
     .filter((t) => t.paymentStatus === 'Paid')
     .reduce((sum, t) => sum + (t.price || 0), 0)
   const meta = parseMeta(master?.metadata || attendees[0]?.metadata)
-  const host = typeof meta.host === 'string' ? meta.host : ''
-  const location = typeof meta.location === 'string' ? meta.location : ''
+  const host = selected?.host || (typeof meta.host === 'string' ? meta.host : '')
+  const location = selected?.location || (typeof meta.location === 'string' ? meta.location : '')
   const payTo = typeof meta.payTo === 'string' ? meta.payTo : ''
-  const eventDate = master?.eventDate || attendees[0]?.eventDate
+  const eventDate = selected?.eventDate || master?.eventDate || attendees[0]?.eventDate
 
   return (
     <>
@@ -142,15 +159,17 @@ export default function TicketingPage() {
       <div className="admin-card">
         <div className="admin-card-header">
           <div>
-            <h3>Events</h3>
-            <p>{filtered.length} of {events.length} shown</p>
+            <h3>Created events</h3>
+            <p>
+              {filtered.length} of {createdEvents.length} shown · auto-deleted 24h after event date
+            </p>
           </div>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search events…"
+              placeholder="Search events or ID…"
               className="h-8 pl-8 w-56 text-sm"
             />
           </div>
@@ -159,12 +178,13 @@ export default function TicketingPage() {
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Event', 'Total tickets', 'Sold / paid', 'Sell-through', ''].map((h) => (
+                {['Event', 'Event ID', 'Date', 'Sold', 'Redeemed', 'Auto-delete', ''].map((h) => (
                   <th
                     key={h || 'action'}
                     style={{
                       padding: '8px 16px',
-                      textAlign: h === 'Sell-through' || h === 'Total tickets' || h === 'Sold / paid' ? 'right' : 'left',
+                      textAlign:
+                        h === 'Sold' || h === 'Redeemed' || h === 'Auto-delete' ? 'right' : 'left',
                       fontSize: 10,
                       fontWeight: 500,
                       letterSpacing: '0.1em',
@@ -180,42 +200,51 @@ export default function TicketingPage() {
             <tbody>
               {eventsPagination.pageItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
-                    {loading ? <InlineSpinner label="Loading…" /> : 'No events found.'}
+                  <td colSpan={7} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
+                    {loading ? <InlineSpinner label="Loading…" /> : 'No created events yet.'}
                   </td>
                 </tr>
               ) : (
-                eventsPagination.pageItems.map((event) => {
-                  const rate =
-                    event.totalTickets > 0
-                      ? Math.round((event.purchasedTickets / event.totalTickets) * 100)
-                      : 0
-                  return (
-                    <tr
-                      key={event.eventName}
-                      style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                      onClick={() => void openEvent(event)}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-                    >
-                      <td style={{ padding: '10px 16px', color: 'var(--foreground)', fontWeight: 600 }}>
-                        {event.eventName}
-                      </td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace' }}>
-                        {event.totalTickets.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace' }}>
-                        {event.purchasedTickets.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--muted-foreground)' }}>
-                        {rate}%
-                      </td>
-                      <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--muted-foreground)', fontSize: 12 }}>
-                        Details →
-                      </td>
-                    </tr>
-                  )
-                })
+                eventsPagination.pageItems.map((event) => (
+                  <tr
+                    key={event.eventId}
+                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                    onClick={() => void openEvent(event)}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                  >
+                    <td style={{ padding: '10px 16px', color: 'var(--foreground)', fontWeight: 600 }}>
+                      <div>{event.eventName}</div>
+                      {event.host ? (
+                        <div style={{ fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 400, marginTop: 2 }}>
+                          {event.host}
+                          {event.location ? ` · ${event.location}` : ''}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12 }}>
+                      {event.eventId}
+                    </td>
+                    <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                      {formatDate(event.eventDate)}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      {event.paidTickets.toLocaleString()}
+                      <span style={{ color: 'var(--muted-foreground)' }}>
+                        /{event.attendeeTickets.toLocaleString()}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace' }}>
+                      {event.redeemedTickets.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--muted-foreground)', fontSize: 12 }}>
+                      {autoDeleteLabel(event.autoDeleteAt)}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--muted-foreground)', fontSize: 12 }}>
+                      Details →
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -237,7 +266,7 @@ export default function TicketingPage() {
           <SheetHeader className="border-b border-border px-6 py-4">
             <SheetTitle>{selected?.eventName || 'Event details'}</SheetTitle>
             <SheetDescription>
-              Tickets sold, payments, and attendees for this event.
+              Created event #{selected?.eventId} · tickets auto-delete 24h after event date.
             </SheetDescription>
           </SheetHeader>
 
@@ -250,7 +279,7 @@ export default function TicketingPage() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Tickets sold', value: String(sold || selected?.purchasedTickets || 0) },
+                    { label: 'Tickets sold', value: String(sold) },
                     { label: 'Unpaid', value: String(unpaid) },
                     { label: 'Redeemed', value: String(redeemed) },
                     { label: 'Revenue', value: currency(revenue) },
@@ -273,17 +302,23 @@ export default function TicketingPage() {
                 </div>
 
                 <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                  <DetailRow label="Event ID" value={selected?.eventId || '—'} />
                   <DetailRow label="Event date" value={formatDate(eventDate)} />
+                  <DetailRow label="Auto-delete" value={formatDate(selected?.autoDeleteAt)} />
                   <DetailRow label="Host" value={host || '—'} />
                   <DetailRow label="Location" value={location || '—'} />
                   <DetailRow label="Pay to" value={payTo || '—'} />
                   <DetailRow
                     label="Master QR"
-                    value={master ? (master.status === 'Cancelled' ? 'Revoked' : 'Active') : '—'}
+                    value={master ? (master.status === 'Cancelled' ? 'Revoked' : 'Active') : selected?.status || '—'}
+                  />
+                  <DetailRow
+                    label="Purchase link"
+                    value={selected?.purchaseUrl || master?.qrCodeUrl || '—'}
                   />
                   <DetailRow
                     label="Total issued"
-                    value={String(detailTickets.length || selected?.totalTickets || 0)}
+                    value={String(detailTickets.length || (selected?.attendeeTickets ?? 0) + 1)}
                   />
                 </div>
 
@@ -346,7 +381,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ color: 'var(--muted-foreground)' }}>{label}</span>
-      <span style={{ fontWeight: 600, textAlign: 'right' }}>{value}</span>
+      <span style={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
     </div>
   )
 }

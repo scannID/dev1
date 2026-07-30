@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminApi } from '../api/services'
-import type { AdminTicket, TicketAnalytics, TicketEventStats } from '../api/types'
+import type { AdminTicket, CreatedEventSummary, TicketAnalytics } from '../api/types'
 
 export function useTicketing() {
-  const [events, setEvents] = useState<TicketEventStats[]>([])
+  const [createdEvents, setCreatedEvents] = useState<CreatedEventSummary[]>([])
   const [analytics, setAnalytics] = useState<TicketAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -12,14 +12,14 @@ export function useTicketing() {
     setLoading(true)
     setError(null)
     try {
-      const [stats, analyticsData] = await Promise.all([
-        adminApi.tickets.getStats(search),
+      const [events, analyticsData] = await Promise.all([
+        adminApi.tickets.listCreatedEvents(search),
         adminApi.tickets.getAnalytics(),
       ])
-      setEvents(stats)
+      setCreatedEvents(events)
       setAnalytics(analyticsData)
     } catch (err) {
-      setEvents([])
+      setCreatedEvents([])
       setAnalytics(null)
       setError(err instanceof Error ? err.message : 'Failed to load ticketing data')
     } finally {
@@ -31,7 +31,7 @@ export function useTicketing() {
     void refresh()
   }, [refresh])
 
-  return { events, analytics, loading, error, refresh }
+  return { createdEvents, analytics, loading, error, refresh }
 }
 
 export async function loadEventTickets(eventName: string): Promise<AdminTicket[]> {

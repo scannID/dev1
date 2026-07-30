@@ -92,9 +92,9 @@ public class OutboxDispatcher {
                 );
             }
             case OutboxService.TYPE_WHATSAPP -> {
-                String to = String.valueOf(payload.getOrDefault("to", ""));
-                String message = String.valueOf(payload.getOrDefault("message", ""));
-                whatsAppNotificationService.sendText(to, message);
+                // Ticket delivery uses WhatsAppNotificationService directly.
+                // Skipping outbox WhatsApp drains backlog / order spam that rate-limits Meta.
+                log.debug("Skipping outbox WhatsApp event {}", event.getId());
             }
             default -> log.debug("Unknown outbox type {}", event.getEventType());
         }
