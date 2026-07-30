@@ -3,17 +3,14 @@ import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
 import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { distributeEqually, type SplitShareDraft } from '../splitValidation'
 import type { CartLine } from './CartStep'
+
+export type { SplitShareDraft }
 
 function UsdHint({ amount }: { amount: number }) {
   const usd = usdEquiv(amount)
   return usd ? <span className="cm-usd">{usd}</span> : null
-}
-
-export type SplitShareDraft = {
-  name: string
-  phone: string
-  amount: string
 }
 
 export function PayStep({
@@ -60,15 +57,7 @@ export function PayStep({
   const remaining = payableTotal - allocated
 
   function setPeopleCount(count: number) {
-    const n = Math.max(2, Math.min(8, count))
-    const base = Math.floor(payableTotal / n)
-    const rem = payableTotal % n
-    const next: SplitShareDraft[] = Array.from({ length: n }, (_, i) => ({
-      name: splitShares[i]?.name?.trim() || `Guest ${i + 1}`,
-      phone: splitShares[i]?.phone ?? '',
-      amount: String(base + (i < rem ? 1 : 0)),
-    }))
-    onSplitShares(next)
+    onSplitShares(distributeEqually(payableTotal, count, splitShares))
   }
 
   function splitEqually() {

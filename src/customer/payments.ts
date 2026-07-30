@@ -38,6 +38,11 @@ function mapStatus(status: PaymentIntentStatus): PaymentStatus {
   return 'PENDING'
 }
 
+/** Stable STK key per share — double-tap reuses the same aggregator transaction. */
+export function splitIdempotencyKey(splitId: string): string {
+  return `split:${splitId}`
+}
+
 export const payments = {
   async initiate(input: InitiatePaymentInput): Promise<PaymentResult> {
     const response = await paymentsApi.initiate({
@@ -57,16 +62,19 @@ export const payments = {
   },
 
   async initiateSplit(input: InitiateSplitPaymentInput): Promise<PaymentResult> {
-    const response = await paymentsApi.initiate({
-      context: 'ORDER_SPLIT',
-      referenceId: input.splitId,
-      provider: input.provider,
-      amount: input.amount,
-      currency: 'UGX',
-      customerPhone: input.phone,
-      customerName: input.customerName,
-      businessId: input.businessId,
-    })
+    const response = await paymentsApi.initiate(
+      {
+        context: 'ORDER_SPLIT',
+        referenceId: input.splitId,
+        provider: input.provider,
+        amount: input.amount,
+        currency: 'UGX',
+        customerPhone: input.phone,
+        customerName: input.customerName,
+        businessId: input.businessId,
+      },
+      { idempotencyKey: splitIdempotencyKey(input.splitId) },
+    )
     return {
       paymentId: response.paymentId,
       status: mapStatus(response.status),

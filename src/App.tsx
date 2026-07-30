@@ -2436,17 +2436,11 @@ function Dashboard({
                   </div>
                 </div>
 
-                {detailOrder.paymentStatus !== 'Paid' ? (
-                  <>
-                    <Separator className="" />
-                    <SplitBillPanel
-                      businessId={business.id}
-                      orderId={detailOrder.id}
-                      orderTotal={detailOrder.total}
-                      onOrderMaybePaid={() => setReloadToken((n) => n + 1)}
-                    />
-                  </>
-                ) : null}
+                <SplitBillPanel
+                  businessId={business.id}
+                  orderId={detailOrder.id}
+                  orderTotal={detailOrder.total}
+                />
               </div>
             </>
           )}

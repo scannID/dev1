@@ -184,10 +184,21 @@ public class PaymentIntentService {
                 && oldStatus != newStatus) {
             intent.setFailedAt(Instant.now());
             intent.setFailureReason(failureReason);
+            // Free unique idempotency key so a later retry can reuse split:{id}.
+            intent.setIdempotencyKey(null);
             onFailed(intent, failureReason);
         }
 
         return paymentIntentRepository.save(intent);
+    }
+
+    @Transactional
+    public void clearIdempotencyKey(PaymentIntent intent) {
+        if (intent.getIdempotencyKey() == null) {
+            return;
+        }
+        intent.setIdempotencyKey(null);
+        paymentIntentRepository.save(intent);
     }
 
     /** Runs order / quick-pay / ticket side effects after intent is marked Paid (via outbox). */

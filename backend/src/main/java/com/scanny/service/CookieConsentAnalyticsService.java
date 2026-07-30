@@ -33,7 +33,8 @@ public class CookieConsentAnalyticsService {
         Instant now = Instant.now();
         Instant lookback = switch (normalized) {
             case "hourly" -> now.minus(24, ChronoUnit.HOURS);
-            case "weekly" -> now.minus(12, ChronoUnit.WEEKS);
+            // Instant does not support ChronoUnit.WEEKS — use days (16 week buckets).
+            case "weekly" -> now.minus(16 * 7L, ChronoUnit.DAYS);
             case "monthly" -> now.minus(12 * 30L, ChronoUnit.DAYS);
             case "yearly" -> now.minus(5 * 365L, ChronoUnit.DAYS);
             default -> now.minus(30, ChronoUnit.DAYS);

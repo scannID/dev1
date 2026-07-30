@@ -1,7 +1,6 @@
 import { ArrowUpRight, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
-import CookieConsentPanel from '../components/CookieConsentPanel'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
 import { usePagination } from '../hooks/usePagination'
@@ -191,8 +190,6 @@ export default function OverviewPage() {
           <PaginationBar pagination={activityPagination} hideWhenEmpty={false} />
         </div>
       </div>
-
-      <CookieConsentPanel />
 
       <div className="admin-card">
         <div className="admin-card-header">

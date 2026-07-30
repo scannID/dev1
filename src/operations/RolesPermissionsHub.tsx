@@ -389,15 +389,6 @@ export function RolesPermissionsHub({ businessId }: { businessId: string }) {
                     <Eye className="size-4" />
                     View access
                   </Button>
-                  {level.id === 'MANAGER' ? (
-                    <Button
-                      onClick={() => setStaffSheetOpen(true)}
-                      className="roles-hub-btn roles-hub-btn-primary gap-2"
-                    >
-                      <UserPlus className="size-4" />
-                      Invite
-                    </Button>
-                  ) : null}
                 </div>
               </article>
             ))}

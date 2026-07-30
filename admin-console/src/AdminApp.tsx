@@ -4,6 +4,7 @@ import {
   BarChart3,
   Bell,
   Building2,
+  Cookie,
   CreditCard,
   FileText,
   LayoutGrid,
@@ -43,6 +44,7 @@ import TicketingPage from './pages/TicketingPage'
 import UsersPage from './pages/UsersPage'
 import RevenuePaymentsPage from './pages/RevenuePaymentsPage'
 import QRActivityPage from './pages/QRActivityPage'
+import CookieConsentPage from './pages/CookieConsentPage'
 import ReportsPage from './pages/ReportsPage'
 import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
@@ -54,7 +56,7 @@ import { useNotifications, useSystemHealth } from './hooks/usePlatform'
 
 type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
-  | 'users' | 'revenue' | 'qr-activity' | 'reports'
+  | 'users' | 'revenue' | 'qr-activity' | 'cookie-consent' | 'reports'
   | 'system' | 'audit' | 'configs'
 
 type NavItem = {
@@ -73,6 +75,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   users: { eyebrow: 'Admin · Platform', title: 'Users' },
   revenue: { eyebrow: 'Admin · Finance', title: 'Revenue & Payments' },
   'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
+  'cookie-consent': { eyebrow: 'Admin · Analytics', title: 'Cookie Consent' },
   reports: { eyebrow: 'Admin · Analytics', title: 'Reports' },
   system: { eyebrow: 'Admin · System', title: 'System Health' },
   audit: { eyebrow: 'Admin · System', title: 'Audit Log' },
@@ -180,6 +183,7 @@ export default function AdminApp({
         label: 'Analytics',
         items: [
           { id: 'qr-activity' as const, label: 'QR Activity', icon: QrCode },
+          { id: 'cookie-consent' as const, label: 'Cookie Consent', icon: Cookie },
           { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
         ],
       },
@@ -319,6 +323,7 @@ export default function AdminApp({
           {view === 'users' && <UsersPage />}
           {view === 'revenue' && <RevenuePaymentsPage />}
           {view === 'qr-activity' && <QRActivityPage />}
+          {view === 'cookie-consent' && <CookieConsentPage />}
           {view === 'reports' && <ReportsPage />}
           {view === 'system' && <SystemHealthPage />}
           {view === 'audit' && <AuditLogPage />}

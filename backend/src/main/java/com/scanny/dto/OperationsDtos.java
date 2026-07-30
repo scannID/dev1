@@ -295,12 +295,12 @@ public final class OperationsDtos {
     ) {}
 
     public record CreateEqualSplitsRequest(
-            @Min(2) @Max(20) int parts,
+            @Min(2) @Max(8) int parts,
             @Size(max = 255) String basePayerName
     ) {}
 
     public record CreateCustomSplitsRequest(
-            @NotEmpty @Size(min = 2, max = 20) List<@Valid CreateSplitPaymentRequest> shares
+            @NotEmpty @Size(min = 2, max = 8) List<@Valid CreateSplitPaymentRequest> shares
     ) {}
 
     public record SplitPaymentResponse(

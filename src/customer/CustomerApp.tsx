@@ -24,6 +24,7 @@ import { DoneStep } from './steps/DoneStep'
 import { MenuStep } from './steps/MenuStep'
 import { StayStep } from './steps/StayStep'
 import { PayStep, type SplitShareDraft } from './steps/PayStep'
+import { validateCustomSplit } from './splitValidation'
 import { WaitingStep, type SplitShareLive } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
@@ -723,29 +724,15 @@ export default function CustomerApp({
       : null
 
     if (splitAllocation) {
-      const allocated = splitAllocation.reduce((sum, share) => sum + share.amount, 0)
-      if (splitAllocation.length < 2) {
-        setError('Split needs at least 2 people')
-        return
-      }
-      if (splitAllocation.some((share) => share.amount < 1)) {
-        setError('Each person needs an amount greater than 0')
-        return
-      }
-      if (allocated !== payableTotal) {
-        setError(
-          allocated < payableTotal
-            ? `Allocate the remaining ${currency(payableTotal - allocated)} before paying`
-            : `Shares are over by ${currency(allocated - payableTotal)}`,
-        )
-        return
-      }
-      for (let i = 0; i < splitAllocation.length; i++) {
-        const phoneIssue = validatePhone(splitAllocation[i].phone)
-        if (phoneIssue) {
-          setPhoneError(`${splitAllocation[i].name}: ${phoneIssue}`)
-          return
+      const validation = validateCustomSplit(payableTotal, splitShares, validatePhone)
+      if (!validation.ok) {
+        const first = validation.errors[0] ?? 'Fix the split before paying'
+        if (/phone|MoMo|number/i.test(first)) {
+          setPhoneError(first)
+        } else {
+          setError(first)
         }
+        return
       }
       // Order contact = first payer
       setPhone(splitAllocation[0].phone)

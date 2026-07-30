@@ -224,6 +224,17 @@ public class TableService {
             orderRepository.save(order);
         }
 
+        if (request.shares().size() < 2 || request.shares().size() > 8) {
+            throw new ApiException(400, "Split requires between 2 and 8 shares.");
+        }
+        for (OperationsDtos.CreateSplitPaymentRequest share : request.shares()) {
+            if (share.amount() < 1) {
+                throw new ApiException(400, "Each share amount must be at least 1 UGX.");
+            }
+            if (share.payerName() == null || share.payerName().isBlank()) {
+                throw new ApiException(400, "Each share needs a payer name.");
+            }
+        }
         int allocated = request.shares().stream().mapToInt(OperationsDtos.CreateSplitPaymentRequest::amount).sum();
         if (allocated != order.getTotal()) {
             throw new ApiException(400, "Split amounts must add up to the order total (" + order.getTotal() + ").");
@@ -232,7 +243,7 @@ public class TableService {
         ensureSplitGroup(order);
         List<OperationsDtos.SplitPaymentResponse> created = new ArrayList<>();
         for (OperationsDtos.CreateSplitPaymentRequest share : request.shares()) {
-            String name = share.payerName() == null || share.payerName().isBlank() ? "Guest" : share.payerName().trim();
+            String name = share.payerName().trim();
             OrderSplitPayment payment = newSplit(order, name, share.payerPhone() == null ? "" : share.payerPhone(), share.amount());
             created.add(OperationsDtos.SplitPaymentResponse.from(splitPaymentRepository.save(payment)));
         }
@@ -386,6 +397,10 @@ public class TableService {
     }
 
     private OperationsDtos.SplitPaymentResponse markSplitPaidInternal(String orderId, UUID splitId) {
+        // Lock parent order first so concurrent share webhooks cannot race the paid-balance check.
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+
         OrderSplitPayment payment = splitPaymentRepository.findById(splitId)
                 .orElseThrow(() -> new ApiException(404, "Split payment was not found."));
         if (!payment.getOrderId().equals(orderId)) {
@@ -395,13 +410,12 @@ public class TableService {
             payment.setPaymentStatus(PaymentStatus.Paid);
             splitPaymentRepository.save(payment);
         }
-        maybeMarkOrderPaid(orderId);
+        maybeMarkOrderPaid(order);
         return OperationsDtos.SplitPaymentResponse.from(payment);
     }
 
-    private void maybeMarkOrderPaid(String orderId) {
-        Order order = orderRepository.findWithItemsById(orderId)
-                .orElseThrow(() -> new ApiException(404, "Order was not found."));
+    private void maybeMarkOrderPaid(Order order) {
+        String orderId = order.getId();
         List<OrderSplitPayment> splits = splitPaymentRepository.findByOrderIdOrderByCreatedAtAsc(orderId);
         if (splits.isEmpty()) {
             return;
@@ -411,6 +425,7 @@ public class TableService {
                 .filter(split -> split.getPaymentStatus() == PaymentStatus.Paid)
                 .mapToInt(OrderSplitPayment::getAmount)
                 .sum();
+        // Paid shares knock off the balance; order is fully paid when every share is Paid and sums cover total.
         if (allPaid && paidTotal >= order.getTotal() && order.getPaymentStatus() != PaymentStatus.Paid) {
             orderService.confirmPaymentFromGateway(orderId, PaymentStatus.Paid);
         }
@@ -421,14 +436,18 @@ public class TableService {
                 .findByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
                 .map(OperationsDtos.SplitPaymentResponse::from)
                 .toList();
-        int allocated = splits.stream().mapToInt(OperationsDtos.SplitPaymentResponse::amount).sum();
+        // Knock-off model: paid shares reduce what is still owed (no refunds).
+        int paidTotal = splits.stream()
+                .filter(s -> "Paid".equalsIgnoreCase(s.paymentStatus()))
+                .mapToInt(OperationsDtos.SplitPaymentResponse::amount)
+                .sum();
         return new OperationsDtos.SplitBillSummary(
                 order.getId(),
                 order.getPublicId(),
                 order.getBusinessName(),
                 order.getTotal(),
-                allocated,
-                Math.max(0, order.getTotal() - allocated),
+                paidTotal,
+                Math.max(0, order.getTotal() - paidTotal),
                 order.getPaymentStatus().name(),
                 splits
         );

@@ -365,8 +365,15 @@ export const paymentsApi = {
     return api.get<PaymentProvidersResponse>('/payments/providers')
   },
 
-  initiate: async (data: PaymentInitiateRequest): Promise<PaymentInitiateResponse> => {
-    return api.post<PaymentInitiateResponse>('/payments/initiate', data)
+  initiate: async (
+    data: PaymentInitiateRequest,
+    options?: { idempotencyKey?: string },
+  ): Promise<PaymentInitiateResponse> => {
+    const headers: Record<string, string> = {}
+    if (options?.idempotencyKey) {
+      headers['Idempotency-Key'] = options.idempotencyKey
+    }
+    return api.post<PaymentInitiateResponse>('/payments/initiate', data, { headers })
   },
 
   status: async (paymentId: string): Promise<PaymentStatusResponse> => {
