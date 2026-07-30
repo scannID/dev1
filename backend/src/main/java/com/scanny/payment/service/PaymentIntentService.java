@@ -263,7 +263,7 @@ public class PaymentIntentService {
             case QUICK_PAY -> completeQuickPay(intent.getReferenceId(), TransactionStatus.Completed, null);
             case TICKET -> ticketPurchaseService.confirmPurchaseFromPayment(
                 intent.getReferenceId(),
-                intent.getProviderReference()
+                intent.getId()
             );
             default -> logger.warn("No side-effect handler for payment context {}", intent.getContext());
         }

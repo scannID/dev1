@@ -10,6 +10,7 @@ import QuickPayTrack from './quickpay/QuickPayTrack'
 import QuickPayCustomer from './quickpay/QuickPayCustomer'
 import TicketPurchasePage from './tickets/TicketPurchasePage'
 import TicketViewPage from './tickets/TicketViewPage'
+import GateScanPage from './tickets/GateScanPage'
 import EventTicketPage from './EventTicket'
 import keycloak, {
   hasPortalSession,
@@ -72,11 +73,19 @@ function resolveTicketViewRoute(): string | null {
 
 function resolveTicketPurchaseRoute(): string | null {
   const match = window.location.pathname.match(/^\/ticket\/([^/]+)\/?$/)
-  return match ? decodeURIComponent(match[1]) : null
+  if (!match) return null
+  const token = decodeURIComponent(match[1])
+  // Reserved paths under /ticket/* — not event purchase tokens
+  if (token === 'gate' || token === 'view') return null
+  return token
 }
 
 function resolveCreateEventRoute(): boolean {
   return /^\/create-event\/?$/.test(window.location.pathname)
+}
+
+function resolveGateScanRoute(): boolean {
+  return /^\/ticket\/gate\/?$/.test(window.location.pathname)
 }
 
 function goToLanding() {
@@ -90,6 +99,7 @@ const trackNumber = resolveTrackRoute()
 const ticketViewToken = resolveTicketViewRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
 const createEventRoute = resolveCreateEventRoute()
+const gateScanRoute = resolveGateScanRoute()
 
 if (kitchenBusinessId) {
   function KitchenRoot() {
@@ -172,6 +182,18 @@ if (kitchenBusinessId) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <TicketViewPage accessToken={ticketViewToken} />
+    </StrictMode>
+  )
+} else if (gateScanRoute) {
+  const gatePayload = new URL(window.location.href).searchParams.get('p')
+    || new URL(window.location.href).searchParams.get('payload')
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <>
+        <GateScanPage initialPayload={gatePayload} />
+        <CookieConsent />
+      </>
     </StrictMode>
   )
 } else if (ticketMasterToken) {

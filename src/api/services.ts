@@ -33,6 +33,7 @@ import type {
   Ticket,
   TicketStats,
   UpdateTicketStatusRequest,
+  TicketScanValidationResponse,
   RegisterDeviceRequest,
   RegisteredDevice,
   PublicCreateQuickPaymentRequest,
@@ -318,6 +319,15 @@ export const ticketsApi = {
   updateStatus: async (ticketId: string, status: UpdateTicketStatusRequest['status']): Promise<Ticket> => {
     return api.patch<Ticket>(`/tickets/${ticketId}/status`, { status })
   },
+
+  scanPayload: async (data: {
+    payload: string
+    scannedBy?: string
+    scanLocation?: string
+    deviceInfo?: string
+  }): Promise<TicketScanValidationResponse> => {
+    return api.post<TicketScanValidationResponse>('/tickets/scan', data)
+  },
 }
 
 export const devicesApi = {
@@ -409,6 +419,15 @@ export const publicTicketsApi = {
     return api.get<EventTicketTrackingMetrics>(
       `/tickets/public/track/${encodeURIComponent(id)}`
     )
+  },
+
+  validate: async (data: {
+    payload: string
+    scannedBy?: string
+    scanLocation?: string
+    deviceInfo?: string
+  }): Promise<TicketScanValidationResponse> => {
+    return api.post<TicketScanValidationResponse>('/tickets/public/validate', data)
   },
 }
 

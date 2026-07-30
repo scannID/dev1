@@ -2,8 +2,14 @@ import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { ticketsApi, publicTicketsApi, imagesApi } from './api/services'
-import type { EventTicketTrackingMetrics, ImageSearchResult } from './api/types'
+import type {
+  EventTicketRecentAttendee,
+  EventTicketTrackingMetrics,
+  ImageSearchResult,
+  TicketScanValidationResponse,
+} from './api/types'
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
+import { buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
 /* ─── Theme tokens (follow app light / dark via CSS vars) ───────────── */
 const G = {
@@ -183,11 +189,11 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
             ['Date', fmtDate(d.date || '')],
             ['Fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
+            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{label}</p>
-              <p style={{ margin: 0, fontSize: label === 'Fee' ? 18 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#111827', letterSpacing: label === 'Fee' ? '-0.02em' : 0, fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
+              <p style={{ margin: 0, fontSize: label === 'Fee' ? 18 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#111827', letterSpacing: label === 'Fee' ? '-0.02em' : 0, fontFamily: label === 'Event ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
           ))}
         </div>
@@ -230,12 +236,12 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
               ['Date', fmtDate(d.date || ''), '#c084fc'],
               ['Fee', currency(fee), '#34d399'],
               ['Pay to', d.paymentDetails || '—', '#60a5fa'],
-              ['Ticket ID', d.ticketId || 'TKT-PREVIEW', '#9ca3af'],
+              ['Event ID', d.ticketId || 'TKT-PREVIEW', '#9ca3af'],
             ] as const
           ).map(([label, val, col]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: col }}>{label}</p>
-              <p style={{ margin: 0, fontSize: label === 'Fee' ? 20 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f0f6fc', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
+              <p style={{ margin: 0, fontSize: label === 'Fee' ? 20 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f0f6fc', fontFamily: label === 'Event ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
           ))}
         </div>
@@ -277,11 +283,11 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
             ['Date', fmtDate(d.date || '')],
             ['Ticket fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
+            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: 10 }}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9ca3af' }}>{label}</p>
-              <p style={{ margin: 0, fontSize: label === 'Ticket fee' ? 19 : 13, fontWeight: label === 'Ticket fee' ? 900 : 600, color: '#111827', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
+              <p style={{ margin: 0, fontSize: label === 'Ticket fee' ? 19 : 13, fontWeight: label === 'Ticket fee' ? 900 : 600, color: '#111827', fontFamily: label === 'Event ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
           ))}
         </div>
@@ -322,11 +328,11 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
             ['Date', fmtDate(d.date || '')],
             ['Fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Ticket ID', d.ticketId || 'TKT-PREVIEW'],
+            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD_VISUAL.goldDim }}>{label}</p>
-              <p style={{ margin: 0, fontSize: label === 'Fee' ? 19 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f5efe3', fontFamily: label === 'Ticket ID' ? 'monospace' : 'inherit' }}>{val}</p>
+              <p style={{ margin: 0, fontSize: label === 'Fee' ? 19 : 13, fontWeight: label === 'Fee' ? 900 : 600, color: '#f5efe3', fontFamily: label === 'Event ID' ? 'monospace' : 'inherit' }}>{val}</p>
             </div>
           ))}
         </div>
@@ -608,13 +614,211 @@ function normalizeTrackQuery(raw: string) {
   return raw.trim().replace(/^#/, '').toUpperCase()
 }
 
+function BoughtTicketDetail({
+  attendee,
+  eventName,
+  onClose,
+  onValidated,
+}: {
+  attendee: EventTicketRecentAttendee
+  eventName: string
+  onClose: () => void
+  onValidated: () => void
+}) {
+  const [qr, setQr] = useState('')
+  const [validating, setValidating] = useState(false)
+  const [scanResult, setScanResult] = useState<TicketScanValidationResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const paid = attendee.paymentStatus === 'Paid'
+  const payload = attendee.qrPayload?.trim() || ''
+  const gateUrl = buildTicketGateUrl(payload || attendee.gateUrl || '')
+  const qrSource = gateUrl || payload
+
+  useEffect(() => {
+    let cancelled = false
+    setQr('')
+    setScanResult(null)
+    setError(null)
+    if (!paid || !qrSource) return
+    QRCode.toDataURL(qrSource, {
+      width: 280,
+      margin: 1,
+      color: { dark: '#0d1612', light: '#ffffff' },
+    })
+      .then((url) => {
+        if (!cancelled) setQr(url)
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not render ticket QR')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [paid, qrSource, attendee.ticketId])
+
+  async function handleValidate() {
+    if (!payload) {
+      setError('No QR payload on this ticket yet')
+      return
+    }
+    try {
+      setValidating(true)
+      setError(null)
+      const result = await publicTicketsApi.validate({
+        payload,
+        scannedBy: 'Event manager',
+        scanLocation: 'Manage screen',
+        deviceInfo: navigator.userAgent,
+      })
+      setScanResult(result)
+      if (result.valid) {
+        toast.success('Ticket validated — knocked off')
+        onValidated()
+      } else {
+        toast.message(result.message || 'Ticket rejected')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Validation failed')
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        background: CREATE.fieldBg,
+        borderRadius: 12,
+        border: `0.5px solid ${CREATE.line}`,
+        padding: 14,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.muted }}>
+            Bought ticket
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 16, fontWeight: 700, color: CREATE.ink }}>
+            {attendee.holderName || 'Guest'}
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: CREATE.muted }}>
+            {eventName} · {attendee.ticketType}
+          </p>
+          <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: SCANN_MONO, color: CREATE.muted }}>
+            #{attendee.ticketId}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: CREATE.muted,
+            fontSize: 13,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            padding: 0,
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+        <span style={{ color: CREATE.muted }}>Amount</span>
+        <strong>{moneyUgx(attendee.price, attendee.currency)}</strong>
+      </div>
+      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
+        <span style={{ color: CREATE.muted }}>Status</span>
+        <strong>
+          {attendee.paymentStatus} · {attendee.status}
+        </strong>
+      </div>
+
+      {paid && qr ? (
+        <div style={{ marginTop: 14, textAlign: 'center' }}>
+          <img
+            src={qr}
+            alt="Ticket QR"
+            style={{ width: 220, height: 220, borderRadius: 12, background: '#fff', padding: 8 }}
+          />
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: CREATE.muted }}>
+            Entry QR for this paid ticket
+          </p>
+        </div>
+      ) : (
+        <p style={{ margin: '14px 0 0', fontSize: 13, color: CREATE.muted }}>
+          {paid ? 'Loading QR…' : 'QR appears after the ticket is paid.'}
+        </p>
+      )}
+
+      {scanResult ? (
+        <p
+          style={{
+            margin: '12px 0 0',
+            fontSize: 13,
+            fontWeight: 600,
+            color: scanResult.valid ? CREATE.teal : CREATE.ink,
+          }}
+        >
+          {scanResult.valid ? 'VALID — knocked off' : `Rejected: ${scanResult.message}`}
+        </p>
+      ) : null}
+      {error ? (
+        <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b91c1c' }} role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+        <button
+          type="button"
+          disabled={!paid || !payload || validating || attendee.status === 'Redeemed'}
+          onClick={() => void handleValidate()}
+          style={{
+            minHeight: 42,
+            borderRadius: 8,
+            border: 'none',
+            background: CREATE.tealDeep,
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: 14,
+            cursor: validating ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            opacity: !paid || !payload || attendee.status === 'Redeemed' ? 0.55 : 1,
+          }}
+        >
+          {attendee.status === 'Redeemed'
+            ? 'Already redeemed'
+            : validating
+              ? 'Validating…'
+              : 'Validate / knock off'}
+        </button>
+        {attendee.viewUrl ? (
+          <a
+            href={attendee.viewUrl}
+            style={{ textAlign: 'center', fontSize: 13, color: CREATE.teal, fontWeight: 600 }}
+          >
+            Open full ticket page
+          </a>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function EventProgressCard({
   metrics,
   compact = false,
+  onRefresh,
 }: {
   metrics: EventTicketTrackingMetrics
   compact?: boolean
+  onRefresh?: () => void
 }) {
+  const [selected, setSelected] = useState<EventTicketRecentAttendee | null>(null)
   const stats = [
     { label: 'Ordered', value: metrics.orderedTickets },
     { label: 'Bought', value: metrics.purchasedTickets },
@@ -682,34 +886,62 @@ function EventProgressCard({
       {!compact && metrics.recentAttendees.length > 0 ? (
         <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.muted }}>
-            Recent cards
+            Recent cards · tap bought to view QR
           </p>
-          {metrics.recentAttendees.slice(0, 8).map((a) => (
-            <div
-              key={a.ticketId}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                padding: '8px 0',
-                borderTop: `0.5px solid ${CREATE.line}`,
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: CREATE.ink }}>
-                  {a.holderName || 'Guest'} · {a.ticketType}
-                </p>
-                <p style={{ margin: '3px 0 0', fontSize: 11.5, fontFamily: SCANN_MONO, color: CREATE.muted }}>
-                  #{a.ticketId}
-                </p>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{moneyUgx(a.price, a.currency)}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 11.5, color: CREATE.muted }}>{a.paymentStatus}</p>
-              </div>
-            </div>
-          ))}
+          {metrics.recentAttendees.slice(0, 8).map((a) => {
+            const isSelected = selected?.ticketId === a.ticketId
+            const canOpen = a.paymentStatus === 'Paid'
+            return (
+              <button
+                key={a.ticketId}
+                type="button"
+                disabled={!canOpen}
+                onClick={() => setSelected(isSelected ? null : a)}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '10px 0',
+                  borderTop: `0.5px solid ${CREATE.line}`,
+                  borderLeft: 'none',
+                  borderRight: 'none',
+                  borderBottom: 'none',
+                  background: 'transparent',
+                  width: '100%',
+                  textAlign: 'left',
+                  cursor: canOpen ? 'pointer' : 'default',
+                  fontFamily: 'inherit',
+                  opacity: canOpen ? 1 : 0.7,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: CREATE.ink }}>
+                    {a.holderName || 'Guest'} · {a.ticketType}
+                  </p>
+                  <p style={{ margin: '3px 0 0', fontSize: 11.5, fontFamily: SCANN_MONO, color: CREATE.muted }}>
+                    #{a.ticketId}
+                    {canOpen ? (isSelected ? ' · open' : ' · tap') : ''}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{moneyUgx(a.price, a.currency)}</p>
+                  <p style={{ margin: '3px 0 0', fontSize: 11.5, color: CREATE.muted }}>{a.paymentStatus}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
+      ) : null}
+
+      {selected ? (
+        <BoughtTicketDetail
+          attendee={selected}
+          eventName={metrics.eventName}
+          onClose={() => setSelected(null)}
+          onValidated={() => {
+            onRefresh?.()
+          }}
+        />
       ) : null}
 
       {!compact && metrics.recentAttendees.length === 0 ? (
@@ -1039,7 +1271,7 @@ function TicketOutput({
                     <p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{data.location || '—'}</p>
                   </div>
                   <div>
-                    <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CONFIRM.muted }}>Ticket ID</p>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CONFIRM.muted }}>Event ID</p>
                     <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500, fontFamily: SCANN_MONO, letterSpacing: '0.01em' }}>#{data.ticketId}</p>
                   </div>
                 </div>
@@ -1110,7 +1342,13 @@ function TicketOutput({
 
             {metrics ? (
               <div style={{ marginBottom: 14 }}>
-                <EventProgressCard metrics={metrics} compact />
+                <EventProgressCard
+                  metrics={metrics}
+                  compact
+                  onRefresh={() => {
+                    void refreshMetrics(metrics.ticketId).catch(() => undefined)
+                  }}
+                />
               </div>
             ) : (
               <p style={{ margin: '0 0 14px 4px', fontSize: 12.5, color: CONFIRM.muted }}>
@@ -1300,7 +1538,7 @@ function TicketForm({
     e.preventDefault()
     const id = normalizeTrackQuery(trackQuery)
     if (!id) {
-      toast.message('Enter a ticket ID like #TKT-FA255B03')
+      toast.message('Enter an event ID like #TKT-FA255B03')
       return
     }
     try {
@@ -2224,7 +2462,7 @@ function TicketForm({
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>{previewFee}</p>
                       </div>
                       <div>
-                        <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Ticket ID</p>
+                        <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Event ID</p>
                         <p style={{ margin: 0, fontSize: 11.5, fontWeight: 500, fontFamily: SCANN_MONO }}>TKT-PREVIEW</p>
                       </div>
                     </div>
@@ -2517,7 +2755,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
               placeholder="#TKT-FA255B03"
               spellCheck={false}
-              aria-label="Ticket ID"
+              aria-label="Event ID"
               style={{ ...fieldStyle(), fontFamily: SCANN_MONO }}
             />
             <button
@@ -2541,7 +2779,12 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
             </button>
           </form>
 
-          <EventProgressCard metrics={metrics} />
+          <EventProgressCard
+            metrics={metrics}
+            onRefresh={() => {
+              void refreshMetrics(metrics.ticketId).catch(() => undefined)
+            }}
+          />
 
           {metrics.purchaseUrl ? (
             <p style={{ margin: '14px 0 0', fontSize: 13 }}>

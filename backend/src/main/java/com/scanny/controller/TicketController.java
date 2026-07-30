@@ -92,6 +92,17 @@ public class TicketController {
         }
     }
 
+    @PostMapping("/scan")
+    public ResponseEntity<TicketDtos.ScanValidationResponse> scanTicketPayload(
+            @RequestBody TicketDtos.ScanPayloadRequest request) {
+        try {
+            TicketDtos.ScanValidationResponse response = ticketService.scanTicketPayload(request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+
     @PatchMapping("/{ticketId}/status")
     public ResponseEntity<TicketResponse> updateTicketStatus(
             @PathVariable String ticketId,

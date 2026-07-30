@@ -6,6 +6,7 @@ import type { AttendeeTicketView } from '../api/types'
 import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
 import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
+import { buildTicketGateUrl } from '../lib/scanBase'
 import './TicketCustomer.css'
 
 type Props = { accessToken: string }
@@ -104,8 +105,10 @@ export default function TicketViewPage({ accessToken }: Props) {
         if (cancelled) return
         setTicket(data)
         if (data.paymentStatus === 'Paid') {
-          const payload = data.viewUrl || data.id
-          const url = await QRCode.toDataURL(payload, {
+          const gateLink = buildTicketGateUrl(
+            data.qrPayload || data.gateUrl || data.viewUrl || data.qrToken || data.id,
+          )
+          const url = await QRCode.toDataURL(gateLink, {
             width: 260,
             margin: 1,
             color: { dark: '#0d1612', light: '#ffffff' },

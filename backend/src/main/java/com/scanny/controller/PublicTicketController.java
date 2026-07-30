@@ -49,4 +49,11 @@ public class PublicTicketController {
     public ResponseEntity<PublicTicketDtos.EventTrackingMetrics> track(@PathVariable String ticketId) {
         return ResponseEntity.ok(ticketPurchaseService.getEventTrackingMetrics(ticketId));
     }
+
+    /** Gate knock-off using the paid ticket QR payload (one-phone manage flow). */
+    @PostMapping("/validate")
+    public ResponseEntity<TicketDtos.ScanValidationResponse> validate(
+            @RequestBody TicketDtos.ScanPayloadRequest request) {
+        return ResponseEntity.ok(ticketPurchaseService.validateGatePayload(request));
+    }
 }

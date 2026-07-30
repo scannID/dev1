@@ -35,6 +35,13 @@ public class TicketDtos {
         String deviceInfo
     ) {}
 
+    public record ScanPayloadRequest(
+        String payload,
+        String scannedBy,
+        String scanLocation,
+        String deviceInfo
+    ) {}
+
     public record UpdateTicketStatusRequest(
         TicketStatus status
     ) {}

@@ -402,6 +402,19 @@ export interface TicketStats {
   purchasedTickets: number
 }
 
+export interface TicketScanValidationResponse {
+  valid: boolean
+  result:
+    | 'Success'
+    | 'Invalid'
+    | 'Expired'
+    | 'Cancelled'
+    | 'PaymentRequired'
+    | 'UsageLimitReached'
+  message: string
+  ticket: Ticket
+}
+
 export interface TicketClassOption {
   name: string
   price: number
@@ -460,6 +473,8 @@ export interface AttendeeTicketView {
   metadata: string
   viewUrl: string
   qrToken: string
+  qrPayload: string
+  gateUrl: string
 }
 
 export interface EventTicketRecentAttendee {
@@ -473,6 +488,9 @@ export interface EventTicketRecentAttendee {
   paymentStatus: string
   status: string
   createdAt: string
+  viewUrl?: string
+  qrPayload?: string
+  gateUrl?: string
 }
 
 export interface EventTicketTrackingMetrics {

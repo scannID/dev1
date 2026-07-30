@@ -66,7 +66,9 @@ public class PublicTicketDtos {
         String template,
         String metadata,
         String viewUrl,
-        String qrToken
+        String qrToken,
+        String qrPayload,
+        String gateUrl
     ) {}
 
     /** Public progress for an event creator, keyed by master ticket id (e.g. TKT-FA255B03). */
@@ -97,6 +99,9 @@ public class PublicTicketDtos {
         String currency,
         String paymentStatus,
         String status,
-        java.time.Instant createdAt
+        java.time.Instant createdAt,
+        String viewUrl,
+        String qrPayload,
+        String gateUrl
     ) {}
 }

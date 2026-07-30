@@ -2,7 +2,6 @@ package com.scanny.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scanny.dto.PaymentDtos;
 import com.scanny.dto.PublicTicketDtos;
 import com.scanny.dto.TicketDtos;
 import com.scanny.dto.TicketResponse;
@@ -10,11 +9,11 @@ import com.scanny.entity.Ticket;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TicketStatus;
-import com.scanny.payment.PaymentContext;
-import com.scanny.payment.service.PaymentGatewayService;
+import com.scanny.payment.PaymentIntentStatus;
 import com.scanny.repository.TicketRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,7 +21,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,7 +32,6 @@ public class TicketPurchaseService {
     );
 
     private final TicketRepository ticketRepository;
-    private final PaymentGatewayService paymentGatewayService;
     private final TicketMailService ticketMailService;
     private final TicketService ticketService;
     private final ObjectMapper objectMapper;
@@ -44,12 +41,10 @@ public class TicketPurchaseService {
 
     public TicketPurchaseService(
             TicketRepository ticketRepository,
-            @Lazy PaymentGatewayService paymentGatewayService,
             TicketMailService ticketMailService,
             TicketService ticketService,
             ObjectMapper objectMapper) {
         this.ticketRepository = ticketRepository;
-        this.paymentGatewayService = paymentGatewayService;
         this.ticketMailService = ticketMailService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
@@ -103,7 +98,7 @@ public class TicketPurchaseService {
         Ticket master = requireEventTemplate(request.masterQrToken());
         String email = requireEmail(request.holderEmail());
         String name = requireText(request.holderName(), "Your name is required");
-        String phone = requireText(request.holderPhone(), "Mobile money number is required");
+        String phone = optionalText(request.holderPhone());
         String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
 
         if (ticketRepository.existsByEventNameAndHolderEmailIgnoreCaseAndPaymentStatusAndMasterTicketIdIsNotNull(
@@ -126,7 +121,7 @@ public class TicketPurchaseService {
         attendee.setEventName(master.getEventName());
         attendee.setEventDate(master.getEventDate());
         attendee.setHolderName(name);
-        attendee.setHolderPhone(phone.trim());
+        attendee.setHolderPhone(phone);
         attendee.setHolderEmail(email);
         attendee.setPrice(price);
         attendee.setCurrency(master.getCurrency());
@@ -141,29 +136,26 @@ public class TicketPurchaseService {
 
         attendee = ticketRepository.save(attendee);
 
-        PaymentDtos.InitiateResponse payment = paymentGatewayService.initiate(new PaymentDtos.InitiateRequest(
-            PaymentContext.TICKET,
-            attendee.getId(),
-            request.provider(),
-            price,
-            master.getCurrency(),
-            phone.trim(),
-            name,
-            null,
-            master.getEventName() + " — " + ticketClass
-        ));
+        String paymentId = generateImmediatePaymentId();
+        attendee.setPaymentStatus(PaymentStatus.Paid);
+        attendee.setPaymentReference(paymentId);
+        attendee.setUpdatedAt(Instant.now());
+        ticketRepository.save(attendee);
+
+        ticketMailService.sendAttendeeTicket(attendee, buildViewUrl(attendee.getAccessToken()));
+        ticketService.refreshStatsBroadcast();
 
         return new PublicTicketDtos.PurchaseResponse(
             attendee.getId(),
-            payment.paymentId(),
-            payment.status(),
-            payment.message(),
+            paymentId,
+            PaymentIntentStatus.Paid,
+            "Ticket created and marked paid",
             buildViewUrl(attendee.getAccessToken())
         );
     }
 
     @Transactional
-    public void confirmPurchaseFromPayment(String attendeeTicketId, String paymentReference) {
+    public void confirmPurchaseFromPayment(String attendeeTicketId, String paymentId) {
         Ticket ticket = ticketRepository.findById(attendeeTicketId)
             .orElseThrow(() -> new ApiException(404, "Ticket not found"));
 
@@ -175,7 +167,7 @@ public class TicketPurchaseService {
         }
 
         ticket.setPaymentStatus(PaymentStatus.Paid);
-        ticket.setPaymentReference(paymentReference != null ? paymentReference : "");
+        ticket.setPaymentReference(paymentId != null ? paymentId : "");
         ticket.setUpdatedAt(Instant.now());
         ticketRepository.save(ticket);
 
@@ -208,8 +200,15 @@ public class TicketPurchaseService {
             stringMeta(meta, "template", "classic"),
             ticket.getMetadata(),
             buildViewUrl(ticket.getAccessToken()),
-            ticket.getQrToken()
+            ticket.getQrToken(),
+            buildGateQrPayload(ticket),
+            buildGateUrl(ticket)
         );
+    }
+
+    @Transactional
+    public TicketDtos.ScanValidationResponse validateGatePayload(TicketDtos.ScanPayloadRequest request) {
+        return ticketService.scanTicketPayload(request);
     }
 
     @Transactional(readOnly = true)
@@ -241,18 +240,29 @@ public class TicketPurchaseService {
         Map<String, Object> meta = parseMetadata(master.getMetadata());
         List<PublicTicketDtos.RecentAttendee> recent = attendees.stream()
             .limit(25)
-            .map(t -> new PublicTicketDtos.RecentAttendee(
-                t.getId(),
-                t.getHolderName(),
-                t.getHolderEmail(),
-                t.getHolderPhone(),
-                t.getTicketType(),
-                t.getPrice(),
-                t.getCurrency(),
-                t.getPaymentStatus().name(),
-                t.getStatus().name(),
-                t.getCreatedAt()
-            ))
+            .map(t -> {
+                boolean paid = t.getPaymentStatus() == PaymentStatus.Paid;
+                String viewUrl = paid && t.getAccessToken() != null && !t.getAccessToken().isBlank()
+                    ? buildViewUrl(t.getAccessToken())
+                    : "";
+                String qrPayload = paid ? buildGateQrPayload(t) : "";
+                String gateUrl = paid ? buildGateUrl(t) : "";
+                return new PublicTicketDtos.RecentAttendee(
+                    t.getId(),
+                    t.getHolderName(),
+                    t.getHolderEmail(),
+                    t.getHolderPhone(),
+                    t.getTicketType(),
+                    t.getPrice(),
+                    t.getCurrency(),
+                    t.getPaymentStatus().name(),
+                    t.getStatus().name(),
+                    t.getCreatedAt(),
+                    viewUrl,
+                    qrPayload,
+                    gateUrl
+                );
+            })
             .toList();
 
         return new PublicTicketDtos.EventTrackingMetrics(
@@ -301,6 +311,31 @@ public class TicketPurchaseService {
 
     private String buildViewUrl(String accessToken) {
         return customerUrl + "/ticket/view/" + accessToken;
+    }
+
+    private String buildGateQrPayload(Ticket ticket) {
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("v", "1");
+        payload.put("ticketId", ticket.getId());
+        payload.put("eventId", ticket.getMasterTicketId() != null ? ticket.getMasterTicketId() : "");
+        payload.put("paymentId", ticket.getPaymentReference() != null ? ticket.getPaymentReference() : "");
+        payload.put("qrToken", ticket.getQrToken());
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "SCANNY:TICKET:" + encoded;
+        } catch (Exception e) {
+            return ticket.getQrToken();
+        }
+    }
+
+    private String buildGateUrl(Ticket ticket) {
+        String payload = buildGateQrPayload(ticket);
+        try {
+            return customerUrl + "/ticket/gate?p=" + java.net.URLEncoder.encode(payload, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return customerUrl + "/ticket/gate?p=" + payload;
+        }
     }
 
     private String serializeAttendeeMetadata(Map<String, Object> masterMeta, String ticketClass) {
@@ -412,6 +447,13 @@ public class TicketPurchaseService {
         return value.trim();
     }
 
+    private static String optionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
+    }
+
     private static String generateTicketId() {
         return "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
     }
@@ -422,5 +464,9 @@ public class TicketPurchaseService {
 
     private static String generateAccessToken() {
         return UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    }
+
+    private static String generateImmediatePaymentId() {
+        return "PAY-LOCAL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
     }
 }

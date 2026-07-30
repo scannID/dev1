@@ -1,14 +1,11 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { Smartphone } from 'lucide-react'
-import { publicTicketsApi, paymentsApi } from '../api/services'
-import type { TicketEventInfo, TicketPurchaseResponse } from '../api/types'
+import { publicTicketsApi } from '../api/services'
+import type { TicketEventInfo } from '../api/types'
 import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
 type Props = { masterQrToken: string }
-
-const PAYMENT_WAIT_LIMIT_SEC = 30
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -36,12 +33,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
   const [holderEmail, setHolderEmail] = useState('')
-  const [holderPhone, setHolderPhone] = useState('')
-  const [provider, setProvider] = useState<'MTN' | 'Airtel'>('MTN')
   const [submitting, setSubmitting] = useState(false)
-  const [purchase, setPurchase] = useState<TicketPurchaseResponse | null>(null)
-  const [waiting, setWaiting] = useState(false)
-  const [waitSecondsLeft, setWaitSecondsLeft] = useState(PAYMENT_WAIT_LIMIT_SEC)
 
   useEffect(() => {
     document.documentElement.classList.add('tk-app')
@@ -77,51 +69,6 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     }
   }, [masterQrToken])
 
-  useEffect(() => {
-    if (!purchase?.paymentId || purchase.paymentStatus === 'Paid') return
-    if (!waiting) return
-
-    let cancelled = false
-    setWaitSecondsLeft(PAYMENT_WAIT_LIMIT_SEC)
-
-    const interval = window.setInterval(async () => {
-      try {
-        const status = await paymentsApi.status(purchase.paymentId)
-        if (cancelled) return
-        if (status.status === 'Paid') {
-          window.location.href = purchase.viewUrl
-        } else if (status.status === 'Failed' || status.status === 'Cancelled') {
-          setError('Payment failed. Try again or use a different number.')
-          setWaiting(false)
-        }
-      } catch {
-        // keep polling
-      }
-    }, 3000)
-
-    const countdown = window.setInterval(() => {
-      setWaitSecondsLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(countdown)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    const timeout = window.setTimeout(() => {
-      if (cancelled) return
-      window.location.href = '/'
-    }, PAYMENT_WAIT_LIMIT_SEC * 1000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-      window.clearInterval(countdown)
-      window.clearTimeout(timeout)
-    }
-  }, [purchase, waiting])
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!event) return
@@ -133,15 +80,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         ticketClass,
         holderName: holderName.trim(),
         holderEmail: holderEmail.trim(),
-        holderPhone: holderPhone.trim(),
-        provider,
+        holderPhone: '',
       })
-      setPurchase(result)
-      if (result.paymentStatus === 'Paid') {
-        window.location.href = result.viewUrl
-        return
-      }
-      setWaiting(true)
+      window.location.href = result.viewUrl
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start purchase')
     } finally {
@@ -180,41 +121,6 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
 
   if (!event) return null
 
-  if (waiting && purchase) {
-    return (
-      <div className="tk-shell">
-        <header className="tk-topbar">
-          <div className="tk-brand">
-            <KodeMark size={28} />
-            <div>
-              <strong>Kode</strong>
-              <span>Event ticket</span>
-            </div>
-          </div>
-        </header>
-        <main className="tk-main">
-          <div className="tk-panel tk-wait tk-enter">
-            <div className="tk-wait-ring" aria-hidden>
-              <Smartphone size={28} color="var(--tk-gold-bright)" strokeWidth={1.75} />
-            </div>
-            <h2>Approve on your phone</h2>
-            <p>
-              Check your phone for the <strong>{provider}</strong> prompt for{' '}
-              <strong>{event.eventName}</strong>.
-            </p>
-            <p>
-              Once paid, your ticket opens here and we email <strong>{holderEmail}</strong>.
-            </p>
-            <p className="tk-ref">Payment ref: {purchase.paymentId}</p>
-            <p className="tk-ref" role="status">
-              Waiting {waitSecondsLeft}s — then back to home if still pending
-            </p>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
   return (
     <div className="tk-shell">
       <header className="tk-topbar">
@@ -237,7 +143,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <p className="tk-hero-kicker">Get your ticket</p>
           <h1>{event.eventName}</h1>
           <p className="tk-hero-meta">
-            {[dateLabel, 'Pay with mobile money'].filter(Boolean).join(' · ')}
+            {[dateLabel, 'Instant entry pass'].filter(Boolean).join(' · ')}
           </p>
         </header>
 
@@ -344,48 +250,8 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 disabled={submitting}
               />
               <p className="tk-hint">
-                Ticket is emailed here after payment — one purchase per email for this event.
+                Ticket is emailed here instantly — one purchase per email for this event.
               </p>
-            </label>
-          </div>
-
-          <p className="tk-section-label" style={{ marginTop: 16 }}>
-            Pay with
-          </p>
-          <div className="tk-providers" role="group" aria-label="Payment provider">
-            <button
-              type="button"
-              className={`tk-provider${provider === 'MTN' ? ' is-active' : ''}`}
-              onClick={() => setProvider('MTN')}
-              disabled={submitting}
-              aria-label="MTN MoMo"
-              aria-pressed={provider === 'MTN'}
-            >
-              <img src="/mtn.png" alt="" />
-            </button>
-            <button
-              type="button"
-              className={`tk-provider${provider === 'Airtel' ? ' is-active' : ''}`}
-              onClick={() => setProvider('Airtel')}
-              disabled={submitting}
-              aria-label="Airtel Money"
-              aria-pressed={provider === 'Airtel'}
-            >
-              <img src="/airtel.png" alt="" className="tk-provider-airtel" />
-            </button>
-          </div>
-
-          <div className="tk-fields" style={{ marginTop: 14 }}>
-            <label className="tk-field">
-              Mobile money number
-              <input
-                value={holderPhone}
-                onChange={(e) => setHolderPhone(e.target.value)}
-                placeholder="+256…"
-                autoComplete="tel"
-                required
-                disabled={submitting}
-              />
             </label>
           </div>
 
@@ -396,7 +262,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           ) : null}
 
           <button type="submit" className="tk-cta" disabled={submitting || !ticketClass}>
-            {submitting ? 'Starting…' : `Pay ${money(selectedPrice, event.currency)}`}
+            {submitting ? 'Creating…' : `Create Ticket ${money(selectedPrice, event.currency)}`}
           </button>
         </form>
       </main>

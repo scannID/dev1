@@ -115,6 +115,7 @@ public class SecurityConfig {
                 // Temporary: allow public create-event image search (tighten later)
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/tickets/qr/*/scan").hasAnyRole("MERCHANT", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/tickets/scan").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/tickets/stats").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/tickets").hasAnyRole("MERCHANT", "ADMIN")
