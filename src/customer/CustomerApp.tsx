@@ -129,7 +129,7 @@ export default function CustomerApp({
 
   const cartItems: CartLine[] = useMemo(() => {
     return Object.entries(cart)
-      .map(([lineKey, quantity]) => {
+      .map(([lineKey, quantity]): CartLine | null => {
         const { itemId, removedIngredients, checkInDate, checkOutDate } = parseCartLineKey(lineKey)
         const item = items.find((i) => i.id === itemId)
         if (!item) return null

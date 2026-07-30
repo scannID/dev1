@@ -58,6 +58,9 @@ function DropdownMenuItem({
   inset,
   variant = "default",
   ...props
+}: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
+  inset?: boolean
+  variant?: "default" | "destructive"
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -140,6 +143,8 @@ function DropdownMenuLabel({
   className,
   inset,
   ...props
+}: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
+  inset?: boolean
 }) {
   return (
     <DropdownMenuPrimitive.Label
