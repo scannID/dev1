@@ -83,7 +83,7 @@ export function useBusinessData() {
         setError(err instanceof Error ? err.message : 'Failed to switch branch')
       }
     },
-    [merchant?.id, staffMode],
+    [merchant, staffMode],
   )
 
   const loadStaffSession = useCallback(async () => {
@@ -212,7 +212,7 @@ export function useBusinessData() {
       setError(err instanceof Error ? err.message : 'Failed to refresh branches')
       return null
     }
-  }, [loadMerchantSession, selectedBusiness?.id, staffMode])
+  }, [loadMerchantSession, selectedBusiness, staffMode])
 
   const updateLocalItems = useCallback((businessId: string, items: CatalogItem[]) => {
     setBusinesses((current) =>

@@ -23,6 +23,11 @@ function addDaysIso(iso: string, days: number) {
   return `${y}-${m}-${day}`
 }
 
+function UsdHint({ amount }: { amount: number }) {
+  const usd = usdEquiv(amount)
+  return usd ? <span className="cm-usd">{usd}</span> : null
+}
+
 export function StayStep({
   items,
   onAddStay,
@@ -30,11 +35,6 @@ export function StayStep({
   items: CatalogItem[]
   onAddStay: (itemId: string, checkInDate: string, checkOutDate: string) => void
 }) {
-  function UsdHint({ amount }: { amount: number }) {
-    const usd = usdEquiv(amount)
-    return usd ? <span className="cm-usd">{usd}</span> : null
-  }
-
   const lodging = useMemo(
     () => items.filter((item) => item.available && isLodgingItem(item)),
     [items],

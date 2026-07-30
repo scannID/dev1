@@ -1060,7 +1060,6 @@ export default function CustomerApp({
       splitShares.every((share) => !validatePhone(share.phone.trim())))
   const splitReady =
     !splitEnabled || (splitShares.length >= 2 && splitAllocated === payableTotal && splitPhonesOk)
-  const payBlocked = submitting || (step === 'pay' && !splitReady)
   const canCancel =
     step !== 'done' && (step !== 'menu' || cartCount > 0 || Boolean(placedOrderId) || Boolean(paymentId))
 

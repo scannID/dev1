@@ -76,8 +76,6 @@ import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
 import { OperationsHub } from './operations/OperationsHub'
 import { SplitBillPanel } from './operations/SplitBillPanel'
-import { openPrintReceipt } from './lib/printReceipt'
-import { operationsApi } from './api/operations'
 import { hasPermission, type PermissionId } from './operations/roleCatalog'
 import type { StaffRole } from './api/operations'
 import { resizeImageFile } from './lib/resizeImage'
@@ -2038,10 +2036,8 @@ function CatalogPage({
 
 function OrderActionMenu({
   onViewDetails,
-  onPrint,
 }: {
   onViewDetails: () => void
-  onPrint?: () => void
 }) {
   return (
     <Button

@@ -101,10 +101,6 @@ export function OperationsHub({
     }
   }
 
-  const staffLoginHint = typeof window !== 'undefined'
-    ? `${window.location.origin}/?staff=1&business=${encodeURIComponent(businessId)}`
-    : ''
-
   return (
     <div className="operations-hub">
       <Tabs defaultValue="roles">

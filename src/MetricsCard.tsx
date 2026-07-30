@@ -62,8 +62,6 @@ export function MetricsCard({ business }: { business: BusinessLike }) {
   const [data, setData] = useState<ScansOrdersSeries>(EMPTY)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const chartRef = useRef<HTMLDivElement>(null)
-  const rangeRef = useRef(range)
-  rangeRef.current = range
 
   useEffect(() => {
     let cancelled = false
@@ -80,7 +78,7 @@ export function MetricsCard({ business }: { business: BusinessLike }) {
     }
 
     const load = async (silent = false) => {
-      const selectedRange = rangeRef.current
+      const selectedRange = range
       try {
         const series = await scannyApi.businesses.getScansOrders(business.id, selectedRange)
         if (!cancelled) applySeries(series, selectedRange)
