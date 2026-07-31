@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, BarChart3, Bell, Check, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed } from 'lucide-react'
+import { Banknote, BarChart3, Bell, Check, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed, Warehouse } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -75,6 +75,7 @@ import type {
 import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
 import { OperationsHub } from './operations/OperationsHub'
+import { InventoryPage } from './inventory/InventoryPage'
 import { SplitBillPanel } from './operations/SplitBillPanel'
 import { hasPermission, type PermissionId } from './operations/roleCatalog'
 import type { StaffRole } from './api/operations'
@@ -297,7 +298,7 @@ function App({
   // Block disallowed views for staff (Overview + Reports are owner / general manager only)
   useEffect(() => {
     if (!staffMode || !staffRole) return
-    const merchantOnlyViews = new Set(['account', 'operations', 'reports'])
+    const merchantOnlyViews = new Set(['account', 'operations', 'reports', 'inventory'])
     const viewPermMap: Record<string, PermissionId> = {
       catalog: 'catalog:read',
       dashboard: 'orders:read',
@@ -701,6 +702,7 @@ function App({
           {([
             { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
             { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId },
+            { id: 'inventory', label: 'Inventory', icon: Warehouse, merchantOnly: true },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
             { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
             { id: 'operations', label: 'Roles', icon: Settings2, perm: 'staff:manage' as PermissionId, merchantOnly: true },
@@ -773,6 +775,7 @@ function App({
               {!editingItem && showAddItem && 'Merchant · Add item'}
               {!editingItem && !showAddItem && view === 'account' && 'Merchant · Overview'}
               {!editingItem && !showAddItem && view === 'catalog' && 'Merchant · Catalog'}
+              {!editingItem && !showAddItem && view === 'inventory' && 'Merchant · Inventory'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
               {!editingItem && !showAddItem && view === 'operations' && 'Merchant · Roles & permissions'}
@@ -785,6 +788,7 @@ function App({
               {!editingItem && showAddItem && 'Add item'}
               {!editingItem && !showAddItem && view === 'account' && `${timeGreeting}, ${welcomeName}`}
               {!editingItem && !showAddItem && view === 'catalog' && 'Catalog'}
+              {!editingItem && !showAddItem && view === 'inventory' && 'Inventory'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
               {!editingItem && !showAddItem && view === 'operations' && 'Roles & permissions'}
@@ -944,6 +948,12 @@ function App({
                   }}
                   Sparkline={Sparkline}
                 />
+              </div>
+            )}
+
+            {view === 'inventory' && (
+              <div className="page-content">
+                <InventoryPage businessId={business.id} catalogItems={business.items ?? []} />
               </div>
             )}
 
@@ -2454,6 +2464,9 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
 
   const totalOrders = reportData.totalOrders
   const totalRevenue = reportData.totalRevenue
+  const totalCogs = reportData.totalCogs
+  const grossProfit = reportData.grossProfit
+  const marginPercent = reportData.marginPercent
   const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
   const completedOrders = reportData.completedOrders
   const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0
@@ -2503,6 +2516,18 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
           <Sparkline data={reportData.revenueTrend} color="#10b981" />
         </div>
         <div>
+          <span>COGS</span>
+          <strong style={{ color: '#b45309' }}>{currency(totalCogs)}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>Recipe cost on paid sales</span>
+          <Sparkline data={reportData.cogsTrend} color="#b45309" />
+        </div>
+        <div>
+          <span>GROSS PROFIT</span>
+          <strong style={{ color: grossProfit >= 0 ? '#059669' : '#b91c1c' }}>{currency(grossProfit)}</strong>
+          <span style={{ color: '#667085', fontWeight: 400 }}>Margin {marginPercent.toFixed(1)}%</span>
+          <Sparkline data={reportData.profitTrend} color="#059669" />
+        </div>
+        <div>
           <span>TOTAL ORDERS</span>
           <strong>{totalOrders}</strong>
           <span style={{ color: '#667085', fontWeight: 400 }}>All statuses</span>
@@ -2539,7 +2564,9 @@ function ReportsPage({ business, orders }: { business: Business; orders: Order[]
                       </div>
                       <div className="report-list-details">
                         <strong>{item.name}</strong>
-                        <span>{item.quantity} sold</span>
+                        <span>
+                          {item.quantity} sold · cost {currency(item.cogs)} · profit {currency(item.profit)}
+                        </span>
                       </div>
                       <strong className="report-list-value">{currency(item.revenue)}</strong>
                     </div>

@@ -160,9 +160,14 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
-        logger.warn("Data integrity violation on {}: {}", path(request), ex.getMostSpecificCause().getMessage());
+        String cause = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        logger.warn("Data integrity violation on {}: {}", path(request), cause);
+        String message = "Could not save this change (data conflict).";
+        if (cause != null && cause.toLowerCase().contains("movement_type")) {
+            message = "Stock movement type is not supported by the database yet. Restart after the latest inventory update.";
+        }
         return ResponseEntity.status(ErrorCode.CONFLICT.status()).body(
-                ApiErrorResponse.of(ErrorCode.CONFLICT, path(request))
+                ApiErrorResponse.of(ErrorCode.CONFLICT, message, path(request))
         );
     }
 

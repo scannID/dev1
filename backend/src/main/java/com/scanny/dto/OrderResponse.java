@@ -31,7 +31,8 @@ public record OrderResponse(
         OrderStatus status,
         PaymentStatus paymentStatus,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Integer cogsTotal
 ) {
     public static OrderResponse from(Order order) {
         return new OrderResponse(
@@ -59,7 +60,8 @@ public record OrderResponse(
                 order.getStatus(),
                 order.getPaymentStatus(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getCogsTotal()
         );
     }
 }
@@ -76,7 +78,8 @@ record OrderLineResponse(
         List<String> removedIngredients,
         String checkInDate,
         String checkOutDate,
-        Integer nights
+        Integer nights,
+        Integer costAmount
 ) {
     static OrderLineResponse from(OrderLineItem line) {
         return new OrderLineResponse(
@@ -88,7 +91,8 @@ record OrderLineResponse(
                 JsonLists.readStringList(line.getRemovedIngredientsJson()),
                 line.getCheckInDate() != null ? line.getCheckInDate().toString() : null,
                 line.getCheckOutDate() != null ? line.getCheckOutDate().toString() : null,
-                line.getNights()
+                line.getNights(),
+                line.getCostAmount()
         );
     }
 }

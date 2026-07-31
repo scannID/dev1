@@ -147,6 +147,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  put: <T>(endpoint: string, data: unknown) =>
+    fetchApi<T>(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   delete: <T>(endpoint: string) =>
     fetchApi<T>(endpoint, {
       method: 'DELETE',

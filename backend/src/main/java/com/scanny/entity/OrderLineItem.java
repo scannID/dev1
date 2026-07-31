@@ -50,6 +50,10 @@ public class OrderLineItem {
     @Column
     private Integer nights;
 
+    /** Locked recipe COGS for this line (UGX) at payment time. */
+    @Column(name = "cost_amount", nullable = false, columnDefinition = "integer default 0")
+    private int costAmount = 0;
+
     public Long getId() {
         return id;
     }
@@ -137,5 +141,13 @@ public class OrderLineItem {
 
     public void setNights(Integer nights) {
         this.nights = nights;
+    }
+
+    public int getCostAmount() {
+        return costAmount;
+    }
+
+    public void setCostAmount(int costAmount) {
+        this.costAmount = Math.max(0, costAmount);
     }
 }

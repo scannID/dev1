@@ -161,6 +161,7 @@ export interface OrderItem {
   checkInDate?: string | null
   checkOutDate?: string | null
   nights?: number | null
+  costAmount?: number
 }
 
 export interface Customer {
@@ -193,6 +194,8 @@ export interface Order {
   status: OrderStatus
   createdAt: string
   updatedAt?: string
+  /** Locked recipe COGS (UGX) after payment. */
+  cogsTotal?: number
 }
 
 /** Matches backend RequestDtos.CreateOrderRequest */

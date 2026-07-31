@@ -39,13 +39,18 @@ export interface ReportOrderRow {
 
 export interface ReportData {
   totalRevenue: number
+  totalCogs: number
+  grossProfit: number
+  marginPercent: number
   totalOrders: number
   completedOrders: number
   revenueTrend: number[]
+  cogsTrend: number[]
+  profitTrend: number[]
   ordersTrend: number[]
   avgOrderTrend: number[]
   completionTrend: number[]
-  itemSales: Array<{ name: string; quantity: number; revenue: number }>
+  itemSales: Array<{ name: string; quantity: number; revenue: number; cogs: number; profit: number }>
   paymentBreakdown: Record<PaymentStatus, number>
   statusBreakdown: Record<OrderStatus, number>
   ordersByStatus: Record<OrderStatus, ReportOrderRow[]>
@@ -268,6 +273,9 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
   const filtered = filterOrdersByRange(orders, range)
   const paidOrders = filtered.filter((order) => order.paymentStatus === 'Paid')
   const totalRevenue = paidOrders.reduce((sum, order) => sum + merchantPayoutOf(order), 0)
+  const totalCogs = paidOrders.reduce((sum, order) => sum + (order.cogsTotal ?? 0), 0)
+  const grossProfit = totalRevenue - totalCogs
+  const marginPercent = totalRevenue > 0 ? (grossProfit * 100) / totalRevenue : 0
   const totalOrders = filtered.length
   const completedOrders = filtered.filter((order) => order.status === 'Completed').length
 
@@ -275,6 +283,24 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
   const revenueTrend = dailySeries(
     filtered,
     (dayOrders) => dayOrders.filter((order) => order.paymentStatus === 'Paid').reduce((sum, order) => sum + merchantPayoutOf(order), 0),
+    trendDays,
+  )
+  const cogsTrend = dailySeries(
+    filtered,
+    (dayOrders) =>
+      dayOrders
+        .filter((order) => order.paymentStatus === 'Paid')
+        .reduce((sum, order) => sum + (order.cogsTotal ?? 0), 0),
+    trendDays,
+  )
+  const profitTrend = dailySeries(
+    filtered,
+    (dayOrders) => {
+      const paid = dayOrders.filter((order) => order.paymentStatus === 'Paid')
+      const rev = paid.reduce((sum, order) => sum + merchantPayoutOf(order), 0)
+      const cogs = paid.reduce((sum, order) => sum + (order.cogsTotal ?? 0), 0)
+      return rev - cogs
+    },
     trendDays,
   )
   const ordersTrend = dailySeries(filtered, (dayOrders) => dayOrders.length, trendDays)
@@ -296,13 +322,14 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
     trendDays,
   )
 
-  const itemMap = new Map<string, { name: string; quantity: number; revenue: number }>()
-  for (const order of filtered) {
-    if (order.status === 'Cancelled') continue
+  const itemMap = new Map<string, { name: string; quantity: number; revenue: number; cogs: number; profit: number }>()
+  for (const order of paidOrders) {
     for (const item of order.items) {
-      const existing = itemMap.get(item.name) ?? { name: item.name, quantity: 0, revenue: 0 }
+      const existing = itemMap.get(item.name) ?? { name: item.name, quantity: 0, revenue: 0, cogs: 0, profit: 0 }
       existing.quantity += item.quantity
       existing.revenue += item.lineTotal
+      existing.cogs += item.costAmount ?? 0
+      existing.profit = existing.revenue - existing.cogs
       itemMap.set(item.name, existing)
     }
   }
@@ -338,9 +365,14 @@ export function buildReportData(orders: Order[], range: TimeRange): ReportData {
 
   return {
     totalRevenue,
+    totalCogs,
+    grossProfit,
+    marginPercent,
     totalOrders,
     completedOrders,
     revenueTrend,
+    cogsTrend,
+    profitTrend,
     ordersTrend,
     avgOrderTrend,
     completionTrend,

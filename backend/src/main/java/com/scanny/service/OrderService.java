@@ -56,6 +56,7 @@ public class OrderService {
     private final FeeService feeService;
     private final MerchantRepository merchantRepository;
     private final TableService tableService;
+    private final InventoryService inventoryService;
 
     public OrderService(
             BusinessService businessService,
@@ -66,7 +67,8 @@ public class OrderService {
             OutboxService outboxService,
             FeeService feeService,
             MerchantRepository merchantRepository,
-            TableService tableService
+            TableService tableService,
+            InventoryService inventoryService
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -77,6 +79,7 @@ public class OrderService {
         this.feeService = feeService;
         this.merchantRepository = merchantRepository;
         this.tableService = tableService;
+        this.inventoryService = inventoryService;
     }
 
     @Transactional(readOnly = true)
@@ -421,6 +424,7 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
+            inventoryService.consumeForPaidOrder(savedOrder);
             tableService.markAllSplitsPaidForOrder(savedOrder.getId());
             outboxService.enqueueReceipt(savedOrder.getId());
             if (savedOrder.getBusiness().isWhatsappNotificationsEnabled()

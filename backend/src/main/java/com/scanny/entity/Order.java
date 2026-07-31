@@ -104,6 +104,13 @@ public class Order {
     @Column(name = "kitchen_notes", nullable = false)
     private String kitchenNotes = "";
 
+    /** Locked recipe COGS (UGX) at payment time. */
+    @Column(name = "cogs_total", nullable = false, columnDefinition = "integer default 0")
+    private int cogsTotal = 0;
+
+    @Column(name = "inventory_consumed", nullable = false, columnDefinition = "boolean default false")
+    private boolean inventoryConsumed = false;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("id ASC")
     private List<OrderLineItem> items = new ArrayList<>();
@@ -314,6 +321,22 @@ public class Order {
 
     public void setKitchenNotes(String kitchenNotes) {
         this.kitchenNotes = kitchenNotes != null ? kitchenNotes : "";
+    }
+
+    public int getCogsTotal() {
+        return cogsTotal;
+    }
+
+    public void setCogsTotal(int cogsTotal) {
+        this.cogsTotal = Math.max(0, cogsTotal);
+    }
+
+    public boolean isInventoryConsumed() {
+        return inventoryConsumed;
+    }
+
+    public void setInventoryConsumed(boolean inventoryConsumed) {
+        this.inventoryConsumed = inventoryConsumed;
     }
 
     public List<OrderLineItem> getItems() {
