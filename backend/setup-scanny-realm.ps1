@@ -23,16 +23,24 @@ function Get-LanIpv4 {
 
 function Ensure-Client($clientId, $port, $lanIp) {
   $existing = Invoke-RestMethod -Method Get -Uri "$kc/admin/realms/$realm/clients?clientId=$clientId" -Headers $H
+  # https variants keep login working when the dev server runs with VITE_DEV_HTTPS=1
+  # (needed so phone cameras get a secure context on the gate scanner).
   $redirectUris = @(
     "http://localhost:$port/*", "http://localhost:$port/",
-    "http://127.0.0.1:$port/*", "http://127.0.0.1:$port/"
+    "http://127.0.0.1:$port/*", "http://127.0.0.1:$port/",
+    "https://localhost:$port/*", "https://localhost:$port/",
+    "https://127.0.0.1:$port/*", "https://127.0.0.1:$port/"
   )
   $webOrigins = @(
-    "http://localhost:$port", "http://127.0.0.1:$port", "+"
+    "http://localhost:$port", "http://127.0.0.1:$port",
+    "https://localhost:$port", "https://127.0.0.1:$port", "+"
   )
   if ($lanIp) {
-    $redirectUris += @("http://${lanIp}:$port/*", "http://${lanIp}:$port/")
-    $webOrigins += "http://${lanIp}:$port"
+    $redirectUris += @(
+      "http://${lanIp}:$port/*", "http://${lanIp}:$port/",
+      "https://${lanIp}:$port/*", "https://${lanIp}:$port/"
+    )
+    $webOrigins += @("http://${lanIp}:$port", "https://${lanIp}:$port")
   }
 
   if ($existing.Count -gt 0) {

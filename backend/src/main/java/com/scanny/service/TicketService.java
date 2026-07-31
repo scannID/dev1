@@ -60,7 +60,8 @@ public class TicketService {
     @Transactional
     public TicketResponse createTicket(TicketDtos.CreateTicketRequest request) {
         Ticket ticket = new Ticket();
-        ticket.setId(generateTicketId());
+        boolean eventTemplate = request.usageLimit() > 1_000_000;
+        ticket.setId(eventTemplate ? generateEventId() : generateTicketId());
         ticket.setQrToken(generateQrToken());
         ticket.setTicketType(request.ticketType());
         ticket.setEventName(request.eventName());
@@ -413,8 +414,14 @@ public class TicketService {
         broadcastStatsUpdate();
     }
 
+    /** Purchased / attendee tickets only. Event shells use {@link #generateEventId()}. */
     private String generateTicketId() {
         return "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    /** Event (master) IDs shown at creation / gate entry — not sold tickets. */
+    private String generateEventId() {
+        return "ERI-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private String generateQrToken() {

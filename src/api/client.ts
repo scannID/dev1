@@ -9,6 +9,9 @@ const STAFF_BUSINESS_KEY = 'scanny-staff-business-id'
 function resolveApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location
+    // An HTTPS page cannot reach the plain-HTTP backend (mixed content), so stay
+    // same-origin and let the dev server proxy / reverse proxy forward it.
+    if (protocol === 'https:') return '/api'
     return `${protocol}//${hostname}:4000/api`
   }
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'

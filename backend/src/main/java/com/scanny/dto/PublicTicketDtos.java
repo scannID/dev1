@@ -87,10 +87,11 @@ public class PublicTicketDtos {
         String viewUrl,
         String qrToken,
         String qrPayload,
-        String gateUrl
+        String gateUrl,
+        String purchaseUrl
     ) {}
 
-    /** Public progress for an event creator, keyed by master ticket id (e.g. TKT-FA255B03). */
+    /** Public progress for an event creator, keyed by master event id (e.g. ERI-FA255B03). */
     public record EventTrackingMetrics(
         String ticketId,
         String eventName,

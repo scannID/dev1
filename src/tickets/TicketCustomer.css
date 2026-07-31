@@ -494,6 +494,28 @@ html.tk-app body {
   word-break: break-all;
 }
 
+.tk-btn-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--tk-line, rgba(15, 23, 42, 0.12));
+  border-radius: 14px;
+  background: transparent;
+  color: var(--tk-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 160ms ease, opacity 160ms ease;
+}
+
+.tk-btn-cancel:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
 /* Owned pass view */
 .tk-status-row {
   display: flex;

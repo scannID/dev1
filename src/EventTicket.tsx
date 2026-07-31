@@ -6,7 +6,6 @@ import type {
   EventTicketRecentAttendee,
   EventTicketTrackingMetrics,
   ImageSearchResult,
-  TicketScanValidationResponse,
 } from './api/types'
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
 import { buildTicketGateUrl } from './lib/scanBase'
@@ -76,6 +75,8 @@ export type EventTicketVisual = {
   ticketClasses: TicketClass[]
   tables: TableOption[]
   ticketId: string
+  /** "Event ID" on the event shell, "Ticket ID" on an attendee's purchased pass. */
+  idLabel?: string
   selectedClass: string
   purchaseUrl?: string
   /** Creator-uploaded event sticker / cover (data URL or http URL). */
@@ -281,7 +282,7 @@ function CreatedEventsQrSection({
 }
 
 function uid() {
-  return 'TKT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase()
+  return 'ERI-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase()
 }
 
 function shortId() {
@@ -337,7 +338,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
             ['Date', fmtDate(d.date || '')],
             ['Fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
+            [d.idLabel || 'Event ID', d.ticketId || 'ERI-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: accent }}>{label}</p>
@@ -384,7 +385,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
               ['Date', fmtDate(d.date || ''), '#c084fc'],
               ['Fee', currency(fee), '#34d399'],
               ['Pay to', d.paymentDetails || '—', '#60a5fa'],
-              ['Event ID', d.ticketId || 'TKT-PREVIEW', '#9ca3af'],
+              [d.idLabel || 'Event ID', d.ticketId || 'ERI-PREVIEW', '#9ca3af'],
             ] as const
           ).map(([label, val, col]) => (
             <div key={label}>
@@ -431,7 +432,7 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
             ['Date', fmtDate(d.date || '')],
             ['Ticket fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
+            [d.idLabel || 'Event ID', d.ticketId || 'ERI-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: 10 }}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9ca3af' }}>{label}</p>
@@ -476,7 +477,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
             ['Date', fmtDate(d.date || '')],
             ['Fee', currency(fee)],
             ['Pay to', d.paymentDetails || '—'],
-            ['Event ID', d.ticketId || 'TKT-PREVIEW'],
+            [d.idLabel || 'Event ID', d.ticketId || 'ERI-PREVIEW'],
           ].map(([label, val]) => (
             <div key={label}>
               <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: GOLD_VISUAL.goldDim }}>{label}</p>
@@ -788,16 +789,12 @@ function BoughtTicketDetail({
   attendee,
   eventName,
   onClose,
-  onValidated,
 }: {
   attendee: EventTicketRecentAttendee
   eventName: string
   onClose: () => void
-  onValidated: () => void
 }) {
   const [qr, setQr] = useState('')
-  const [validating, setValidating] = useState(false)
-  const [scanResult, setScanResult] = useState<TicketScanValidationResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const paid = attendee.paymentStatus === 'Paid'
   const payload = attendee.qrPayload?.trim() || ''
@@ -807,7 +804,6 @@ function BoughtTicketDetail({
   useEffect(() => {
     let cancelled = false
     setQr('')
-    setScanResult(null)
     setError(null)
     if (!paid || !qrSource) return
     QRCode.toDataURL(qrSource, {
@@ -825,34 +821,6 @@ function BoughtTicketDetail({
       cancelled = true
     }
   }, [paid, qrSource, attendee.ticketId])
-
-  async function handleValidate() {
-    if (!payload) {
-      setError('No QR payload on this ticket yet')
-      return
-    }
-    try {
-      setValidating(true)
-      setError(null)
-      const result = await publicTicketsApi.validate({
-        payload,
-        scannedBy: 'Event manager',
-        scanLocation: 'Manage screen',
-        deviceInfo: navigator.userAgent,
-      })
-      setScanResult(result)
-      if (result.valid) {
-        toast.success('Ticket validated — knocked off')
-        onValidated()
-      } else {
-        toast.message(result.message || 'Ticket rejected')
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Validation failed')
-    } finally {
-      setValidating(false)
-    }
-  }
 
   return (
     <div
@@ -914,9 +882,6 @@ function BoughtTicketDetail({
             alt="Ticket QR"
             style={{ width: 220, height: 220, borderRadius: 12, background: '#fff', padding: 8 }}
           />
-          <p style={{ margin: '8px 0 0', fontSize: 12, color: CREATE.muted }}>
-            Entry QR for this paid ticket
-          </p>
         </div>
       ) : (
         <p style={{ margin: '14px 0 0', fontSize: 13, color: CREATE.muted }}>
@@ -924,57 +889,11 @@ function BoughtTicketDetail({
         </p>
       )}
 
-      {scanResult ? (
-        <p
-          style={{
-            margin: '12px 0 0',
-            fontSize: 13,
-            fontWeight: 600,
-            color: scanResult.valid ? CREATE.teal : CREATE.ink,
-          }}
-        >
-          {scanResult.valid ? 'VALID — knocked off' : `Rejected: ${scanResult.message}`}
-        </p>
-      ) : null}
       {error ? (
         <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b91c1c' }} role="alert">
           {error}
         </p>
       ) : null}
-
-      <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
-        <button
-          type="button"
-          disabled={!paid || !payload || validating || attendee.status === 'Redeemed'}
-          onClick={() => void handleValidate()}
-          style={{
-            minHeight: 42,
-            borderRadius: 8,
-            border: 'none',
-            background: CREATE.tealDeep,
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: validating ? 'wait' : 'pointer',
-            fontFamily: 'inherit',
-            opacity: !paid || !payload || attendee.status === 'Redeemed' ? 0.55 : 1,
-          }}
-        >
-          {attendee.status === 'Redeemed'
-            ? 'Already redeemed'
-            : validating
-              ? 'Validating…'
-              : 'Validate / knock off'}
-        </button>
-        {attendee.viewUrl ? (
-          <a
-            href={attendee.viewUrl}
-            style={{ textAlign: 'center', fontSize: 13, color: CREATE.teal, fontWeight: 600 }}
-          >
-            Open full ticket page
-          </a>
-        ) : null}
-      </div>
     </div>
   )
 }
@@ -982,11 +901,9 @@ function BoughtTicketDetail({
 function EventProgressCard({
   metrics,
   compact = false,
-  onRefresh,
 }: {
   metrics: EventTicketTrackingMetrics
   compact?: boolean
-  onRefresh?: () => void
 }) {
   const [selected, setSelected] = useState<EventTicketRecentAttendee | null>(null)
   const stats = [
@@ -1108,9 +1025,6 @@ function EventProgressCard({
           attendee={selected}
           eventName={metrics.eventName}
           onClose={() => setSelected(null)}
-          onValidated={() => {
-            onRefresh?.()
-          }}
         />
       ) : null}
 
@@ -1515,9 +1429,6 @@ function TicketOutput({
                 <EventProgressCard
                   metrics={metrics}
                   compact
-                  onRefresh={() => {
-                    void refreshMetrics(metrics.ticketId).catch(() => undefined)
-                  }}
                 />
               </div>
             ) : (
@@ -1708,7 +1619,7 @@ function TicketForm({
     e.preventDefault()
     const id = normalizeTrackQuery(trackQuery)
     if (!id) {
-      toast.message('Enter an event ID like #TKT-FA255B03')
+      toast.message('Enter an event ID like #ERI-FA255B03')
       return
     }
     try {
@@ -1964,7 +1875,7 @@ function TicketForm({
             type="search"
             value={trackQuery}
             onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
-            placeholder="Track event · #TKT-FA255B03"
+            placeholder="Track event · #ERI-FA255B03"
             aria-label="Track event by ticket ID"
             spellCheck={false}
             style={{
@@ -2639,7 +2550,7 @@ function TicketForm({
                       </div>
                       <div>
                         <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Event ID</p>
-                        <p style={{ margin: 0, fontSize: 11.5, fontWeight: 500, fontFamily: SCANN_MONO }}>TKT-PREVIEW</p>
+                        <p style={{ margin: 0, fontSize: 11.5, fontWeight: 500, fontFamily: SCANN_MONO }}>ERI-PREVIEW</p>
                       </div>
                     </div>
                     <div
@@ -2956,7 +2867,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               type="search"
               value={trackQuery}
               onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
-              placeholder="#TKT-FA255B03"
+              placeholder="#ERI-FA255B03"
               spellCheck={false}
               aria-label="Event ID"
               style={{ ...fieldStyle(), fontFamily: SCANN_MONO }}
@@ -2984,26 +2895,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
 
           <EventProgressCard
             metrics={metrics}
-            onRefresh={() => {
-              void refreshMetrics(metrics.ticketId).catch(() => undefined)
-            }}
           />
-
-          {metrics.purchaseUrl ? (
-            <p style={{ margin: '14px 0 0', fontSize: 13 }}>
-              <a href={metrics.purchaseUrl} style={{ color: CREATE.teal, fontWeight: 600 }}>
-                Open purchase link
-              </a>
-            </p>
-          ) : null}
-          <p style={{ margin: metrics.purchaseUrl ? '8px 0 0' : '14px 0 0', fontSize: 13 }}>
-            <a
-              href={`/ticket/gate?event=${encodeURIComponent(metrics.ticketId)}`}
-              style={{ color: CREATE.teal, fontWeight: 600 }}
-            >
-              Open gate scanner
-            </a>
-          </p>
         </div>
       </div>
     )

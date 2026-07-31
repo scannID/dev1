@@ -144,9 +144,10 @@ export default function TicketViewPage({ accessToken }: Props) {
       host,
       paymentDetails: payTo,
       template: parseTemplate(ticket.template),
-      ticketClasses: [{ id: '1', name: ticket.ticketType, fee: String(ticket.price) }],
+      ticketClasses: [{ id: '1', name: ticket.ticketType, fee: String(ticket.price), capacity: '' }],
       tables: [],
       ticketId: ticket.id,
+      idLabel: 'Ticket ID',
       selectedClass: ticket.ticketType,
       eventImageUrl,
     }
@@ -256,6 +257,17 @@ export default function TicketViewPage({ accessToken }: Props) {
               clears.
             </p>
             <p className="tk-ref">Ticket {ticket.id}</p>
+            {ticket.purchaseUrl ? (
+              <button
+                type="button"
+                className="tk-btn-cancel"
+                onClick={() => {
+                  window.location.href = ticket.purchaseUrl!
+                }}
+              >
+                Cancel — back to tickets
+              </button>
+            ) : null}
           </div>
         )}
       </main>

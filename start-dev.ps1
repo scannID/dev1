@@ -4,11 +4,13 @@
 #   .\start-dev.ps1 -Frontend    # also npm run dev on :5173
 #   .\start-dev.ps1 -Admin       # also admin console on :5174
 #   .\start-dev.ps1 -All         # everything
+#   .\start-dev.ps1 -All -Https  # serve the apps over HTTPS (phone camera / gate scanner)
 
 param(
     [switch]$Frontend,
     [switch]$Admin,
     [switch]$All,
+    [switch]$Https,
     [switch]$SkipKeycloak,
     [switch]$SkipBackend,
     [string]$HostIp
@@ -42,7 +44,8 @@ if (-not $HostIp) {
     $HostIp = 'localhost'
 }
 
-$ScanBaseUrl = "http://$HostIp`:5173"
+$WebScheme = if ($Https) { 'https' } else { 'http' }
+$ScanBaseUrl = "${WebScheme}://$HostIp`:5173"
 
 if ($All) {
     $Frontend = $true
@@ -180,8 +183,9 @@ if ($Frontend) {
     } else {
         Write-Host 'Starting merchant app on :5173...'
         Start-DevWindow -Name 'frontend' -Title 'Kode Frontend' -WorkingDirectory $Root -Lines @(
+            "`$env:VITE_DEV_HTTPS = '$(if ($Https) { '1' } else { '0' })'"
             "`$env:VITE_API_BASE_URL = 'http://$HostIp`:4000/api'"
-            "`$env:VITE_SCAN_BASE_URL = 'http://$HostIp`:5173'"
+            "`$env:VITE_SCAN_BASE_URL = '$ScanBaseUrl'"
             "`$env:VITE_WS_BASE_URL = 'ws://$HostIp`:4000'"
             "`$env:VITE_KEYCLOAK_URL = 'http://localhost:8080'"
             'npm run dev -- --host 0.0.0.0 --port 5173'
@@ -195,6 +199,7 @@ if ($Admin) {
     } else {
         Write-Host 'Starting admin console on :5174...'
         Start-DevWindow -Name 'admin' -Title 'Kode Admin' -WorkingDirectory $Root -Lines @(
+            "`$env:VITE_DEV_HTTPS = '$(if ($Https) { '1' } else { '0' })'"
             "`$env:VITE_API_BASE_URL = 'http://$HostIp`:4000/api'"
             "`$env:VITE_WS_BASE_URL = 'ws://$HostIp`:4000'"
             "`$env:VITE_KEYCLOAK_URL = 'http://localhost:8080'"
@@ -209,9 +214,14 @@ Write-Host ''
 Write-Host 'Ready:' -ForegroundColor Green
 Write-Host '  API:        http://localhost:4000/health'
 Write-Host '  Keycloak:   http://localhost:8080/admin  (admin / admin)'
-Write-Host '  Merchant:   http://localhost:5173'
-Write-Host '  Admin UI:   http://localhost:5174'
+Write-Host "  Merchant:   ${WebScheme}://localhost:5173"
+Write-Host "  Admin UI:   ${WebScheme}://localhost:5174"
 Write-Host "  Phone URL:  $ScanBaseUrl"
+if ($Https) {
+    Write-Host ''
+    Write-Host 'HTTPS uses a self-signed certificate: on the phone tap Advanced -> Proceed once.' -ForegroundColor Yellow
+    Write-Host 'That secure context is what lets the gate scanner open the camera.' -ForegroundColor Yellow
+}
 Write-Host ''
 Write-Host 'Local logins:'
 Write-Host '  Merchant app  (:5173): samantha@scanny.local / Samantha@2026!'

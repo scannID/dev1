@@ -226,6 +226,12 @@ public class TicketPurchaseService {
         }
 
         Map<String, Object> meta = parseMetadata(ticket.getMetadata());
+        String purchaseUrl = "";
+        if (ticket.getMasterTicketId() != null) {
+            purchaseUrl = ticketRepository.findById(ticket.getMasterTicketId())
+                .map(master -> customerUrl + "/ticket/" + master.getQrToken())
+                .orElse("");
+        }
         return new PublicTicketDtos.AttendeeTicketView(
             ticket.getId(),
             ticket.getTicketType(),
@@ -244,7 +250,8 @@ public class TicketPurchaseService {
             buildViewUrl(ticket.getAccessToken()),
             ticket.getQrToken(),
             buildGateQrPayload(ticket),
-            buildGateUrl(ticket)
+            buildGateUrl(ticket),
+            purchaseUrl
         );
     }
 

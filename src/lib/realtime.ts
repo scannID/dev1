@@ -25,7 +25,10 @@ type RealtimeOptions = {
 function resolveWsBase(): string {
   const explicit = (import.meta.env.VITE_WS_BASE_URL as string | undefined)?.replace(/\/$/, '')
   if (typeof window !== 'undefined') {
-    const { protocol, hostname } = window.location
+    const { protocol, host, hostname } = window.location
+    // Mirror the API client: an HTTPS page must not open a ws:// socket to the
+    // plain-HTTP backend, so ride the same origin and let the proxy forward it.
+    if (protocol === 'https:') return `wss://${host}`
     const isLocalOrLan =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||

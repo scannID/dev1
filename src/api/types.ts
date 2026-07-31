@@ -486,6 +486,7 @@ export interface AttendeeTicketView {
   qrToken: string
   qrPayload: string
   gateUrl: string
+  purchaseUrl?: string
 }
 
 export interface EventTicketRecentAttendee {
