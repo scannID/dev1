@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, BarChart3, Bell, Check, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Search, Settings2, ShoppingCart, Sun, Trash2, UtensilsCrossed, Warehouse } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -76,6 +76,11 @@ import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
 import { OperationsHub } from './operations/OperationsHub'
 import { InventoryPage } from './inventory/InventoryPage'
+import {
+  InventoryAdjustPage,
+  InventoryTransferPage,
+  InventoryWastePage,
+} from './inventory/InventoryActionPage'
 import { SplitBillPanel } from './operations/SplitBillPanel'
 import { hasPermission, type PermissionId } from './operations/roleCatalog'
 import type { StaffRole } from './api/operations'
@@ -284,6 +289,7 @@ function App({
   } = useBusinessData()
 
   const [view, setView] = useState('account')
+  const [inventoryNavOpen, setInventoryNavOpen] = useState(true)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
@@ -298,7 +304,15 @@ function App({
   // Block disallowed views for staff (Overview + Reports are owner / general manager only)
   useEffect(() => {
     if (!staffMode || !staffRole) return
-    const merchantOnlyViews = new Set(['account', 'operations', 'reports', 'inventory'])
+    const merchantOnlyViews = new Set([
+      'account',
+      'operations',
+      'reports',
+      'inventory',
+      'inventory-transfer',
+      'inventory-adjust',
+      'inventory-waste',
+    ])
     const viewPermMap: Record<string, PermissionId> = {
       catalog: 'catalog:read',
       dashboard: 'orders:read',
@@ -702,36 +716,112 @@ function App({
           {([
             { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
             { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId },
-            { id: 'inventory', label: 'Inventory', icon: Warehouse, merchantOnly: true },
+            {
+              id: 'inventory',
+              label: 'Inventory',
+              icon: Warehouse,
+              merchantOnly: true,
+              children: [
+                { id: 'inventory', label: 'Stock', icon: Warehouse },
+                { id: 'inventory-transfer', label: 'Transfer', icon: ArrowLeftRight },
+                { id: 'inventory-adjust', label: 'Adjust', icon: Scale },
+                { id: 'inventory-waste', label: 'Waste', icon: Trash },
+              ],
+            },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
             { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
             { id: 'operations', label: 'Roles', icon: Settings2, perm: 'staff:manage' as PermissionId, merchantOnly: true },
             { id: 'reports', label: 'Reports', icon: BarChart3, merchantOnly: true },
-          ] as Array<{ id: string; label: string; icon: typeof Home; count?: number; perm?: PermissionId; merchantOnly?: boolean }>)
+          ] as Array<{
+            id: string
+            label: string
+            icon: typeof Home
+            count?: number
+            perm?: PermissionId
+            merchantOnly?: boolean
+            children?: Array<{ id: string; label: string; icon: typeof Home }>
+          }>)
           .filter(({ perm, merchantOnly }) => {
             if (staffMode && merchantOnly) return false
             return !staffMode || !perm || hasPermission(staffRole as StaffRole, perm)
           })
-          .map(({ id, label, icon: Icon, count }) => (
-            <button
-              type="button"
-              className={!showAddItem && !editingItem && view === id ? 'active' : ''}
-              key={id}
-              onClick={() => {
-                setShowAddItem(false)
-                setEditingItem(null)
-                setView(id)
-              }}
-            >
-              <Icon size={20} />
-              <span style={{ flex: 1 }}>{label}</span>
-              {count ? (
-                <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
-                  {count}
-                </Badge>
-              ) : null}
-            </button>
-          ))}
+          .map(({ id, label, icon: Icon, count, children }) => {
+            const inventoryChildActive =
+              id === 'inventory' &&
+              (view === 'inventory' ||
+                view === 'inventory-transfer' ||
+                view === 'inventory-adjust' ||
+                view === 'inventory-waste')
+            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive)
+            const groupOpen = id === 'inventory' && inventoryNavOpen
+
+            if (children?.length) {
+              return (
+                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${inventoryChildActive ? ' active-group' : ''}`}>
+                  <button
+                    type="button"
+                    className={isActive ? 'active' : ''}
+                    aria-expanded={groupOpen}
+                    onClick={() => {
+                      setShowAddItem(false)
+                      setEditingItem(null)
+                      setInventoryNavOpen((open) => !open)
+                      if (!inventoryChildActive) setView('inventory')
+                    }}
+                  >
+                    <Icon size={20} />
+                    <span style={{ flex: 1 }}>{label}</span>
+                    <ChevronDown
+                      size={16}
+                      className={`side-nav-chevron${groupOpen ? ' open' : ''}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {groupOpen ? (
+                    <div className="side-nav-sub" role="group" aria-label={`${label} sections`}>
+                      {children.map(({ id: childId, label: childLabel, icon: ChildIcon }) => (
+                        <button
+                          type="button"
+                          key={childId}
+                          className={!showAddItem && !editingItem && view === childId ? 'active' : ''}
+                          onClick={() => {
+                            setShowAddItem(false)
+                            setEditingItem(null)
+                            setInventoryNavOpen(true)
+                            setView(childId)
+                          }}
+                        >
+                          <ChildIcon size={16} />
+                          <span style={{ flex: 1 }}>{childLabel}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            return (
+              <button
+                type="button"
+                className={!showAddItem && !editingItem && view === id ? 'active' : ''}
+                key={id}
+                onClick={() => {
+                  setShowAddItem(false)
+                  setEditingItem(null)
+                  setView(id)
+                }}
+              >
+                <Icon size={20} />
+                <span style={{ flex: 1 }}>{label}</span>
+                {count ? (
+                  <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
+                    {count}
+                  </Badge>
+                ) : null}
+              </button>
+            )
+          })}
         </nav>
 
         <SidebarProfile
@@ -776,6 +866,9 @@ function App({
               {!editingItem && !showAddItem && view === 'account' && 'Merchant · Overview'}
               {!editingItem && !showAddItem && view === 'catalog' && 'Merchant · Catalog'}
               {!editingItem && !showAddItem && view === 'inventory' && 'Merchant · Inventory'}
+              {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Merchant · Inventory · Transfer'}
+              {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Merchant · Inventory · Adjust'}
+              {!editingItem && !showAddItem && view === 'inventory-waste' && 'Merchant · Inventory · Waste'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
               {!editingItem && !showAddItem && view === 'operations' && 'Merchant · Roles & permissions'}
@@ -789,6 +882,9 @@ function App({
               {!editingItem && !showAddItem && view === 'account' && `${timeGreeting}, ${welcomeName}`}
               {!editingItem && !showAddItem && view === 'catalog' && 'Catalog'}
               {!editingItem && !showAddItem && view === 'inventory' && 'Inventory'}
+              {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Transfer'}
+              {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Adjust'}
+              {!editingItem && !showAddItem && view === 'inventory-waste' && 'Waste'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
               {!editingItem && !showAddItem && view === 'operations' && 'Roles & permissions'}
@@ -954,6 +1050,24 @@ function App({
             {view === 'inventory' && (
               <div className="page-content">
                 <InventoryPage businessId={business.id} catalogItems={business.items ?? []} />
+              </div>
+            )}
+
+            {view === 'inventory-transfer' && (
+              <div className="page-content">
+                <InventoryTransferPage businessId={business.id} />
+              </div>
+            )}
+
+            {view === 'inventory-adjust' && (
+              <div className="page-content">
+                <InventoryAdjustPage businessId={business.id} />
+              </div>
+            )}
+
+            {view === 'inventory-waste' && (
+              <div className="page-content">
+                <InventoryWastePage businessId={business.id} />
               </div>
             )}
 

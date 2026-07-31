@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PaginationBar } from '../components/PaginationBar'
+import { usePagination } from '../hooks/usePagination'
 import {
   inventoryApi,
   type Ingredient,
@@ -55,15 +58,12 @@ export function InventoryPage({
   const [summary, setSummary] = useState<{ ingredientCount: number; lowStockCount: number; stockValueTotal: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [movementSearch, setMovementSearch] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
 
   const foodItems = useMemo(
     () => catalogItems.filter((item) => !item.itemKind || item.itemKind === 'FOOD'),
     [catalogItems],
-  )
-
-  const siblingBranches = useMemo(
-    () => branches.filter((b) => b.id !== businessId),
-    [branches, businessId],
   )
 
   const reload = useCallback(async () => {
@@ -72,7 +72,7 @@ export function InventoryPage({
       const [items, sum, moves, branchList] = await Promise.all([
         inventoryApi.listIngredients(businessId),
         inventoryApi.summary(businessId),
-        inventoryApi.listMovements(businessId, 80),
+        inventoryApi.listMovements(businessId, 200),
         operationsApi.listBranches(businessId).catch(() => [] as Branch[]),
       ])
       setIngredients(items)
@@ -103,20 +103,52 @@ export function InventoryPage({
 
   return (
     <section className="inventory-page">
-      <div className="inventory-metrics">
-        <div>
-          <span>INGREDIENTS</span>
-          <strong>{summary?.ingredientCount ?? '—'}</strong>
+      <div className="inventory-metrics-row">
+        <div className="metric-grid overview-metric-grid" aria-label="Inventory summary">
+          <div>
+            <span>INGREDIENTS</span>
+            <strong>{summary?.ingredientCount ?? '—'}</strong>
+          </div>
+          <div>
+            <span>STOCK VALUE</span>
+            <strong>{summary ? ugx(summary.stockValueTotal) : '—'}</strong>
+          </div>
+          <div>
+            <span>LOW STOCK</span>
+            <strong style={{ color: (summary?.lowStockCount ?? 0) > 0 ? '#b45309' : undefined }}>
+              {summary?.lowStockCount ?? '—'}
+            </strong>
+          </div>
         </div>
-        <div>
-          <span>STOCK VALUE</span>
-          <strong>{summary ? ugx(summary.stockValueTotal) : '—'}</strong>
-        </div>
-        <div>
-          <span>LOW STOCK</span>
-          <strong style={{ color: (summary?.lowStockCount ?? 0) > 0 ? '#b45309' : undefined }}>
-            {summary?.lowStockCount ?? '—'}
-          </strong>
+
+        <div className="inventory-page-toolbar">
+          {tab === 'recipes' ? null : (
+            <div className="relative w-full max-w-xs">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder={tab === 'stock' ? 'Search ingredients…' : 'Search movements…'}
+                value={tab === 'stock' ? search : movementSearch}
+                onChange={(e) =>
+                  tab === 'stock' ? setSearch(e.target.value) : setMovementSearch(e.target.value)
+                }
+                className="h-8 pl-8 text-sm"
+                aria-label={tab === 'stock' ? 'Search ingredients' : 'Search movements'}
+              />
+            </div>
+          )}
+          {tab === 'stock' ? (
+            <Button type="button" size="sm" className="h-8" onClick={() => setShowAdd((v) => !v)}>
+              {showAdd ? (
+                'Cancel'
+              ) : (
+                <>
+                  <Plus className="size-3.5" />
+                  Add ingredient
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -145,15 +177,15 @@ export function InventoryPage({
         <StockTab
           businessId={businessId}
           ingredients={filtered}
-          siblingBranches={siblingBranches}
           search={search}
-          onSearch={setSearch}
+          showAdd={showAdd}
+          onCloseAdd={() => setShowAdd(false)}
           onChanged={reload}
         />
       ) : tab === 'recipes' ? (
         <RecipesTab businessId={businessId} foodItems={foodItems} ingredients={ingredients} />
       ) : (
-        <MovementsTab movements={movements} branches={branches} />
+        <MovementsTab movements={movements} branches={branches} search={movementSearch} />
       )}
     </section>
   )
@@ -162,121 +194,102 @@ export function InventoryPage({
 function StockTab({
   businessId,
   ingredients,
-  siblingBranches,
   search,
-  onSearch,
+  showAdd,
+  onCloseAdd,
   onChanged,
 }: {
   businessId: string
   ingredients: Ingredient[]
-  siblingBranches: Branch[]
   search: string
-  onSearch: (v: string) => void
+  showAdd: boolean
+  onCloseAdd: () => void
   onChanged: () => void
 }) {
-  const [showAdd, setShowAdd] = useState(false)
   const [actionFor, setActionFor] = useState<{
     id: string
-    mode: 'receive' | 'adjust' | 'waste' | 'transfer'
+    mode: 'receive'
   } | null>(null)
+  const pagination = usePagination(ingredients, {
+    initialPageSize: 20,
+    resetKey: `${businessId}|${search}`,
+  })
+  const { pageItems } = pagination
 
   return (
     <div className="inventory-panel">
-      <p className="text-sm text-muted-foreground" style={{ margin: 0 }}>
-        Adjust fixes stock on <strong>this branch only</strong>. Use Transfer to move stock to another branch — both sides get matching movements.
-      </p>
-      <div className="inventory-toolbar">
-        <Input
-          placeholder="Search ingredients…"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Button type="button" onClick={() => setShowAdd((v) => !v)}>
-          {showAdd ? 'Cancel' : 'Add ingredient'}
-        </Button>
-      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {showAdd ? (
+          <div className="border-b border-border px-4 py-4">
+            <AddIngredientForm
+              businessId={businessId}
+              onDone={() => {
+                onCloseAdd()
+                onChanged()
+              }}
+            />
+          </div>
+        ) : null}
 
-      {showAdd ? (
-        <AddIngredientForm
-          businessId={businessId}
-          onDone={() => {
-            setShowAdd(false)
-            onChanged()
-          }}
-        />
-      ) : null}
+        {actionFor ? (
+          <div className="border-b border-border px-4 py-4">
+            <StockActionForm
+              businessId={businessId}
+              ingredient={ingredients.find((i) => i.id === actionFor.id)}
+              mode="receive"
+              siblingBranches={[]}
+              onCancel={() => setActionFor(null)}
+              onDone={() => {
+                setActionFor(null)
+                onChanged()
+              }}
+            />
+          </div>
+        ) : null}
 
-      {actionFor ? (
-        <StockActionForm
-          businessId={businessId}
-          ingredient={ingredients.find((i) => i.id === actionFor.id)}
-          mode={actionFor.mode}
-          siblingBranches={siblingBranches}
-          onCancel={() => setActionFor(null)}
-          onDone={() => {
-            setActionFor(null)
-            onChanged()
-          }}
-        />
-      ) : null}
-
-      <div className="report-card" style={{ marginTop: 12 }}>
-        <div className="report-card-body">
+        <div className="p-4">
           {ingredients.length === 0 ? (
             <p className="report-empty">No ingredients yet. Add stock to track cost and profit.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ingredient</TableHead>
-                  <TableHead>On hand</TableHead>
-                  <TableHead>Unit cost</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ingredients.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <strong>{item.name}</strong>
-                      <div className="text-xs text-muted-foreground">
-                        {item.category || 'Uncategorized'}
-                        {item.lowStock ? (
-                          <Badge variant="outline" className="ml-2">
-                            Low
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>{fmtQty(item.qtyOnHand, item.unit)}</TableCell>
-                    <TableCell>{ugx(item.avgUnitCost)}</TableCell>
-                    <TableCell>{ugx(item.stockValue)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setActionFor({ id: item.id, mode: 'receive' })}>
-                        Receive
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setActionFor({ id: item.id, mode: 'adjust' })}>
-                        Adjust
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={siblingBranches.length === 0}
-                        onClick={() => setActionFor({ id: item.id, mode: 'transfer' })}
-                      >
-                        Transfer
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setActionFor({ id: item.id, mode: 'waste' })}>
-                        Waste
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ingredient</TableHead>
+                    <TableHead>On hand</TableHead>
+                    <TableHead>Unit cost</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {pageItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <strong>{item.name}</strong>
+                        <div className="text-xs text-muted-foreground">
+                          {item.category || 'Uncategorized'}
+                          {item.lowStock ? (
+                            <Badge variant="outline" className="ml-2">
+                              Low
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>{fmtQty(item.qtyOnHand, item.unit)}</TableCell>
+                      <TableCell>{ugx(item.avgUnitCost)}</TableCell>
+                      <TableCell>{ugx(item.stockValue)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setActionFor({ id: item.id, mode: 'receive' })}>
+                          Receive
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <PaginationBar pagination={pagination} hideWhenEmpty={false} className="report-list-pagination" />
+            </>
           )}
         </div>
       </div>
@@ -322,7 +335,7 @@ function AddIngredientForm({
   }
 
   return (
-    <form className="add-item-card inventory-form" onSubmit={submit}>
+    <form className="inventory-form" onSubmit={submit}>
       <h3 style={{ margin: 0 }}>New ingredient</h3>
       <div className="inventory-form-grid">
         <div className="grid gap-1.5">
@@ -449,7 +462,7 @@ function StockActionForm({
           : `Waste · ${ingredient.name}`
 
   return (
-    <form className="add-item-card inventory-form" onSubmit={submit}>
+    <form className="inventory-form" onSubmit={submit}>
       <h3 style={{ margin: 0 }}>{title}</h3>
       <p className="text-sm text-muted-foreground" style={{ margin: 0 }}>
         On hand: {fmtQty(ingredient.qtyOnHand, ingredient.unit)}
@@ -586,10 +599,10 @@ function RecipesTab({
   }
 
   return (
-    <div className="inventory-panel">
-      <div className="inventory-toolbar">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
         <Select value={selectedId} onValueChange={setSelectedId}>
-          <SelectTrigger className="max-w-sm">
+          <SelectTrigger className="h-8 max-w-sm text-sm">
             <SelectValue placeholder="Select menu item" />
           </SelectTrigger>
           <SelectContent>
@@ -600,153 +613,192 @@ function RecipesTab({
             ))}
           </SelectContent>
         </Select>
-        <Button type="button" onClick={() => void save()} disabled={saving || loading}>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 ml-auto"
+          onClick={() => void save()}
+          disabled={saving || loading}
+        >
           {saving ? 'Saving…' : 'Save recipe'}
         </Button>
       </div>
 
-      {meta ? (
-        <div className="inventory-recipe-meta">
-          <span>
-            Sell <strong>{ugx(meta.sellPrice)}</strong>
-          </span>
-          <span>
-            Est. cost <strong>{ugx(liveCost || meta.estimatedCost)}</strong>
-          </span>
-          <span>
-            Margin{' '}
-            <strong>
-              {meta.sellPrice > 0
-                ? `${Math.round(((meta.sellPrice - (liveCost || meta.estimatedCost)) * 100) / meta.sellPrice)}%`
-                : '—'}
-            </strong>
-          </span>
-        </div>
-      ) : null}
+      <div className="inventory-panel p-4">
+        {meta ? (
+          <div className="inventory-recipe-meta">
+            <span>
+              Sell <strong>{ugx(meta.sellPrice)}</strong>
+            </span>
+            <span>
+              Est. cost <strong>{ugx(liveCost || meta.estimatedCost)}</strong>
+            </span>
+            <span>
+              Margin{' '}
+              <strong>
+                {meta.sellPrice > 0
+                  ? `${Math.round(((meta.sellPrice - (liveCost || meta.estimatedCost)) * 100) / meta.sellPrice)}%`
+                  : '—'}
+              </strong>
+            </span>
+          </div>
+        ) : null}
 
-      {loading ? (
-        <p className="report-empty">Loading recipe…</p>
-      ) : (
-        <div className="add-item-card inventory-form">
-          {lines.map((line, index) => (
-            <div key={`${line.ingredientId}-${index}`} className="inventory-form-grid">
-              <div className="grid gap-1.5">
-                <Label>Ingredient</Label>
-                <Select
-                  value={line.ingredientId}
-                  onValueChange={(value) => {
-                    const next = [...lines]
-                    next[index] = { ...next[index], ingredientId: value }
-                    setLines(next)
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pick ingredient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ingredients.map((ing) => (
-                      <SelectItem key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {loading ? (
+          <p className="report-empty">Loading recipe…</p>
+        ) : (
+          <div className="inventory-form">
+            {lines.map((line, index) => (
+              <div key={`${line.ingredientId}-${index}`} className="inventory-form-grid">
+                <div className="grid gap-1.5">
+                  <Label>Ingredient</Label>
+                  <Select
+                    value={line.ingredientId}
+                    onValueChange={(value) => {
+                      const next = [...lines]
+                      next[index] = { ...next[index], ingredientId: value }
+                      setLines(next)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pick ingredient" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ingredients.map((ing) => (
+                        <SelectItem key={ing.id} value={ing.id}>
+                          {ing.name} ({ing.unit})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Qty per portion</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={line.qtyPerSale}
+                    onChange={(e) => {
+                      const next = [...lines]
+                      next[index] = { ...next[index], qtyPerSale: e.target.value }
+                      setLines(next)
+                    }}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </div>
-              <div className="grid gap-1.5">
-                <Label>Qty per portion</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={line.qtyPerSale}
-                  onChange={(e) => {
-                    const next = [...lines]
-                    next[index] = { ...next[index], qtyPerSale: e.target.value }
-                    setLines(next)
-                  }}
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setLines(lines.filter((_, i) => i !== index))}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              setLines([...lines, { ingredientId: ingredients[0]?.id ?? '', qtyPerSale: '1' }])
-            }
-          >
-            Add line
-          </Button>
-        </div>
-      )}
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setLines([...lines, { ingredientId: ingredients[0]?.id ?? '', qtyPerSale: '1' }])
+              }
+            >
+              Add line
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function MovementsTab({ movements, branches }: { movements: StockMovement[]; branches: Branch[] }) {
+function MovementsTab({
+  movements,
+  branches,
+  search,
+}: {
+  movements: StockMovement[]
+  branches: Branch[]
+  search: string
+}) {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return movements
+    return movements.filter(
+      (m) =>
+        m.ingredientName.toLowerCase().includes(q) ||
+        m.movementType.toLowerCase().includes(q) ||
+        (m.note || '').toLowerCase().includes(q) ||
+        (m.transferGroupId || '').toLowerCase().includes(q),
+    )
+  }, [movements, search])
+
+  const pagination = usePagination(filtered, {
+    initialPageSize: 20,
+    resetKey: `${search}|${filtered.length}`,
+  })
+  const { pageItems } = pagination
+
   const branchName = (id?: string | null) => {
     if (!id) return null
     const b = branches.find((x) => x.id === id)
     return b ? b.branchLabel || b.name : id
   }
 
-  if (movements.length === 0) {
-    return <p className="report-empty">No stock movements yet.</p>
-  }
-
   return (
-    <div className="report-card">
-      <div className="report-card-body">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>When</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Ingredient</TableHead>
-              <TableHead>Qty</TableHead>
-              <TableHead>Match / note</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {movements.map((m) => {
-              const other = branchName(m.relatedBusinessId)
-              const matchLabel =
-                m.transferGroupId && other
-                  ? `${m.transferGroupId} · ${m.movementType === 'TRANSFER_OUT' ? '→' : '←'} ${other}`
-                  : m.transferGroupId || m.note || m.orderId || '—'
-              return (
-                <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap text-xs">
-                    {new Date(m.createdAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{m.movementType}</Badge>
-                  </TableCell>
-                  <TableCell>{m.ingredientName}</TableCell>
-                  <TableCell>
-                    {m.qtyDelta > 0 ? '+' : ''}
-                    {m.qtyDelta}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {matchLabel}
-                    {m.note && m.transferGroupId ? (
-                      <div>{m.note}</div>
-                    ) : null}
-                  </TableCell>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="p-4">
+        {movements.length === 0 ? (
+          <p className="report-empty">No stock movements yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="report-empty">No movements match your search.</p>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>When</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Ingredient</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Match / note</TableHead>
                 </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {pageItems.map((m) => {
+                  const other = branchName(m.relatedBusinessId)
+                  const matchLabel =
+                    m.transferGroupId && other
+                      ? `${m.transferGroupId} · ${m.movementType === 'TRANSFER_OUT' ? '→' : '←'} ${other}`
+                      : m.transferGroupId || m.note || m.orderId || '—'
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        {new Date(m.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{m.movementType}</Badge>
+                      </TableCell>
+                      <TableCell>{m.ingredientName}</TableCell>
+                      <TableCell>
+                        {m.qtyDelta > 0 ? '+' : ''}
+                        {m.qtyDelta}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {matchLabel}
+                        {m.note && m.transferGroupId ? (
+                          <div>{m.note}</div>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+            <PaginationBar pagination={pagination} hideWhenEmpty={false} className="report-list-pagination" />
+          </>
+        )}
       </div>
     </div>
   )

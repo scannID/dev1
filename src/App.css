@@ -87,6 +87,41 @@
   gap: 2px;
 }
 
+.side-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-nav-chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+
+.side-nav-chevron.open {
+  transform: rotate(180deg);
+}
+
+.side-nav-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px 12px;
+  margin-left: 8px;
+  border-left: 1px solid color-mix(in oklab, var(--sidebar-border) 80%, transparent);
+}
+
+.side-nav-sub button {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.side-nav-sub button svg {
+  opacity: 0.85;
+}
+
 .side-nav button {
   position: relative;
   display: flex;
@@ -3358,32 +3393,75 @@ button:disabled {
   gap: 20px;
 }
 
-.inventory-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.inventory-metrics-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.inventory-metrics > div {
-  background: var(--scan-panel, #ffffff);
-  border: 1px solid var(--scan-border, #e5e7eb);
-  border-radius: 8px;
-  padding: 16px 18px;
+.inventory-metrics-row .metric-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.inventory-metrics-row--actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inventory-metrics-row--actions .inventory-action-hero {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inventory-page-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding-top: 4px;
+}
+
+.inventory-page-toolbar > .relative {
+  flex: 0 1 auto;
+  width: 220px;
+  max-width: 220px;
+}
+
+@media (max-width: 900px) {
+  .inventory-metrics-row {
+    flex-wrap: wrap;
+  }
+
+  .inventory-page-toolbar {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.inventory-action-hero {
   display: grid;
   gap: 6px;
 }
 
-.inventory-metrics span {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #667085;
+.inventory-action-hero h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
 }
 
-.inventory-metrics strong {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--scan-ink, #111827);
+.inventory-action-hero p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+  max-width: 52rem;
 }
 
 .inventory-toolbar {
