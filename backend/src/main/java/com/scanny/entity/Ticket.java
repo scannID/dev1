@@ -97,6 +97,13 @@ public class Ticket {
     @Column(name = "gate_token")
     private String gateToken;
 
+    /**
+     * Soft inventory hold expiry for unpaid attendee tickets.
+     * While {@code paymentStatus == Unpaid} and this is in the future, the seat/class unit is reserved.
+     */
+    @Column(name = "hold_expires_at")
+    private Instant holdExpiresAt;
+
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("scannedAt DESC")
     private List<TicketScan> scans = new ArrayList<>();
@@ -293,6 +300,14 @@ public class Ticket {
 
     public void setGateToken(String gateToken) {
         this.gateToken = gateToken;
+    }
+
+    public Instant getHoldExpiresAt() {
+        return holdExpiresAt;
+    }
+
+    public void setHoldExpiresAt(Instant holdExpiresAt) {
+        this.holdExpiresAt = holdExpiresAt;
     }
 
     public boolean isEventTemplate() {

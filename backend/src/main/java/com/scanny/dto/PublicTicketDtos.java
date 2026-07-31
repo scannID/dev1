@@ -9,15 +9,33 @@ public class PublicTicketDtos {
         throw new UnsupportedOperationException("Utility class");
     }
 
+    /**
+     * @param capacity null means unlimited stock
+     * @param remaining null when unlimited; otherwise units left after sold + held
+     */
     public record TicketClassOption(
         String name,
-        int price
+        int price,
+        Integer capacity,
+        int sold,
+        int held,
+        Integer remaining,
+        boolean soldOut
     ) {}
 
+    /**
+     * @param seats party size for the table package (display)
+     * @param capacity how many of this package can be sold; null = unlimited
+     */
     public record TicketTableOption(
         String name,
         int seats,
-        int price
+        int price,
+        Integer capacity,
+        int sold,
+        int held,
+        Integer remaining,
+        boolean soldOut
     ) {}
 
     public record EventInfoResponse(

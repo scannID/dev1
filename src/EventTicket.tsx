@@ -52,6 +52,8 @@ type TicketClass = {
   id: string
   name: string
   fee: string
+  /** Max tickets for this class; empty = unlimited */
+  capacity: string
 }
 
 type TableOption = {
@@ -59,6 +61,8 @@ type TableOption = {
   name: string
   seats: string
   price: string
+  /** How many of this table package can sell; empty = unlimited */
+  capacity: string
 }
 
 export type EventTicketVisual = {
@@ -612,8 +616,8 @@ function Stepper({
 
 /* ─── Classes / tables editors ──────────────────────────────────────── */
 const DEFAULT_CLASSES: TicketClass[] = [
-  { id: shortId(), name: 'Ordinary', fee: '' },
-  { id: shortId(), name: 'VIP', fee: '' },
+  { id: shortId(), name: 'Ordinary', fee: '', capacity: '' },
+  { id: shortId(), name: 'VIP', fee: '', capacity: '' },
 ]
 
 const PRESET_NAMES = ['Ordinary', 'VIP', 'VVIP']
@@ -626,7 +630,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
     onChange(classes.filter((c) => c.id !== id))
   }
   function addClass() {
-    onChange([...classes, { id: shortId(), name: '', fee: '' }])
+    onChange([...classes, { id: shortId(), name: '', fee: '', capacity: '' }])
   }
 
   return (
@@ -637,87 +641,34 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
         </button>
       </div>
       {classes.map((cls) => (
-        <div key={cls.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input
-            list={`class-names-${cls.id}`}
-            value={cls.name}
-            onChange={(e) => updateClass(cls.id, 'name', e.target.value)}
-            placeholder="Class name (e.g. VIP)"
-            aria-label="Class name"
-            style={{ ...fieldStyle(), flex: 1 }}
-          />
-          <datalist id={`class-names-${cls.id}`}>
-            {PRESET_NAMES.map((n) => (
-              <option key={n} value={n} />
-            ))}
-          </datalist>
-          <input
-            type="number"
-            min="0"
-            value={cls.fee}
-            onChange={(e) => updateClass(cls.id, 'fee', e.target.value)}
-            placeholder="Fee UGX"
-            aria-label="Class fee"
-            style={{ ...fieldStyle(), flex: 1 }}
-          />
-          <button
-            type="button"
-            onClick={() => removeClass(cls.id)}
-            aria-label="Remove class"
-            style={{
-              width: 42,
-              height: 42,
-              flexShrink: 0,
-              borderRadius: 6,
-              border: '1px solid rgba(180,64,46,0.25)',
-              background: CREATE.redBg,
-              color: CREATE.red,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (t: TableOption[]) => void }) {
-  function updateTable(id: string, field: keyof TableOption, val: string) {
-    onChange(tables.map((t) => (t.id === id ? { ...t, [field]: val } : t)))
-  }
-  function removeTable(id: string) {
-    onChange(tables.filter((t) => t.id !== id))
-  }
-  function addTable() {
-    onChange([...tables, { id: shortId(), name: `Table ${tables.length + 1}`, seats: '', price: '' }])
-  }
-
-  return (
-    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="button" onClick={addTable} style={tintTealBtn()}>
-          + Add table
-        </button>
-      </div>
-      {tables.length === 0 ? (
-        <p style={{ margin: 0, color: CREATE.muted, fontSize: 12.5 }}>No table bookings yet.</p>
-      ) : (
-        tables.map((t) => (
-          <div key={t.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input value={t.name} onChange={(e) => updateTable(t.id, 'name', e.target.value)} placeholder="Table name" aria-label="Table name" style={{ ...fieldStyle(), flex: 1 }} />
-            <input type="number" min="1" value={t.seats} onChange={(e) => updateTable(t.id, 'seats', e.target.value)} placeholder="Seats" aria-label="Seats" style={{ ...fieldStyle(), width: 90, flex: '0 0 90px' }} />
-            <input type="number" min="0" value={t.price} onChange={(e) => updateTable(t.id, 'price', e.target.value)} placeholder="Price" aria-label="Table price" style={{ ...fieldStyle(), flex: 1 }} />
+        <div key={cls.id} style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              list={`class-names-${cls.id}`}
+              value={cls.name}
+              onChange={(e) => updateClass(cls.id, 'name', e.target.value)}
+              placeholder="Class name (e.g. VIP)"
+              aria-label="Class name"
+              style={{ ...fieldStyle(), flex: 1 }}
+            />
+            <datalist id={`class-names-${cls.id}`}>
+              {PRESET_NAMES.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+            <input
+              type="number"
+              min="0"
+              value={cls.fee}
+              onChange={(e) => updateClass(cls.id, 'fee', e.target.value)}
+              placeholder="Fee UGX"
+              aria-label="Class fee"
+              style={{ ...fieldStyle(), flex: 1 }}
+            />
             <button
               type="button"
-              onClick={() => removeTable(t.id)}
-              aria-label="Remove table"
+              onClick={() => removeClass(cls.id)}
+              aria-label="Remove class"
               style={{
                 width: 42,
                 height: 42,
@@ -736,6 +687,81 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
+          </div>
+          <input
+            type="number"
+            min="1"
+            value={cls.capacity}
+            onChange={(e) => updateClass(cls.id, 'capacity', e.target.value)}
+            placeholder="Capacity (blank = unlimited)"
+            aria-label="Class capacity"
+            style={{ ...fieldStyle(), width: '100%' }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (t: TableOption[]) => void }) {
+  function updateTable(id: string, field: keyof TableOption, val: string) {
+    onChange(tables.map((t) => (t.id === id ? { ...t, [field]: val } : t)))
+  }
+  function removeTable(id: string) {
+    onChange(tables.filter((t) => t.id !== id))
+  }
+  function addTable() {
+    onChange([...tables, { id: shortId(), name: `Table ${tables.length + 1}`, seats: '', price: '', capacity: '1' }])
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button type="button" onClick={addTable} style={tintTealBtn()}>
+          + Add table
+        </button>
+      </div>
+      {tables.length === 0 ? (
+        <p style={{ margin: 0, color: CREATE.muted, fontSize: 12.5 }}>No table bookings yet.</p>
+      ) : (
+        tables.map((t) => (
+          <div key={t.id} style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input value={t.name} onChange={(e) => updateTable(t.id, 'name', e.target.value)} placeholder="Table name" aria-label="Table name" style={{ ...fieldStyle(), flex: 1 }} />
+              <input type="number" min="1" value={t.seats} onChange={(e) => updateTable(t.id, 'seats', e.target.value)} placeholder="Seats" aria-label="Seats" style={{ ...fieldStyle(), width: 90, flex: '0 0 90px' }} />
+              <input type="number" min="0" value={t.price} onChange={(e) => updateTable(t.id, 'price', e.target.value)} placeholder="Price" aria-label="Table price" style={{ ...fieldStyle(), flex: 1 }} />
+              <button
+                type="button"
+                onClick={() => removeTable(t.id)}
+                aria-label="Remove table"
+                style={{
+                  width: 42,
+                  height: 42,
+                  flexShrink: 0,
+                  borderRadius: 6,
+                  border: '1px solid rgba(180,64,46,0.25)',
+                  background: CREATE.redBg,
+                  color: CREATE.red,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <input
+              type="number"
+              min="1"
+              value={t.capacity}
+              onChange={(e) => updateTable(t.id, 'capacity', e.target.value)}
+              placeholder="How many available (blank = unlimited)"
+              aria-label="Table capacity"
+              style={{ ...fieldStyle(), width: '100%' }}
+            />
           </div>
         ))
       )}
@@ -2762,8 +2788,25 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           location: data.location,
           time: data.time,
           host: data.host,
-          ticketClasses: data.ticketClasses,
-          tables: data.tables,
+          ticketClasses: data.ticketClasses.map((c) => {
+            const capacity = Number(c.capacity)
+            return {
+              id: c.id,
+              name: c.name,
+              fee: c.fee,
+              ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+            }
+          }),
+          tables: data.tables.map((t) => {
+            const capacity = Number(t.capacity)
+            return {
+              id: t.id,
+              name: t.name,
+              seats: t.seats,
+              price: t.price,
+              ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+            }
+          }),
           ...(data.eventImageUrl ? { eventImageUrl: data.eventImageUrl } : {}),
         }),
       })

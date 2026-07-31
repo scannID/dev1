@@ -90,6 +90,9 @@ scanny:
     # Delete master + attendee tickets this many hours after eventDate.
     auto-delete-hours-after-event: ${TICKET_AUTO_DELETE_HOURS:24}
     cleanup-cron: ${TICKET_CLEANUP_CRON:0 15 * * * *}
+    # Soft hold TTL for unpaid class/table inventory before payment completes.
+    hold-ttl-minutes: ${TICKET_HOLD_TTL_MINUTES:10}
+    hold-expiry-cron: ${TICKET_HOLD_EXPIRY_CRON:0 */1 * * * *}
   pexels:
     api-key: ${PEXELS_API_KEY:}
   fees:

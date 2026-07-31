@@ -418,12 +418,22 @@ export interface TicketScanValidationResponse {
 export interface TicketClassOption {
   name: string
   price: number
+  capacity?: number | null
+  sold?: number
+  held?: number
+  remaining?: number | null
+  soldOut?: boolean
 }
 
 export interface TicketTableOption {
   name: string
   seats: number
   price: number
+  capacity?: number | null
+  sold?: number
+  held?: number
+  remaining?: number | null
+  soldOut?: boolean
 }
 
 export interface TicketEventInfo {

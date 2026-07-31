@@ -233,6 +233,16 @@ html.tk-app body {
   color: var(--tk-muted);
 }
 
+.tk-card-meta.is-danger {
+  color: var(--tk-danger);
+  font-weight: 600;
+}
+
+.tk-class-card.is-sold-out {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .tk-class-card:hover:not(:disabled) {
   border-color: var(--tk-gold-dim);
   background: var(--tk-gold-soft);

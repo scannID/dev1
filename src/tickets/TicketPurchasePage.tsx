@@ -11,6 +11,14 @@ function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
 }
 
+function stockLabel(option: { capacity?: number | null; remaining?: number | null; soldOut?: boolean }) {
+  if (option.soldOut) return 'Sold out'
+  if (option.capacity == null || option.remaining == null) return null
+  if (option.remaining <= 0) return 'Sold out'
+  if (option.remaining === 1) return '1 left'
+  return `${option.remaining} left`
+}
+
 function formatEventDate(iso: string | null) {
   if (!iso) return null
   try {
@@ -55,7 +63,11 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (!cancelled) {
           setEvent(data)
-          setTicketClass(data.ticketClasses[0]?.name ?? '')
+          const firstOpen =
+            data.ticketClasses.find((c) => !c.soldOut)?.name ??
+            data.ticketClasses[0]?.name ??
+            ''
+          setTicketClass(firstOpen)
           setBuyTab('classes')
         }
       } catch (err) {
@@ -95,6 +107,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const selectedClass = event?.ticketClasses.find((c) => c.name === ticketClass)
   const selectedTable = tables.find((t) => t.name === ticketClass)
   const selectedPrice = selectedClass?.price ?? selectedTable?.price ?? 0
+  const selectedSoldOut = Boolean(selectedClass?.soldOut || selectedTable?.soldOut)
   const dateLabel = formatEventDate(event?.eventDate ?? null)
 
   if (loading) {
@@ -157,7 +170,11 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 className={`tk-tab${buyTab === 'classes' ? ' is-active' : ''}`}
                 onClick={() => {
                   setBuyTab('classes')
-                  setTicketClass(event.ticketClasses[0]?.name ?? '')
+                  setTicketClass(
+                    event.ticketClasses.find((c) => !c.soldOut)?.name ??
+                      event.ticketClasses[0]?.name ??
+                      '',
+                  )
                 }}
                 disabled={submitting}
               >
@@ -170,7 +187,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 className={`tk-tab${buyTab === 'tables' ? ' is-active' : ''}`}
                 onClick={() => {
                   setBuyTab('tables')
-                  setTicketClass(tables[0]?.name ?? '')
+                  setTicketClass(tables.find((t) => !t.soldOut)?.name ?? tables[0]?.name ?? '')
                 }}
                 disabled={submitting}
               >
@@ -188,19 +205,21 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             {buyTab === 'tables' && hasTables
               ? tables.map((t) => {
                   const active = t.name === ticketClass
+                  const stock = stockLabel(t)
                   return (
                     <button
                       key={t.name}
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      className={`tk-class-card${active ? ' is-selected' : ''}`}
+                      className={`tk-class-card${active ? ' is-selected' : ''}${t.soldOut ? ' is-sold-out' : ''}`}
                       onClick={() => setTicketClass(t.name)}
-                      disabled={submitting}
+                      disabled={submitting || Boolean(t.soldOut)}
                     >
                       <span>
                         <strong>{t.name}</strong>
                         {t.seats > 0 ? <em className="tk-card-meta">{t.seats} seats</em> : null}
+                        {stock ? <em className={`tk-card-meta${t.soldOut ? ' is-danger' : ''}`}>{stock}</em> : null}
                       </span>
                       <span>{money(t.price, event.currency)}</span>
                     </button>
@@ -208,17 +227,21 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 })
               : event.ticketClasses.map((c) => {
                   const active = c.name === ticketClass
+                  const stock = stockLabel(c)
                   return (
                     <button
                       key={c.name}
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      className={`tk-class-card${active ? ' is-selected' : ''}`}
+                      className={`tk-class-card${active ? ' is-selected' : ''}${c.soldOut ? ' is-sold-out' : ''}`}
                       onClick={() => setTicketClass(c.name)}
-                      disabled={submitting}
+                      disabled={submitting || Boolean(c.soldOut)}
                     >
-                      <strong>{c.name}</strong>
+                      <span>
+                        <strong>{c.name}</strong>
+                        {stock ? <em className={`tk-card-meta${c.soldOut ? ' is-danger' : ''}`}>{stock}</em> : null}
+                      </span>
                       <span>{money(c.price, event.currency)}</span>
                     </button>
                   )
@@ -261,8 +284,12 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </div>
           ) : null}
 
-          <button type="submit" className="tk-cta" disabled={submitting || !ticketClass}>
-            {submitting ? 'Creating…' : `Create Ticket ${money(selectedPrice, event.currency)}`}
+          <button type="submit" className="tk-cta" disabled={submitting || !ticketClass || selectedSoldOut}>
+            {submitting
+              ? 'Creating…'
+              : selectedSoldOut
+                ? 'Sold out'
+                : `Create Ticket ${money(selectedPrice, event.currency)}`}
           </button>
         </form>
       </main>

@@ -13,6 +13,7 @@ import com.scanny.payment.PaymentIntentStatus;
 import com.scanny.repository.TicketRepository;
 import com.scanny.util.PhoneUtils;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -38,6 +39,7 @@ public class TicketPurchaseService {
     private final TicketService ticketService;
     private final ObjectMapper objectMapper;
     private final Environment environment;
+    private final long holdTtlMinutes;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
@@ -47,12 +49,14 @@ public class TicketPurchaseService {
             WhatsAppNotificationService whatsAppNotificationService,
             TicketService ticketService,
             ObjectMapper objectMapper,
-            Environment environment) {
+            Environment environment,
+            @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes) {
         this.ticketRepository = ticketRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
         this.environment = environment;
+        this.holdTtlMinutes = Math.max(1, holdTtlMinutes);
     }
 
     @Transactional
@@ -81,8 +85,10 @@ public class TicketPurchaseService {
     public PublicTicketDtos.EventInfoResponse getEventForPurchase(String masterQrToken) {
         Ticket master = requireEventTemplate(masterQrToken);
         Map<String, Object> meta = parseMetadata(master.getMetadata());
-        List<PublicTicketDtos.TicketClassOption> classes = parseClasses(meta, master.getTicketType(), master.getPrice());
-        List<PublicTicketDtos.TicketTableOption> tables = parseTables(meta);
+        Instant now = Instant.now();
+        List<PublicTicketDtos.TicketClassOption> classes = parseClasses(
+            meta, master.getTicketType(), master.getPrice(), master.getId(), now);
+        List<PublicTicketDtos.TicketTableOption> tables = parseTables(meta, master.getId(), now);
         return new PublicTicketDtos.EventInfoResponse(
             master.getId(),
             master.getEventName(),
@@ -100,7 +106,7 @@ public class TicketPurchaseService {
 
     @Transactional
     public PublicTicketDtos.PurchaseResponse startPurchase(PublicTicketDtos.PurchaseRequest request) {
-        Ticket master = requireEventTemplate(request.masterQrToken());
+        Ticket master = requireEventTemplateForUpdate(request.masterQrToken());
         String email = optionalEmail(request.holderEmail());
         String name = requireText(request.holderName(), "Your name is required");
         String phone = requirePhone(request.holderPhone());
@@ -123,6 +129,10 @@ public class TicketPurchaseService {
             throw new ApiException(400, "Unknown ticket class or table");
         }
 
+        Instant now = Instant.now();
+        Integer capacity = resolveSelectionCapacity(masterMeta, ticketClass);
+        assertInventoryAvailable(master.getId(), ticketClass, capacity, now);
+
         Ticket attendee = new Ticket();
         attendee.setId(generateTicketId());
         attendee.setQrToken(generateQrToken());
@@ -141,15 +151,18 @@ public class TicketPurchaseService {
         attendee.setExpiresAt(master.getExpiresAt());
         attendee.setStatus(TicketStatus.Active);
         attendee.setPaymentStatus(PaymentStatus.Unpaid);
+        attendee.setHoldExpiresAt(now.plus(holdTtlMinutes, ChronoUnit.MINUTES));
         attendee.setIssuedBy("public-purchase");
         attendee.setMetadata(serializeAttendeeMetadata(masterMeta, ticketClass));
-        attendee.setCreatedAt(Instant.now());
+        attendee.setCreatedAt(now);
 
         attendee = ticketRepository.save(attendee);
 
+        // Local instant-pay path: convert hold → sold in the same transaction.
         String paymentId = generateImmediatePaymentId();
         attendee.setPaymentStatus(PaymentStatus.Paid);
         attendee.setPaymentReference(paymentId);
+        attendee.setHoldExpiresAt(null);
         attendee.setUpdatedAt(Instant.now());
         ticketRepository.save(attendee);
 
@@ -180,6 +193,7 @@ public class TicketPurchaseService {
 
         ticket.setPaymentStatus(PaymentStatus.Paid);
         ticket.setPaymentReference(paymentId != null ? paymentId : "");
+        ticket.setHoldExpiresAt(null);
         ticket.setUpdatedAt(Instant.now());
         ticketRepository.save(ticket);
 
@@ -337,6 +351,42 @@ public class TicketPurchaseService {
         return ticket;
     }
 
+    /** Lock the master event row so concurrent purchases cannot oversell. */
+    private Ticket requireEventTemplateForUpdate(String qrToken) {
+        Ticket unlocked = requireEventTemplate(qrToken);
+        return ticketRepository.findByIdForUpdate(unlocked.getId())
+            .orElseThrow(() -> new ApiException(404, "Event not found"));
+    }
+
+    private void assertInventoryAvailable(String masterId, String selection, Integer capacity, Instant now) {
+        if (capacity == null) {
+            return;
+        }
+        long sold = ticketRepository.countSoldByMasterAndType(masterId, selection);
+        long held = ticketRepository.countActiveHoldsByMasterAndType(masterId, selection, now);
+        if (sold + held >= capacity) {
+            throw new ApiException(409, "Sold out — no more tickets left for " + selection);
+        }
+    }
+
+    private InventorySnapshot inventoryFor(String masterId, String selection, Integer capacity, Instant now) {
+        int sold = (int) ticketRepository.countSoldByMasterAndType(masterId, selection);
+        int held = (int) ticketRepository.countActiveHoldsByMasterAndType(masterId, selection, now);
+        if (capacity == null) {
+            return new InventorySnapshot(null, sold, held, null, false);
+        }
+        int remaining = Math.max(0, capacity - sold - held);
+        return new InventorySnapshot(capacity, sold, held, remaining, remaining == 0);
+    }
+
+    private record InventorySnapshot(
+        Integer capacity,
+        int sold,
+        int held,
+        Integer remaining,
+        boolean soldOut
+    ) {}
+
     private String buildViewUrl(String accessToken) {
         return customerUrl + "/ticket/view/" + accessToken;
     }
@@ -378,7 +428,12 @@ public class TicketPurchaseService {
     }
 
     @SuppressWarnings("unchecked")
-    private List<PublicTicketDtos.TicketClassOption> parseClasses(Map<String, Object> meta, String fallbackType, int fallbackPrice) {
+    private List<PublicTicketDtos.TicketClassOption> parseClasses(
+            Map<String, Object> meta,
+            String fallbackType,
+            int fallbackPrice,
+            String masterId,
+            Instant now) {
         Object raw = meta.get("ticketClasses");
         List<PublicTicketDtos.TicketClassOption> classes = new ArrayList<>();
         if (raw instanceof List<?> list) {
@@ -387,19 +442,41 @@ public class TicketPurchaseService {
                     String name = String.valueOf(map.get("name"));
                     int price = parsePrice(map.get("fee"), fallbackPrice);
                     if (!name.isBlank() && !"null".equalsIgnoreCase(name)) {
-                        classes.add(new PublicTicketDtos.TicketClassOption(name, price));
+                        Integer capacity = parseOptionalCapacity(map.get("capacity"));
+                        InventorySnapshot inv = inventoryFor(masterId, name, capacity, now);
+                        classes.add(new PublicTicketDtos.TicketClassOption(
+                            name,
+                            price,
+                            inv.capacity(),
+                            inv.sold(),
+                            inv.held(),
+                            inv.remaining(),
+                            inv.soldOut()
+                        ));
                     }
                 }
             }
         }
         if (classes.isEmpty()) {
-            classes.add(new PublicTicketDtos.TicketClassOption(fallbackType, fallbackPrice));
+            InventorySnapshot inv = inventoryFor(masterId, fallbackType, null, now);
+            classes.add(new PublicTicketDtos.TicketClassOption(
+                fallbackType,
+                fallbackPrice,
+                inv.capacity(),
+                inv.sold(),
+                inv.held(),
+                inv.remaining(),
+                inv.soldOut()
+            ));
         }
         return classes;
     }
 
     @SuppressWarnings("unchecked")
-    private List<PublicTicketDtos.TicketTableOption> parseTables(Map<String, Object> meta) {
+    private List<PublicTicketDtos.TicketTableOption> parseTables(
+            Map<String, Object> meta,
+            String masterId,
+            Instant now) {
         Object raw = meta.get("tables");
         List<PublicTicketDtos.TicketTableOption> tables = new ArrayList<>();
         if (!(raw instanceof List<?> list)) {
@@ -413,24 +490,93 @@ public class TicketPurchaseService {
                 }
                 int seats = parsePrice(map.get("seats"), 0);
                 int price = parsePrice(map.get("price"), 0);
-                tables.add(new PublicTicketDtos.TicketTableOption(name, seats, price));
+                Integer capacity = parseOptionalCapacity(map.get("capacity"));
+                InventorySnapshot inv = inventoryFor(masterId, name, capacity, now);
+                tables.add(new PublicTicketDtos.TicketTableOption(
+                    name,
+                    seats,
+                    price,
+                    inv.capacity(),
+                    inv.sold(),
+                    inv.held(),
+                    inv.remaining(),
+                    inv.soldOut()
+                ));
             }
         }
         return tables;
     }
 
     private int resolveSelectionPrice(Map<String, Object> meta, String selection, int fallbackPrice) {
-        for (PublicTicketDtos.TicketClassOption option : parseClasses(meta, selection, fallbackPrice)) {
-            if (option.name().equalsIgnoreCase(selection)) {
-                return option.price();
+        Object rawClasses = meta.get("ticketClasses");
+        boolean hasClasses = false;
+        if (rawClasses instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.isBlank() || "null".equalsIgnoreCase(name)) {
+                        continue;
+                    }
+                    hasClasses = true;
+                    if (name.equalsIgnoreCase(selection)) {
+                        return parsePrice(map.get("fee"), fallbackPrice);
+                    }
+                }
             }
         }
-        for (PublicTicketDtos.TicketTableOption table : parseTables(meta)) {
-            if (table.name().equalsIgnoreCase(selection)) {
-                return table.price();
+        Object rawTables = meta.get("tables");
+        if (rawTables instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.equalsIgnoreCase(selection)) {
+                        return parsePrice(map.get("price"), 0);
+                    }
+                }
             }
+        }
+        if (!hasClasses) {
+            return fallbackPrice;
         }
         return -1;
+    }
+
+    private Integer resolveSelectionCapacity(Map<String, Object> meta, String selection) {
+        Object rawClasses = meta.get("ticketClasses");
+        if (rawClasses instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.equalsIgnoreCase(selection)) {
+                        return parseOptionalCapacity(map.get("capacity"));
+                    }
+                }
+            }
+        }
+        Object rawTables = meta.get("tables");
+        if (rawTables instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.equalsIgnoreCase(selection)) {
+                        return parseOptionalCapacity(map.get("capacity"));
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private Integer parseOptionalCapacity(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String digits = String.valueOf(value).replaceAll("[^0-9]", "").trim();
+        if (digits.isBlank()) {
+            return null;
+        }
+        int capacity = Integer.parseInt(digits);
+        return capacity > 0 ? capacity : null;
     }
 
     private int parsePrice(Object fee, int fallback) {
