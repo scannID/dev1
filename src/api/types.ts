@@ -692,3 +692,21 @@ export interface FeeConfig {
   currency: string
 }
 
+export type BroadcastSeverity = 'INFO' | 'WARNING' | 'CRITICAL'
+
+export interface MerchantBroadcast {
+  id: string
+  title: string
+  body: string
+  severity: BroadcastSeverity
+  publishedAt: string | null
+  expiresAt: string | null
+  unread: boolean
+  dismissed: boolean
+}
+
+export interface MerchantBroadcastListResponse {
+  broadcasts: MerchantBroadcast[]
+  unread: number
+}
+

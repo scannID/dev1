@@ -33,6 +33,9 @@ import type {
   ScansOrdersSeries,
   CookieConsentAnalytics,
   NotificationsResponse,
+  AdminBroadcast,
+  AdminBroadcastListResponse,
+  PublishBroadcastRequest,
 } from './types'
 
 export const dashboardApi = {
@@ -229,6 +232,20 @@ export const notificationsApi = {
   },
 }
 
+export const broadcastsApi = {
+  list: async (): Promise<AdminBroadcastListResponse> => {
+    return api.get<AdminBroadcastListResponse>('/admin/broadcasts')
+  },
+
+  publish: async (payload: PublishBroadcastRequest): Promise<AdminBroadcast> => {
+    return api.post<AdminBroadcast>('/admin/broadcasts', payload)
+  },
+
+  revoke: async (id: string): Promise<AdminBroadcast> => {
+    return api.post<AdminBroadcast>(`/admin/broadcasts/${id}/revoke`)
+  },
+}
+
 export const adminApi = {
   dashboard: dashboardApi,
   merchants: merchantsApi,
@@ -244,6 +261,7 @@ export const adminApi = {
   tickets: ticketsApi,
   configs: configsApi,
   notifications: notificationsApi,
+  broadcasts: broadcastsApi,
 }
 
 export default adminApi

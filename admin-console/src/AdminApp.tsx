@@ -9,6 +9,7 @@ import {
   FileText,
   LayoutGrid,
   LogOut,
+  Megaphone,
   Moon,
   QrCode,
   Settings,
@@ -49,6 +50,7 @@ import ReportsPage from './pages/ReportsPage'
 import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
+import CommunicationsPage from './pages/CommunicationsPage'
 import { InlineSpinner } from './components/LoadingSpinner'
 import { PaginationBar } from './components/PaginationBar'
 import { usePagination } from './hooks/usePagination'
@@ -56,7 +58,7 @@ import { useNotifications, useSystemHealth } from './hooks/usePlatform'
 
 type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
-  | 'users' | 'revenue' | 'qr-activity' | 'cookie-consent' | 'reports'
+  | 'users' | 'communications' | 'revenue' | 'qr-activity' | 'cookie-consent' | 'reports'
   | 'system' | 'audit' | 'configs'
 
 type NavItem = {
@@ -73,6 +75,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   orders: { eyebrow: 'Admin · Platform', title: 'All Orders' },
   ticketing: { eyebrow: 'Admin · Platform', title: 'Ticketing' },
   users: { eyebrow: 'Admin · Platform', title: 'Users' },
+  communications: { eyebrow: 'Admin · Platform', title: 'Communications' },
   revenue: { eyebrow: 'Admin · Finance', title: 'Revenue & Payments' },
   'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
   'cookie-consent': { eyebrow: 'Admin · Analytics', title: 'Cookie Consent' },
@@ -171,6 +174,7 @@ export default function AdminApp({
           { id: 'orders' as const, label: 'All Orders', icon: ShoppingCart },
           { id: 'ticketing' as const, label: 'Ticketing', icon: Ticket },
           { id: 'users' as const, label: 'Users', icon: Users },
+          { id: 'communications' as const, label: 'Communications', icon: Megaphone },
         ],
       },
       {
@@ -321,6 +325,7 @@ export default function AdminApp({
           {view === 'orders' && <OrdersPage />}
           {view === 'ticketing' && <TicketingPage />}
           {view === 'users' && <UsersPage />}
+          {view === 'communications' && <CommunicationsPage />}
           {view === 'revenue' && <RevenuePaymentsPage />}
           {view === 'qr-activity' && <QRActivityPage />}
           {view === 'cookie-consent' && <CookieConsentPage />}

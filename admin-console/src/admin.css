@@ -354,6 +354,38 @@
   margin-top: auto;
 }
 
+.admin-monthly-chart {
+  position: relative;
+  height: 140px;
+}
+
+.admin-sparkline-overlay {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 18px;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.admin-bar-chart--overlay {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+}
+
+.admin-bar-chart--overlay .bar {
+  opacity: 0.45;
+}
+
+.admin-bar-chart--overlay .bar.accent {
+  opacity: 0.7;
+}
+
 /* ── Status dot ──────────────────────────── */
 .status-dot {
   width: 7px;

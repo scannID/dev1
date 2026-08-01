@@ -1,7 +1,6 @@
 /** Device-local list of events created on this browser (for create-event QR gallery). */
 
 export type LocalCreatedEvent = {
-  /** Stored for track/open only — never shown in the create-event UI. */
   eventId: string
   eventName: string
   purchaseUrl: string

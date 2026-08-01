@@ -427,3 +427,30 @@ export interface NotificationsResponse {
   notifications: AdminNotification[]
   unread: number
 }
+
+export type BroadcastSeverity = 'INFO' | 'WARNING' | 'CRITICAL'
+export type BroadcastStatus = 'DRAFT' | 'PUBLISHED' | 'REVOKED'
+
+export interface AdminBroadcast {
+  id: string
+  title: string
+  body: string
+  severity: BroadcastSeverity
+  status: BroadcastStatus
+  createdBy: string | null
+  createdByEmail: string | null
+  createdAt: string
+  publishedAt: string | null
+  expiresAt: string | null
+}
+
+export interface AdminBroadcastListResponse {
+  broadcasts: AdminBroadcast[]
+}
+
+export interface PublishBroadcastRequest {
+  title: string
+  body: string
+  severity?: BroadcastSeverity
+  expiresAt?: string | null
+}

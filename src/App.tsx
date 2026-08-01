@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useBusinessData } from './hooks/useBusinessData'
 import { useCatalog } from './hooks/useCatalog'
+import { useMerchantBroadcasts } from './hooks/useMerchantBroadcasts'
 import { useOrders } from './hooks/useOrders'
 import { usePagination } from './hooks/usePagination'
 import { useServerPagination } from './hooks/useServerPagination'
@@ -68,6 +69,7 @@ import type {
   CatalogItem as ApiCatalogItem,
   CatalogItemKind,
   CreateCatalogItemRequest,
+  MerchantBroadcast,
   Order as ApiOrder,
   OrderStatus,
   PaymentStatus,
@@ -296,6 +298,13 @@ function App({
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
   const [showNotifications, setShowNotifications] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
+  const {
+    broadcasts,
+    unread: broadcastUnread,
+    bannerBroadcast,
+    markRead: markBroadcastRead,
+    dismiss: dismissBroadcast,
+  } = useMerchantBroadcasts(!staffMode)
   const [actionError, setActionError] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
   const [branchOverviewCounts, setBranchOverviewCounts] = useState<Record<string, { openOrders: number; kitchenOrders: number }>>({})
@@ -924,10 +933,35 @@ function App({
               onClick={() => setShowNotifications(true)}
             >
               <Bell className="size-3.5" />
-              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+              {broadcastUnread > 0 ? (
+                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+              ) : null}
             </Button>
           </div>
         </header>
+
+        {bannerBroadcast ? (
+          <div
+            className={`merchant-broadcast-banner severity-${bannerBroadcast.severity.toLowerCase()}`}
+            role="status"
+          >
+            <div className="merchant-broadcast-banner-icon" aria-hidden="true">
+              <Megaphone size={16} />
+            </div>
+            <div className="merchant-broadcast-banner-copy">
+              <strong>{bannerBroadcast.title}</strong>
+              <p>{bannerBroadcast.body}</p>
+            </div>
+            <button
+              type="button"
+              className="merchant-broadcast-banner-dismiss"
+              aria-label="Dismiss message"
+              onClick={() => void dismissBroadcast(bannerBroadcast.id)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : null}
 
         {showAddItem || editingItem ? (
           <div className="page-content add-item-page-content">
@@ -1125,10 +1159,16 @@ function App({
           <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
             <SheetHeader className="border-b border-border px-6 py-4">
               <SheetTitle className="">Notifications</SheetTitle>
-              <SheetDescription className="">Recent activity for {business.name || 'your business'}</SheetDescription>
+              <SheetDescription className="">Kode messages and recent activity for {business.name || 'your business'}</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto">
-              <NotificationsPanel businessName={business.name} orders={businessOrders} />
+              <NotificationsPanel
+                businessName={business.name}
+                orders={businessOrders}
+                broadcasts={broadcasts}
+                onOpenBroadcast={(id) => void markBroadcastRead(id)}
+                onDismissBroadcast={(id) => void dismissBroadcast(id)}
+              />
             </div>
           </SheetContent>
         </Sheet>
@@ -1136,7 +1176,19 @@ function App({
     </main>
   )
 }
-function NotificationsPanel({ businessName, orders }: { businessName: string; orders: Order[] }) {
+function NotificationsPanel({
+  businessName,
+  orders,
+  broadcasts = [],
+  onOpenBroadcast,
+  onDismissBroadcast,
+}: {
+  businessName: string
+  orders: Order[]
+  broadcasts?: MerchantBroadcast[]
+  onOpenBroadcast?: (id: string) => void
+  onDismissBroadcast?: (id: string) => void
+}) {
   const sortedOrders = useMemo(
     () => [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [orders],
@@ -1166,6 +1218,55 @@ function NotificationsPanel({ businessName, orders }: { businessName: string; or
 
   return (
     <div>
+      {broadcasts.length > 0 && (
+        <div style={{ borderBottom: '1px solid var(--border)' }}>
+          <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>From Kode</p>
+          {broadcasts.map((b) => (
+            <div
+              key={b.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenBroadcast?.(b.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onOpenBroadcast?.(b.id)
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: b.severity === 'CRITICAL' ? 'oklch(0.96 0.02 30)' : b.severity === 'WARNING' ? 'oklch(0.96 0.04 75)' : 'oklch(0.94 0.04 250)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--foreground)' }}>
+                <Megaphone size={15} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: b.unread ? 600 : 500, color: 'var(--foreground)' }}>{b.title}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)', whiteSpace: 'pre-wrap' }}>{b.body}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>
+                  {b.publishedAt ? new Date(b.publishedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Kode'}
+                  {b.dismissed ? ' · Dismissed' : ''}
+                </p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                {b.unread && !b.dismissed ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--destructive)', flexShrink: 0 }} /> : null}
+                {!b.dismissed ? (
+                  <button
+                    type="button"
+                    aria-label={`Dismiss ${b.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDismissBroadcast?.(b.id)
+                    }}
+                    style={{ border: 'none', background: 'transparent', color: 'var(--muted-foreground)', cursor: 'pointer', padding: 2 }}
+                  >
+                    <X size={12} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* System alerts */}
       {systemNotifs.length > 0 && (
         <div style={{ borderBottom: '1px solid var(--border)' }}>

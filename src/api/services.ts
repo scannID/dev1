@@ -52,6 +52,7 @@ import type {
   PagedResult,
   PaginationMeta,
   FeeConfig,
+  MerchantBroadcastListResponse,
 } from './types'
 
 export type CatalogListParams = {
@@ -118,6 +119,18 @@ export const merchantAuthApi = {
 
   markPrinted: async (merchantId: string): Promise<void> => {
     await api.post(`/auth/merchant/qr-code/mark-printed?merchantId=${merchantId}`)
+  },
+
+  listBroadcasts: async (): Promise<MerchantBroadcastListResponse> => {
+    return api.get<MerchantBroadcastListResponse>('/auth/merchant/broadcasts')
+  },
+
+  markBroadcastRead: async (id: string): Promise<void> => {
+    await api.post(`/auth/merchant/broadcasts/${id}/read`)
+  },
+
+  dismissBroadcast: async (id: string): Promise<void> => {
+    await api.post(`/auth/merchant/broadcasts/${id}/dismiss`)
   },
 }
 

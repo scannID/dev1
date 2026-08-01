@@ -614,7 +614,8 @@ html.cm-app #root {
   position: absolute;
   inset: auto 0 0;
   z-index: 1;
-  padding: 36px 14px 14px;
+  /* Right padding clears the absolute Add button (36px + inset). */
+  padding: 36px 52px 14px 14px;
   border-radius: 0 0 20px 20px;
   background: linear-gradient(to top, rgba(12, 12, 12, 0.92) 0%, rgba(12, 12, 12, 0.55) 55%, transparent 100%);
 }
@@ -626,13 +627,14 @@ html.cm-app #root {
   letter-spacing: -0.02em;
   line-height: 1.2;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
-  padding-right: 40px;
 }
 
 .cm-offer-prices {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 .cm-offer-now {

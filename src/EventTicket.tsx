@@ -273,6 +273,22 @@ function CreatedEventsQrSection({
                   QR
                 </div>
               )}
+              <span
+                style={{
+                  display: 'block',
+                  marginTop: 8,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: '0.02em',
+                  color: CREATE.muted,
+                  textAlign: 'center',
+                  wordBreak: 'break-all',
+                  lineHeight: 1.25,
+                }}
+              >
+                {event.eventId}
+              </span>
             </button>
           )
         })}

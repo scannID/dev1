@@ -334,3 +334,67 @@ export function useNotifications() {
   return { notifications, unread, loading, error, refresh: () => refresh(false), markAllRead }
 }
 
+export function useBroadcasts() {
+  const [data, setData] = useState<Awaited<ReturnType<typeof adminApi.broadcasts.list>> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const refresh = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      setError(null)
+      setData(await adminApi.broadcasts.list())
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load broadcasts')
+        setData(null)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh(false)
+  }, [refresh])
+
+  const publish = useCallback(
+    async (payload: { title: string; body: string; severity?: 'INFO' | 'WARNING' | 'CRITICAL'; expiresAt?: string | null }) => {
+      setSaving(true)
+      try {
+        const created = await adminApi.broadcasts.publish(payload)
+        await refresh(true)
+        return created
+      } finally {
+        setSaving(false)
+      }
+    },
+    [refresh],
+  )
+
+  const revoke = useCallback(
+    async (id: string) => {
+      setSaving(true)
+      try {
+        const updated = await adminApi.broadcasts.revoke(id)
+        await refresh(true)
+        return updated
+      } finally {
+        setSaving(false)
+      }
+    },
+    [refresh],
+  )
+
+  return {
+    broadcasts: data?.broadcasts ?? [],
+    loading,
+    error,
+    saving,
+    refresh: () => refresh(false),
+    publish,
+    revoke,
+  }
+}
+

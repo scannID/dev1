@@ -2,6 +2,7 @@ import { TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
+import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 import { useRevenue } from '../hooks/usePlatform'
 
@@ -82,16 +83,25 @@ export default function RevenuePaymentsPage() {
               <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No monthly revenue data yet.</p>
             ) : (
               <>
-                <div className="admin-bar-chart" style={{ height: 140 }}>
-                  {monthly.map((m, i) => (
-                    <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{Math.round(m.revenue / 1000)}k</span>
-                      <div
-                        className={`bar ${i === monthly.length - 1 ? 'accent' : ''}`}
-                        style={{ width: '100%', height: `${(m.revenue / maxRev) * 100}%`, borderRadius: '4px 4px 0 0' }}
-                      />
-                    </div>
-                  ))}
+                <div className="admin-monthly-chart">
+                  <Sparkline
+                    data={monthly.map((m) => m.revenue)}
+                    color="var(--primary)"
+                    className="admin-sparkline-overlay"
+                    height={100}
+                    strokeWidth={1.6}
+                  />
+                  <div className="admin-bar-chart admin-bar-chart--overlay" style={{ height: 140 }}>
+                    {monthly.map((m, i) => (
+                      <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{Math.round(m.revenue / 1000)}k</span>
+                        <div
+                          className={`bar ${i === monthly.length - 1 ? 'accent' : ''}`}
+                          style={{ width: '100%', height: `${(m.revenue / maxRev) * 100}%`, borderRadius: '4px 4px 0 0' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8 }}>
                   {monthly.map((m) => (

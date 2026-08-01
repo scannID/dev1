@@ -456,8 +456,84 @@ button:disabled {
 
 /* Main content padding */
 .company-workspace > section,
-.company-workspace > div:not(.company-topbar) {
+.company-workspace > div:not(.company-topbar):not(.merchant-broadcast-banner) {
   padding: 20px 24px 24px;
+}
+
+.merchant-broadcast-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 24px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
+.merchant-broadcast-banner.severity-warning {
+  background: color-mix(in srgb, #d97706 10%, var(--card));
+  border-color: color-mix(in srgb, #d97706 35%, var(--border));
+}
+
+.merchant-broadcast-banner.severity-critical {
+  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
+  border-color: color-mix(in srgb, var(--destructive) 35%, var(--border));
+}
+
+.merchant-broadcast-banner-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--foreground);
+}
+
+.merchant-broadcast-banner.severity-warning .merchant-broadcast-banner-icon {
+  background: color-mix(in srgb, #d97706 16%, transparent);
+}
+
+.merchant-broadcast-banner.severity-critical .merchant-broadcast-banner-icon {
+  background: color-mix(in srgb, var(--destructive) 16%, transparent);
+}
+
+.merchant-broadcast-banner-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.merchant-broadcast-banner-copy strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.merchant-broadcast-banner-copy p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+}
+
+.merchant-broadcast-banner-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 0;
+}
+
+.merchant-broadcast-banner-dismiss:hover {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--foreground);
 }
 
 .dashboard h3,
