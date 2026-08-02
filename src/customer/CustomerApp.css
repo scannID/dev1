@@ -91,6 +91,14 @@ html.cm-app #root {
   gap: 0;
 }
 
+.cm-boot-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
 .cm-utensil-loader {
   display: flex;
   align-items: flex-end;

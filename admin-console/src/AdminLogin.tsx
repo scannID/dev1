@@ -18,7 +18,7 @@ export default function AdminLogin({
       <CursorField />
       <div className="admin-login-card">
         <div className="admin-login-brand">
-          <img src="/qrcode1.png" alt="" className="admin-login-logo" />
+          <img src="/kode-icon.svg" alt="" className="admin-login-logo" />
           <div>
             <p className="admin-login-name">Kode</p>
             <p className="admin-login-tag">Admin Console</p>

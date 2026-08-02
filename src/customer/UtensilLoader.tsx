@@ -1,14 +1,25 @@
 /** Orange fork / knife / spoon loader for the customer menu boot. */
+import { KodeMark } from './KodeMark'
+
 export function UtensilLoader({ size = 58 }: { size?: number }) {
+  const markSize = Math.max(36, Math.round(size * 0.9))
+
   return (
     <div
-      className="cm-utensil-loader"
+      className="cm-boot-loader"
       role="status"
       aria-live="polite"
       aria-label="Preparing menu"
       style={{ ['--cm-utensil-size' as string]: `${size}px` }}
     >
       <style>{`
+        .cm-boot-loader {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 22px;
+        }
         .cm-utensil-loader {
           display: flex;
           align-items: flex-end;
@@ -50,42 +61,46 @@ export function UtensilLoader({ size = 58 }: { size?: number }) {
       `}</style>
       <span className="sr-only">Preparing menu</span>
 
-      <span className="cm-utensil cm-utensil-fork" aria-hidden="true">
-        <svg viewBox="0 0 32 64" fill="none">
-          <path
-            d="M8 6v14M14 6v16M20 6v14"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-          <path
-            d="M8 20c0 4.5 2.6 7 6 7s6-2.5 6-7"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-          <path d="M14 27v31" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        </svg>
-      </span>
+      <KodeMark size={markSize} />
 
-      <span className="cm-utensil cm-utensil-knife" aria-hidden="true">
-        <svg viewBox="0 0 32 64" fill="none">
-          <path
-            d="M11 8c9 6 12 16 12 24H11V8Z"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinejoin="round"
-          />
-          <path d="M11 32v26" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        </svg>
-      </span>
+      <div className="cm-utensil-loader" aria-hidden="true">
+        <span className="cm-utensil cm-utensil-fork">
+          <svg viewBox="0 0 32 64" fill="none">
+            <path
+              d="M8 6v14M14 6v16M20 6v14"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+            />
+            <path
+              d="M8 20c0 4.5 2.6 7 6 7s6-2.5 6-7"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+            />
+            <path d="M14 27v31" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          </svg>
+        </span>
 
-      <span className="cm-utensil cm-utensil-spoon" aria-hidden="true">
-        <svg viewBox="0 0 32 64" fill="none">
-          <ellipse cx="16" cy="14" rx="8" ry="10" stroke="currentColor" strokeWidth="2.6" />
-          <path d="M16 24v34" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
-        </svg>
-      </span>
+        <span className="cm-utensil cm-utensil-knife">
+          <svg viewBox="0 0 32 64" fill="none">
+            <path
+              d="M11 8c9 6 12 16 12 24H11V8Z"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinejoin="round"
+            />
+            <path d="M11 32v26" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          </svg>
+        </span>
+
+        <span className="cm-utensil cm-utensil-spoon">
+          <svg viewBox="0 0 32 64" fill="none">
+            <ellipse cx="16" cy="14" rx="8" ry="10" stroke="currentColor" strokeWidth="2.6" />
+            <path d="M16 24v34" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+          </svg>
+        </span>
+      </div>
     </div>
   )
 }

@@ -685,10 +685,11 @@
 .admin-login-logo {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
   object-fit: contain;
-  background: var(--muted);
-  padding: 4px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  display: block;
 }
 
 .admin-login-name {

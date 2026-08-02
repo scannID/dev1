@@ -711,7 +711,7 @@ function App({
       <aside className="company-sidebar" aria-label="Company workspace navigation">
         <div className="sidebar-brand">
           <img
-            src="/qrcode1.png"
+            src="/kode-icon.svg"
             alt="Kode"
             className="sidebar-brand-logo"
           />

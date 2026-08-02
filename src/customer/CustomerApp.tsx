@@ -70,6 +70,7 @@ export default function CustomerApp({
 }) {
   const draft = useMemo(() => loadCheckoutDraft(businessId), [businessId])
   const savedActiveOrder = useMemo(() => loadActiveOrder(businessId), [businessId])
+  const resumedDraftRef = useRef(false)
 
   const [business, setBusiness] = useState<Business | null>(null)
   const [items, setItems] = useState<CatalogItem[]>([])
@@ -394,6 +395,16 @@ export default function CustomerApp({
         setDeviceKnown(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (!business || resumedDraftRef.current) return
+    resumedDraftRef.current = true
+    const cartQty = Object.values(draft?.cart ?? {}).reduce((sum, n) => sum + (n || 0), 0)
+    const midCheckout = Boolean(draft?.step && draft.step !== 'menu')
+    if (cartQty > 0 || midCheckout) {
+      toast.message('Welcome back — we kept your order draft for this place')
+    }
+  }, [business, draft])
 
   useEffect(() => {
     if (!business) return

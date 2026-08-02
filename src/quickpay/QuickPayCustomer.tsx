@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPaymentCode } from '../api/types'
 import { LoadingSpinner, InlineSpinner } from '../components/LoadingSpinner'
+import { KodeMark } from '../customer/KodeMark'
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -67,7 +68,10 @@ export default function QuickPayCustomer({ qrToken }: Props) {
   if (loading) {
     return (
       <div className="scanny-page">
-        <LoadingSpinner fullPage label="Loading payment…" />
+        <div className="scanny-loading-page" style={{ display: 'grid', gap: 22, placeItems: 'center' }}>
+          <KodeMark size={52} />
+          <LoadingSpinner label="Loading payment…" />
+        </div>
       </div>
     )
   }

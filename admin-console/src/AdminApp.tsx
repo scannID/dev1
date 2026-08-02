@@ -215,7 +215,7 @@ export default function AdminApp({
       <Toaster />
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-brand">
-          <img src="/qrcode1.png" alt="Kode" className="admin-brand-logo" />
+          <img src="/kode-icon.svg" alt="Kode" className="admin-brand-logo" />
           <div className="admin-brand-text">
             <strong>Kode</strong>
             <span>Admin Console</span>

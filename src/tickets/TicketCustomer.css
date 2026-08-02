@@ -625,6 +625,14 @@ html.tk-app body {
   gap: 0;
 }
 
+.tk-boot-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
 .tk-music-loader {
   display: flex;
   align-items: flex-end;

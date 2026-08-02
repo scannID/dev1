@@ -33,7 +33,7 @@ const getStyles = (tokens: LandingTokens): Record<string, CSSProperties> => ({
   nav: { background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: 'none', position: 'sticky', top: 0, zIndex: 50, overflow: 'visible' },
   navInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', maxWidth: 1160, margin: '0 auto', height: 60, gap: 16, overflow: 'visible' },
   logo: { display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' },
-  logoMark: { width: 32, height: 32, background: '#0a0a0a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  logoMark: { width: 32, height: 32, borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   logoText: { color: tokens.text, fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' },
   navLinks: { display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 },
   navLink: { color: tokens.muted, fontSize: 14, textDecoration: 'none' },
@@ -791,15 +791,7 @@ function TopNav({
       <div style={S.navInner}>
         <a href="#" style={S.logo}>
           <div style={S.logoMark}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-              <rect x="1"  y="1"  width="6" height="6" rx="1" fill="white"/>
-              <rect x="11" y="1"  width="6" height="6" rx="1" fill="white"/>
-              <rect x="1"  y="11" width="6" height="6" rx="1" fill="white"/>
-              <rect x="11" y="11" width="3" height="3" rx="0.5" fill="white"/>
-              <rect x="15" y="11" width="2" height="2" rx="0.5" fill="white"/>
-              <rect x="11" y="15" width="2" height="2" rx="0.5" fill="white"/>
-              <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white"/>
-            </svg>
+            <img src="/kode-icon.svg" alt="" width={32} height={32} style={{ width: '100%', height: '100%', display: 'block' }} />
           </div>
           <span style={S.logoText}>Kode</span>
         </a>

@@ -5,6 +5,7 @@
         <line x1="30" y1="16" x2="30" y2="84" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
         <line x1="30" y1="50" x2="80" y2="16" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
         <line x1="30" y1="50" x2="80" y2="84" stroke="#fff" stroke-width="17" stroke-linecap="round"/>
+        <!-- punch notch stays transparent -->
         <circle cx="30" cy="50" r="9" fill="#000"/>
       </g>
     </mask>
