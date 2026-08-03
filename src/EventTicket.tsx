@@ -859,7 +859,13 @@ function moneyUgx(amount: number, currency = 'UGX') {
 }
 
 function normalizeTrackQuery(raw: string) {
-  return raw.trim().replace(/^#/, '').toUpperCase()
+  const cleaned = raw.trim()
+  if (!cleaned) return ''
+  // Accept pasted IDs from plain text, hashtags, or full URLs.
+  const fromText = cleaned.match(/\b(ERI-[A-Z0-9-]{5,}|TKT-[A-Z0-9-]{5,})\b/i)
+  const fromPath = cleaned.match(/(?:^|\/)(ERI-[A-Z0-9-]{5,}|TKT-[A-Z0-9-]{5,})(?:$|[/?#])/i)
+  const token = fromText?.[1] ?? fromPath?.[1] ?? cleaned
+  return token.replace(/^#/, '').toUpperCase()
 }
 
 function BoughtTicketDetail({
@@ -1712,7 +1718,7 @@ function TicketForm({
     e.preventDefault()
     const id = normalizeTrackQuery(trackQuery)
     if (!id) {
-      toast.message('Enter an event ID like #ERI-FA255B03')
+      toast.message('Enter an event ID like #ERI-7EAB33E')
       return
     }
     try {
@@ -1991,7 +1997,7 @@ function TicketForm({
                 type="search"
                 value={trackQuery}
                 onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
-                placeholder="Track event · #ERI-FA255B03"
+                placeholder="Track event · #ERI-7EAB33E"
                 aria-label="Track event by ticket ID"
                 spellCheck={false}
                 style={{
@@ -2782,6 +2788,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [trackedTicketId, setTrackedTicketId] = useState<string | null>(null)
   const [trackQuery, setTrackQuery] = useState('')
   const [trackBusy, setTrackBusy] = useState(false)
+  const [trackLookupError, setTrackLookupError] = useState<string | null>(null)
 
   useEffect(() => {
     // Keep this page synced with the persisted theme and allow D hotkey toggling.
@@ -2902,9 +2909,16 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   }
 
   async function handleTrackLookup(ticketId: string) {
+    const normalized = normalizeTrackQuery(ticketId)
+    if (!normalized) {
+      toast.message('Enter an event ID like #TKT-10653D22')
+      return
+    }
     try {
+      setTrackingOnly(true)
       setTrackBusy(true)
-      const data = await refreshMetrics(ticketId)
+      setTrackLookupError(null)
+      const data = await refreshMetrics(normalized)
       setTrackQuery(data.ticketId)
       setTrackingOnly(true)
       setTicket(null)
@@ -2912,7 +2926,9 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       toast.success(`Tracking ${data.eventName}`)
     } catch (err) {
       setMetrics(null)
-      toast.error(err instanceof Error ? err.message : 'No event found for that ticket ID')
+      const message = err instanceof Error ? err.message : 'No event found for that ticket ID'
+      setTrackLookupError(message)
+      toast.error(message)
     } finally {
       setTrackBusy(false)
     }
@@ -2939,7 +2955,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
     )
   }
 
-  if (trackingOnly && metrics) {
+  if (trackingOnly) {
     return (
       <div
         style={{
@@ -2960,6 +2976,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               setTrackingOnly(false)
               setMetrics(null)
               setTrackedTicketId(null)
+              setTrackLookupError(null)
             }}
             style={{
               background: 'transparent',
@@ -2999,7 +3016,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               type="search"
               value={trackQuery}
               onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
-              placeholder="#ERI-FA255B03"
+              placeholder="#ERI-7EAB33E"
               spellCheck={false}
               aria-label="Event ID"
               style={{ ...fieldStyle(), fontFamily: SCANN_MONO }}
@@ -3025,9 +3042,41 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
             </button>
           </form>
 
-          <EventProgressCard
-            metrics={metrics}
-          />
+          {trackLookupError ? (
+            <p
+              style={{
+                margin: '0 0 14px',
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `0.5px solid ${CREATE.red}`,
+                background: 'rgba(180,64,46,0.08)',
+                color: CREATE.red,
+                fontSize: 12.5,
+                fontWeight: 500,
+              }}
+            >
+              {trackLookupError}
+            </p>
+          ) : null}
+
+          {metrics ? (
+            <EventProgressCard
+              metrics={metrics}
+            />
+          ) : (
+            <div
+              style={{
+                border: `0.5px solid ${CREATE.line}`,
+                borderRadius: 12,
+                padding: '14px 16px',
+                color: CREATE.muted,
+                fontSize: 13,
+                background: CREATE.card,
+              }}
+            >
+              {trackBusy ? 'Looking up event tracking…' : 'Enter a master Event ID (for example #ERI-7EAB33E) to load tracking.'}
+            </div>
+          )}
         </div>
       </div>
     )

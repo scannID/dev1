@@ -3,6 +3,7 @@ import jsQR from 'jsqr'
 import { ApiError } from '../api/client'
 import { publicTicketsApi } from '../api/services'
 import type { EventTicketTrackingMetrics, Ticket } from '../api/types'
+import { KodeMark } from '../customer/KodeMark'
 import './GateScan.css'
 
 type Props = {
@@ -12,10 +13,16 @@ type Props = {
   initialEventId?: string | null
 }
 
-/** How long the result stays up before scanning resumes. */
-const RESUME_MS = 2400
+/** Brief flash after allow — keep the line moving. */
+const RESUME_OK_MS = 900
+/** Longer flash on reject so staff can read why. */
+const RESUME_BAD_MS = 2200
 const SAME_CODE_COOLDOWN_MS = 4000
 const METRICS_POLL_MS = 15000
+const LAST_EVENT_KEY = 'kode-gate-last-event'
+const ACTIVE_SESSION_KEY = 'kode-gate-active-event'
+/** Ignore frames briefly after camera opens so a leftover QR isn't auto-fired. */
+const CAMERA_WARMUP_MS = 1200
 
 type BarcodeDetectorLike = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>
@@ -48,10 +55,6 @@ function normalizeEventRef(raw: string) {
   return raw.trim().replace(/^#/, '').toUpperCase()
 }
 
-function money(amount: number, currency: string) {
-  return `${amount.toLocaleString()} ${currency || 'UGX'}`
-}
-
 function canUseCamera() {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
@@ -64,9 +67,31 @@ function cameraBlockedMessage() {
   if (typeof window === 'undefined') return 'This device cannot open a camera.'
   const { protocol, host, pathname, search } = window.location
   if (protocol !== 'https:') {
-    return `The camera is blocked because this page is on ${protocol}//${host}. Open https://${host}${pathname}${search} instead (accept the certificate warning once).`
+    const gatePath = pathname.startsWith('/ticket/gate') ? pathname : '/ticket/gate'
+    const target = `https://${host}${gatePath}${search}`
+    return `Camera is blocked on ${protocol}//${host}. Open ${target} instead, accept the browser certificate warning once, then retry camera.`
   }
   return 'This browser refused camera access. Allow the camera permission for this site, then tap Retry camera.'
+}
+
+function secureGateUrl() {
+  if (typeof window === 'undefined') return ''
+  const { host, pathname, search, hash } = window.location
+  const gatePath = pathname.startsWith('/ticket/gate') ? pathname : '/ticket/gate'
+  return `https://${host}${gatePath}${search}${hash}`
+}
+
+function cameraStartErrorMessage(err: unknown) {
+  if (!(err instanceof Error)) return 'Could not start camera'
+  const name = err.name || ''
+  const message = err.message || ''
+  if (/NotAllowedError|SecurityError/i.test(name) || /NotAllowed|Permission/i.test(message)) {
+    return cameraBlockedMessage()
+  }
+  if (/NotFoundError|OverconstrainedError|NotReadableError/i.test(name)) {
+    return 'No usable camera was found. Close other apps using camera, then tap Retry camera.'
+  }
+  return message || 'Could not start camera'
 }
 
 async function waitForVideo(
@@ -114,20 +139,86 @@ function CloseIcon() {
   )
 }
 
+function loadLastEventId() {
+  try {
+    return normalizeEventRef(localStorage.getItem(LAST_EVENT_KEY) || '')
+  } catch {
+    return ''
+  }
+}
+
+function saveLastEventId(eventId: string) {
+  try {
+    localStorage.setItem(LAST_EVENT_KEY, normalizeEventRef(eventId))
+  } catch {
+    // ignore
+  }
+}
+
+function loadActiveSessionEventId() {
+  try {
+    return normalizeEventRef(localStorage.getItem(ACTIVE_SESSION_KEY) || '')
+  } catch {
+    return ''
+  }
+}
+
+function saveActiveSessionEventId(eventId: string) {
+  try {
+    localStorage.setItem(ACTIVE_SESSION_KEY, normalizeEventRef(eventId))
+  } catch {
+    // ignore
+  }
+}
+
+function clearActiveSessionEventId() {
+  try {
+    localStorage.removeItem(ACTIVE_SESSION_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+/** Soft beep so staff can keep eyes on the queue. */
+function playGateTone(ok: boolean) {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = ok ? 880 : 240
+    gain.gain.value = 0.07
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    const now = ctx.currentTime
+    osc.start(now)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + (ok ? 0.14 : 0.32))
+    osc.stop(now + (ok ? 0.15 : 0.34))
+    window.setTimeout(() => void ctx.close(), 500)
+  } catch {
+    // ignore autoplay / unsupported
+  }
+}
+
 export default function GateScanPage({
   gateName = 'Gate Device',
   gateLocation = 'Main Gate',
   initialPayload = null,
   initialEventId = null,
 }: Props) {
-  const [eventRef, setEventRef] = useState(() => normalizeEventRef(initialEventId || ''))
-  const [sessionEventId, setSessionEventId] = useState<string | null>(null)
+  const restoredSessionId = normalizeEventRef(initialEventId || '') || loadActiveSessionEventId()
+  const [eventRef, setEventRef] = useState(() => restoredSessionId || loadLastEventId())
+  const [sessionEventId, setSessionEventId] = useState<string | null>(restoredSessionId || null)
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
 
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [verdict, setVerdict] = useState<Verdict | null>(null)
+  const [resumeMs, setResumeMs] = useState(RESUME_OK_MS)
+  const [rapidMode, setRapidMode] = useState(true)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -141,7 +232,7 @@ export default function GateScanPage({
   const lastCodeRef = useRef<{ code: string; at: number } | null>(null)
   const sessionEventIdRef = useRef<string | null>(null)
   const pausedRef = useRef(false)
-  const pendingPayloadRef = useRef(extractTicketPayload(initialPayload || ''))
+  const ignoreScansUntilRef = useRef(0)
   const submitScanRef = useRef<(payload: string) => Promise<void>>(async () => {})
   const startCameraRef = useRef<() => Promise<void>>(async () => {})
   const refreshMetricsRef = useRef<(eventId: string) => Promise<void>>(async () => {})
@@ -149,6 +240,22 @@ export default function GateScanPage({
   useEffect(() => {
     sessionEventIdRef.current = sessionEventId
   }, [sessionEventId])
+
+  // Drop deep-link ticket payloads — gate mode is continuous camera validation,
+  // not one-shot validate of the QR that opened this page.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('p') || url.searchParams.has('payload')) {
+        url.searchParams.delete('p')
+        url.searchParams.delete('payload')
+        const next = `${url.pathname}${url.search}${url.hash}`
+        window.history.replaceState({}, '', next)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
 
   useEffect(() => {
     const Detector = (
@@ -248,21 +355,25 @@ export default function GateScanPage({
 
       if (!busyRef.current && !pausedRef.current && videoRef.current) {
         try {
-          const code = await readCodeFromVideo(videoRef.current)
-          if (
-            loopId === scanLoopIdRef.current &&
-            code &&
-            !busyRef.current &&
-            !pausedRef.current
-          ) {
-            const last = lastCodeRef.current
-            const now = Date.now()
-            const duplicate =
-              !!last && last.code === code && now - last.at < SAME_CODE_COOLDOWN_MS
-            if (!duplicate) {
-              busyRef.current = true
-              lastCodeRef.current = { code, at: now }
-              await submitScanRef.current(code)
+          if (Date.now() < ignoreScansUntilRef.current) {
+            // warm-up / post-verdict grace
+          } else {
+            const code = await readCodeFromVideo(videoRef.current)
+            if (
+              loopId === scanLoopIdRef.current &&
+              code &&
+              !busyRef.current &&
+              !pausedRef.current
+            ) {
+              const last = lastCodeRef.current
+              const now = Date.now()
+              const duplicate =
+                !!last && last.code === code && now - last.at < SAME_CODE_COOLDOWN_MS
+              if (!duplicate) {
+                busyRef.current = true
+                lastCodeRef.current = { code, at: now }
+                await submitScanRef.current(code)
+              }
             }
           }
         } catch {
@@ -295,20 +406,70 @@ export default function GateScanPage({
     return true
   }, [])
 
-  const resumeScanning = useCallback(() => {
-    pausedRef.current = false
-    busyRef.current = false
-    void wakeVideo().then((ok) => {
+  const acquireCamera = useCallback(async (): Promise<boolean> => {
+    if (!sessionEventIdRef.current) return false
+    if (!canUseCamera()) {
+      setCameraError(cameraBlockedMessage())
+      setCameraActive(false)
+      return false
+    }
+
+    if (streamRef.current) {
+      const ok = await wakeVideo()
       if (ok) {
         setCameraActive(true)
         setCameraError(null)
-        startScanLoop()
-      } else {
-        setCameraActive(false)
-        setCameraError('Camera stopped after the last scan. Tap Retry camera.')
+        return true
       }
-    })
-  }, [startScanLoop, wakeVideo])
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+      streamRef.current = stream
+
+      const video = await waitForVideo(() => videoRef.current)
+      if (!video) {
+        stream.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+        setCameraError('Scanner view is not ready yet. Tap Retry camera.')
+        setCameraActive(false)
+        return false
+      }
+
+      video.srcObject = stream
+      await video.play()
+      setCameraActive(true)
+      setCameraError(null)
+      return true
+    } catch (err) {
+      setCameraError(cameraStartErrorMessage(err))
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      setCameraActive(false)
+      return false
+    }
+  }, [wakeVideo])
+
+  const resumeScanning = useCallback(() => {
+    pausedRef.current = false
+    busyRef.current = false
+    ignoreScansUntilRef.current = Date.now() + 450
+    void (async () => {
+      // Stay on this event session — reopen the camera if the track died.
+      const ok = (await wakeVideo()) || (await acquireCamera())
+      if (!ok) return
+      setCameraActive(true)
+      setCameraError(null)
+      startScanLoop()
+    })()
+  }, [acquireCamera, startScanLoop, wakeVideo])
 
   const dismissVerdict = useCallback(() => {
     if (resumeTimerRef.current != null) {
@@ -316,22 +477,32 @@ export default function GateScanPage({
       resumeTimerRef.current = null
     }
     setVerdict(null)
-    // Allow the next guest's QR immediately; same-code cooldown still blocks
-    // accidental double-fire of the ticket we just handled.
     resumeScanning()
   }, [resumeScanning])
 
-  const scheduleResumeScan = useCallback(() => {
-    pauseScanning()
-    if (resumeTimerRef.current != null) {
-      window.clearTimeout(resumeTimerRef.current)
-    }
-    resumeTimerRef.current = window.setTimeout(() => {
-      resumeTimerRef.current = null
-      setVerdict(null)
-      resumeScanning()
-    }, RESUME_MS)
-  }, [pauseScanning, resumeScanning])
+  const scheduleResumeScan = useCallback(
+    (tone: Verdict['tone']) => {
+      pauseScanning()
+      const wait =
+        tone === 'ok'
+          ? rapidMode
+            ? RESUME_OK_MS
+            : 1400
+          : rapidMode
+            ? RESUME_BAD_MS
+            : 2800
+      setResumeMs(wait)
+      if (resumeTimerRef.current != null) {
+        window.clearTimeout(resumeTimerRef.current)
+      }
+      resumeTimerRef.current = window.setTimeout(() => {
+        resumeTimerRef.current = null
+        setVerdict(null)
+        resumeScanning()
+      }, wait)
+    },
+    [pauseScanning, rapidMode, resumeScanning],
+  )
 
   const submitScan = useCallback(
     async (scannedPayload: string) => {
@@ -347,6 +518,8 @@ export default function GateScanPage({
       }
 
       pauseScanning()
+      const payloadPreview = raw.length > 80 ? `${raw.slice(0, 80)}…` : raw
+      console.info('[gate] validate', { eventId, payloadPreview })
       try {
         const response = await publicTicketsApi.validate({
           payload: raw,
@@ -355,15 +528,24 @@ export default function GateScanPage({
           scanLocation: gateLocation,
           deviceInfo: navigator.userAgent,
         })
+        console.info('[gate] result', {
+          valid: response.valid,
+          result: response.result,
+          message: response.message,
+          ticketId: response.ticket?.id,
+        })
+        const tone: Verdict['tone'] = response.valid ? 'ok' : 'bad'
         setVerdict({
-          tone: response.valid ? 'ok' : 'bad',
-          title: response.valid ? 'Entry allowed' : 'Rejected',
+          tone,
+          title: response.valid ? 'Allowed' : 'Rejected',
           reason: response.message,
           ticket: response.ticket,
         })
+        playGateTone(response.valid)
         if (response.valid) {
           void refreshMetrics(eventId)
         }
+        scheduleResumeScan(tone)
       } catch (err) {
         const message =
           err instanceof ApiError
@@ -371,9 +553,10 @@ export default function GateScanPage({
             : err instanceof Error
               ? err.message
               : 'Scan failed'
+        console.error('[gate] validate error', { eventId, payloadPreview, message, err })
         setVerdict({ tone: 'bad', title: 'Rejected', reason: message, ticket: null })
-      } finally {
-        scheduleResumeScan()
+        playGateTone(false)
+        scheduleResumeScan('bad')
       }
     },
     [gateLocation, gateName, pauseScanning, refreshMetrics, scheduleResumeScan],
@@ -381,60 +564,14 @@ export default function GateScanPage({
 
   const startCamera = useCallback(async () => {
     if (!sessionEventIdRef.current) return
-    setCameraError(null)
     setVerdict(null)
-    try {
-      if (!canUseCamera()) {
-        setCameraError(cameraBlockedMessage())
-        return
-      }
-
-      // Reuse an already-live stream — never bounce staff back to the ID screen.
-      if (streamRef.current) {
-        const ok = await wakeVideo()
-        if (ok) {
-          setCameraActive(true)
-          resumeScanning()
-          return
-        }
-        // Track died — fall through and request a fresh stream.
-        streamRef.current.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      })
-      streamRef.current = stream
-
-      const video = await waitForVideo(() => videoRef.current)
-      if (!video) {
-        stream.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-        setCameraError('Scanner view is not ready yet. Tap Retry camera.')
-        return
-      }
-
-      video.srcObject = stream
-      await video.play()
-      setCameraActive(true)
-      resumeScanning()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not start camera'
-      setCameraError(
-        /NotAllowed|Permission/i.test(message)
-          ? 'Camera access is blocked. Allow the camera for this site, then tap Retry camera.'
-          : message,
-      )
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-      }
-      setCameraActive(false)
-      clearScanLoop()
-    }
-  }, [clearScanLoop, resumeScanning, wakeVideo])
+    setCameraError(null)
+    pausedRef.current = false
+    busyRef.current = false
+    ignoreScansUntilRef.current = Date.now() + CAMERA_WARMUP_MS
+    const ok = await acquireCamera()
+    if (ok) startScanLoop()
+  }, [acquireCamera, startScanLoop])
 
   // Keep the latest callbacks reachable from the session effect / scan loop
   // without putting them in dependency lists that would restart the camera.
@@ -454,12 +591,6 @@ export default function GateScanPage({
       await refreshMetricsRef.current(sessionEventId)
       if (cancelled) return
       await startCameraRef.current()
-      if (cancelled) return
-      const queued = pendingPayloadRef.current
-      if (queued) {
-        pendingPayloadRef.current = ''
-        void submitScanRef.current(queued)
-      }
     })()
 
     metricsTimerRef.current = window.setInterval(() => {
@@ -500,12 +631,17 @@ export default function GateScanPage({
         )
         return
       }
+      const resolvedId = data.ticketId || id
       setMetrics(data)
       setError(null)
       setVerdict(null)
       setCameraError(null)
+      lastCodeRef.current = null
+      busyRef.current = false
       pauseScanning()
-      setSessionEventId(data.ticketId || id)
+      saveLastEventId(resolvedId)
+      saveActiveSessionEventId(resolvedId)
+      setSessionEventId(resolvedId)
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -519,6 +655,7 @@ export default function GateScanPage({
 
   function endSession() {
     stopCamera()
+    clearActiveSessionEventId()
     setSessionEventId(null)
     setMetrics(null)
     setVerdict(null)
@@ -530,6 +667,10 @@ export default function GateScanPage({
   const bought = metrics?.purchasedTickets ?? 0
   const redeemed = metrics?.redeemedTickets ?? 0
   const eventLabel = metrics?.eventName || sessionEventId
+  const rememberedEventId = loadLastEventId()
+  const fromScannedTicketQr = Boolean(initialPayload && extractTicketPayload(initialPayload))
+  const secureUrl = secureGateUrl()
+  const needsHttps = typeof window !== 'undefined' && window.location.protocol !== 'https:'
 
   if (!sessionEventId) {
     return (
@@ -537,16 +678,26 @@ export default function GateScanPage({
         <div className="gate-setup">
           <div className="gate-setup-card">
             <div className="gate-badge">
-              <ScanIcon size={26} />
+              <KodeMark size={30} />
             </div>
             <p className="gate-eyebrow">Gate collection</p>
             <h1 className="gate-heading">Start a gate session</h1>
             <p className="gate-sub">
-              Enter the event ID from creation. The camera stays open for the whole session — you only
-              enter the ID once.
+              Enter the event ID once. Camera stays open on that event — keep scanning guest tickets
+              without coming back here.
             </p>
+            {needsHttps ? (
+              <p className="gate-alert" role="alert">
+                Camera needs HTTPS on this device. Open secure gate scanner first.
+              </p>
+            ) : null}
+            {fromScannedTicketQr ? (
+              <p className="gate-hint">
+                Ticket QR detected. Enter the event ID (`ERI-...`) for this gate, then scan attendee tickets.
+              </p>
+            ) : null}
 
-            <form onSubmit={(e) => void beginSession(e)} className="gate-form">
+            <form onSubmit={(e) => void beginSession(e)} className="gate-form" noValidate>
               <label className="gate-field">
                 <span className="gate-field-label">Event ID</span>
                 <input
@@ -563,6 +714,17 @@ export default function GateScanPage({
               <button type="submit" className="gate-btn gate-btn-primary" disabled={!eventRef.trim()}>
                 Open scanner
               </button>
+              {needsHttps ? (
+                <a
+                  className="gate-btn gate-btn-ghost"
+                  href={secureUrl}
+                >
+                  Open secure scanner (HTTPS)
+                </a>
+              ) : null}
+              {rememberedEventId && rememberedEventId === normalizeEventRef(eventRef) ? (
+                <p className="gate-hint">Last used on this device — ready to reopen.</p>
+              ) : null}
               {error ? <p className="gate-alert" role="alert">{error}</p> : null}
             </form>
           </div>
@@ -572,7 +734,10 @@ export default function GateScanPage({
   }
 
   return (
-    <div className="gate-shell">
+    <div
+      className="gate-shell"
+      style={{ ['--gate-resume' as string]: `${resumeMs}ms` }}
+    >
       <header className="gate-topbar">
         <div className="gate-event">
           <p className="gate-event-label">{eventLabel}</p>
@@ -588,12 +753,21 @@ export default function GateScanPage({
             <p className="gate-count-label">Redeemed</p>
           </div>
         </div>
+        <button
+          type="button"
+          className={`gate-mode-btn${rapidMode ? ' is-on' : ''}`}
+          onClick={() => setRapidMode((v) => !v)}
+          aria-pressed={rapidMode}
+          title={rapidMode ? 'Rapid mode on' : 'Rapid mode off'}
+        >
+          {rapidMode ? 'Rapid' : 'Slow'}
+        </button>
         <button type="button" className="gate-icon-btn" onClick={endSession} aria-label="End gate session">
           <CloseIcon />
         </button>
       </header>
 
-      <main className="gate-stage">
+      <main className={`gate-stage${verdict ? ` is-flash is-${verdict.tone}` : ''}`}>
         {/* Keep the video in the DOM for the whole session so the stream never detaches. */}
         <video
           ref={videoRef}
@@ -604,19 +778,21 @@ export default function GateScanPage({
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} aria-hidden />
 
-        {cameraActive && !verdict ? (
+        {cameraActive ? (
           <>
-            <div className="gate-reticle">
+            <div className="gate-reticle" aria-hidden>
               <span className="gate-corner tl" />
               <span className="gate-corner tr" />
               <span className="gate-corner bl" />
               <span className="gate-corner br" />
               <span className="gate-laser" />
             </div>
-            <div className="gate-prompt">
-              <span className="gate-dot" />
-              Hold the ticket QR in the frame
-            </div>
+            {!verdict ? (
+              <div className="gate-prompt">
+                <span className="gate-dot" />
+                Hold the ticket QR in the frame
+              </div>
+            ) : null}
           </>
         ) : null}
 
@@ -631,63 +807,48 @@ export default function GateScanPage({
             <button type="button" className="gate-btn gate-btn-primary" onClick={() => void startCamera()}>
               Retry camera
             </button>
+            {needsHttps ? (
+              <a className="gate-btn gate-btn-ghost" href={secureUrl}>
+                Open secure scanner (HTTPS)
+              </a>
+            ) : null}
           </div>
         ) : null}
 
         {verdict ? (
-          <div className={`gate-result ${verdict.tone === 'ok' ? 'is-ok' : 'is-bad'}`} role="status" aria-live="assertive">
-            <div className="gate-result-body">
-              <div className="gate-verdict-icon">
+          <div
+            className={`gate-flash ${verdict.tone === 'ok' ? 'is-ok' : 'is-bad'}`}
+            role="status"
+            aria-live="assertive"
+          >
+            <div className="gate-flash-main">
+              <div className="gate-flash-icon" aria-hidden>
                 {verdict.tone === 'ok' ? <CheckIcon /> : <CrossIcon />}
               </div>
-              <p className="gate-verdict">{verdict.title}</p>
-
-              {ticket ? (
-                <>
-                  <p className="gate-guest">{ticket.holderName || 'Guest'}</p>
-                  <span className="gate-class">{ticket.ticketType}</span>
-                  <div className="gate-details">
-                    {ticket.eventName ? (
-                      <div className="gate-detail-row">
-                        <span className="gate-detail-key">Event</span>
-                        <span className="gate-detail-value">{ticket.eventName}</span>
-                      </div>
-                    ) : null}
-                    <div className="gate-detail-row">
-                      <span className="gate-detail-key">Ticket</span>
-                      <span className="gate-detail-value is-mono">{ticket.id}</span>
-                    </div>
-                    <div className="gate-detail-row">
-                      <span className="gate-detail-key">Paid</span>
-                      <span className="gate-detail-value">{money(ticket.price, ticket.currency)}</span>
-                    </div>
-                    <div className="gate-detail-row">
-                      <span className="gate-detail-key">Entries used</span>
-                      <span className="gate-detail-value">
-                        {ticket.usageCount} / {ticket.usageLimit}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : null}
-
-              {!ticket || verdict.tone === 'bad' ? (
-                <p className="gate-reason">{verdict.reason}</p>
-              ) : null}
-            </div>
-
-            <div className="gate-resume">
-              <p className="gate-resume-label">Next guest</p>
-              <div className="gate-resume-track">
-                <span className="gate-resume-fill" />
+              <div className="gate-flash-copy">
+                <p className="gate-flash-title">{verdict.title}</p>
+                {ticket ? (
+                  <p className="gate-flash-guest">
+                    {ticket.holderName || 'Guest'}
+                    {ticket.ticketType ? ` · ${ticket.ticketType}` : ''}
+                  </p>
+                ) : (
+                  <p className="gate-flash-guest">{verdict.reason}</p>
+                )}
+                {ticket && verdict.tone === 'bad' ? (
+                  <p className="gate-flash-reason">{verdict.reason}</p>
+                ) : null}
               </div>
               <button
                 type="button"
-                className="gate-btn gate-btn-ghost gate-resume-cancel"
+                className="gate-flash-next"
                 onClick={dismissVerdict}
               >
-                Cancel — scan next
+                Next
               </button>
+            </div>
+            <div className="gate-resume-track" aria-hidden>
+              <span className="gate-resume-fill" />
             </div>
           </div>
         ) : null}
