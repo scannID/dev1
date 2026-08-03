@@ -12,6 +12,7 @@ import { buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
 import {
   loadCreatedEvents,
+  removeCreatedEvent,
   saveCreatedEvent,
   type LocalCreatedEvent,
 } from './tickets/createdEventsLocal'
@@ -70,6 +71,7 @@ export type EventTicketVisual = {
   time?: string
   location?: string
   host?: string
+  hostContact?: string
   paymentDetails: string
   template: TemplateId
   ticketClasses: TicketClass[]
@@ -228,68 +230,127 @@ function CreatedEventsQrSection({
         {events.map((event) => {
           const qr = qrMap[event.eventId]
           return (
-            <button
+            <div
               key={event.eventId}
-              type="button"
-              onClick={() => onOpen(event)}
-              title={event.eventName}
-              aria-label={`Open ${event.eventName}`}
               style={{
-                display: 'block',
-                padding: 10,
                 borderRadius: 12,
                 border: `0.5px solid ${CREATE.line}`,
                 background: '#fff',
-                cursor: 'pointer',
-                font: 'inherit',
-                color: 'inherit',
+                overflow: 'hidden',
               }}
             >
-              {qr ? (
-                <img
-                  src={qr}
-                  alt=""
-                  style={{
-                    width: '100%',
-                    aspectRatio: '1',
-                    borderRadius: 8,
-                    display: 'block',
-                    background: '#fff',
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: '100%',
-                    aspectRatio: '1',
-                    borderRadius: 8,
-                    border: `0.5px dashed ${CREATE.line}`,
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: CREATE.muted,
-                    fontSize: 11,
-                  }}
-                >
-                  QR
-                </div>
-              )}
-              <span
+              <button
+                type="button"
+                onClick={() => onOpen(event)}
+                title={event.eventName}
+                aria-label={`Open ${event.eventName}`}
                 style={{
                   display: 'block',
-                  marginTop: 8,
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  letterSpacing: '0.02em',
-                  color: CREATE.muted,
-                  textAlign: 'center',
-                  wordBreak: 'break-all',
-                  lineHeight: 1.25,
+                  width: '100%',
+                  padding: 10,
+                  paddingBottom: 6,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  color: 'inherit',
                 }}
               >
-                {event.eventId}
-              </span>
-            </button>
+                {qr ? (
+                  <img
+                    src={qr}
+                    alt=""
+                    style={{
+                      width: '100%',
+                      aspectRatio: '1',
+                      borderRadius: 8,
+                      display: 'block',
+                      background: '#fff',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      aspectRatio: '1',
+                      borderRadius: 8,
+                      border: `0.5px dashed ${CREATE.line}`,
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: CREATE.muted,
+                      fontSize: 11,
+                    }}
+                  >
+                    QR
+                  </div>
+                )}
+              </button>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '0 6px 8px',
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
+                    color: CREATE.muted,
+                    textAlign: 'center',
+                    wordBreak: 'break-all',
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {event.eventId}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = removeCreatedEvent(event.eventId)
+                    setEvents(next)
+                    setQrMap((prev) => {
+                      const copy = { ...prev }
+                      delete copy[event.eventId]
+                      return copy
+                    })
+                    try {
+                      window.dispatchEvent(new Event('kode-created-events'))
+                    } catch {
+                      // ignore
+                    }
+                    toast.message(`Removed ${event.eventName || event.eventId}`)
+                  }}
+                  title="Remove from this device"
+                  aria-label={`Delete ${event.eventName || event.eventId}`}
+                  style={{
+                    flexShrink: 0,
+                    width: 26,
+                    height: 26,
+                    display: 'grid',
+                    placeItems: 'center',
+                    border: 'none',
+                    borderRadius: 7,
+                    background: 'transparent',
+                    color: CREATE.red,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           )
         })}
       </div>
@@ -530,20 +591,20 @@ const SCANN_FONT = "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-se
 const SCANN_MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 
 const CREATE = {
-  ink: '#191410',
-  paper: '#F3EEE6',
-  card: '#FFFFFF',
-  magenta: '#A8195A',
-  magentaDeep: '#7A1242',
-  gold: '#C08B2C',
-  teal: '#0B5F58',
-  tealDeep: '#083F3A',
-  muted: '#8B8377',
-  line: 'rgba(25,20,16,0.10)',
-  lineStrong: 'rgba(25,20,16,0.16)',
-  fieldBg: '#EDE8DE',
-  red: '#B4402E',
-  redBg: '#FBEDEA',
+  ink: 'var(--foreground)',
+  paper: 'var(--background)',
+  card: 'var(--card)',
+  magenta: 'var(--destructive)',
+  magentaDeep: 'var(--destructive)',
+  gold: 'var(--primary)',
+  teal: 'var(--primary)',
+  tealDeep: 'var(--primary)',
+  muted: 'var(--muted-foreground)',
+  line: 'var(--border)',
+  lineStrong: 'var(--border)',
+  fieldBg: 'var(--muted)',
+  red: 'var(--destructive)',
+  redBg: 'color-mix(in srgb, var(--destructive) 14%, transparent)',
 }
 
 function fieldStyle(hasError?: boolean): CSSProperties {
@@ -556,10 +617,10 @@ function fieldStyle(hasError?: boolean): CSSProperties {
     fontSize: 14,
     fontFamily: 'inherit',
     fontWeight: 400,
-    background: '#ffffff',
-    color: '#111827',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
     outline: 'none',
-    border: `1px solid ${hasError ? CREATE.red : '#d1d5db'}`,
+    border: `1px solid ${hasError ? CREATE.red : 'var(--border)'}`,
     boxSizing: 'border-box',
   }
 }
@@ -574,7 +635,7 @@ function tintTealBtn(extra?: CSSProperties): CSSProperties {
     padding: '0 16px',
     borderRadius: 12,
     border: 'none',
-    background: 'rgba(11,95,88,0.12)',
+    background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
     color: CREATE.tealDeep,
     fontSize: 14,
     fontWeight: 600,
@@ -848,8 +909,8 @@ function BoughtTicketDetail({
         padding: 14,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.muted }}>
             Bought ticket
           </p>
@@ -862,48 +923,50 @@ function BoughtTicketDetail({
           <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: SCANN_MONO, color: CREATE.muted }}>
             #{attendee.ticketId}
           </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: CREATE.muted,
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            padding: 0,
-          }}
-        >
-          Close
-        </button>
-      </div>
 
-      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-        <span style={{ color: CREATE.muted }}>Amount</span>
-        <strong>{moneyUgx(attendee.price, attendee.currency)}</strong>
-      </div>
-      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13 }}>
-        <span style={{ color: CREATE.muted }}>Status</span>
-        <strong>
-          {attendee.paymentStatus} · {attendee.status}
-        </strong>
-      </div>
-
-      {paid && qr ? (
-        <div style={{ marginTop: 14, textAlign: 'center' }}>
-          <img
-            src={qr}
-            alt="Ticket QR"
-            style={{ width: 220, height: 220, borderRadius: 12, background: '#fff', padding: 8 }}
-          />
+          <div style={{ marginTop: 12, display: 'grid', gap: 6, fontSize: 13 }}>
+            <p style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ color: CREATE.muted }}>Amount:</span>
+              <strong>{moneyUgx(attendee.price, attendee.currency)}</strong>
+            </p>
+            <p style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ color: CREATE.muted }}>Status:</span>
+              <strong>
+                {attendee.paymentStatus} · {attendee.status}
+              </strong>
+            </p>
+          </div>
         </div>
-      ) : (
-        <p style={{ margin: '14px 0 0', fontSize: 13, color: CREATE.muted }}>
-          {paid ? 'Loading QR…' : 'QR appears after the ticket is paid.'}
-        </p>
-      )}
+
+        <div style={{ flex: '0 0 auto', width: 170, display: 'grid', gap: 10, justifyItems: 'end' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: CREATE.muted,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              padding: 0,
+            }}
+          >
+            Close
+          </button>
+          {paid && qr ? (
+            <img
+              src={qr}
+              alt="Ticket QR"
+              style={{ width: '100%', aspectRatio: '1', borderRadius: 12, background: '#fff', padding: 8 }}
+            />
+          ) : (
+            <p style={{ margin: 0, fontSize: 13, color: CREATE.muted }}>
+              {paid ? 'Loading QR…' : 'QR appears after the ticket is paid.'}
+            </p>
+          )}
+        </div>
+      </div>
 
       {error ? (
         <p style={{ margin: '10px 0 0', fontSize: 13, color: '#b91c1c' }} role="alert">
@@ -1395,7 +1458,7 @@ function TicketOutput({
                     {hostInitials(hostName)}
                   </div>
                   <div>
-                    <span style={{ display: 'block', fontSize: 11, color: CONFIRM.muted, lineHeight: 1.3 }}>Host</span>
+                    <span style={{ display: 'block', fontSize: 11, color: CONFIRM.muted, lineHeight: 1.3 }}>Host name</span>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 500, lineHeight: 1.3 }}>{hostName}</span>
                   </div>
                 </div>
@@ -1566,6 +1629,7 @@ type FormState = {
   time: string
   location: string
   host: string
+  hostContact: string
   paymentMethod: PaymentMethod | ''
   mobileProvider: 'MTN' | 'Airtel'
   mobileNumber: string
@@ -1602,6 +1666,7 @@ function TicketForm({
     time: '19:00',
     location: '',
     host: '',
+    hostContact: '',
     paymentMethod: '',
     mobileProvider: 'MTN',
     mobileNumber: '',
@@ -1626,6 +1691,18 @@ function TicketForm({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [trackQuery, setTrackQuery] = useState('')
   const [trackBusy, setTrackBusy] = useState(false)
+  const [showTools, setShowTools] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== 'undefined' ? window.innerHeight : 900,
+  )
+
+  useEffect(() => {
+    const onResize = () => setViewportHeight(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const layoutScale = Math.min(1, Math.max(0.72, (viewportHeight - 120) / 980))
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -1719,6 +1796,7 @@ function TicketForm({
     if (!form.date) e.date = 'Event date is required'
     if (!form.location.trim()) e.location = 'Location is required'
     if (!form.host.trim()) e.host = 'Host name is required'
+    if (!form.hostContact.trim()) e.hostContact = 'Host contact is required'
     if (!form.paymentMethod) e.paymentMethod = 'Choose Mobile Money or Bank'
     if (form.paymentMethod === 'MOBILE_MONEY') {
       if (!form.mobileNumber.trim()) e.mobileNumber = 'Enter the mobile money number'
@@ -1761,6 +1839,7 @@ function TicketForm({
         time: form.time,
         location: form.location,
         host: form.host.trim(),
+        hostContact: form.hostContact.trim(),
         paymentDetails: formatPaymentDetails(form),
         template: form.template,
         ticketClasses: form.ticketClasses,
@@ -1813,9 +1892,9 @@ function TicketForm({
         background: CREATE.paper,
         color: CREATE.ink,
         fontFamily: SCANN_FONT,
-        padding: '32px 24px',
+        padding: '20px 18px',
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -1840,8 +1919,8 @@ function TicketForm({
         }
       `}</style>
 
-      <div style={{ maxWidth: 760, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexShrink: 0 }}>
+      <div style={{ maxWidth: 1020, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexShrink: 0 }}>
           <button
             type="button"
             onClick={() => {
@@ -1860,10 +1939,7 @@ function TicketForm({
           >
             ← {step === 2 ? 'Back to Details' : 'Back'}
           </button>
-          <span />
-        </div>
-
-        <div style={{ flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
           <Stepper
             steps={[
               { id: 'details', label: 'Details' },
@@ -1871,67 +1947,103 @@ function TicketForm({
             ]}
             active={step - 1}
           />
-        </div>
-
-        <form
-          onSubmit={(e) => void handleTrackSubmit(e)}
-          style={{
-            flexShrink: 0,
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            gap: 8,
-            margin: '10px 0 18px',
-            padding: 10,
-            borderRadius: 12,
-            border: `0.5px solid ${CREATE.line}`,
-            background: CREATE.card,
-          }}
-        >
-          <input
-            type="search"
-            value={trackQuery}
-            onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
-            placeholder="Track event · #ERI-FA255B03"
-            aria-label="Track event by ticket ID"
-            spellCheck={false}
-            style={{
-              ...fieldStyle(),
-              fontFamily: SCANN_MONO,
-              fontSize: 13,
-              letterSpacing: '0.02em',
-            }}
-          />
+          </div>
           <button
-            type="submit"
-            disabled={trackBusy}
+            type="button"
+            onClick={() => setShowTools((v) => !v)}
             style={{
-              minHeight: 42,
-              height: 42,
-              padding: '0 16px',
-              borderRadius: 6,
-              border: 'none',
-              background: CREATE.tealDeep,
-              color: '#fff',
+              minHeight: 36,
+              height: 36,
+              padding: '0 12px',
+              borderRadius: 9,
+              border: `0.5px solid ${CREATE.line}`,
+              background: CREATE.card,
+              color: CREATE.ink,
               fontWeight: 600,
-              fontSize: 13,
-              cursor: trackBusy ? 'wait' : 'pointer',
+              fontSize: 12.5,
+              cursor: 'pointer',
               fontFamily: 'inherit',
-              opacity: trackBusy ? 0.75 : 1,
               whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
-            {trackBusy ? 'Looking…' : 'Track'}
+            {showTools ? 'Hide tracking' : 'Tracking'}
           </button>
-        </form>
+        </div>
 
-        <CreatedEventsQrSection
-          onOpen={(event) => {
-            void onTrackLookup(event.eventId)
-          }}
-        />
+        {showTools ? (
+          <div style={{ display: 'grid', gap: 8, margin: '0 0 14px', flexShrink: 0 }}>
+            <form
+              noValidate
+              onSubmit={(e) => void handleTrackSubmit(e)}
+              style={{
+                flexShrink: 0,
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: 8,
+                padding: 10,
+                borderRadius: 12,
+                border: `0.5px solid ${CREATE.line}`,
+                background: CREATE.card,
+              }}
+            >
+              <input
+                type="search"
+                value={trackQuery}
+                onChange={(e) => setTrackQuery(e.target.value.toUpperCase())}
+                placeholder="Track event · #ERI-FA255B03"
+                aria-label="Track event by ticket ID"
+                spellCheck={false}
+                style={{
+                  ...fieldStyle(),
+                  fontFamily: SCANN_MONO,
+                  fontSize: 13,
+                  letterSpacing: '0.02em',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={trackBusy}
+                style={{
+                  minHeight: 42,
+                  height: 42,
+                  padding: '0 16px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: CREATE.tealDeep,
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: trackBusy ? 'wait' : 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: trackBusy ? 0.75 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {trackBusy ? 'Looking…' : 'Track'}
+              </button>
+            </form>
+
+            <CreatedEventsQrSection
+              onOpen={(event) => {
+                void onTrackLookup(event.eventId)
+              }}
+            />
+          </div>
+        ) : null}
 
         {step === 1 ? (
-        <div className="et-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div
+          className="et-scroll"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            margin: '0 auto',
+          }}
+        >
           <h1
             style={{
               margin: '0 0 6px',
@@ -1996,16 +2108,29 @@ function TicketForm({
               </div>
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <input
-                style={fieldStyle(Boolean(touched && errors.host))}
-                type="text"
-                placeholder="Host"
-                aria-label="Host"
-                value={form.host}
-                onChange={(e) => set('host', e.target.value)}
-              />
-              {touched && errors.host && <span style={errStyle}>{errors.host}</span>}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input
+                  style={fieldStyle(Boolean(touched && errors.host))}
+                  type="text"
+                  placeholder="Host name"
+                  aria-label="Host name"
+                  value={form.host}
+                  onChange={(e) => set('host', e.target.value)}
+                />
+                {touched && errors.host && <span style={errStyle}>{errors.host}</span>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <input
+                  style={fieldStyle(Boolean(touched && errors.hostContact))}
+                  type="text"
+                  placeholder="Host contact"
+                  aria-label="Host contact"
+                  value={form.hostContact}
+                  onChange={(e) => set('hostContact', e.target.value)}
+                />
+                {touched && errors.hostContact && <span style={errStyle}>{errors.hostContact}</span>}
+              </div>
             </div>
 
             <div style={{ ...cardStyle, marginTop: 22 }}>
@@ -2017,56 +2142,61 @@ function TicketForm({
               </div>
 
               <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
-                <input
-                  type="search"
-                  value={imageQuery}
-                  disabled={imageSearching}
-                  placeholder={form.eventName.trim() || 'Search photos e.g. concert, gala'}
-                  onChange={(e) => setImageQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void runImageSearch()
-                    }
-                  }}
-                  style={{ ...fieldStyle(), flex: 1, minWidth: 0 }}
-                  aria-label="Search event photos"
-                />
-                <button
-                  type="button"
-                  disabled={imageSearching}
-                  onClick={() => void runImageSearch()}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 48,
-                    padding: '0 20px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: CREATE.tealDeep,
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: imageSearching ? 'wait' : 'pointer',
-                    fontFamily: 'inherit',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  {imageSearching ? 'Searching…' : 'Find photos'}
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                  <input
+                    type="search"
+                    value={imageQuery}
+                    disabled={imageSearching}
+                    placeholder={form.eventName.trim() || 'Search photos e.g. concert, gala'}
+                    onChange={(e) => setImageQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void runImageSearch()
+                      }
+                    }}
+                    style={{ ...fieldStyle(), paddingRight: 120 }}
+                    aria-label="Search event photos"
+                  />
+                  <button
+                    type="button"
+                    disabled={imageSearching}
+                    onClick={() => void runImageSearch()}
+                    style={{
+                      position: 'absolute',
+                      right: 5,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      height: 26,
+                      padding: '0 9px',
+                      borderRadius: 7,
+                      border: 'none',
+                      background: CREATE.tealDeep,
+                      color: '#fff',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: imageSearching ? 'wait' : 'pointer',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {imageSearching ? 'Searching…' : 'Find photos'}
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={imageBusy || Boolean(imageImportingId)}
-                  style={tintTealBtn({ cursor: imageBusy ? 'wait' : 'pointer' })}
+                  style={{
+                    ...tintTealBtn({ cursor: imageBusy ? 'wait' : 'pointer' }),
+                    flexShrink: 0,
+                  }}
                 >
                   {imageBusy ? 'Processing…' : 'Upload from device'}
                 </button>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {form.eventImageUrl ? (
                   <button
                     type="button"
@@ -2193,19 +2323,7 @@ function TicketForm({
                     })}
                   </div>
                 </>
-              ) : (
-                <p style={{ margin: '2px 0 0', fontSize: 12.5, color: CREATE.muted }}>
-                  Search or upload — the photo appears on the guest ticket pass.
-                </p>
-              )}
-
-              <p style={{ margin: 0, fontSize: 12, color: CREATE.muted }}>
-                Photos from{' '}
-                <a href="https://www.pexels.com" target="_blank" rel="noreferrer" style={{ color: CREATE.tealDeep, textDecoration: 'none' }}>
-                  Pexels
-                </a>
-                .
-              </p>
+              ) : null}
             </div>
 
             <div style={{ ...cardStyle, marginTop: 22 }}>
@@ -2442,19 +2560,29 @@ function TicketForm({
           </div>
         </div>
         ) : (
-        <div className="et-scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', maxWidth: 380, width: '100%', margin: '0 auto' }}>
+        <div
+          className="et-scroll"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            margin: '0 auto',
+            transform: `scale(${layoutScale})`,
+            transformOrigin: 'top center',
+          }}
+        >
           {(() => {
             const previewClass = form.ticketClasses[0]
             const previewFee = currency(previewClass?.fee || '')
-            const heroStyle: CSSProperties = form.eventImageUrl
-              ? { position: 'relative', height: 78, overflow: 'hidden', background: '#111' }
-              : {
-                  position: 'relative',
-                  height: 78,
-                  overflow: 'hidden',
-                  background:
-                    'radial-gradient(90px 90px at 20% 60%, rgba(192,139,44,0.5), transparent 65%), radial-gradient(110px 110px at 75% 30%, rgba(168,25,90,0.55), transparent 65%), linear-gradient(135deg, #0F0B08, #191410 70%)',
-                }
+            const heroStyle: CSSProperties = {
+              position: 'relative',
+              height: 78,
+              overflow: 'hidden',
+              background:
+                'radial-gradient(90px 90px at 20% 60%, rgba(192,139,44,0.5), transparent 65%), radial-gradient(110px 110px at 75% 30%, rgba(168,25,90,0.55), transparent 65%), linear-gradient(135deg, #0F0B08, #191410 70%)',
+            }
             return (
               <>
                 <div
@@ -2467,34 +2595,30 @@ function TicketForm({
                   }}
                 >
                   <div style={heroStyle}>
-                    {form.eventImageUrl ? (
-                      <img src={form.eventImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : (
-                      <svg viewBox="0 0 380 78" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-                        <g stroke="#E7C77A" strokeWidth="1.1" fill="none" opacity="0.9">
-                          <path d="M90 40 L90 8 M90 8 L82 18 M90 8 L98 18 M90 8 L76 12 M90 8 L104 12 M90 8 L78 4 M90 8 L102 4" />
-                        </g>
-                        <g fill="#F0D89A" opacity="0.9">
-                          <circle cx="90" cy="8" r="2" />
-                          <circle cx="82" cy="18" r="1.4" />
-                          <circle cx="98" cy="18" r="1.4" />
-                        </g>
-                        <g stroke="#D65E8A" strokeWidth="1.1" fill="none" opacity="0.85">
-                          <path d="M290 46 L290 14 M290 14 L280 24 M290 14 L300 24 M290 14 L272 20 M290 14 L308 20" />
-                        </g>
-                        <g fill="#F0A8C6" opacity="0.9">
-                          <circle cx="290" cy="14" r="2" />
-                          <circle cx="280" cy="24" r="1.4" />
-                          <circle cx="300" cy="24" r="1.4" />
-                        </g>
-                        <g fill="#F0D89A" opacity="0.6">
-                          <circle cx="200" cy="20" r="1.2" />
-                          <circle cx="230" cy="40" r="1.2" />
-                          <circle cx="150" cy="50" r="1.2" />
-                          <circle cx="330" cy="45" r="1.2" />
-                        </g>
-                      </svg>
-                    )}
+                    <svg viewBox="0 0 380 78" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+                      <g stroke="#E7C77A" strokeWidth="1.1" fill="none" opacity="0.9">
+                        <path d="M90 40 L90 8 M90 8 L82 18 M90 8 L98 18 M90 8 L76 12 M90 8 L104 12 M90 8 L78 4 M90 8 L102 4" />
+                      </g>
+                      <g fill="#F0D89A" opacity="0.9">
+                        <circle cx="90" cy="8" r="2" />
+                        <circle cx="82" cy="18" r="1.4" />
+                        <circle cx="98" cy="18" r="1.4" />
+                      </g>
+                      <g stroke="#D65E8A" strokeWidth="1.1" fill="none" opacity="0.85">
+                        <path d="M290 46 L290 14 M290 14 L280 24 M290 14 L300 24 M290 14 L272 20 M290 14 L308 20" />
+                      </g>
+                      <g fill="#F0A8C6" opacity="0.9">
+                        <circle cx="290" cy="14" r="2" />
+                        <circle cx="280" cy="24" r="1.4" />
+                        <circle cx="300" cy="24" r="1.4" />
+                      </g>
+                      <g fill="#F0D89A" opacity="0.6">
+                        <circle cx="200" cy="20" r="1.2" />
+                        <circle cx="230" cy="40" r="1.2" />
+                        <circle cx="150" cy="50" r="1.2" />
+                        <circle cx="330" cy="45" r="1.2" />
+                      </g>
+                    </svg>
                   </div>
 
                   <div
@@ -2527,62 +2651,51 @@ function TicketForm({
                         {form.eventName || 'Event name'}
                       </p>
                     </div>
-                    {previewClass?.name ? (
-                      <span
-                        style={{
-                          background: 'rgba(255,255,255,0.16)',
-                          border: '0.5px solid rgba(255,255,255,0.3)',
-                          color: '#fff',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: '4px 12px',
-                          borderRadius: 999,
-                          whiteSpace: 'nowrap',
-                          marginBottom: 2,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {previewClass.name}
-                      </span>
-                    ) : null}
                   </div>
 
                   <div
                     style={{
-                      display: 'flex',
-                      padding: '16px 16px 14px',
-                      gap: 14,
+                      padding: '14px 16px',
                       borderBottom: `1px dashed ${CREATE.lineStrong}`,
                     }}
                   >
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-                      <div>
-                        <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Date</p>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>{fmtDate(form.date)}</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Fee</p>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>{previewFee}</p>
-                      </div>
-                      <div>
-                        <p style={{ margin: '0 0 2px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: CREATE.teal }}>Event ID</p>
-                        <p style={{ margin: 0, fontSize: 11.5, fontWeight: 500, fontFamily: SCANN_MONO }}>ERI-PREVIEW</p>
-                      </div>
-                    </div>
                     <div
                       style={{
-                        width: 78,
-                        height: 78,
-                        flexShrink: 0,
-                        border: `1px dashed ${CREATE.lineStrong}`,
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center',
+                        width: '100%',
+                        height: 170,
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        background:
+                          form.eventImageUrl
+                            ? CREATE.fieldBg
+                            : 'radial-gradient(90px 90px at 20% 60%, rgba(192,139,44,0.45), transparent 65%), radial-gradient(110px 110px at 75% 30%, rgba(168,25,90,0.4), transparent 65%), linear-gradient(135deg, #0F0B08, #191410 70%)',
+                        border: `1px solid ${CREATE.lineStrong}`,
                       }}
                     >
-                      <span style={{ fontSize: 9, color: CREATE.muted, fontWeight: 500 }}>QR code</span>
+                      {form.eventImageUrl ? (
+                        <img
+                          src={form.eventImageUrl}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: CREATE.muted,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Event photo
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2595,7 +2708,9 @@ function TicketForm({
                 <div style={{ marginTop: 32 }}>
                   {[
                     ['Event', form.eventName],
-                    ['Host', form.host],
+                    ['Price', previewFee],
+                    ['Host name', form.host],
+                    ['Contact', form.hostContact],
                     ['When', `${fmtDate(form.date)} · ${fmtTime(form.time)}`],
                     ['Where', form.location],
                     ['Pay to', formatPaymentDetails(form) || '—'],
@@ -2669,13 +2784,11 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [trackBusy, setTrackBusy] = useState(false)
 
   useEffect(() => {
-    // Create-ticket page defaults to light; restore prior preference on leave.
-    const previousDark = readDarkMode()
-    applyDarkMode(false)
+    // Keep this page synced with the persisted theme and allow D hotkey toggling.
+    applyDarkMode(readDarkMode())
     const unbind = bindThemeHotkey()
     return () => {
       unbind()
-      applyDarkMode(previousDark)
     }
   }, [])
 
@@ -2715,6 +2828,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           location: data.location,
           time: data.time,
           host: data.host,
+          hostContact: data.hostContact,
           ticketClasses: data.ticketClasses.map((c) => {
             const capacity = Number(c.capacity)
             return {
@@ -2753,6 +2867,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
         location: data.location,
         host: data.host,
+        hostContact: data.hostContact,
         createdAt: new Date().toISOString(),
       })
       window.dispatchEvent(new Event('kode-created-events'))
@@ -2838,7 +2953,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           overflow: 'auto',
         }}
       >
-        <div style={{ maxWidth: 640, width: '100%', margin: '0 auto' }}>
+        <div style={{ maxWidth: 1020, width: '100%', margin: '0 auto' }}>
           <button
             type="button"
             onClick={() => {
@@ -2868,6 +2983,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           </p>
 
           <form
+            noValidate
             onSubmit={(e) => {
               e.preventDefault()
               void handleTrackLookup(normalizeTrackQuery(trackQuery))

@@ -130,6 +130,7 @@ export default function TicketingPage() {
     .reduce((sum, t) => sum + (t.price || 0), 0)
   const meta = parseMeta(master?.metadata || attendees[0]?.metadata)
   const host = selected?.host || (typeof meta.host === 'string' ? meta.host : '')
+  const hostContact = typeof meta.hostContact === 'string' ? meta.hostContact : ''
   const location = selected?.location || (typeof meta.location === 'string' ? meta.location : '')
   const payTo = typeof meta.payTo === 'string' ? meta.payTo : ''
   const eventDate = selected?.eventDate || master?.eventDate || attendees[0]?.eventDate
@@ -305,7 +306,8 @@ export default function TicketingPage() {
                   <DetailRow label="Event ID" value={selected?.eventId || '—'} />
                   <DetailRow label="Event date" value={formatDate(eventDate)} />
                   <DetailRow label="Auto-delete" value={formatDate(selected?.autoDeleteAt)} />
-                  <DetailRow label="Host" value={host || '—'} />
+                  <DetailRow label="Host name" value={host || '—'} />
+                  <DetailRow label="Host contact" value={hostContact || '—'} />
                   <DetailRow label="Location" value={location || '—'} />
                   <DetailRow label="Pay to" value={payTo || '—'} />
                   <DetailRow

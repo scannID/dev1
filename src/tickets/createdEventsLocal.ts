@@ -7,6 +7,7 @@ export type LocalCreatedEvent = {
   eventDate?: string | null
   location?: string
   host?: string
+  hostContact?: string
   createdAt: string
 }
 
