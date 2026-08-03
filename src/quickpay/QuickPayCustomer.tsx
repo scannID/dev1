@@ -131,7 +131,7 @@ export default function QuickPayCustomer({ qrToken }: Props) {
           {!code.canBeUsed ? (
             <p className="scanny-error" role="alert" style={{ marginTop: 16 }}>This payment QR is no longer active.</p>
           ) : (
-            <form onSubmit={handlePay} className="scanny-form">
+            <form onSubmit={handlePay} className="scanny-form" noValidate>
               <label className="scanny-field">
                 <span className="scanny-label">Your name</span>
                 <input

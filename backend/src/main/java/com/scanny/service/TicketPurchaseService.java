@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -134,7 +135,7 @@ public class TicketPurchaseService {
         assertInventoryAvailable(master.getId(), ticketClass, capacity, now);
 
         Ticket attendee = new Ticket();
-        attendee.setId(generateTicketId());
+        attendee.setId(generateUniqueTicketId());
         attendee.setQrToken(generateQrToken());
         attendee.setAccessToken(generateAccessToken());
         attendee.setMasterTicketId(master.getId());
@@ -172,6 +173,7 @@ public class TicketPurchaseService {
 
         return new PublicTicketDtos.PurchaseResponse(
             ticketId,
+            shortCodeForTicketId(ticketId),
             paymentId,
             PaymentIntentStatus.Paid,
             "Ticket created and marked paid",
@@ -249,6 +251,7 @@ public class TicketPurchaseService {
             ticket.getMetadata(),
             buildViewUrl(ticket.getAccessToken()),
             ticket.getQrToken(),
+            shortCodeForTicketId(ticket.getId()),
             buildGateQrPayload(ticket),
             buildGateUrl(ticket),
             purchaseUrl
@@ -319,6 +322,7 @@ public class TicketPurchaseService {
             master.getEventName(),
             master.getEventDate() != null ? master.getEventDate().toString() : null,
             stringMeta(meta, "host", ""),
+            stringMeta(meta, "eventImageUrl", ""),
             master.getStatus().name(),
             ordered,
             purchased,
@@ -402,6 +406,7 @@ public class TicketPurchaseService {
         Map<String, String> payload = new LinkedHashMap<>();
         payload.put("v", "1");
         payload.put("ticketId", ticket.getId());
+        payload.put("code", shortCodeForTicketId(ticket.getId()));
         payload.put("eventId", ticket.getMasterTicketId() != null ? ticket.getMasterTicketId() : "");
         payload.put("paymentId", ticket.getPaymentReference() != null ? ticket.getPaymentReference() : "");
         payload.put("qrToken", ticket.getQrToken());
@@ -648,8 +653,24 @@ public class TicketPurchaseService {
         return false;
     }
 
+    private String generateUniqueTicketId() {
+        for (int i = 0; i < 12; i++) {
+            String candidate = generateTicketId();
+            if (!ticketRepository.existsById(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ApiException(500, "Could not generate a unique ticket code");
+    }
+
     private static String generateTicketId() {
-        return "TKT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+        final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        char[] out = new char[4];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = alphabet[random.nextInt(alphabet.length)];
+        }
+        return new String(out);
     }
 
     private static String generateQrToken() {
@@ -662,5 +683,16 @@ public class TicketPurchaseService {
 
     private static String generateImmediatePaymentId() {
         return "PAY-LOCAL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+    }
+
+    private static String shortCodeForTicketId(String ticketId) {
+        if (ticketId == null || ticketId.isBlank()) {
+            return "";
+        }
+        String normalized = ticketId.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        if (normalized.length() <= 4) {
+            return normalized;
+        }
+        return normalized.substring(normalized.length() - 4);
     }
 }

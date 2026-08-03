@@ -76,7 +76,7 @@ import type {
 } from './api/types'
 import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
-import { OperationsHub } from './operations/OperationsHub'
+import { OperationsHub, type OperationsTab } from './operations/OperationsHub'
 import { InventoryPage } from './inventory/InventoryPage'
 import {
   InventoryAdjustPage,
@@ -291,7 +291,8 @@ function App({
   } = useBusinessData()
 
   const [view, setView] = useState('account')
-  const [inventoryNavOpen, setInventoryNavOpen] = useState(true)
+  const [inventoryNavOpen, setInventoryNavOpen] = useState(false)
+  const [operationsNavOpen, setOperationsNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
@@ -316,6 +317,9 @@ function App({
     const merchantOnlyViews = new Set([
       'account',
       'operations',
+      'operations-roles',
+      'operations-settings',
+      'operations-branches',
       'reports',
       'inventory',
       'inventory-transfer',
@@ -342,6 +346,13 @@ function App({
   }, [view, staffMode, staffRole])
 
   const business = selectedBusiness ?? emptyBusiness
+  const operationViews = new Set(['operations', 'operations-roles', 'operations-settings', 'operations-branches'])
+  const operationTabByView: Record<string, OperationsTab> = {
+    operations: 'roles',
+    'operations-roles': 'roles',
+    'operations-settings': 'settings',
+    'operations-branches': 'branches',
+  }
   const hourOfDay = new Date().getHours()
   const timeGreeting = hourOfDay < 12 ? 'Good morning' : hourOfDay < 18 ? 'Good afternoon' : 'Good evening'
   const welcomeName = business.branchLabel || business.name || merchant?.businessName || business.ownerName || 'Merchant'
@@ -739,7 +750,18 @@ function App({
             },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
             { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
-            { id: 'operations', label: 'Roles', icon: Settings2, perm: 'staff:manage' as PermissionId, merchantOnly: true },
+            {
+              id: 'operations',
+              label: 'Permissions',
+              icon: Settings2,
+              perm: 'staff:manage' as PermissionId,
+              merchantOnly: true,
+              children: [
+                { id: 'operations-roles', label: 'Staff', icon: Settings2 },
+                { id: 'operations-settings', label: 'Busy mode', icon: Settings2 },
+                { id: 'operations-branches', label: 'Branches', icon: Settings2 },
+              ],
+            },
             { id: 'reports', label: 'Reports', icon: BarChart3, merchantOnly: true },
           ] as Array<{
             id: string
@@ -761,12 +783,19 @@ function App({
                 view === 'inventory-transfer' ||
                 view === 'inventory-adjust' ||
                 view === 'inventory-waste')
-            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive)
-            const groupOpen = id === 'inventory' && inventoryNavOpen
+            const operationsChildActive = id === 'operations' && operationViews.has(view)
+            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || operationsChildActive)
+            const groupOpen =
+              id === 'inventory'
+                ? (inventoryNavOpen || inventoryChildActive)
+                : id === 'operations'
+                  ? (operationsNavOpen || operationsChildActive)
+                  : false
 
             if (children?.length) {
+              const defaultChildView = children[0]?.id
               return (
-                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${inventoryChildActive ? ' active-group' : ''}`}>
+                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || operationsChildActive) ? ' active-group' : ''}`}>
                   <button
                     type="button"
                     className={isActive ? 'active' : ''}
@@ -774,8 +803,13 @@ function App({
                     onClick={() => {
                       setShowAddItem(false)
                       setEditingItem(null)
-                      setInventoryNavOpen((open) => !open)
-                      if (!inventoryChildActive) setView('inventory')
+                      if (id === 'inventory') {
+                        setInventoryNavOpen((open) => !open)
+                        if (!inventoryChildActive) setView('inventory')
+                      } else if (id === 'operations') {
+                        setOperationsNavOpen((open) => !open)
+                        if (!operationsChildActive && defaultChildView) setView(defaultChildView)
+                      }
                     }}
                   >
                     <Icon size={20} />
@@ -796,7 +830,8 @@ function App({
                           onClick={() => {
                             setShowAddItem(false)
                             setEditingItem(null)
-                            setInventoryNavOpen(true)
+                            if (id === 'inventory') setInventoryNavOpen(true)
+                            if (id === 'operations') setOperationsNavOpen(true)
                             setView(childId)
                           }}
                         >
@@ -823,7 +858,7 @@ function App({
               >
                 <Icon size={20} />
                 <span style={{ flex: 1 }}>{label}</span>
-                {count ? (
+                {typeof count === 'number' ? (
                   <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
                     {count}
                   </Badge>
@@ -880,7 +915,7 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-waste' && 'Merchant · Inventory · Waste'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
-              {!editingItem && !showAddItem && view === 'operations' && 'Merchant · Roles & permissions'}
+              {!editingItem && !showAddItem && operationViews.has(view) && 'Merchant · Permissions'}
               {!editingItem && !showAddItem && view === 'reports' && 'Merchant · Reports'}
             </p>
             <h2>
@@ -896,7 +931,10 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-waste' && 'Waste'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
-              {!editingItem && !showAddItem && view === 'operations' && 'Roles & permissions'}
+              {!editingItem && !showAddItem && view === 'operations-roles' && 'Staff'}
+              {!editingItem && !showAddItem && view === 'operations-settings' && 'Busy mode'}
+              {!editingItem && !showAddItem && view === 'operations-branches' && 'Branches'}
+              {!editingItem && !showAddItem && view === 'operations' && 'Permissions'}
               {!editingItem && !showAddItem && view === 'reports' && 'Reports'}
             </h2>
             {(actionError || sessionError) && (
@@ -1133,12 +1171,14 @@ function App({
               </div>
             )}
 
-            {view === 'operations' && (
+            {operationViews.has(view) && (
               <div className="page-content">
                 <OperationsHub
                   businessId={business.id}
                   staffMode={staffMode}
                   staffRole={staffRole}
+                  activeTab={operationTabByView[view] ?? 'roles'}
+                  showTabs={false}
                   onBranchCreated={(branchId) => {
                     void refreshBusinesses().then(() => selectBusiness(branchId))
                   }}
@@ -1540,6 +1580,44 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
     }
   }, [business.id, compact, logoUrl, size, url])
 
+  async function shareQr() {
+    if (!qrImage) {
+      toast.error('QR image is still loading')
+      return
+    }
+
+    const shareTitle = `${business.name} QR code`
+    const fileName = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kode'}-qr.png`
+
+    try {
+      const imageResponse = await fetch(qrImage)
+      const imageBlob = await imageResponse.blob()
+      const imageFile = new File([imageBlob], fileName, { type: 'image/png' })
+
+      if (
+        typeof navigator !== 'undefined'
+        && typeof navigator.share === 'function'
+        && (!navigator.canShare || navigator.canShare({ files: [imageFile] }))
+      ) {
+        await navigator.share({
+          title: shareTitle,
+          files: [imageFile],
+        })
+        return
+      }
+
+      // Fallback for browsers that cannot share files directly.
+      const a = document.createElement('a')
+      a.href = qrImage
+      a.download = fileName
+      a.click()
+      toast.success('QR image downloaded. Share the PNG from your files.')
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      toast.error(err instanceof Error ? err.message : 'Could not share QR image')
+    }
+  }
+
   return (
     <div className={compact ? 'qr-panel compact' : 'qr-panel large'} style={{ '--accent': business.accent } as QrStyle}>
       <div className="print-card">
@@ -1579,6 +1657,9 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
               >
                 Download QR
               </button>
+              <button type="button" onClick={() => void shareQr()}>
+                Share QR
+              </button>
             </div>
           </>
         )}
@@ -1593,7 +1674,7 @@ function catalogItemToFormState(item: CatalogItem | undefined, isLodging: boolea
       name: '',
       category: isLodging ? 'Rooms' : '',
       price: '',
-      discountPercent: '0',
+      discountPercent: '',
       description: '',
       imageUrl: null as string | null,
       imageUrls: [] as string[],
@@ -1610,7 +1691,7 @@ function catalogItemToFormState(item: CatalogItem | undefined, isLodging: boolea
     name: item.name ?? '',
     category: item.category ?? (isLodging ? 'Rooms' : ''),
     price: item.price != null ? String(item.price) : '',
-    discountPercent: String(item.discountPercent ?? 0),
+    discountPercent: item.discountPercent && item.discountPercent > 0 ? String(item.discountPercent) : '',
     description: item.description ?? '',
     imageUrl: item.imageUrl ?? null,
     imageUrls: item.imageUrls?.length ? [...item.imageUrls] : item.imageUrl ? [item.imageUrl] : [],
@@ -1861,7 +1942,7 @@ function AddItemForm({
                 type="number"
                 value={item.discountPercent}
                 onChange={(event) => setItem({ ...item, discountPercent: event.target.value })}
-                placeholder="0"
+                placeholder="Optional"
               />
               {discountPercent > 0 && salePrice != null ? (
                 <p className="text-xs text-muted-foreground">

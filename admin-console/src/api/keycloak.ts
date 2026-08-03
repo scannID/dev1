@@ -25,10 +25,10 @@ export function hasAdminSession() {
 
 /** End Keycloak SSO (shared across merchant/admin on the same realm). */
 export function logoutAdmin(redirectUri: string) {
-  if (adminKeycloak.authenticated) {
-    return adminKeycloak.logout({ redirectUri })
-  }
-  window.location.href = adminKeycloak.createLogoutUrl({ redirectUri })
+  // Avoid showing Keycloak's extra confirm page ("Log out / Back to application").
+  // We clear local auth state and return directly to the app shell.
+  adminKeycloak.clearToken()
+  window.location.replace(redirectUri)
   return Promise.resolve()
 }
 

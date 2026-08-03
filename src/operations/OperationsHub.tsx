@@ -1,27 +1,87 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { operationsApi, type Branch, type OperationsSettings } from '../api/operations'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RolesPermissionsHub } from './RolesPermissionsHub'
 import { hasPermission } from './roleCatalog'
 import type { StaffRole } from '../api/operations'
 
+export type OperationsTab = 'roles' | 'settings' | 'branches'
+const BUSY_TIMER_STORAGE_PREFIX = 'Kode:busy-until:'
+
+type BusyTimerSnapshot = {
+  busyUntilMs: number
+  etaMinutes: number
+  pauseMessage: string
+}
+
+function busyTimerKeyFor(businessId: string): string {
+  return `${BUSY_TIMER_STORAGE_PREFIX}${businessId}`
+}
+
+function readBusyTimer(key: string): BusyTimerSnapshot | null {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<BusyTimerSnapshot>
+    if (
+      typeof parsed.busyUntilMs !== 'number'
+      || typeof parsed.etaMinutes !== 'number'
+      || typeof parsed.pauseMessage !== 'string'
+    ) return null
+    return {
+      busyUntilMs: parsed.busyUntilMs,
+      etaMinutes: parsed.etaMinutes,
+      pauseMessage: parsed.pauseMessage,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeBusyTimer(key: string, snapshot: BusyTimerSnapshot) {
+  try {
+    localStorage.setItem(key, JSON.stringify(snapshot))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function clearBusyTimer(key: string) {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const safe = Math.max(0, totalSeconds)
+  const mins = Math.floor(safe / 60)
+  const secs = safe % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
 export function OperationsHub({
   businessId,
   staffMode = false,
   staffRole,
   onBranchCreated,
+  activeTab,
+  showTabs = true,
 }: {
   businessId: string
   staffMode?: boolean
   staffRole?: string | null
   onBranchCreated?: (branchId: string) => void
+  activeTab?: OperationsTab
+  showTabs?: boolean
 }) {
+  const [tab, setTab] = useState<OperationsTab>('roles')
   const [settings, setSettings] = useState<OperationsSettings | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchName, setBranchName] = useState('')
@@ -30,13 +90,47 @@ export function OperationsHub({
   const [branchPhone, setBranchPhone] = useState('')
   const [creatingBranch, setCreatingBranch] = useState(false)
   const [buildingCatalogFor, setBuildingCatalogFor] = useState<string | null>(null)
+  const [busyCountdownSec, setBusyCountdownSec] = useState<number | null>(null)
+  const autoStoppingBusyRef = useRef(false)
+
+  const syncBusyCountdown = useCallback((next: OperationsSettings, forceReset = false) => {
+    const key = busyTimerKeyFor(businessId)
+    const etaMinutes = Math.max(0, Math.round(Number(next.busyEtaMinutes) || 0))
+    const pauseMessage = next.pauseMessage?.trim() || ''
+    const isBusy = Boolean(next.busyMode) && etaMinutes > 0
+    if (!isBusy) {
+      clearBusyTimer(key)
+      setBusyCountdownSec(null)
+      return
+    }
+    const now = Date.now()
+    const existing = readBusyTimer(key)
+    const needsReset = forceReset
+      || !existing
+      || existing.etaMinutes !== etaMinutes
+      || existing.pauseMessage !== pauseMessage
+      || existing.busyUntilMs <= now
+    const busyUntilMs = needsReset ? now + etaMinutes * 60_000 : existing.busyUntilMs
+    if (needsReset) {
+      writeBusyTimer(key, {
+        busyUntilMs,
+        etaMinutes,
+        pauseMessage,
+      })
+    }
+    const remaining = Math.max(0, Math.ceil((busyUntilMs - now) / 1000))
+    setBusyCountdownSec(remaining)
+  }, [businessId])
 
   useEffect(() => {
     void operationsApi
       .getSettings(businessId)
-      .then(setSettings)
+      .then((next) => {
+        setSettings(next)
+        syncBusyCountdown(next)
+      })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Failed to load venue settings'))
-  }, [businessId])
+  }, [businessId, syncBusyCountdown])
 
   useEffect(() => {
     if (staffMode) return
@@ -50,11 +144,48 @@ export function OperationsHub({
     try {
       const next = await operationsApi.updateSettings(businessId, patch)
       setSettings(next)
+      syncBusyCountdown(next, true)
       toast.success('Settings saved')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save settings')
     }
   }
+
+  useEffect(() => {
+    if (busyCountdownSec == null) return
+    if (busyCountdownSec <= 0) return
+    const id = window.setInterval(() => {
+      setBusyCountdownSec((seconds) => {
+        if (seconds == null) return seconds
+        if (seconds <= 0) return 0
+        return seconds - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [busyCountdownSec])
+
+  useEffect(() => {
+    if (busyCountdownSec !== 0 || !settings?.busyMode) return
+    if (autoStoppingBusyRef.current) return
+    autoStoppingBusyRef.current = true
+    void operationsApi
+      .updateSettings(businessId, {
+        busyMode: false,
+        acceptingOrders: true,
+        busyEtaMinutes: 0,
+      })
+      .then((next) => {
+        setSettings(next)
+        syncBusyCountdown(next)
+        toast.success('Busy mode ended automatically')
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : 'Failed to auto-end busy mode')
+      })
+      .finally(() => {
+        autoStoppingBusyRef.current = false
+      })
+  }, [busyCountdownSec, settings?.busyMode, businessId, syncBusyCountdown])
 
   async function createBranch() {
     if (!branchName.trim() || !branchLabel.trim()) {
@@ -101,16 +232,26 @@ export function OperationsHub({
     }
   }
 
+  const currentTab = activeTab ?? tab
+
+  function handleTabChange(nextTab: string) {
+    if (nextTab === 'roles' || nextTab === 'settings' || nextTab === 'branches') {
+      setTab(nextTab)
+    }
+  }
+
   return (
     <div className="operations-hub">
-      <Tabs defaultValue="roles">
-        <TabsList>
-          <TabsTrigger value="roles">Roles &amp; staff</TabsTrigger>
-          {(!staffMode || !staffRole || hasPermission(staffRole as StaffRole, 'venue:settings')) ? (
-            <TabsTrigger value="settings">Venue</TabsTrigger>
-          ) : null}
-          {!staffMode ? <TabsTrigger value="branches">Branches</TabsTrigger> : null}
-        </TabsList>
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
+        {showTabs ? (
+          <TabsList>
+            <TabsTrigger value="roles">Staff</TabsTrigger>
+            {(!staffMode || !staffRole || hasPermission(staffRole as StaffRole, 'venue:settings')) ? (
+              <TabsTrigger value="settings">Busy mode</TabsTrigger>
+            ) : null}
+            {!staffMode ? <TabsTrigger value="branches">Branches</TabsTrigger> : null}
+          </TabsList>
+        ) : null}
 
         <TabsContent value="roles">
           <RolesPermissionsHub businessId={businessId} />
@@ -120,43 +261,50 @@ export function OperationsHub({
           {settings ? (
             <div className="operations-panel">
               <div className="operations-row">
-                <Label>Accepting orders</Label>
-                <Switch className="" checked={settings.acceptingOrders} onCheckedChange={(v) => void saveSettings({ acceptingOrders: v })} />
-              </div>
-              <div className="operations-row">
-                <Label>Busy mode</Label>
-                <Switch className="" checked={settings.busyMode} onCheckedChange={(v) => void saveSettings({ busyMode: v })} />
+                <Label>Order flow</Label>
+                <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>
+                  {settings.busyMode ? 'Busy active' : 'Open'}
+                </span>
               </div>
               <div className="operations-field">
                 <Label>Busy ETA (minutes)</Label>
-                <Input type="number" value={settings.busyEtaMinutes} onChange={(e) => setSettings({ ...settings, busyEtaMinutes: Number(e.target.value) })} />
+                <Input
+                  type="number"
+                  min={0}
+                  value={settings.busyEtaMinutes}
+                  onChange={(e) => setSettings({ ...settings, busyEtaMinutes: Math.max(0, Number(e.target.value) || 0) })}
+                />
+                {busyCountdownSec != null ? (
+                  <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+                    Countdown: {formatCountdown(busyCountdownSec)}
+                  </span>
+                ) : null}
               </div>
               <div className="operations-field">
                 <Label>Pause message</Label>
                 <Textarea className="" value={settings.pauseMessage} onChange={(e) => setSettings({ ...settings, pauseMessage: e.target.value })} />
               </div>
-              <div className="operations-row">
-                <Label>Daily digest</Label>
-                <Switch className="" checked={settings.dailyDigestEnabled} onCheckedChange={(v) => void saveSettings({ dailyDigestEnabled: v })} />
-              </div>
-              <Button onClick={() => settings && void saveSettings({
-                acceptingOrders: settings.acceptingOrders,
-                busyMode: settings.busyMode,
-                busyEtaMinutes: settings.busyEtaMinutes,
-                pauseMessage: settings.pauseMessage,
-                dailyDigestEnabled: settings.dailyDigestEnabled,
-              })}>Save venue settings</Button>
-              <div className="operations-actions">
-                <Button variant="outline" onClick={() => window.open(`/kitchen/${businessId}`, '_blank')}>Open kitchen screen</Button>
-                <Button variant="outline" onClick={() => void operationsApi.exportCatalogCsv(businessId).then((csv) => {
-                  const blob = new Blob([csv], { type: 'text/csv' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `catalog-${businessId}.csv`
-                  a.click()
-                  URL.revokeObjectURL(url)
-                })}>Export catalog CSV</Button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+                <Button style={{ width: '100%' }} onClick={() => settings && void saveSettings({
+                  acceptingOrders: (Math.round(Number(settings.busyEtaMinutes) || 0) <= 0),
+                  busyMode: (Math.round(Number(settings.busyEtaMinutes) || 0) > 0),
+                  busyEtaMinutes: Math.max(0, Math.round(Number(settings.busyEtaMinutes) || 0)),
+                  pauseMessage: settings.pauseMessage,
+                  dailyDigestEnabled: settings.dailyDigestEnabled,
+                })}>Save busy mode</Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  style={{ width: '100%' }}
+                  disabled={!settings.busyMode}
+                  onClick={() => void saveSettings({
+                    busyMode: false,
+                    acceptingOrders: true,
+                    busyEtaMinutes: 0,
+                  })}
+                >
+                  Revoke busy mode
+                </Button>
               </div>
             </div>
           ) : null}

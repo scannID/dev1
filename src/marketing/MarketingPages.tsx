@@ -259,6 +259,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
         </Section>
         <Section title="Send a message">
           <form
+            noValidate
             onSubmit={e => {
               e.preventDefault()
             }}

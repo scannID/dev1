@@ -37,14 +37,14 @@ const getStyles = (tokens: LandingTokens): Record<string, CSSProperties> => ({
   logoText: { color: tokens.text, fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' },
   navLinks: { display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 },
   navLink: { color: tokens.muted, fontSize: 14, textDecoration: 'none' },
-  navCta: { background: '#ffffff', color: tokens.teal, padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', display: 'inline-flex', alignItems: 'center', gap: 8 },
+  navCta: { background: '#ffffff', color: '#e86a17', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', display: 'inline-flex', alignItems: 'center', gap: 8 },
   hero: { background: 'transparent', padding: '100px 48px 100px', position: 'relative', overflow: 'hidden' },
   heroInner: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, alignItems: 'center', maxWidth: '100%' },
   eyebrow: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', color: tokens.tealLt, fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.02em' },
   heroH1: { color: tokens.text, fontSize: 'clamp(30px,4vw,48px)', fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px' },
   heroSub: { color: tokens.muted, fontSize: 'clamp(14px,1.7vw,17px)', lineHeight: 1.6, margin: '0 0 36px', maxWidth: 420 },
   ctaRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  ctaPrimary: { background: '#ffffff', color: tokens.teal, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', cursor: 'pointer' },
+  ctaPrimary: { background: '#ffffff', color: '#e86a17', padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', cursor: 'pointer' },
   ctaSecondary: { background: 'transparent', color: tokens.text, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: `1.5px solid ${tokens.border}`, cursor: 'pointer' },
 })
 
@@ -798,7 +798,7 @@ function TopNav({
 
         <div className="scanny-nav-actions">
           <button type="button" onClick={onCreateEventTicket} className="scanny-nav-event">
-            <span className="scanny-nav-event__label">Create event ticket</span>
+            <span className="scanny-nav-event__label">Event ticketing</span>
             <span className="scanny-nav-event__ticket" aria-hidden>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path
@@ -884,7 +884,7 @@ export default function LandingPage({
           <div>
             <h1 style={S.heroH1}>
               One scan.<br />
-              <span style={{ color: C.tealLt }}>Total control.</span>
+              <span style={{ color: '#e86a17' }}>Total control.</span>
             </h1>
             <p style={{ ...S.heroSub, fontWeight: 600 }}>
               Gone are the days.

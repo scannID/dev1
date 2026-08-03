@@ -60,7 +60,7 @@ export default function AddCategoryPopover({
         sideOffset={8}
         className="z-[70] w-64 p-4 shadow-lg"
       >
-        <form className="grid gap-3" onSubmit={(e) => void submit(e)}>
+        <form className="grid gap-3" onSubmit={(e) => void submit(e)} noValidate>
           <div>
             <p className="text-sm font-medium text-foreground">{title}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Menu group for your items</p>

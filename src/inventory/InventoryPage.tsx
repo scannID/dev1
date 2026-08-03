@@ -335,7 +335,7 @@ function AddIngredientForm({
   }
 
   return (
-    <form className="inventory-form" onSubmit={submit}>
+    <form className="inventory-form" onSubmit={submit} noValidate>
       <h3 style={{ margin: 0 }}>New ingredient</h3>
       <div className="inventory-form-grid">
         <div className="grid gap-1.5">
@@ -462,7 +462,7 @@ function StockActionForm({
           : `Waste · ${ingredient.name}`
 
   return (
-    <form className="inventory-form" onSubmit={submit}>
+    <form className="inventory-form" onSubmit={submit} noValidate>
       <h3 style={{ margin: 0 }}>{title}</h3>
       <p className="text-sm text-muted-foreground" style={{ margin: 0 }}>
         On hand: {fmtQty(ingredient.qtyOnHand, ingredient.unit)}

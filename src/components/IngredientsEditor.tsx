@@ -88,7 +88,7 @@ export function IngredientsEditor({
         <p className="text-xs text-muted-foreground">No ingredients yet — optional for simple items.</p>
       )}
       {/* keep form semantics for Enter without nesting forms */}
-      <form className="hidden" onSubmit={onSubmit} />
+      <form className="hidden" onSubmit={onSubmit} noValidate />
     </div>
   )
 }

@@ -57,6 +57,55 @@ public class PublicTicketController {
     @PostMapping("/validate")
     public ResponseEntity<TicketDtos.ScanValidationResponse> validate(
             @RequestBody TicketDtos.ScanPayloadRequest request) {
-        return ResponseEntity.ok(ticketPurchaseService.validateGatePayload(request));
+        String payload = request != null && request.payload() != null ? request.payload().trim() : "";
+        String preview = payload.length() > 96 ? payload.substring(0, 96) + "…" : payload;
+        org.slf4j.LoggerFactory.getLogger(PublicTicketController.class)
+            .info("GATE_VALIDATE eventId={} payloadPreview={}",
+                request != null ? request.eventId() : null, preview);
+        try {
+            TicketDtos.ScanValidationResponse response = ticketPurchaseService.validateGatePayload(request);
+            org.slf4j.LoggerFactory.getLogger(PublicTicketController.class)
+                .info("GATE_VALIDATE result valid={} result={} message={} ticket={}",
+                    response.valid(),
+                    response.result(),
+                    response.message(),
+                    response.ticket() != null ? response.ticket().id() : null);
+            appendGateScanLog(
+                "OK eventId=" + (request != null ? request.eventId() : "")
+                    + " valid=" + response.valid()
+                    + " result=" + response.result()
+                    + " message=" + response.message()
+                    + " preview=" + preview
+            );
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            org.slf4j.LoggerFactory.getLogger(PublicTicketController.class)
+                .warn("GATE_VALIDATE failed eventId={} preview={} err={}",
+                    request != null ? request.eventId() : null, preview, ex.toString());
+            appendGateScanLog(
+                "FAIL eventId=" + (request != null ? request.eventId() : "")
+                    + " preview=" + preview
+                    + " err=" + ex.getMessage()
+            );
+            throw ex;
+        }
+    }
+
+    private static void appendGateScanLog(String line) {
+        try {
+            java.nio.file.Path path = java.nio.file.Path.of(
+                System.getProperty("user.dir"), "..", ".dev", "gate-scan.log"
+            ).normalize();
+            java.nio.file.Files.createDirectories(path.getParent());
+            String stamped = java.time.Instant.now() + " " + line + System.lineSeparator();
+            java.nio.file.Files.writeString(
+                path,
+                stamped,
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.APPEND
+            );
+        } catch (Exception ignored) {
+            // debug aid only
+        }
     }
 }

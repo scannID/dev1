@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -203,14 +204,37 @@ public class TicketService {
     @Transactional
     public TicketDtos.ScanValidationResponse scanTicketPayload(TicketDtos.ScanPayloadRequest request) {
         GatePayload payload = parseGatePayload(request.payload());
-        Ticket ticket = ticketRepository.findById(payload.ticketId())
-            .orElseThrow(() -> new ApiException(404, "Ticket not found"));
+        String gateEventId = request.eventId() != null ? request.eventId().trim() : "";
+        String payloadEventId = nullToEmpty(payload.eventId());
+        String expectedEventId = !gateEventId.isBlank() ? gateEventId : payloadEventId;
+        Ticket ticket;
+        if (!payload.ticketId().isBlank()) {
+            ticket = ticketRepository.findById(payload.ticketId())
+                .orElseThrow(() -> new ApiException(404, "Ticket not found"));
+        } else if (!payload.shortCode().isBlank()) {
+            if (expectedEventId.isBlank()) {
+                throw new ApiException(400, "Event ID is required before entering ticket code");
+            }
+            List<Ticket> matched = ticketRepository.findByMasterTicketIdAndIdEndingWithIgnoreCase(
+                expectedEventId,
+                payload.shortCode()
+            ).stream()
+                .filter(Ticket::isAttendeeTicket)
+                .toList();
+            if (matched.isEmpty()) {
+                throw new ApiException(404, "Ticket code not found for this event");
+            }
+            if (matched.size() > 1) {
+                throw new ApiException(409, "Ticket code collision. Scan the QR ticket directly.");
+            }
+            ticket = matched.get(0);
+        } else {
+            throw new ApiException(400, "Ticket payload or ticket code is required");
+        }
         if (!ticket.isAttendeeTicket()) {
             throw new ApiException(400, "Only attendee tickets can be scanned at the gate");
         }
         String masterId = nullToEmpty(ticket.getMasterTicketId());
-        String payloadEventId = nullToEmpty(payload.eventId());
-        String gateEventId = request.eventId() != null ? request.eventId().trim() : "";
         if (!payloadEventId.isBlank() && !masterId.isBlank()
                 && !payloadEventId.equalsIgnoreCase(masterId)) {
             throw new ApiException(400, "Ticket event does not match payload");
@@ -219,7 +243,6 @@ public class TicketService {
                 && !gateEventId.equalsIgnoreCase(payloadEventId)) {
             throw new ApiException(400, "Ticket is for a different event");
         }
-        String expectedEventId = !gateEventId.isBlank() ? gateEventId : payloadEventId;
         return validateAndRecordScan(
             ticket,
             request.scannedBy(),
@@ -314,6 +337,9 @@ public class TicketService {
             throw new ApiException(400, "Scan payload is required");
         }
         String trimmed = extractTicketPayload(rawPayload.trim());
+        if (isShortCode(trimmed)) {
+            return new GatePayload("", "", "", "", trimmed.toUpperCase(Locale.ROOT));
+        }
         if (!trimmed.startsWith("SCANNY:TICKET:")) {
             throw new ApiException(400, "Unsupported ticket payload");
         }
@@ -325,10 +351,14 @@ public class TicketService {
             String eventId = values.getOrDefault("eventId", "").trim();
             String paymentId = values.getOrDefault("paymentId", "").trim();
             String qrToken = values.getOrDefault("qrToken", "").trim();
-            if (ticketId.isBlank()) {
-                throw new ApiException(400, "Invalid payload: missing ticket id");
+            String shortCode = values.getOrDefault("code", "").trim().toUpperCase(Locale.ROOT);
+            if (ticketId.isBlank() && shortCode.isBlank()) {
+                throw new ApiException(400, "Invalid payload: missing ticket id/code");
             }
-            return new GatePayload(ticketId, eventId, paymentId, qrToken);
+            if (shortCode.isBlank() && !ticketId.isBlank()) {
+                shortCode = shortCodeForTicketId(ticketId);
+            }
+            return new GatePayload(ticketId, eventId, paymentId, qrToken, shortCode);
         } catch (ApiException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -369,7 +399,24 @@ public class TicketService {
         return value == null ? "" : value.trim();
     }
 
-    private record GatePayload(String ticketId, String eventId, String paymentId, String qrToken) {}
+    private static boolean isShortCode(String value) {
+        if (value == null) return false;
+        String normalized = value.trim();
+        return normalized.matches("(?i)^[A-Z0-9]{4}$");
+    }
+
+    private static String shortCodeForTicketId(String ticketId) {
+        if (ticketId == null || ticketId.isBlank()) {
+            return "";
+        }
+        String normalized = ticketId.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        if (normalized.length() <= 4) {
+            return normalized;
+        }
+        return normalized.substring(normalized.length() - 4);
+    }
+
+    private record GatePayload(String ticketId, String eventId, String paymentId, String qrToken, String shortCode) {}
 
     @Transactional
     public TicketResponse updateTicketStatus(String ticketId, TicketStatus status) {
@@ -405,9 +452,15 @@ public class TicketService {
     }
 
     private void broadcastStatsUpdate() {
-        List<TicketDtos.TicketEventStats> stats = getTicketStats(null);
-        ticketStatsWebSocketHandler.broadcastTicketStats(stats);
-        realtimeEventPublisher.publishTicketStats(stats);
+        try {
+            List<TicketDtos.TicketEventStats> stats = getTicketStats(null);
+            ticketStatsWebSocketHandler.broadcastTicketStats(stats);
+            realtimeEventPublisher.publishTicketStats(stats);
+        } catch (Exception ex) {
+            // Never fail a gate knock-off because stats fan-out broke.
+            org.slf4j.LoggerFactory.getLogger(TicketService.class)
+                .warn("Ticket stats broadcast failed: {}", ex.toString());
+        }
     }
 
     public void refreshStatsBroadcast() {

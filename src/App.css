@@ -7,6 +7,13 @@
   background: var(--background);
 }
 
+/* Use red field styling for validation instead of browser popup messages. */
+form :where(input, select, textarea):required:invalid,
+form :where(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--destructive, #dc2626) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--destructive, #dc2626) 20%, transparent);
+}
+
 /* =============================================
    SIDEBAR — white in light, dark in dark mode
    ============================================= */
@@ -5210,20 +5217,37 @@ button:disabled {
 .cm-feedback-stars {
   display: flex;
   gap: 6px;
+  justify-content: center;
 }
 
 .cm-feedback-stars button {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   border: 1px solid var(--border, #d1d5db);
   background: transparent;
+  color: #9ca3af;
+  font-size: 22px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.cm-feedback-stars button:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.cm-feedback-stars button:active {
+  transform: translateY(1px);
 }
 
 .cm-feedback-stars button.active {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
+  background: #fffbeb;
+  color: #f59e0b;
+  border-color: #f59e0b;
 }
 
 

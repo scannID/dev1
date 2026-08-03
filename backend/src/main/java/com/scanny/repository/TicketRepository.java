@@ -43,6 +43,7 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
     Optional<Ticket> findByAccessToken(String accessToken);
 
     List<Ticket> findByMasterTicketIdOrderByCreatedAtDesc(String masterTicketId);
+    List<Ticket> findByMasterTicketIdAndIdEndingWithIgnoreCase(String masterTicketId, String suffix);
 
     List<Ticket> findByMasterTicketIdIsNullAndUsageLimitGreaterThan(int usageLimit);
 

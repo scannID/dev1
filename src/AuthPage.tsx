@@ -318,7 +318,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
 
         {/* Login Form */}
         {view === 'login' && (
-          <form onSubmit={handleLogin} style={{ display: 'grid', gap: 20 }}>
+          <form onSubmit={handleLogin} style={{ display: 'grid', gap: 20 }} noValidate>
             <label style={{ display: 'grid', gap: 8 }}>
               <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>Email</span>
               <input
@@ -451,7 +451,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
 
         {/* Register Form */}
         {view === 'register' && (
-          <form onSubmit={handleRegister} style={{ display: 'grid', gap: 18 }}>
+          <form onSubmit={handleRegister} style={{ display: 'grid', gap: 18 }} noValidate>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <label style={{ display: 'grid', gap: 8 }}>
                 <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>Business name *</span>
@@ -631,7 +631,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
 
         {/* Forgot Password Form */}
         {view === 'forgot' && (
-          <form onSubmit={handleForgotPassword} style={{ display: 'grid', gap: 20 }}>
+          <form onSubmit={handleForgotPassword} style={{ display: 'grid', gap: 20 }} noValidate>
             <label style={{ display: 'grid', gap: 8 }}>
               <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>Email</span>
               <input

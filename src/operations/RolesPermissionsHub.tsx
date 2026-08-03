@@ -406,7 +406,7 @@ export function RolesPermissionsHub({ businessId }: { businessId: string }) {
             </SheetDescription>
           </SheetHeader>
 
-          <form id="add-staff-form" onSubmit={handleAddStaff} className="roles-sheet-form">
+          <form id="add-staff-form" onSubmit={handleAddStaff} className="roles-sheet-form" noValidate>
             <div className="roles-create-fields">
               <div className="roles-field">
                 <Label htmlFor="staff-display-name">Display name</Label>

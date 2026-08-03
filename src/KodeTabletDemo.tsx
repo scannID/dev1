@@ -273,21 +273,15 @@ export function KodeTabletDemo() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14, padding: '0 4px' }}>
-                <div
+                <img
+                  src="/kode-icon.svg"
+                  alt="Kode"
                   style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 6,
-                    background: 'var(--primary, #2f8f6b)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: '#fff',
-                    fontSize: 10,
-                    fontWeight: 800,
+                    width: 28,
+                    height: 28,
+                    objectFit: 'cover',
                   }}
-                >
-                  S
-                </div>
+                />
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Kode</div>
                   <div style={{ fontSize: 7.5, color: '#7a867f' }}>Merchant</div>
@@ -348,10 +342,12 @@ export function KodeTabletDemo() {
                   background: '#fff',
                 }}
               >
-                <div style={{ fontSize: 8, fontWeight: 650, color: '#8a948c', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                  Merchant · Orders
+                <div>
+                  <div style={{ fontSize: 8, fontWeight: 650, color: '#8a948c', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    Merchant · Orders
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 750, color: '#15231c', marginTop: 2 }}>Orders</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 750, color: '#15231c', marginTop: 2 }}>Orders</div>
               </header>
 
               {/* Metrics */}

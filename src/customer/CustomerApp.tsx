@@ -3,6 +3,7 @@ import { ArrowLeft, Clock3, History, Package, Receipt, ShoppingCart, X } from 'l
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { businessApi, devicesApi, feesApi, fxApi, ordersApi } from '../api/services'
+import { operationsApi } from '../api/operations'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
@@ -60,6 +61,62 @@ const PROGRESS_STEPS: CheckoutStep[] = ['menu', 'cart', 'details', 'pay']
 
 /** In-memory guard so React StrictMode remounts don't fire two scan POSTs before sessionStorage sticks. */
 const recordedScanKeys = new Set<string>()
+const BUSY_TIMER_STORAGE_PREFIX = 'Kode:busy-until:'
+
+type BusyTimerSnapshot = {
+  busyUntilMs: number
+  etaMinutes: number
+  pauseMessage: string
+}
+
+function getBusyTimerKey(businessId: string): string {
+  return `${BUSY_TIMER_STORAGE_PREFIX}${businessId}`
+}
+
+function readBusyTimer(key: string): BusyTimerSnapshot | null {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<BusyTimerSnapshot>
+    if (
+      typeof parsed.busyUntilMs !== 'number'
+      || typeof parsed.etaMinutes !== 'number'
+      || typeof parsed.pauseMessage !== 'string'
+    ) {
+      return null
+    }
+    return {
+      busyUntilMs: parsed.busyUntilMs,
+      etaMinutes: parsed.etaMinutes,
+      pauseMessage: parsed.pauseMessage,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeBusyTimer(key: string, snapshot: BusyTimerSnapshot) {
+  try {
+    localStorage.setItem(key, JSON.stringify(snapshot))
+  } catch {
+    // ignore storage limitations
+  }
+}
+
+function clearBusyTimer(key: string) {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // ignore storage limitations
+  }
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const safe = Math.max(0, totalSeconds)
+  const mins = Math.floor(safe / 60)
+  const secs = safe % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
 
 export default function CustomerApp({
   businessId,
@@ -75,7 +132,6 @@ export default function CustomerApp({
   const [business, setBusiness] = useState<Business | null>(null)
   const [items, setItems] = useState<CatalogItem[]>([])
   const [popularItems, setPopularItems] = useState<CatalogItem[]>([])
-  const [estimatedWaitMinutes, setEstimatedWaitMinutes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [serviceFeeUgx, setServiceFeeUgx] = useState(DEFAULT_SERVICE_FEE_UGX)
@@ -121,6 +177,7 @@ export default function CustomerApp({
   const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
   const [ordersPaused, setOrdersPaused] = useState(false)
   const [busyBanner, setBusyBanner] = useState<string | null>(null)
+  const [busyEtaRemainingSec, setBusyEtaRemainingSec] = useState<number | null>(null)
 
   const trackOrder = Boolean(orderPublicId) && Boolean(phone.trim())
   const {
@@ -195,6 +252,78 @@ export default function CustomerApp({
     },
     [business, customerName, phone, provider, serviceFeeUgx],
   )
+
+  const applyOperationalStatus = useCallback((
+    status: {
+      acceptingOrders?: boolean
+      busyMode?: boolean
+      busyEtaMinutes?: number
+      pauseMessage?: string
+    },
+    fallbackBusiness?: Business,
+  ) => {
+    const accepting = status.acceptingOrders !== false
+    const busyMode = Boolean(status.busyMode)
+    const etaMinutes = Math.max(0, Math.round(Number(status.busyEtaMinutes) || 0))
+    const pauseMessage = status.pauseMessage?.trim() || ''
+    const busyTimerKey = getBusyTimerKey(businessId)
+    let remainingBusySeconds: number | null = null
+    let busyWindowExpired = false
+
+    if (busyMode && etaMinutes > 0) {
+      const now = Date.now()
+      const existing = readBusyTimer(busyTimerKey)
+      const mustResetTimer = !existing
+        || existing.etaMinutes !== etaMinutes
+        || existing.pauseMessage !== pauseMessage
+        || existing.busyUntilMs <= now
+      const busyUntilMs = mustResetTimer
+        ? now + etaMinutes * 60_000
+        : existing.busyUntilMs
+      if (mustResetTimer) {
+        writeBusyTimer(busyTimerKey, {
+          busyUntilMs,
+          etaMinutes,
+          pauseMessage,
+        })
+      }
+      remainingBusySeconds = Math.max(0, Math.ceil((busyUntilMs - now) / 1000))
+      busyWindowExpired = remainingBusySeconds === 0
+    } else {
+      clearBusyTimer(busyTimerKey)
+    }
+
+    const effectiveBusyMode = busyMode && !busyWindowExpired
+    const manuallyPaused = !busyMode && !accepting
+    const intakePaused = effectiveBusyMode || manuallyPaused
+    setOrdersPaused(intakePaused)
+    setBusiness((prev) => {
+      const base = prev ?? fallbackBusiness
+      if (!base) return prev
+      return {
+        ...base,
+        busyMode: effectiveBusyMode,
+        busyEtaMinutes: effectiveBusyMode ? etaMinutes : 0,
+        acceptingOrders: intakePaused ? !effectiveBusyMode : true,
+        pauseMessage,
+      }
+    })
+    if (effectiveBusyMode) {
+      setBusyEtaRemainingSec(remainingBusySeconds)
+      setBusyBanner(
+        pauseMessage
+          || (etaMinutes > 0
+            ? `Kitchen is busy — about ${etaMinutes} min wait`
+            : 'Kitchen is busy right now'),
+      )
+    } else if (manuallyPaused) {
+      setBusyEtaRemainingSec(null)
+      setBusyBanner(pauseMessage || 'This location is not accepting orders right now.')
+    } else {
+      setBusyEtaRemainingSec(null)
+      setBusyBanner(null)
+    }
+  }, [businessId])
 
   useEffect(() => {
     if (!trackedOrder) return
@@ -281,33 +410,18 @@ export default function CustomerApp({
         const remaining = Math.max(0, 700 - (Date.now() - started))
         if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (cancelled) return
-        setBusiness(menu.business)
         setItems(menu.items ?? [])
         setPopularItems(menu.popular ?? [])
         if (menu.business.type === 'Hotel') {
           setBrowseMode('stay')
         }
-        setEstimatedWaitMinutes(
-          typeof menu.estimatedWaitMinutes === 'number' ? menu.estimatedWaitMinutes : null,
-        )
-        const accepting = menu.business.acceptingOrders !== false
-        setOrdersPaused(!accepting)
-        if (menu.business.busyMode) {
-          const eta = menu.business.busyEtaMinutes
-          setBusyBanner(
-            menu.business.pauseMessage?.trim()
-              || (typeof eta === 'number' && eta > 0
-                ? `Kitchen is busy — about ${eta} min wait`
-                : 'Kitchen is busy right now'),
-          )
-        } else {
-          setBusyBanner(null)
-        }
-        if (!accepting) {
-          setBusyBanner(
-            menu.business.pauseMessage?.trim() || 'This location is not accepting orders right now.',
-          )
-        }
+        setBusiness(menu.business)
+        applyOperationalStatus({
+          acceptingOrders: menu.business.acceptingOrders,
+          busyMode: menu.business.busyMode,
+          busyEtaMinutes: menu.business.busyEtaMinutes,
+          pauseMessage: menu.business.pauseMessage,
+        }, menu.business)
       } catch (err) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Failed to load menu')
@@ -319,7 +433,58 @@ export default function CustomerApp({
     return () => {
       cancelled = true
     }
-  }, [businessId, qrToken])
+  }, [businessId, qrToken, applyOperationalStatus])
+
+  useEffect(() => {
+    let cancelled = false
+    const pullStatus = async () => {
+      try {
+        const status = await operationsApi.publicStatus(businessId)
+        if (cancelled) return
+        applyOperationalStatus(status)
+      } catch {
+        // keep current customer state on transient errors
+      }
+    }
+    void pullStatus()
+    const id = window.setInterval(() => {
+      void pullStatus()
+    }, 4000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [businessId, applyOperationalStatus])
+
+  const hasBusyCountdown = ordersPaused && busyEtaRemainingSec !== null
+  useEffect(() => {
+    if (!hasBusyCountdown) return
+    const id = window.setInterval(() => {
+      setBusyEtaRemainingSec((seconds) => {
+        if (seconds == null) return seconds
+        if (seconds <= 0) return 0
+        return seconds - 1
+      })
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [hasBusyCountdown])
+
+  useEffect(() => {
+    if (!ordersPaused) return
+    if (busyEtaRemainingSec !== 0) return
+    setOrdersPaused(false)
+    setBusyBanner(null)
+    setBusiness((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        busyMode: false,
+        busyEtaMinutes: 0,
+        acceptingOrders: true,
+      }
+    })
+    clearBusyTimer(getBusyTimerKey(businessId))
+  }, [ordersPaused, busyEtaRemainingSec, businessId])
 
   // Record one scan per open. Server also dedupes (~45s). sessionStorage only
   // suppresses rapid reloads in the same tab so counts still move on real revisits.
@@ -372,7 +537,7 @@ export default function CustomerApp({
     setPlacedOrderId(savedActiveOrder.orderId)
     setOrderPublicId(savedActiveOrder.publicId)
     if (savedActiveOrder.phone) {
-      setPhone(savedActiveOrder.phone)
+      setPhone(formatUgPhoneHint(savedActiveOrder.phone))
     }
     setStep('waiting')
   }, [savedActiveOrder, draft?.step])
@@ -386,7 +551,7 @@ export default function CustomerApp({
         if (registered) {
           const device = await devicesApi.get(deviceId)
           setSavedDevice(device)
-          if (device.primaryPhone) setPhone(device.primaryPhone)
+          if (device.primaryPhone) setPhone(formatUgPhoneHint(device.primaryPhone))
           if (device.customerName) setCustomerName(device.customerName)
           setSaveNumber(false)
         }
@@ -568,12 +733,10 @@ export default function CustomerApp({
     const trimmed = value.trim()
     if (!trimmed) return 'Enter your mobile money number'
     const digits = trimmed.replace(/\D/g, '')
-    // UG local 07XXXXXXXX (10) or +2567XXXXXXXX (12) or 2567XXXXXXXX (12)
+    // Customer checkout accepts local UG format only: 07XXXXXXXX.
     if (digits.length === 10 && /^0[67]\d{8}$/.test(digits)) return null
-    if (digits.length === 12 && /^256[67]\d{8}$/.test(digits)) return null
-    if (digits.length === 9 && /^[67]\d{8}$/.test(digits)) return null
-    if (digits.length < 9) return 'Enter a valid mobile money number'
-    return 'Use a valid UG number (07… or +256…)'
+    if (digits.length < 10) return 'Enter a valid UG number starting with 0 (07XXXXXXXX)'
+    return 'Use a valid UG number starting with 0 (07XXXXXXXX)'
   }
 
   async function startPaymentForOrder(orderId: string, amount: number) {
@@ -1030,7 +1193,7 @@ export default function CustomerApp({
     setNameError(null)
     setLocationError(null)
     setProvider('MTN')
-    setPhone(savedDevice?.primaryPhone ?? '')
+    setPhone(formatUgPhoneHint(savedDevice?.primaryPhone ?? ''))
     setSaveNumber(!deviceKnown)
     setPhoneError(null)
     setSubmitting(false)
@@ -1081,10 +1244,23 @@ export default function CustomerApp({
     !splitEnabled || (splitShares.length >= 2 && splitAllocated === payableTotal && splitPhonesOk)
   const canCancel =
     step !== 'done' && (step !== 'menu' || cartCount > 0 || Boolean(placedOrderId) || Boolean(paymentId))
+  const showBusyHeaderBadge = business.busyMode || business.acceptingOrders === false
+  const busyCountdownText = busyEtaRemainingSec != null ? formatCountdown(busyEtaRemainingSec) : null
+  const busyCountdownDone = busyEtaRemainingSec === 0
+  const busyHeaderText = business.busyMode
+    ? busyCountdownText
+      ? (busyCountdownDone ? 'Busy - opening soon' : `Busy - opens in ${busyCountdownText}`)
+      : 'Busy - orders paused'
+    : 'Orders paused'
+  const busyOverlayActive = ordersPaused && !busyCountdownDone
+  const busyOverlayMessage = business.busyMode && busyCountdownText
+    ? `${busyBanner || 'Kitchen is busy right now.'} Reopening in ${busyCountdownText}.`
+    : (busyBanner || 'Orders are temporarily paused.')
 
   return (
     <div className="cm-page">
       <Toaster />
+      <div className={`cm-app-shell${busyOverlayActive ? ' is-busy' : ''}`}>
       <header className="cm-topbar">
         <div className="cm-brand">
           {business.logoUrl ? (
@@ -1096,6 +1272,16 @@ export default function CustomerApp({
             <span className="cm-brand-name">Kode</span>
             <span className="cm-brand-biz">{business.name}</span>
           </div>
+          {showBusyHeaderBadge ? (
+            <span
+              className={`cm-status-chip${business.busyMode ? ' busy blink' : ' paused'}`}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="cm-status-dot" aria-hidden="true" />
+              {busyHeaderText}
+            </span>
+          ) : null}
         </div>
         <div className="cm-topbar-actions">
           {canCancel ? (
@@ -1156,13 +1342,6 @@ export default function CustomerApp({
           ) : null}
         </div>
       </header>
-
-      {busyBanner ? (
-        <div className={`cm-ops-banner${ordersPaused ? ' paused' : ''}`} role="status">
-          <Clock3 size={16} />
-          <span>{busyBanner}</span>
-        </div>
-      ) : null}
 
       <StepProgress step={step} variant={checkoutMode} />
 
@@ -1278,9 +1457,6 @@ export default function CustomerApp({
           customerName={customerName}
           status={paymentStatus}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
-          estimatedWaitMinutes={
-            trackedOrder?.estimatedWaitMinutes ?? estimatedWaitMinutes ?? undefined
-          }
           trackingLoading={trackingLoading}
           error={error}
           splitSummary={splitSummary}
@@ -1297,18 +1473,11 @@ export default function CustomerApp({
           businessName={business.name}
           orderId={placedOrderId}
           publicId={orderPublicId}
-          businessId={business.id}
           total={paidTotal}
           orderStatus={trackedOrder?.status ?? fulfillmentStatus}
-          estimatedWaitMinutes={
-            trackedOrder?.estimatedWaitMinutes ?? estimatedWaitMinutes ?? undefined
-          }
           trackingLoading={trackingLoading}
           trackingError={trackingError}
           onOrderMore={orderMore}
-          phone={phone}
-          customerName={customerName}
-          provider={provider}
         />
       )}
 
@@ -1375,6 +1544,23 @@ export default function CustomerApp({
 
       {showHistory ? (
         <OrderHistoryPanel initialPhone={phone} onClose={() => setShowHistory(false)} />
+      ) : null}
+      </div>
+      {busyOverlayActive ? (
+        <div className="cm-busy-overlay" role="alert" aria-live="assertive" aria-busy="true">
+          <div className="cm-busy-overlay-card">
+            <span className="cm-busy-overlay-icon" aria-hidden="true">
+              <Clock3 size={20} />
+            </span>
+            <h2>{busyCountdownText ? `Busy until ${busyCountdownText}` : 'Currently busy'}</h2>
+            <p>{busyOverlayMessage}</p>
+            <span className="cm-busy-overlay-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </div>
+        </div>
       ) : null}
     </div>
   )

@@ -27,14 +27,28 @@ export function OrderHistoryPanel({
   const [sessionToken, setSessionToken] = useState(() => sessionStorage.getItem(SESSION_KEY) || '')
   const [busy, setBusy] = useState(false)
 
+  function validateLocalPhone(value: string) {
+    const digits = value.replace(/\D/g, '')
+    if (!/^0[67]\d{8}$/.test(digits)) {
+      return 'Use a UG number that starts with 0 (07XXXXXXXX)'
+    }
+    return null
+  }
+
   async function requestCode() {
     if (!phone.trim()) {
       toast.error('Enter your phone number')
       return
     }
+    const phoneError = validateLocalPhone(phone)
+    if (phoneError) {
+      toast.error(phoneError)
+      return
+    }
+    const normalizedPhone = phone.replace(/\D/g, '')
     setBusy(true)
     try {
-      await operationsApi.requestHistoryCode(phone.trim())
+      await operationsApi.requestHistoryCode(normalizedPhone)
       setCodeSent(true)
       toast.success('Verification code sent')
     } catch (err) {
@@ -45,9 +59,15 @@ export function OrderHistoryPanel({
   }
 
   async function verify() {
+    const phoneError = validateLocalPhone(phone)
+    if (phoneError) {
+      toast.error(phoneError)
+      return
+    }
+    const normalizedPhone = phone.replace(/\D/g, '')
     setBusy(true)
     try {
-      const result = await operationsApi.verifyHistory(phone.trim(), code.trim())
+      const result = await operationsApi.verifyHistory(normalizedPhone, code.trim())
       sessionStorage.setItem(SESSION_KEY, result.sessionToken)
       setSessionToken(result.sessionToken)
       setOrders(result.orders)

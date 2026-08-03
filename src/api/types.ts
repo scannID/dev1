@@ -464,6 +464,7 @@ export interface TicketPurchaseRequest {
 
 export interface TicketPurchaseResponse {
   attendeeTicketId: string
+  ticketCode: string
   paymentId: string
   paymentStatus: PaymentIntentStatus
   message: string
@@ -487,6 +488,7 @@ export interface AttendeeTicketView {
   metadata: string
   viewUrl: string
   qrToken: string
+  ticketCode: string
   qrPayload: string
   gateUrl: string
   purchaseUrl?: string
@@ -513,6 +515,7 @@ export interface EventTicketTrackingMetrics {
   eventName: string
   eventDate: string | null
   host: string
+  eventImageUrl?: string
   status: string
   orderedTickets: number
   purchasedTickets: number

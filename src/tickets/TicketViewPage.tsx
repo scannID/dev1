@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
-import { Check, Clock } from 'lucide-react'
+import { ArrowRight, Check, Clock } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
 import type { AttendeeTicketView } from '../api/types'
 import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
@@ -146,8 +146,8 @@ export default function TicketViewPage({ accessToken }: Props) {
       template: parseTemplate(ticket.template),
       ticketClasses: [{ id: '1', name: ticket.ticketType, fee: String(ticket.price), capacity: '' }],
       tables: [],
-      ticketId: ticket.id,
-      idLabel: 'Ticket ID',
+      ticketId: ticket.ticketCode || ticket.id,
+      idLabel: ticket.ticketCode ? 'Ticket code' : 'Ticket ID',
       selectedClass: ticket.ticketType,
       eventImageUrl,
     }
@@ -187,6 +187,19 @@ export default function TicketViewPage({ accessToken }: Props) {
             <span>{visual.host?.trim() || ticket.holderName || 'Hosted event'}</span>
           </div>
         </div>
+        {ticket.purchaseUrl ? (
+          <button
+            type="button"
+            className="tk-back-btn"
+            onClick={() => {
+              window.location.href = ticket.purchaseUrl!
+            }}
+            aria-label="Back to ticket menu"
+          >
+            <span>Menu</span>
+            <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
+          </button>
+        ) : null}
       </header>
 
       <main className="tk-main">
@@ -227,6 +240,13 @@ export default function TicketViewPage({ accessToken }: Props) {
           )}
         </div>
 
+        {ticket.ticketCode ? (
+          <section className="tk-ticket-code tk-enter" aria-label="Ticket code">
+            <span className="tk-ticket-code-label">Ticket code</span>
+            <strong className="tk-ticket-code-value">{ticket.ticketCode}</strong>
+          </section>
+        ) : null}
+
         {paid ? (
           <div className="tk-enter">
             <TicketPassFrame>
@@ -256,7 +276,7 @@ export default function TicketViewPage({ accessToken }: Props) {
               Approve the prompt on your phone. This page updates automatically when payment
               clears.
             </p>
-            <p className="tk-ref">Ticket {ticket.id}</p>
+            <p className="tk-ref">Ticket {ticket.ticketCode || ticket.id}</p>
             {ticket.purchaseUrl ? (
               <button
                 type="button"

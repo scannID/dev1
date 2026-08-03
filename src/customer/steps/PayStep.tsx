@@ -1,8 +1,9 @@
+import { useRef } from 'react'
 import type { Business } from '../../api/types'
 import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
-import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, withServiceFee } from '../utils'
+import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, formatUgPhoneHint, withServiceFee } from '../utils'
 import { distributeEqually, type SplitShareDraft } from '../splitValidation'
 import type { CartLine } from './CartStep'
 
@@ -52,6 +53,7 @@ export function PayStep({
   onPhone: (value: string) => void
   onSaveNumber: (value: boolean) => void
 }) {
+  const phoneInputRef = useRef<HTMLInputElement | null>(null)
   const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
   const allocated = splitShares.reduce((sum, share) => sum + (Math.round(Number(share.amount)) || 0), 0)
   const remaining = payableTotal - allocated
@@ -73,6 +75,14 @@ export function PayStep({
     if (enabled && splitShares.length < 2) {
       setPeopleCount(2)
     }
+  }
+
+  function beginChangeSavedNumber() {
+    onPhone('0')
+    window.setTimeout(() => {
+      phoneInputRef.current?.focus()
+      phoneInputRef.current?.setSelectionRange(1, 1)
+    }, 0)
   }
 
   return (
@@ -234,17 +244,26 @@ export function PayStep({
           {deviceKnown && savedPhone ? (
             <div className="cm-saved-box">
               <p className="cm-eyebrow">Saved on this phone</p>
-              <strong>{savedPhone}</strong>
+              <strong>{formatUgPhoneHint(savedPhone ?? '')}</strong>
               <p className="cm-muted">We’ll send the {provider} prompt here. Change the number below if needed.</p>
+              <button
+                type="button"
+                className="customer-secondary-btn"
+                disabled={submitting}
+                onClick={beginChangeSavedNumber}
+              >
+                Change number
+              </button>
             </div>
           ) : null}
 
           <label className="cm-field">
             Mobile money number
             <input
+              ref={phoneInputRef}
               value={phone}
               onChange={(e) => onPhone(e.target.value)}
-              placeholder="07XX XXX XXX or +256…"
+              placeholder="07XX XXX XXX"
               inputMode="tel"
               autoComplete="tel"
               required

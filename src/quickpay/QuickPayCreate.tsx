@@ -128,7 +128,7 @@ export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
             One fixed amount — parking, tips, entry fees, donations. Customers scan and pay; you track with a number emailed to you.
           </p>
 
-          <form onSubmit={handleSubmit} className="scanny-form">
+          <form onSubmit={handleSubmit} className="scanny-form" noValidate>
             <Field label="What is this for?" required>
               <input
                 required

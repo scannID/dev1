@@ -51,6 +51,27 @@ html.tk-app body {
   z-index: 20;
 }
 
+.tk-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0 0 0 auto;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--tk-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--tk-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tk-back-btn:hover {
+  background: #f8fafc;
+}
+
 .tk-brand {
   display: flex;
   align-items: center;
@@ -559,6 +580,37 @@ html.tk-app body {
 .tk-status-note strong {
   color: var(--tk-text);
   font-weight: 600;
+}
+
+.tk-ticket-code {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--tk-gold) 38%, var(--tk-border));
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--tk-gold) 8%, #fff), #ffffff),
+    #ffffff;
+  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.14);
+  display: grid;
+  gap: 6px;
+}
+
+.tk-ticket-code-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tk-muted);
+}
+
+.tk-ticket-code-value {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--tk-gold);
+  line-height: 1;
 }
 
 .tk-pass-frame {

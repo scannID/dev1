@@ -63,6 +63,7 @@ public class PublicTicketDtos {
 
     public record PurchaseResponse(
         String attendeeTicketId,
+        String ticketCode,
         String paymentId,
         PaymentIntentStatus paymentStatus,
         String message,
@@ -86,6 +87,7 @@ public class PublicTicketDtos {
         String metadata,
         String viewUrl,
         String qrToken,
+        String ticketCode,
         String qrPayload,
         String gateUrl,
         String purchaseUrl
@@ -97,6 +99,7 @@ public class PublicTicketDtos {
         String eventName,
         String eventDate,
         String host,
+        String eventImageUrl,
         String status,
         long orderedTickets,
         long purchasedTickets,

@@ -233,7 +233,7 @@ export function InventoryActionPage({
       ) : (
         <>
           <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <form className="inventory-form p-4" onSubmit={submit}>
+            <form className="inventory-form p-4" onSubmit={submit} noValidate>
               <div className="inventory-form-grid">
                 <div className="grid gap-1.5">
                   <Label>Ingredient</Label>

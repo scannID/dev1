@@ -67,6 +67,15 @@ export function initials(name: string) {
 }
 
 export function formatUgPhoneHint(value: string) {
-  const digits = value.replace(/[^\d+]/g, '')
-  return digits
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('256')) {
+    const local = digits.slice(3)
+    if (local.startsWith('0')) return local.slice(0, 10)
+    return `0${local}`.slice(0, 10)
+  }
+  if (digits.startsWith('7')) {
+    return `0${digits}`.slice(0, 10)
+  }
+  return digits.slice(0, 10)
 }

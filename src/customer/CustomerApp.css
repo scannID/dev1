@@ -22,6 +22,16 @@
   overscroll-behavior-y: contain;
 }
 
+.cm-app-shell {
+  min-height: inherit;
+}
+
+.cm-app-shell.is-busy {
+  filter: blur(7px);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* App-like shell: no pinch/double-tap zoom leftover on customer route */
 html.cm-app,
 html.cm-app body {
@@ -162,6 +172,55 @@ html.cm-app #root {
   gap: 8px;
   min-width: 0;
   flex: 1;
+}
+
+.cm-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cm-status-chip .cm-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.cm-status-chip.busy {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.cm-status-chip.paused {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.cm-status-chip.blink {
+  animation: cm-status-blink 1s steps(2, start) infinite;
+}
+
+@keyframes cm-status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .cm-brand-logo {
@@ -1654,6 +1713,8 @@ html.cm-app #root {
   border-radius: 14px;
   background: var(--cm-teal-soft);
   border: 1px solid color-mix(in srgb, var(--cm-teal) 25%, white);
+  display: grid;
+  gap: 6px;
 }
 
 .cm-saved-box strong {
@@ -1661,6 +1722,14 @@ html.cm-app #root {
   margin: 4px 0;
   font-size: 18px;
   letter-spacing: -0.02em;
+}
+
+.cm-saved-box .customer-secondary-btn {
+  margin-top: 8px;
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
 }
 
 .cm-hint {
@@ -2471,6 +2540,111 @@ html.cm-app #root {
 .cm-ops-banner.paused {
   background: #fef2f2;
   color: #991b1b;
+}
+
+.cm-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(3px);
+}
+
+.cm-busy-overlay-card {
+  width: min(420px, 100%);
+  border-radius: 16px;
+  padding: 20px 18px;
+  background: #7f1d1d;
+  border: 1px solid #fecaca;
+  box-shadow: 0 22px 48px rgba(127, 29, 29, 0.45);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #fff;
+  animation: cm-busy-card-pulse 1.7s ease-in-out infinite;
+}
+
+.cm-busy-overlay-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+.cm-busy-overlay-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #fee2e2;
+  line-height: 1.45;
+}
+
+.cm-busy-overlay-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  animation: cm-busy-icon-pulse 1s ease-in-out infinite;
+}
+
+.cm-busy-overlay-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cm-busy-overlay-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0.35;
+  animation: cm-busy-dot 1s ease-in-out infinite;
+}
+
+.cm-busy-overlay-dots span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.cm-busy-overlay-dots span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+@keyframes cm-busy-card-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.01);
+  }
+}
+
+@keyframes cm-busy-icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes cm-busy-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 
 .split-pay-panel {

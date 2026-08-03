@@ -1,12 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 
-// Import Poppins font
-const fontLink = document.createElement('link')
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap'
-fontLink.rel = 'stylesheet'
-if (!document.querySelector('link[href*="Poppins"]')) {
-  document.head.appendChild(fontLink)
-}
+const APP_FONT = "'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif"
 
 const products = [
   { name: "Grilled Chicken Plate", price: 32000, icon: "🍗", bg: "#FEF3C7", fg: "#92400E" },
@@ -23,6 +17,7 @@ export function KodePhoneDemo() {
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null)
   const [showCheck, setShowCheck] = useState(false)
+  const [orderStage, setOrderStage] = useState(0)
   const scanDirRef = useRef(1)
 
   // Scan line animation
@@ -47,17 +42,21 @@ export function KodePhoneDemo() {
       setSelectedProducts([])
       setSelectedPayment(null)
       setShowCheck(false)
+      setOrderStage(0)
 
-      timers.push(setTimeout(() => setCurrentScreen(1), 1800))
-      timers.push(setTimeout(() => setCurrentScreen(2), 3000))
-      timers.push(setTimeout(() => setSelectedProducts([0]), 4200))
-      timers.push(setTimeout(() => setSelectedProducts([0, 3]), 5000))
+      timers.push(setTimeout(() => setCurrentScreen(1), 1700))
+      timers.push(setTimeout(() => setCurrentScreen(2), 2800))
+      timers.push(setTimeout(() => setSelectedProducts([0]), 3900))
+      timers.push(setTimeout(() => setSelectedProducts([0, 3]), 4700))
       timers.push(setTimeout(() => setCurrentScreen(3), 6200))
-      timers.push(setTimeout(() => setCurrentScreen(4), 8200))
-      timers.push(setTimeout(() => setSelectedPayment('mtn'), 9400))
-      timers.push(setTimeout(() => setCurrentScreen(5), 10800))
-      timers.push(setTimeout(() => setShowCheck(true), 11200))
-      timers.push(setTimeout(() => runSequence(), 14500))
+      timers.push(setTimeout(() => setCurrentScreen(4), 8100))
+      timers.push(setTimeout(() => setSelectedPayment('mtn'), 9000))
+      timers.push(setTimeout(() => setCurrentScreen(5), 10400))
+      timers.push(setTimeout(() => setShowCheck(true), 10800))
+      timers.push(setTimeout(() => setOrderStage(1), 11600))
+      timers.push(setTimeout(() => setOrderStage(2), 12800))
+      timers.push(setTimeout(() => setOrderStage(3), 14000))
+      timers.push(setTimeout(() => runSequence(), 17000))
     }
 
     runSequence()
@@ -65,6 +64,7 @@ export function KodePhoneDemo() {
   }, [])
 
   const total = selectedIndexes.reduce((sum, idx) => sum + products[idx].price, 0)
+  const orderStages = ['Payment confirmed', 'Kitchen preparing', 'Ready for service', 'Served at table']
 
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
@@ -105,7 +105,7 @@ export function KodePhoneDemo() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
               padding: '0 26px', zIndex: 60, 
               background: 'linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0))',
-              fontFamily: "'Poppins', sans-serif"
+              fontFamily: APP_FONT
             }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: '#000' }}>9:41</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}>📶 📡 🔋</div>
@@ -127,10 +127,10 @@ export function KodePhoneDemo() {
                 opacity: currentScreen === 0 ? 1 : 0, 
                 transition: 'opacity 0.4s', 
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px',
-                fontFamily: "'Poppins', sans-serif"
+                fontFamily: APP_FONT
               }}>
                 <p style={{ fontSize: '9px', color: '#64748b', margin: 0, fontWeight: 500 }}>
-                  point camera at table qr code
+                  scan the table QR to start your dine-in order
                 </p>
                 <div style={{ 
                   position: 'relative', width: '170px', height: '170px', 
@@ -166,17 +166,17 @@ export function KodePhoneDemo() {
                   </svg>
                   <div style={{ 
                     position: 'absolute', left: '5px', right: '5px', top: `${scanLinePos}px`, 
-                    height: '3px', background: 'linear-gradient(90deg, transparent, #0a84ff, transparent)', 
-                    boxShadow: '0 0 10px rgba(10,132,255,0.8)' 
+                    height: '3px', background: 'linear-gradient(90deg, transparent, #e86a17, transparent)', 
+                    boxShadow: '0 0 10px rgba(232,106,23,0.65)' 
                   }} />
-                  <div style={{ position: 'absolute', inset: 0, border: '3px solid #0a84ff', borderRadius: '10px', opacity: 0.5 }} />
+                  <div style={{ position: 'absolute', inset: 0, border: '3px solid #e86a17', borderRadius: '10px', opacity: 0.5 }} />
                 </div>
                 <div style={{ 
                   display: 'flex', alignItems: 'center', gap: '8px', 
-                  background: 'rgba(10,132,255,0.1)', padding: '8px 16px', borderRadius: '20px' 
+                  background: '#fff7ed', padding: '8px 16px', borderRadius: '20px' 
                 }}>
                   <span style={{ fontSize: '11px' }}>📍</span>
-                  <p style={{ fontSize: '9px', color: '#0a84ff', margin: 0, fontWeight: 600 }}>table 12</p>
+                  <p style={{ fontSize: '9px', color: '#c4530d', margin: 0, fontWeight: 600 }}>table c12 detected</p>
                 </div>
               </div>
 
@@ -186,22 +186,22 @@ export function KodePhoneDemo() {
                 background: 'linear-gradient(to bottom, #f8fafc 0%, #ffffff 50%)', 
                 opacity: currentScreen === 1 ? 1 : 0, transition: 'opacity 0.4s', 
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px',
-                fontFamily: "'Poppins', sans-serif"
+                fontFamily: APP_FONT
               }}>
                 <div style={{ 
                   width: '72px', height: '72px', borderRadius: '20px', 
-                  background: '#0a84ff', display: 'flex', 
+                  background: 'linear-gradient(135deg, #e86a17, #c4530d)', display: 'flex', 
                   alignItems: 'center', justifyContent: 'center', fontSize: '26px', 
-                  boxShadow: '0 8px 24px rgba(10,132,255,0.3)' 
-                }}>📱</div>
+                  boxShadow: '0 8px 24px rgba(232,106,23,0.3)' 
+                }}>🍽️</div>
                 <p style={{ 
                   fontSize: '15px', fontWeight: 700, margin: '6px 0 0', 
                   color: '#0f172a', letterSpacing: '-0.02em' 
-                }}>scanny</p>
+                }}>Tasty Grill House</p>
                 <p style={{ 
                   fontSize: '10px', color: '#64748b', margin: 0, 
                   textAlign: 'center', padding: '0 40px', fontWeight: 500 
-                }}>connecting to tasty grill house</p>
+                }}>table c12 connected • waiter: sam</p>
               </div>
 
               {/* Screen 2: Menu List */}
@@ -209,26 +209,28 @@ export function KodePhoneDemo() {
                 position: 'absolute', inset: 0, top: '54px', background: '#f8fafc', 
                 opacity: currentScreen === 2 ? 1 : 0, transition: 'opacity 0.4s', 
                 display: 'flex', flexDirection: 'column',
-                fontFamily: "'Poppins', sans-serif"
+                fontFamily: APP_FONT
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
                   <p style={{ fontSize: '8px', color: '#94a3b8', margin: 0, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                    tasty grill house
+                    dine-in
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <p style={{ fontSize: '13px', fontWeight: 700, margin: '4px 0 0', color: '#0f172a' }}>menu</p>
-                    <span style={{ fontSize: '14px' }}>🛒</span>
+                    <p style={{ fontSize: '13px', fontWeight: 700, margin: '4px 0 0', color: '#0f172a' }}>Tasty Grill Menu</p>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#c4530d', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '999px', padding: '4px 8px' }}>
+                      cart {selectedProducts.length}
+                    </span>
                   </div>
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', padding: '8px 16px', overflow: 'hidden' }}>
                   {products.map((p, i) => (
                     <div key={i} style={{ 
                       display: 'flex', alignItems: 'center', gap: '14px', 
-                      background: selectedProducts.includes(i) ? 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)' : '#ffffff', 
-                      border: selectedProducts.includes(i) ? '2px solid #3B82F6' : '1.5px solid #E5E7EB', 
+                      background: selectedProducts.includes(i) ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)' : '#ffffff', 
+                      border: selectedProducts.includes(i) ? '2px solid #e86a17' : '1.5px solid #E5E7EB', 
                       borderRadius: '16px', padding: '14px', transition: 'all 0.3s ease', 
                       boxShadow: selectedProducts.includes(i) 
-                        ? '0 8px 16px rgba(59,130,246,0.15), 0 0 0 4px rgba(59,130,246,0.08)' 
+                        ? '0 8px 16px rgba(232,106,23,0.15), 0 0 0 4px rgba(232,106,23,0.08)' 
                         : '0 2px 8px rgba(0,0,0,0.04)',
                       transform: selectedProducts.includes(i) ? 'scale(1.02)' : 'scale(1)'
                     }}>
@@ -248,7 +250,7 @@ export function KodePhoneDemo() {
                           letterSpacing: '-0.01em', lineHeight: 1.3
                         }}>{p.name}</p>
                         <p style={{ 
-                          fontSize: '9px', color: '#3B82F6', margin: '3px 0 0', 
+                          fontSize: '9px', color: '#c4530d', margin: '3px 0 0', 
                           fontWeight: 700, letterSpacing: '-0.01em' 
                         }}>
                           UGX {p.price.toLocaleString()}
@@ -256,7 +258,7 @@ export function KodePhoneDemo() {
                       </div>
                       <div style={{ 
                         fontSize: '16px', 
-                        color: selectedProducts.includes(i) ? '#3B82F6' : '#D1D5DB',
+                        color: selectedProducts.includes(i) ? '#e86a17' : '#D1D5DB',
                         transition: 'all 0.3s ease',
                         transform: selectedProducts.includes(i) ? 'rotate(90deg) scale(1.1)' : 'rotate(0deg) scale(1)'
                       }}>
@@ -272,13 +274,13 @@ export function KodePhoneDemo() {
                 position: 'absolute', inset: 0, top: '54px', background: '#f8fafc', 
                 opacity: currentScreen === 3 ? 1 : 0, transition: 'opacity 0.4s', 
                 display: 'flex', flexDirection: 'column',
-                fontFamily: "'Poppins', sans-serif"
+                fontFamily: APP_FONT
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
                   <p style={{ fontSize: '13px', fontWeight: 700, margin: 0, color: '#0f172a' }}>your order</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                     <span style={{ fontSize: '10px' }}>📍</span>
-                    <p style={{ fontSize: '9px', color: '#64748b', margin: 0, fontWeight: 500 }}>table 12</p>
+                    <p style={{ fontSize: '9px', color: '#64748b', margin: 0, fontWeight: 500 }}>table c12 • 2 guests</p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 16px' }}>
@@ -299,7 +301,7 @@ export function KodePhoneDemo() {
                         <div style={{ flex: 1 }}>
                           <p style={{ fontSize: '10px', fontWeight: 600, margin: 0, color: '#0f172a' }}>{p.name}</p>
                         </div>
-                        <p style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: '#0a84ff' }}>
+                        <p style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: '#c4530d' }}>
                           UGX {p.price.toLocaleString()}
                         </p>
                       </div>
@@ -310,16 +312,19 @@ export function KodePhoneDemo() {
                   marginTop: 'auto', padding: '16px', background: '#ffffff', 
                   borderTop: '1px solid #e2e8f0' 
                 }}>
+                  <p style={{ fontSize: '9px', color: '#64748b', margin: '0 0 10px', fontWeight: 500 }}>
+                    Add note: no onions on burger
+                  </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '12px' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>total</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a' }}>UGX {total.toLocaleString()}</span>
+                    <span style={{ color: '#c4530d', fontWeight: 700 }}>total</span>
+                    <span style={{ fontWeight: 800, color: '#e86a17' }}>UGX {total.toLocaleString()}</span>
                   </div>
                   <button style={{ 
-                    width: '100%', background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)', 
+                    width: '100%', background: 'linear-gradient(135deg, #e86a17 0%, #c4530d 100%)', 
                     color: '#fff', border: 'none', padding: '14px', fontSize: '11px', 
                     fontWeight: 700, borderRadius: '12px', cursor: 'pointer', 
-                    boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
-                    fontFamily: "'Poppins', sans-serif"
+                    boxShadow: '0 4px 12px rgba(232,106,23,0.3)',
+                    fontFamily: APP_FONT
                   }}>checkout</button>
                 </div>
               </div>
@@ -329,20 +334,20 @@ export function KodePhoneDemo() {
                 position: 'absolute', inset: 0, top: '54px', background: '#f8fafc', 
                 opacity: currentScreen === 4 ? 1 : 0, transition: 'opacity 0.4s', 
                 display: 'flex', flexDirection: 'column',
-                fontFamily: "'Poppins', sans-serif"
+                fontFamily: APP_FONT
               }}>
                 <div style={{ padding: '16px 16px 12px', background: 'linear-gradient(to bottom, #ffffff, #f8fafc)' }}>
                   <p style={{ fontSize: '13px', fontWeight: 700, margin: 0, color: '#0f172a' }}>pay with</p>
                   <p style={{ fontSize: '9px', color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
-                    choose mobile money
+                    select a checkout method
                   </p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 16px' }}>
                   <div style={{ 
                     display: 'flex', alignItems: 'center', gap: '12px', background: '#ffffff', 
-                    border: selectedPayment === 'mtn' ? '2px solid #0a84ff' : '1px solid #e2e8f0', 
+                    border: selectedPayment === 'mtn' ? '2px solid #e86a17' : '1px solid #e2e8f0', 
                     borderRadius: '14px', padding: '14px', transition: 'all 0.3s', 
-                    boxShadow: selectedPayment === 'mtn' ? '0 4px 12px rgba(10,132,255,0.15)' : '0 2px 4px rgba(0,0,0,0.04)' 
+                    boxShadow: selectedPayment === 'mtn' ? '0 4px 12px rgba(232,106,23,0.15)' : '0 2px 4px rgba(0,0,0,0.04)' 
                   }}>
                     <div style={{ 
                       width: '42px', height: '42px', borderRadius: '10px', 
@@ -355,7 +360,7 @@ export function KodePhoneDemo() {
                       <p style={{ fontSize: '10px', fontWeight: 600, margin: 0, color: '#0f172a' }}>mtn mobile money</p>
                       <p style={{ fontSize: '9px', color: '#64748b', margin: '2px 0 0', fontWeight: 500 }}>**** 4421</p>
                     </div>
-                    <div style={{ fontSize: '16px', color: selectedPayment === 'mtn' ? '#0a84ff' : '#cbd5e1' }}>
+                    <div style={{ fontSize: '16px', color: selectedPayment === 'mtn' ? '#e86a17' : '#cbd5e1' }}>
                       {selectedPayment === 'mtn' ? '✅' : '⭕'}
                     </div>
                   </div>
@@ -380,43 +385,92 @@ export function KodePhoneDemo() {
                 </div>
                 <div style={{ marginTop: 'auto', padding: '16px', background: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
                   <button style={{ 
-                    width: '100%', background: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)', 
+                    width: '100%', background: 'linear-gradient(135deg, #e86a17 0%, #c4530d 100%)', 
                     color: '#fff', border: 'none', padding: '14px', fontSize: '11px', 
                     fontWeight: 700, borderRadius: '12px', cursor: 'pointer', 
-                    boxShadow: '0 4px 12px rgba(10,132,255,0.3)',
-                    fontFamily: "'Poppins', sans-serif"
+                    boxShadow: '0 4px 12px rgba(232,106,23,0.3)',
+                    fontFamily: APP_FONT
                   }}>confirm payment</button>
                 </div>
               </div>
 
-              {/* Screen 5: Success */}
+              {/* Screen 5: Live order tracking */}
               <div style={{ 
                 position: 'absolute', inset: 0, top: '54px', 
-                background: 'linear-gradient(135deg, #EAF3DE 0%, #d4edda 100%)', 
+                background: 'linear-gradient(180deg, #fff 0%, #fff7ed 100%)', 
                 opacity: currentScreen === 5 ? 1 : 0, transition: 'opacity 0.4s', 
-                display: 'flex', flexDirection: 'column', alignItems: 'center', 
-                justifyContent: 'center', gap: '20px',
-                fontFamily: "'Poppins', sans-serif"
+                display: 'flex', flexDirection: 'column',
+                fontFamily: APP_FONT
               }}>
-                <div style={{ 
-                  width: '80px', height: '80px', borderRadius: '50%', 
-                  background: 'linear-gradient(135deg, #34d399 0%, #10b981 100%)', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  transform: showCheck ? 'scale(1)' : 'scale(0)', 
-                  transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)', 
-                  fontSize: '28px', color: '#ffffff', 
-                  boxShadow: '0 8px 24px rgba(16,185,129,0.3)' 
-                }}>✓</div>
-                <div style={{ textAlign: 'center', padding: '0 32px' }}>
-                  <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: '#166534' }}>
-                    payment successful
+                <div style={{ padding: '16px 16px 12px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 700, margin: 0, color: '#0f172a' }}>order #C12-204</p>
+                  <p style={{ fontSize: '9px', color: '#64748b', margin: '4px 0 0', fontWeight: 500 }}>
+                    Live restaurant updates
                   </p>
-                  <p style={{ 
-                    fontSize: '10px', color: '#15803d', margin: '8px 0 0', 
-                    fontWeight: 500, lineHeight: 1.5 
-                  }}>
-                    order sent to tasty grill house kitchen
-                  </p>
+                </div>
+                <div style={{ padding: '14px 16px 0' }}>
+                  <div style={{ width: '100%', height: '8px', borderRadius: '999px', background: '#e2e8f0', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.min(((orderStage + 1) / orderStages.length) * 100, 100)}%`,
+                        height: '100%',
+                        background: 'linear-gradient(135deg, #e86a17 0%, #c4530d 100%)',
+                        transition: 'width 0.4s ease',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 16px' }}>
+                  {orderStages.map((stage, index) => {
+                    const done = index <= orderStage
+                    return (
+                      <div
+                        key={stage}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          background: done ? '#ecfdf5' : '#ffffff',
+                          border: `1px solid ${done ? '#86efac' : '#e2e8f0'}`,
+                          borderRadius: '12px',
+                          padding: '10px 12px',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '999px',
+                            background: done ? '#16a34a' : '#cbd5e1',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {done ? '✓' : index + 1}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: '10px', margin: 0, fontWeight: 600, color: done ? '#14532d' : '#334155' }}>
+                            {stage}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ marginTop: 'auto', padding: '14px 16px 16px', background: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ fontSize: '10px', margin: 0, color: '#334155', fontWeight: 600 }}>
+                      ETA: 12 min
+                    </p>
+                    <p style={{ fontSize: '10px', margin: 0, color: '#16a34a', fontWeight: 700 }}>
+                      {showCheck ? 'Kitchen accepted' : 'Confirming payment...'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

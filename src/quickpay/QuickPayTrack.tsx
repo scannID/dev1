@@ -226,7 +226,7 @@ export default function QuickPayTrack({ trackingNumber: initial, onBack }: Props
             .
           </p>
 
-          <form onSubmit={handleSubmit} className="scanny-form" style={{ marginTop: 20, gridTemplateColumns: '1fr auto', alignItems: 'start' }}>
+          <form onSubmit={handleSubmit} className="scanny-form" style={{ marginTop: 20, gridTemplateColumns: '1fr auto', alignItems: 'start' }} noValidate>
             <input
               className="scanny-input scanny-mono"
               value={input}

@@ -169,9 +169,13 @@ public class OrderService {
     public OrderResponse createOrder(String businessId, CreateOrderRequest request) {
         Business business = businessService.requireBusinessLight(businessId);
 
-        if (!business.isAcceptingOrders()) {
+        boolean intakePaused = !business.isAcceptingOrders() || business.isBusyMode();
+        if (intakePaused) {
+            String fallbackMessage = business.isBusyMode()
+                    ? "Kitchen is busy right now. Please try again shortly."
+                    : "This location is not accepting orders right now.";
             String message = business.getPauseMessage().isBlank()
-                    ? "This location is not accepting orders right now."
+                    ? fallbackMessage
                     : business.getPauseMessage();
             throw new ApiException(503, message);
         }

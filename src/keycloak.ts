@@ -77,10 +77,10 @@ export function isStaffSession() {
 
 /** End Keycloak SSO (shared across merchant/admin on the same realm). */
 export function logoutMerchant(redirectUri: string) {
-  if (keycloak.authenticated) {
-    return keycloak.logout({ redirectUri })
-  }
-  window.location.href = keycloak.createLogoutUrl({ redirectUri })
+  // Avoid showing Keycloak's extra confirm page ("Log out / Back to application").
+  // We clear local auth state and return straight to the app landing page.
+  keycloak.clearToken()
+  window.location.replace(redirectUri)
   return Promise.resolve()
 }
 

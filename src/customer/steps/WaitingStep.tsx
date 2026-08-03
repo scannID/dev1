@@ -1,6 +1,5 @@
 import { Loader2 } from 'lucide-react'
 import type { OrderStatus } from '../../api/types'
-import { formatWaitRange } from '../../lib/waitEstimate'
 import type { PaymentProvider, PaymentStatus } from '../payments'
 import { OrderStatusTracker } from '../OrderStatusTracker'
 import { currency, usdEquiv } from '../utils'
@@ -29,7 +28,6 @@ export function WaitingStep({
   phone,
   status,
   orderStatus,
-  estimatedWaitMinutes,
   trackingLoading,
   error,
   splitSummary,
@@ -47,7 +45,6 @@ export function WaitingStep({
   customerName?: string
   status: PaymentStatus
   orderStatus?: OrderStatus
-  estimatedWaitMinutes?: number | null
   trackingLoading?: boolean
   error?: string | null
   splitSummary?: SplitShareLive[] | null
@@ -55,7 +52,6 @@ export function WaitingStep({
   onChangeNumber: () => void
 }) {
   const failed = status === 'FAILED'
-  const waitLabel = formatWaitRange(estimatedWaitMinutes)
   const multi = Boolean(splitSummary && splitSummary.length > 0)
   const paidCount = splitSummary?.filter((s) => s.status === 'PAID').length ?? 0
   const pendingCount = splitSummary?.filter((s) => s.status === 'PENDING').length ?? 0
@@ -96,13 +92,6 @@ export function WaitingStep({
           Kode payment ref: <strong>{paymentReference}</strong>
           {multi ? ' · all shares settle under this ref' : null}
         </p>
-      ) : null}
-
-      {!failed && waitLabel ? (
-        <div className="cm-wait-estimate" role="status">
-          <span>Est. ready in</span>
-          <strong>{waitLabel}</strong>
-        </div>
       ) : null}
 
       <div className="cm-waiting-meta">
@@ -173,11 +162,6 @@ export function WaitingStep({
         {failed ? (
           <button type="button" className="cm-primary cm-full" onClick={onRetry}>
             {multi ? 'Retry unpaid shares' : 'Try again'}
-          </button>
-        ) : null}
-        {!multi ? (
-          <button type="button" className="cm-ghost-btn cm-full-btn" onClick={onChangeNumber}>
-            Change number
           </button>
         ) : null}
       </div>

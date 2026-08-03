@@ -160,7 +160,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} className="tk-panel tk-enter">
+        <form onSubmit={handleSubmit} className="tk-panel tk-enter" noValidate>
           {hasTables ? (
             <div className="tk-tabs" role="tablist" aria-label="Buy general tickets or tables">
               <button
@@ -267,13 +267,13 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 type="tel"
                 value={holderPhone}
                 onChange={(e) => setHolderPhone(e.target.value)}
-                placeholder="e.g. 0700 000 000"
+                placeholder="e.g. +256 700 000 000"
                 autoComplete="tel"
                 required
                 disabled={submitting}
               />
               <p className="tk-hint">
-                Use your WhatsApp number with country code, e.g. 07… or +2567… — ticket + QR are sent here.
+                Use your WhatsApp number with country code, e.g. +2567… — ticket + QR are sent here.
               </p>
             </label>
           </div>
