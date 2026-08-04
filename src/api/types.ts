@@ -510,6 +510,17 @@ export interface EventTicketRecentAttendee {
   gateUrl?: string
 }
 
+export interface GateRedeemedAttendee {
+  ticketId: string
+  ticketCode: string
+  holderName: string
+  holderPhone: string
+  ticketType: string
+  paymentStatus: string
+  status: string
+  redeemedAt: string | null
+}
+
 export interface EventTicketTrackingMetrics {
   ticketId: string
   eventName: string

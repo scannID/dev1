@@ -205,16 +205,16 @@ public class TicketService {
     public TicketDtos.ScanValidationResponse scanTicketPayload(TicketDtos.ScanPayloadRequest request) {
         GatePayload payload = parseGatePayload(request.payload());
         String gateEventId = request.eventId() != null ? request.eventId().trim() : "";
+        if (gateEventId.isBlank()) {
+            throw new ApiException(400, "Scan event QR and start gate session before validating tickets");
+        }
         String payloadEventId = nullToEmpty(payload.eventId());
-        String expectedEventId = !gateEventId.isBlank() ? gateEventId : payloadEventId;
+        String expectedEventId = gateEventId;
         Ticket ticket;
         if (!payload.ticketId().isBlank()) {
             ticket = ticketRepository.findById(payload.ticketId())
                 .orElseThrow(() -> new ApiException(404, "Ticket not found"));
         } else if (!payload.shortCode().isBlank()) {
-            if (expectedEventId.isBlank()) {
-                throw new ApiException(400, "Event ID is required before entering ticket code");
-            }
             List<Ticket> matched = ticketRepository.findByMasterTicketIdAndIdEndingWithIgnoreCase(
                 expectedEventId,
                 payload.shortCode()

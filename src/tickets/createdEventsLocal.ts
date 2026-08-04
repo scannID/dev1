@@ -4,6 +4,7 @@ export type LocalCreatedEvent = {
   eventId: string
   eventName: string
   purchaseUrl: string
+  managerUrl?: string
   eventDate?: string | null
   location?: string
   host?: string

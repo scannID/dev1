@@ -278,7 +278,6 @@ public class TicketPurchaseService {
         } else {
             throw new ApiException(400, "That ticket ID is not an event tracking code");
         }
-
         List<Ticket> attendees = ticketRepository.findByMasterTicketIdOrderByCreatedAtDesc(master.getId());
         long ordered = attendees.size();
         long purchased = attendees.stream().filter(t -> t.getPaymentStatus() == PaymentStatus.Paid).count();
@@ -334,6 +333,49 @@ public class TicketPurchaseService {
             master.getCreatedAt(),
             recent
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublicTicketDtos.RedeemedAttendee> getRedeemedAttendees(String rawEventId, String query) {
+        String eventId = normalizeTicketId(rawEventId);
+        Ticket seed = ticketRepository.findById(eventId)
+            .orElseThrow(() -> new ApiException(404, "No event found for that ticket ID"));
+
+        Ticket master;
+        if (seed.isEventTemplate()) {
+            master = seed;
+        } else if (seed.isAttendeeTicket() && seed.getMasterTicketId() != null) {
+            master = ticketRepository.findById(seed.getMasterTicketId())
+                .orElseThrow(() -> new ApiException(404, "No event found for that ticket ID"));
+        } else {
+            throw new ApiException(400, "That ticket ID is not an event tracking code");
+        }
+
+        String codeQuery = query == null ? "" : query.trim().replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        boolean hasSearch = !codeQuery.isBlank();
+        if (hasSearch && codeQuery.length() != 4) {
+            return List.of();
+        }
+
+        return ticketRepository.findByMasterTicketIdOrderByCreatedAtDesc(master.getId()).stream()
+            .filter(Ticket::isAttendeeTicket)
+            .filter(t -> t.getStatus() == TicketStatus.Redeemed)
+            .filter(t -> {
+                if (!hasSearch) return true;
+                String ticketCode = shortCodeForTicketId(t.getId());
+                return ticketCode.equalsIgnoreCase(codeQuery);
+            })
+            .map(t -> new PublicTicketDtos.RedeemedAttendee(
+                t.getId(),
+                shortCodeForTicketId(t.getId()),
+                t.getHolderName(),
+                t.getHolderPhone(),
+                t.getTicketType(),
+                t.getPaymentStatus() != null ? t.getPaymentStatus().name() : "",
+                t.getStatus() != null ? t.getStatus().name() : "",
+                t.getRedeemedAt() != null ? t.getRedeemedAt() : t.getUpdatedAt()
+            ))
+            .toList();
     }
 
     private String normalizeTicketId(String raw) {

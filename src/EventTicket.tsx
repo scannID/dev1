@@ -8,7 +8,7 @@ import type {
   ImageSearchResult,
 } from './api/types'
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
-import { buildTicketGateUrl } from './lib/scanBase'
+import { buildEventManagerGateUrl, buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
 import {
   loadCreatedEvents,
@@ -81,6 +81,7 @@ export type EventTicketVisual = {
   idLabel?: string
   selectedClass: string
   purchaseUrl?: string
+  managerUrl?: string
   /** Creator-uploaded event sticker / cover (data URL or http URL). */
   eventImageUrl?: string
 }
@@ -135,9 +136,9 @@ function rewriteScanUrl(url: string) {
   }
 }
 
-async function makeEventQrDataUrl(link: string, size = 320) {
+async function makeEventQrDataUrl(link: string, size = 320, darkColor = '#000000') {
   return QRCode.toDataURL(link, {
-    color: { dark: '#000000', light: '#ffffff' },
+    color: { dark: darkColor, light: '#ffffff' },
     margin: 4,
     width: size,
     errorCorrectionLevel: 'H',
@@ -150,7 +151,7 @@ function CreatedEventsQrSection({
   onOpen: (event: LocalCreatedEvent) => void
 }) {
   const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadCreatedEvents())
-  const [qrMap, setQrMap] = useState<Record<string, string>>({})
+  const [managerQrMap, setManagerQrMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const refresh = () => setEvents(loadCreatedEvents())
@@ -165,23 +166,27 @@ function CreatedEventsQrSection({
 
   useEffect(() => {
     let cancelled = false
-    const missing = events.filter((e) => e.purchaseUrl && !qrMap[e.eventId])
+    const missing = events.filter((e) => !managerQrMap[e.eventId])
     if (missing.length === 0) return
     void Promise.all(
       missing.map(async (event) => {
         try {
-          const dataUrl = await makeEventQrDataUrl(event.purchaseUrl, 200)
-          return [event.eventId, dataUrl] as const
+          const managerLink = event.managerUrl || buildEventManagerGateUrl(event.eventId)
+          const managerQr = await makeEventQrDataUrl(managerLink, 320, '#B91C1C')
+          return {
+            eventId: event.eventId,
+            managerQr,
+          }
         } catch {
           return null
         }
       }),
     ).then((rows) => {
       if (cancelled) return
-      setQrMap((prev) => {
+      setManagerQrMap((prev) => {
         const next = { ...prev }
         for (const row of rows) {
-          if (row) next[row[0]] = row[1]
+          if (row?.managerQr) next[row.eventId] = row.managerQr
         }
         return next
       })
@@ -189,7 +194,7 @@ function CreatedEventsQrSection({
     return () => {
       cancelled = true
     }
-  }, [events, qrMap])
+  }, [events, managerQrMap])
 
   if (events.length === 0) return null
 
@@ -217,18 +222,18 @@ function CreatedEventsQrSection({
           Created events
         </h2>
         <p style={{ margin: '4px 0 0', fontSize: 12.5, color: CREATE.muted }}>
-          Purchase QRs from this device. Tap a code to open tracking.
+          Manager gate QR (red) only.
         </p>
       </div>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))',
-          gap: 10,
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: 12,
         }}
       >
         {events.map((event) => {
-          const qr = qrMap[event.eventId]
+          const managerQr = managerQrMap[event.eventId]
           return (
             <div
               key={event.eventId}
@@ -247,8 +252,8 @@ function CreatedEventsQrSection({
                 style={{
                   display: 'block',
                   width: '100%',
-                  padding: 10,
-                  paddingBottom: 6,
+                  padding: 12,
+                  paddingBottom: 8,
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -256,18 +261,24 @@ function CreatedEventsQrSection({
                   color: 'inherit',
                 }}
               >
-                {qr ? (
-                  <img
-                    src={qr}
-                    alt=""
-                    style={{
-                      width: '100%',
-                      aspectRatio: '1',
-                      borderRadius: 8,
-                      display: 'block',
-                      background: '#fff',
-                    }}
-                  />
+                {managerQr ? (
+                  <div>
+                    <img
+                      src={managerQr}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: 10,
+                        display: 'block',
+                        background: '#fff',
+                        border: '2px solid #B91C1C',
+                      }}
+                    />
+                    <p style={{ margin: '6px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#B91C1C', textAlign: 'center' }}>
+                      Manager
+                    </p>
+                  </div>
                 ) : (
                   <div
                     style={{
@@ -281,7 +292,7 @@ function CreatedEventsQrSection({
                       fontSize: 11,
                     }}
                   >
-                    QR
+                    Manager QR
                   </div>
                 )}
               </button>
@@ -314,7 +325,7 @@ function CreatedEventsQrSection({
                   onClick={() => {
                     const next = removeCreatedEvent(event.eventId)
                     setEvents(next)
-                    setQrMap((prev) => {
+                    setManagerQrMap((prev) => {
                       const copy = { ...prev }
                       delete copy[event.eventId]
                       return copy
@@ -1132,6 +1143,7 @@ function hostInitials(name: string) {
 function TicketOutput({
   data,
   qr,
+  managerQr,
   onCreateAnother,
   onRevoke,
   revoking,
@@ -1140,6 +1152,7 @@ function TicketOutput({
 }: {
   data: TicketData
   qr: string
+  managerQr: string
   onCreateAnother: () => void
   onRevoke: (ticketId: string) => Promise<void>
   revoking: boolean
@@ -1295,11 +1308,22 @@ function TicketOutput({
           {data.location ? ` · ${data.location}` : ''}
         </p>
         {qr ? (
-          <img className="print-qr-img" src={qr} alt="Event QR code" width={240} height={240} style={{ width: 240, height: 240, border: '2px solid #111', borderRadius: 8, background: '#fff' }} />
+          <div style={{ display: 'inline-grid', gridTemplateColumns: managerQr ? '1fr 1fr' : '1fr', gap: 16 }}>
+            <div>
+              <img className="print-qr-img" src={qr} alt="Customer purchase QR code" width={240} height={240} style={{ width: 240, height: 240, border: '2px solid #111', borderRadius: 8, background: '#fff' }} />
+              <p style={{ margin: '8px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#111' }}>Customer purchase (black)</p>
+            </div>
+            {managerQr ? (
+              <div>
+                <img className="print-qr-img" src={managerQr} alt="Event manager gate QR code" width={240} height={240} style={{ width: 240, height: 240, border: '2px solid #B91C1C', borderRadius: 8, background: '#fff' }} />
+                <p style={{ margin: '8px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#B91C1C' }}>Event manager gate (red)</p>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <p style={{ color: '#c00' }}>QR code unavailable</p>
         )}
-        <p style={{ margin: '14px 0 0', fontSize: 12, fontWeight: 600, letterSpacing: '0.1em', color: '#111' }}>SCAN TO BUY / ENTER</p>
+        <p style={{ margin: '14px 0 0', fontSize: 12, fontWeight: 600, letterSpacing: '0.1em', color: '#111' }}>BLACK: BUY TICKETS · RED: MANAGER GATE</p>
         <p style={{ margin: '8px 0 0', fontSize: 12, fontFamily: SCANN_MONO, color: '#555' }}>#{data.ticketId}</p>
       </div>
 
@@ -1489,8 +1513,17 @@ function TicketOutput({
                   </div>
                 )}
                 <p style={{ margin: '12px 0 0', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: CONFIRM.muted }}>
-                  Scan for entry
+                  Customer purchase (black)
                 </p>
+                {managerQr ? (
+                  <>
+                    <div style={{ width: '100%', height: 1, background: CONFIRM.line, margin: '12px 0 10px' }} />
+                    <img src={managerQr} alt="Event manager gate QR" style={{ width: '100%', aspectRatio: '1', borderRadius: 6, display: 'block', background: '#fff', border: '1px solid #B91C1C' }} />
+                    <p style={{ margin: '10px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#B91C1C', textAlign: 'center' }}>
+                      Event manager gate (red)
+                    </p>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
@@ -2781,6 +2814,7 @@ function TicketForm({
 export default function EventTicketPage({ onBack }: { onBack: () => void }) {
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [qr, setQr] = useState('')
+  const [managerQr, setManagerQr] = useState('')
   const [revoking, setRevoking] = useState(false)
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
@@ -2860,17 +2894,24 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       })
 
       const purchaseLink = rewriteScanUrl(createdTicket.qrCodeUrl)
-      const url = await makeEventQrDataUrl(purchaseLink, 320)
-      setQr(url)
+      const managerLink = buildEventManagerGateUrl(createdTicket.id)
+      const [purchaseQrUrl, managerQrUrl] = await Promise.all([
+        makeEventQrDataUrl(purchaseLink, 320, '#000000'),
+        makeEventQrDataUrl(managerLink, 320, '#B91C1C'),
+      ])
+      setQr(purchaseQrUrl)
+      setManagerQr(managerQrUrl)
       setTicket({
         ...data,
         ticketId: createdTicket.id,
         purchaseUrl: purchaseLink,
+        managerUrl: managerLink,
       })
       saveCreatedEvent({
         eventId: createdTicket.id,
         eventName: data.eventName,
         purchaseUrl: purchaseLink,
+        managerUrl: managerLink,
         eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
         location: data.location,
         host: data.host,
@@ -2923,6 +2964,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       setTrackingOnly(true)
       setTicket(null)
       setQr('')
+      setManagerQr('')
       toast.success(`Tracking ${data.eventName}`)
     } catch (err) {
       setMetrics(null)
@@ -2939,9 +2981,11 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       <TicketOutput
         data={ticket}
         qr={qr}
+        managerQr={managerQr}
         onCreateAnother={() => {
           setTicket(null)
           setQr('')
+          setManagerQr('')
           setRevokeMessage(null)
           setMetrics(null)
           setTrackedTicketId(null)

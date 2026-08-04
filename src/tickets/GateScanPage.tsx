@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import { ApiError } from '../api/client'
 import { publicTicketsApi } from '../api/services'
-import type { EventTicketTrackingMetrics, Ticket } from '../api/types'
+import type { EventTicketTrackingMetrics, GateRedeemedAttendee, Ticket } from '../api/types'
 import { KodeMark } from '../customer/KodeMark'
 import './GateScan.css'
 
@@ -35,6 +35,11 @@ type Verdict = {
   ticket?: Ticket | null
 }
 
+type ScanNotice = {
+  tone: 'ok' | 'bad'
+  text: string
+}
+
 function extractTicketPayload(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return ''
@@ -51,23 +56,14 @@ function extractTicketPayload(raw: string): string {
   return trimmed
 }
 
-function extractEventIdFromPayload(raw: string): string {
-  const payload = extractTicketPayload(raw)
-  if (!payload.startsWith('SCANNY:TICKET:')) return ''
-  const encoded = payload.slice('SCANNY:TICKET:'.length)
-  try {
-    const base = encoded.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base + '='.repeat((4 - (base.length % 4)) % 4)
-    const json = atob(padded)
-    const parsed = JSON.parse(json) as { eventId?: string }
-    return normalizeEventRef(parsed.eventId || '')
-  } catch {
-    return ''
-  }
-}
-
 function normalizeEventRef(raw: string) {
   return raw.trim().replace(/^#/, '').toUpperCase()
+}
+
+function shortCodeFromTicketId(ticketId: string): string {
+  const cleaned = (ticketId || '').replace(/[^a-z0-9]/gi, '').toUpperCase()
+  if (!cleaned) return ''
+  return cleaned.length <= 4 ? cleaned : cleaned.slice(-4)
 }
 
 function canUseCamera() {
@@ -131,19 +127,19 @@ function CrossIcon() {
   )
 }
 
-function CloseIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  )
-}
-
 function saveLastEventId(eventId: string) {
   try {
     localStorage.setItem(LAST_EVENT_KEY, normalizeEventRef(eventId))
   } catch {
     // ignore
+  }
+}
+
+function loadLastEventId() {
+  try {
+    return normalizeEventRef(localStorage.getItem(LAST_EVENT_KEY) || '')
+  } catch {
+    return ''
   }
 }
 
@@ -163,11 +159,40 @@ function saveActiveSessionEventId(eventId: string) {
   }
 }
 
-function clearActiveSessionEventId() {
+function extractMasterQrToken(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  const fromPath = (pathname: string) => {
+    const match = pathname.match(/^\/ticket\/([^/?#]+)\/?$/)
+    if (!match) return ''
+    const token = decodeURIComponent(match[1] || '')
+    if (!token || token === 'gate' || token === 'view') return ''
+    return token
+  }
   try {
-    localStorage.removeItem(ACTIVE_SESSION_KEY)
+    const url = new URL(trimmed)
+    const fromUrlPath = fromPath(url.pathname)
+    if (fromUrlPath) return fromUrlPath
   } catch {
-    // ignore
+    // not a URL
+  }
+  const pathMatch = trimmed.match(/\/ticket\/([^/?#\s]+)/i)
+  if (!pathMatch) return ''
+  const token = decodeURIComponent(pathMatch[1] || '')
+  if (!token || token === 'gate' || token === 'view') return ''
+  return token
+}
+
+function extractEventIdFromGateLink(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  try {
+    const url = new URL(trimmed)
+    if (!/^\/ticket\/gate\/?$/i.test(url.pathname)) return ''
+    const value = url.searchParams.get('eventId') || url.searchParams.get('event') || ''
+    return normalizeEventRef(value)
+  } catch {
+    return ''
   }
 }
 
@@ -177,18 +202,37 @@ function playGateTone(ok: boolean) {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) return
     const ctx = new AudioCtx()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = ok ? 880 : 240
-    gain.gain.value = 0.07
-    osc.connect(gain)
-    gain.connect(ctx.destination)
     const now = ctx.currentTime
-    osc.start(now)
-    gain.gain.exponentialRampToValueAtTime(0.001, now + (ok ? 0.14 : 0.32))
-    osc.stop(now + (ok ? 0.15 : 0.34))
-    window.setTimeout(() => void ctx.close(), 500)
+    const makeTone = (freq: number, start: number, duration: number, type: OscillatorType, volume: number) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = type
+      osc.frequency.setValueAtTime(freq, start)
+      gain.gain.setValueAtTime(volume, start)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + duration)
+    }
+    if (ok) {
+      // Two short, rising pings for a clear "allowed" signal.
+      makeTone(900, now, 0.11, 'sine', 0.09)
+      makeTone(1300, now + 0.12, 0.12, 'sine', 0.09)
+      window.setTimeout(() => void ctx.close(), 500)
+    } else {
+      // Lower descending buzz for "rejected".
+      makeTone(320, now, 0.16, 'square', 0.08)
+      makeTone(220, now + 0.15, 0.2, 'square', 0.08)
+      window.setTimeout(() => void ctx.close(), 650)
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(ok ? [40, 40, 40] : [120, 60, 120])
+      } catch {
+        // ignore
+      }
+    }
   } catch {
     // ignore autoplay / unsupported
   }
@@ -200,8 +244,11 @@ export default function GateScanPage({
   initialPayload = null,
   initialEventId = null,
 }: Props) {
-  const restoredSessionId = normalizeEventRef(initialEventId || '') || loadActiveSessionEventId()
+  const initialEventRef = normalizeEventRef(initialEventId || '')
+  const restoredSessionId = initialEventRef ? null : loadActiveSessionEventId()
+  const restoredDraftEventId = initialEventRef || restoredSessionId || loadLastEventId()
   const [sessionEventId, setSessionEventId] = useState<string | null>(restoredSessionId || null)
+  const [eventDraftId, setEventDraftId] = useState<string>(restoredDraftEventId)
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
 
@@ -210,9 +257,16 @@ export default function GateScanPage({
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [resumeMs, setResumeMs] = useState(RESUME_OK_MS)
   const [ticketCode, setTicketCode] = useState('')
+  const [lastNotice, setLastNotice] = useState<ScanNotice | null>(null)
+  const [redeemedOpen, setRedeemedOpen] = useState(false)
+  const [redeemedLoading, setRedeemedLoading] = useState(false)
+  const [redeemedQuery, setRedeemedQuery] = useState('')
+  const [redeemedError, setRedeemedError] = useState<string | null>(null)
+  const [redeemedRows, setRedeemedRows] = useState<GateRedeemedAttendee[]>([])
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const eventInputRef = useRef<HTMLInputElement | null>(null)
   const ticketInputRef = useRef<HTMLInputElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanTimerRef = useRef<number | null>(null)
@@ -233,6 +287,11 @@ export default function GateScanPage({
   useEffect(() => {
     sessionEventIdRef.current = sessionEventId
   }, [sessionEventId])
+
+  useEffect(() => {
+    if (!initialEventRef) return
+    setError(null)
+  }, [initialEventRef])
 
   // Drop deep-link ticket payloads — gate mode is continuous camera validation,
   // and now manual code entry handles payloads after event selection.
@@ -269,6 +328,49 @@ export default function GateScanPage({
       setMetrics(data)
     } catch {
       // Keep last known counts if refresh fails mid-session.
+    }
+  }, [])
+
+  const loadRedeemed = useCallback(async (eventId: string, query: string) => {
+    setRedeemedLoading(true)
+    setRedeemedError(null)
+    try {
+      const rows = await publicTicketsApi.redeemed(eventId, query)
+      setRedeemedRows(rows)
+    } catch (err) {
+      try {
+        const metricsData = await publicTicketsApi.track(eventId)
+        const codeQuery = (query || '').trim().toUpperCase()
+        const rows: GateRedeemedAttendee[] = metricsData.recentAttendees
+          .filter((item) => item.status?.toLowerCase() === 'redeemed')
+          .map((item) => ({
+            ticketId: item.ticketId,
+            ticketCode: shortCodeFromTicketId(item.ticketId),
+            holderName: item.holderName || '',
+            holderPhone: item.holderPhone || '',
+            ticketType: item.ticketType || '',
+            paymentStatus: item.paymentStatus || '',
+            status: item.status || '',
+            redeemedAt: item.createdAt || null,
+          }))
+          .filter((item) => !codeQuery || item.ticketCode === codeQuery)
+        setRedeemedRows(rows)
+        setRedeemedError(null)
+      } catch (fallbackErr) {
+        const message =
+          fallbackErr instanceof ApiError
+            ? fallbackErr.message || 'Could not load redeemed tickets'
+            : fallbackErr instanceof Error
+              ? fallbackErr.message
+              : err instanceof ApiError
+                ? err.message || 'Could not load redeemed tickets'
+                : err instanceof Error
+                  ? err.message
+                  : 'Could not load redeemed tickets'
+        setRedeemedError(message)
+      }
+    } finally {
+      setRedeemedLoading(false)
     }
   }, [])
 
@@ -496,20 +598,52 @@ export default function GateScanPage({
         busyRef.current = false
         return
       }
-      let eventId = sessionEventIdRef.current
+      const eventId = sessionEventIdRef.current
       if (!eventId) {
-        const inferred = extractEventIdFromPayload(raw)
-        if (!inferred) {
+        const candidate = normalizeEventRef(raw)
+        if (/^ERI-[A-Z0-9-]+$/i.test(candidate)) {
+          setEventDraftId(candidate)
+          saveLastEventId(candidate)
+          setError(null)
           busyRef.current = false
-          setError('Scan a ticket QR first to lock the event session.')
           return
         }
-        eventId = inferred
-        setSessionEventId(inferred)
-        saveLastEventId(inferred)
-        saveActiveSessionEventId(inferred)
-        setError(null)
-        void refreshMetrics(inferred)
+        const fromManagerLink = extractEventIdFromGateLink(raw)
+        if (fromManagerLink) {
+          setEventDraftId(fromManagerLink)
+          saveLastEventId(fromManagerLink)
+          setError(null)
+          busyRef.current = false
+          return
+        }
+        const masterQrToken = extractMasterQrToken(raw)
+        if (masterQrToken) {
+          try {
+            const event = await publicTicketsApi.getEvent(masterQrToken)
+            const masterId = normalizeEventRef(event.masterTicketId || '')
+            if (!masterId) {
+              setError('Could not resolve event ID from this event QR.')
+              busyRef.current = false
+              return
+            }
+            setEventDraftId(masterId)
+            saveLastEventId(masterId)
+            setError(null)
+          } catch (err) {
+            const message =
+              err instanceof ApiError
+                ? err.message || 'Could not load event from QR'
+                : err instanceof Error
+                  ? err.message
+                  : 'Could not load event from QR'
+            setError(message)
+          }
+          busyRef.current = false
+          return
+        }
+        setError('Scan the event QR code first to load the Event ID.')
+        busyRef.current = false
+        return
       }
 
       pauseScanning()
@@ -536,6 +670,19 @@ export default function GateScanPage({
           reason: response.message,
           ticket: response.ticket,
         })
+        if (response.valid) {
+          const guest = response.ticket?.holderName?.trim() || 'Guest'
+          const ticketCode = response.ticket?.id || ''
+          setLastNotice({
+            tone: 'ok',
+            text: `Redeemed: ${guest}${ticketCode ? ` (${ticketCode})` : ''}`,
+          })
+        } else {
+          setLastNotice({
+            tone: 'bad',
+            text: `Rejected: ${response.message}`,
+          })
+        }
         playGateTone(response.valid)
         if (response.valid) {
           void refreshMetrics(eventId)
@@ -550,6 +697,10 @@ export default function GateScanPage({
               : 'Scan failed'
         console.error('[gate] validate error', { eventId, payloadPreview, message, err })
         setVerdict({ tone: 'bad', title: 'Rejected', reason: message, ticket: null })
+        setLastNotice({
+          tone: 'bad',
+          text: `Rejected: ${message}`,
+        })
         playGateTone(false)
         scheduleResumeScan('bad')
       }
@@ -574,6 +725,31 @@ export default function GateScanPage({
     setError(null)
     await submitScan(value)
   }, [ticketCode, submitScan])
+
+  const startValidationSession = useCallback(async () => {
+    const nextEventId = normalizeEventRef(eventDraftId)
+    if (!nextEventId) {
+      setError('Enter or scan an event ID first.')
+      return
+    }
+    try {
+      const data = await publicTicketsApi.track(nextEventId)
+      setSessionEventId(nextEventId)
+      saveLastEventId(nextEventId)
+      saveActiveSessionEventId(nextEventId)
+      setMetrics(data)
+      setError(null)
+      ignoreScansUntilRef.current = Date.now() + 450
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message || 'Event ID not found'
+          : err instanceof Error
+            ? err.message
+            : 'Event ID not found'
+      setError(message)
+    }
+  }, [eventDraftId])
 
   // Keep the latest callbacks reachable from the session effect / scan loop
   // without putting them in dependency lists that would restart the camera.
@@ -617,10 +793,14 @@ export default function GateScanPage({
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      ticketInputRef.current?.focus()
+      if (sessionEventId) {
+        ticketInputRef.current?.focus()
+      } else {
+        eventInputRef.current?.focus()
+      }
     }, 120)
     return () => window.clearTimeout(id)
-  }, [verdict])
+  }, [verdict, sessionEventId])
 
   useEffect(() => {
     if (!sessionEventId) return
@@ -633,6 +813,22 @@ export default function GateScanPage({
     return () => window.clearTimeout(id)
   }, [ticketCode, submitTicketCode, sessionEventId])
 
+  useEffect(() => {
+    if (!redeemedOpen) return
+    if (!sessionEventId) return
+    const cleaned = redeemedQuery.trim().replace(/[^a-z0-9]/gi, '').toUpperCase()
+    if (cleaned && cleaned.length !== 4) {
+      setRedeemedRows([])
+      setRedeemedError(null)
+      setRedeemedLoading(false)
+      return
+    }
+    const id = window.setTimeout(() => {
+      void loadRedeemed(sessionEventId, cleaned)
+    }, 220)
+    return () => window.clearTimeout(id)
+  }, [loadRedeemed, redeemedOpen, redeemedQuery, sessionEventId])
+
   // Tear down camera only when leaving the page.
   useEffect(() => {
     return () => {
@@ -640,29 +836,9 @@ export default function GateScanPage({
     }
   }, [stopCamera])
 
-  function endSession() {
-    if (resumeTimerRef.current != null) {
-      window.clearTimeout(resumeTimerRef.current)
-      resumeTimerRef.current = null
-    }
-    clearActiveSessionEventId()
-    lastCodeRef.current = null
-    pausedRef.current = false
-    busyRef.current = false
-    setSessionEventId(null)
-    setMetrics(null)
-    setVerdict(null)
-    setError('Session cleared. Scan a ticket QR to lock a new event.')
-    setCameraError(null)
-    resumeScanning()
-  }
-
   const ticket = verdict?.ticket
-  const bought = metrics?.purchasedTickets ?? 0
-  const redeemed = metrics?.redeemedTickets ?? 0
-  const eventLabel = metrics?.eventName || (sessionEventId || 'Scan first ticket')
-  const eventIdLabel = sessionEventId || 'UNLOCKED'
-  const eventHost = metrics?.host?.trim() || gateName
+  const eventLabel = metrics?.eventName || (sessionEventId || 'Scan event QR first')
+  const eventIdLabel = sessionEventId || 'NOT LOGGED IN'
   const eventImageUrl = metrics?.eventImageUrl?.trim() || ''
 
   return (
@@ -670,45 +846,66 @@ export default function GateScanPage({
       className="gate-shell"
       style={{ ['--gate-resume' as string]: `${resumeMs}ms` }}
     >
-      <header className="gate-topbar">
-        <div className="gate-brand">
-          <div className="gate-brand-logo" aria-hidden>
-            <KodeMark size={22} />
+      {sessionEventId ? (
+        <header className="gate-topbar">
+          <div className="gate-brand">
+            <div className="gate-brand-logo" aria-hidden>
+              <KodeMark size={22} />
+            </div>
+            <div className="gate-brand-text">
+              <span className="gate-brand-name">Kode</span>
+            </div>
           </div>
-          <div className="gate-brand-text">
-            <span className="gate-brand-name">Kode</span>
-            <span className="gate-brand-host">{eventHost}</span>
-          </div>
+        </header>
+      ) : (
+        <div className="gate-floating-brand" aria-hidden>
+          <span className="gate-floating-logo">
+            <KodeMark size={30} />
+          </span>
+          <span className="gate-floating-name">Kode</span>
         </div>
-        <button type="button" className="gate-icon-btn" onClick={endSession} aria-label="End gate session">
-          <CloseIcon />
-        </button>
-      </header>
+      )}
 
-      <div className="gate-counts">
-        <div className="gate-count">
-          <p className="gate-count-value">{bought}</p>
-          <p className="gate-count-label">Bought</p>
-        </div>
-        <div className="gate-count is-allowed">
-          <p className="gate-count-value">{redeemed}</p>
-          <p className="gate-count-label">Redeemed</p>
-        </div>
-      </div>
-
-      <section className="gate-event-hero" aria-label="Active event">
-        {eventImageUrl ? (
-          <img className="gate-event-hero-image" src={eventImageUrl} alt="" />
-        ) : (
-          <div className="gate-event-hero-fallback" aria-hidden>
-            <KodeMark size={28} />
+      {sessionEventId ? (
+        <>
+          <div className="gate-counts">
+            <div className="gate-count">
+              <p className="gate-count-value">{metrics?.purchasedTickets ?? 0}</p>
+              <p className="gate-count-label">Bought</p>
+            </div>
+            <div className="gate-count is-allowed">
+              <p className="gate-count-value">{metrics?.redeemedTickets ?? 0}</p>
+              <p className="gate-count-label">Redeemed</p>
+            </div>
           </div>
-        )}
-        <div className="gate-event-hero-overlay">
-          <p className="gate-event-hero-name">{eventLabel}</p>
-          <p className="gate-event-hero-id">{eventIdLabel}</p>
-        </div>
-      </section>
+          <div className="gate-metrics-actions">
+            <button
+              type="button"
+              className="gate-btn gate-btn-ghost gate-redeemed-btn"
+              onClick={() => {
+                setRedeemedOpen(true)
+                setRedeemedQuery('')
+              }}
+            >
+              Redeemed list ({metrics?.redeemedTickets ?? 0})
+            </button>
+          </div>
+
+          <section className="gate-event-hero" aria-label="Active event">
+            {eventImageUrl ? (
+              <img className="gate-event-hero-image" src={eventImageUrl} alt="" />
+            ) : (
+              <div className="gate-event-hero-fallback" aria-hidden>
+                <KodeMark size={28} />
+              </div>
+            )}
+            <div className="gate-event-hero-overlay">
+              <p className="gate-event-hero-name">{eventLabel}</p>
+              <p className="gate-event-hero-id">{eventIdLabel}</p>
+            </div>
+          </section>
+        </>
+      ) : null}
 
       <main className={`gate-stage${verdict ? ` is-flash is-${verdict.tone}` : ''}`}>
         {/* Keep the video in the DOM for the whole session so the stream never detaches. */}
@@ -733,7 +930,7 @@ export default function GateScanPage({
             {!verdict ? (
               <div className="gate-prompt">
                 <span className="gate-dot" />
-                Hold the ticket QR in the frame
+                {sessionEventId ? 'Hold the attendee ticket QR in the frame' : ''}
               </div>
             ) : null}
           </>
@@ -778,40 +975,124 @@ export default function GateScanPage({
         ) : null}
       </main>
 
-      <section className="gate-manual-entry">
-        <label className="gate-manual-label" htmlFor="gate-ticket-code">
-          Ticket code
-        </label>
-        <div className="gate-manual-row">
-          <input
-            id="gate-ticket-code"
-            ref={ticketInputRef}
-            className="gate-manual-input"
-            value={ticketCode}
-            onChange={(e) => setTicketCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                void submitTicketCode()
-              }
-            }}
-            placeholder={sessionEventId ? '4-char ticket code' : 'Scan ticket QR first to lock event'}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            disabled={!sessionEventId}
-          />
-          <button
-            type="button"
-            className="gate-btn gate-btn-primary gate-manual-btn"
-            onClick={() => void submitTicketCode()}
-            disabled={!sessionEventId || !ticketCode.trim()}
-          >
-            Redeem
-          </button>
-        </div>
+      <section className={`gate-manual-entry${!sessionEventId ? ' gate-manual-entry-centered' : ''}`}>
+        {!sessionEventId ? (
+          <>
+            <label className="gate-manual-label" htmlFor="gate-event-id">
+              Event ID
+            </label>
+            <div className="gate-manual-row">
+              <input
+                id="gate-event-id"
+                ref={eventInputRef}
+                className="gate-manual-input"
+                value={eventDraftId}
+                onChange={(e) => setEventDraftId(normalizeEventRef(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void startValidationSession()
+                  }
+                }}
+                placeholder="Scan event QR or type ERI-..."
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="gate-btn gate-btn-primary gate-manual-btn"
+                onClick={() => void startValidationSession()}
+                disabled={!eventDraftId.trim()}
+              >
+                Start Validation
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="gate-manual-label" htmlFor="gate-ticket-code">
+              Ticket code
+            </label>
+            <div className="gate-manual-row" style={{ gridTemplateColumns: '1fr' }}>
+              <input
+                id="gate-ticket-code"
+                ref={ticketInputRef}
+                className="gate-manual-input"
+                value={ticketCode}
+                onChange={(e) => setTicketCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void submitTicketCode()
+                  }
+                }}
+                placeholder="4-char ticket code"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+              />
+            </div>
+          </>
+        )}
+        {lastNotice ? (
+          <p className={lastNotice.tone === 'ok' ? 'gate-alert gate-alert-ok' : 'gate-alert'} role="status" aria-live="polite">
+            {lastNotice.text}
+          </p>
+        ) : null}
         {error ? <p className="gate-alert" role="alert">{error}</p> : null}
       </section>
+
+      {redeemedOpen ? (
+        <div className="gate-redeemed-overlay" role="dialog" aria-modal="true" aria-label="Redeemed tickets list">
+          <div className="gate-redeemed-card">
+            <div className="gate-redeemed-head">
+              <p className="gate-redeemed-title">Redeemed tickets</p>
+              <button
+                type="button"
+                className="gate-icon-btn"
+                onClick={() => setRedeemedOpen(false)}
+                aria-label="Close redeemed list"
+              >
+                ×
+              </button>
+            </div>
+            <input
+              className="gate-manual-input"
+              value={redeemedQuery}
+              onChange={(e) => setRedeemedQuery(e.target.value.toUpperCase())}
+              placeholder="Search by 4-char ticket ID"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={4}
+            />
+            {redeemedQuery.trim() && redeemedQuery.trim().replace(/[^a-z0-9]/gi, '').length !== 4 ? (
+              <p className="gate-hint">Enter exactly 4 characters.</p>
+            ) : null}
+            {redeemedLoading ? <p className="gate-hint">Loading redeemed list…</p> : null}
+            {redeemedError ? <p className="gate-alert">{redeemedError}</p> : null}
+            {!redeemedLoading && !redeemedError ? (
+              <div className="gate-redeemed-list">
+                {redeemedRows.length === 0 ? (
+                  <p className="gate-hint">No redeemed tickets found.</p>
+                ) : (
+                  redeemedRows.map((row) => (
+                    <div key={row.ticketId} className="gate-redeemed-row">
+                      <p className="gate-redeemed-name">{row.holderName || 'Guest'}</p>
+                      <p className="gate-redeemed-meta">
+                        {row.ticketCode ? `${row.ticketCode} · ` : ''}
+                        {row.ticketType || 'Ticket'}
+                        {row.holderPhone ? ` · ${row.holderPhone}` : ''}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

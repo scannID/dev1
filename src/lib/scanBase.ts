@@ -30,3 +30,10 @@ export function buildTicketGateUrl(qrPayload: string): string {
   }
   return `${scanBaseOrigin()}/ticket/gate?p=${encodeURIComponent(payload)}`
 }
+
+/** Event manager QR opens gate setup with event prefilled (must still start session). */
+export function buildEventManagerGateUrl(eventId: string): string {
+  const normalized = eventId.trim().replace(/^#/, '').toUpperCase()
+  if (!normalized) return `${scanBaseOrigin()}/ticket/gate`
+  return `${scanBaseOrigin()}/ticket/gate?eventId=${encodeURIComponent(normalized)}`
+}

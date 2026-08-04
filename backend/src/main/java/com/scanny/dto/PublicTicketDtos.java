@@ -127,4 +127,15 @@ public class PublicTicketDtos {
         String qrPayload,
         String gateUrl
     ) {}
+
+    public record RedeemedAttendee(
+        String ticketId,
+        String ticketCode,
+        String holderName,
+        String holderPhone,
+        String ticketType,
+        String paymentStatus,
+        String status,
+        java.time.Instant redeemedAt
+    ) {}
 }

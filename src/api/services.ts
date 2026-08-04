@@ -49,6 +49,7 @@ import type {
   TicketEventInfo,
   AttendeeTicketView,
   EventTicketTrackingMetrics,
+  GateRedeemedAttendee,
   PagedResult,
   PaginationMeta,
   FeeConfig,
@@ -442,6 +443,14 @@ export const publicTicketsApi = {
     deviceInfo?: string
   }): Promise<TicketScanValidationResponse> => {
     return api.post<TicketScanValidationResponse>('/tickets/public/validate', data)
+  },
+
+  redeemed: async (eventId: string, q?: string): Promise<GateRedeemedAttendee[]> => {
+    const id = eventId.trim().replace(/^#/, '')
+    const suffix = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''
+    return api.get<GateRedeemedAttendee[]>(
+      `/tickets/public/redeemed/${encodeURIComponent(id)}${suffix}`
+    )
   },
 }
 

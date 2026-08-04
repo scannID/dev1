@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -51,6 +52,14 @@ public class PublicTicketController {
     @GetMapping("/track/{ticketId}")
     public ResponseEntity<PublicTicketDtos.EventTrackingMetrics> track(@PathVariable String ticketId) {
         return ResponseEntity.ok(ticketPurchaseService.getEventTrackingMetrics(ticketId));
+    }
+
+    /** Redeemed attendees for an event (supports local gate search by id/name/phone/code). */
+    @GetMapping("/redeemed/{eventId}")
+    public ResponseEntity<java.util.List<PublicTicketDtos.RedeemedAttendee>> redeemed(
+            @PathVariable String eventId,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(ticketPurchaseService.getRedeemedAttendees(eventId, q));
     }
 
     /** Gate knock-off using the paid ticket QR payload (one-phone manage flow). */
