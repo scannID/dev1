@@ -34,6 +34,7 @@ public class TicketPurchaseService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
         "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
     );
+    private static final int SERVICE_FEE_PER_TRANSACTION = 700;
 
     private final TicketRepository ticketRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
@@ -125,10 +126,11 @@ public class TicketPurchaseService {
         }
 
         Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
-        int price = resolveSelectionPrice(masterMeta, ticketClass, master.getPrice());
-        if (price < 0) {
+        int basePrice = resolveSelectionPrice(masterMeta, ticketClass, master.getPrice());
+        if (basePrice < 0) {
             throw new ApiException(400, "Unknown ticket class or table");
         }
+        int price = basePrice + SERVICE_FEE_PER_TRANSACTION;
 
         Instant now = Instant.now();
         Integer capacity = resolveSelectionCapacity(masterMeta, ticketClass);

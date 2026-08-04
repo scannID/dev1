@@ -19,8 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -449,6 +451,145 @@ public class TicketService {
         ticket = ticketRepository.save(ticket);
         broadcastStatsUpdate();
         return TicketResponse.from(ticket, customerUrl);
+    }
+
+    @Transactional
+    public TicketResponse updateCreatedEvent(String eventId, TicketDtos.UpdateCreatedEventRequest request) {
+        if (request == null) {
+            throw new ApiException(400, "Update payload is required");
+        }
+        Ticket master = ticketRepository.findByIdForUpdate(eventId)
+            .orElseThrow(() -> new ApiException(404, "Event not found"));
+        if (!master.isEventTemplate()) {
+            throw new ApiException(400, "Only created event templates can be edited");
+        }
+
+        String eventName = normalizeRequiredText(request.eventName());
+        if (eventName.isBlank()) {
+            throw new ApiException(400, "Event name is required");
+        }
+        master.setEventName(eventName);
+        if (request.eventDate() != null) {
+            master.setEventDate(request.eventDate());
+        }
+
+        String nextTicketType = normalizeRequiredText(request.ticketType());
+        if (nextTicketType.isBlank()) {
+            throw new ApiException(400, "Ticket type is required");
+        }
+        master.setTicketType(nextTicketType);
+        if (request.price() != null && request.price() >= 0) {
+            master.setPrice(request.price());
+        }
+        String currency = normalizeRequiredText(request.currency());
+        if (!currency.isBlank()) {
+            master.setCurrency(currency);
+        }
+
+        Map<String, Object> meta = new LinkedHashMap<>(parseMetadata(master.getMetadata()));
+        putMeta(meta, "template", request.template());
+        putMeta(meta, "payTo", request.payTo());
+        putMeta(meta, "location", request.location());
+        putMeta(meta, "time", request.time());
+        putMeta(meta, "host", request.host());
+        putMeta(meta, "hostContact", request.hostContact());
+        putMeta(meta, "eventImageUrl", request.eventImageUrl());
+
+        if (request.ticketClasses() != null) {
+            List<Map<String, Object>> classes = new ArrayList<>();
+            for (TicketDtos.EventClassInput item : request.ticketClasses()) {
+                if (item == null) continue;
+                String name = normalizeRequiredText(item.name());
+                if (name.isBlank()) {
+                    throw new ApiException(400, "Ticket class name is required");
+                }
+                int fee = item.fee() == null ? 0 : Math.max(0, item.fee());
+                Integer capacity = sanitizeCapacity(item.capacity());
+                assertCapacityNotBelowSold(master.getId(), name, capacity);
+                Map<String, Object> cls = new LinkedHashMap<>();
+                cls.put("name", name);
+                cls.put("fee", fee);
+                if (capacity != null) {
+                    cls.put("capacity", capacity);
+                }
+                classes.add(cls);
+            }
+            meta.put("ticketClasses", classes);
+        }
+
+        if (request.tables() != null) {
+            List<Map<String, Object>> tables = new ArrayList<>();
+            for (TicketDtos.EventTableInput item : request.tables()) {
+                if (item == null) continue;
+                String name = normalizeRequiredText(item.name());
+                if (name.isBlank()) {
+                    throw new ApiException(400, "Table name is required");
+                }
+                int seats = item.seats() == null ? 0 : Math.max(0, item.seats());
+                int price = item.price() == null ? 0 : Math.max(0, item.price());
+                Integer capacity = sanitizeCapacity(item.capacity());
+                assertCapacityNotBelowSold(master.getId(), name, capacity);
+                Map<String, Object> table = new LinkedHashMap<>();
+                table.put("name", name);
+                table.put("seats", seats);
+                table.put("price", price);
+                if (capacity != null) {
+                    table.put("capacity", capacity);
+                }
+                tables.add(table);
+            }
+            meta.put("tables", tables);
+        }
+
+        master.setMetadata(writeMetadata(meta));
+        master.setUpdatedAt(Instant.now());
+        Ticket saved = ticketRepository.save(master);
+        broadcastStatsUpdate();
+        return TicketResponse.from(saved, customerUrl);
+    }
+
+    private static String normalizeRequiredText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String out = value.trim();
+        return out;
+    }
+
+    private static Integer sanitizeCapacity(Integer value) {
+        if (value == null) return null;
+        return value > 0 ? value : null;
+    }
+
+    private void assertCapacityNotBelowSold(String masterId, String selection, Integer capacity) {
+        if (capacity == null) {
+            return;
+        }
+        long sold = ticketRepository.countSoldByMasterAndType(masterId, selection);
+        long held = ticketRepository.countActiveHoldsByMasterAndType(masterId, selection, Instant.now());
+        if (capacity < sold + held) {
+            throw new ApiException(400, "Capacity for " + selection + " cannot be below already sold/held tickets");
+        }
+    }
+
+    private static void putMeta(Map<String, Object> meta, String key, String value) {
+        if (value == null) {
+            return;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) {
+            meta.remove(key);
+        } else {
+            meta.put(key, trimmed);
+        }
+    }
+
+    private String writeMetadata(Map<String, Object> meta) {
+        try {
+            return objectMapper.writeValueAsString(meta);
+        } catch (Exception e) {
+            throw new ApiException(400, "Invalid event metadata");
+        }
     }
 
     private void broadcastStatsUpdate() {

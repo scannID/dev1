@@ -395,6 +395,36 @@ export interface Ticket {
   qrCodeUrl: string
 }
 
+export interface UpdateEventClassInput {
+  name: string
+  fee: number
+  capacity?: number | null
+}
+
+export interface UpdateEventTableInput {
+  name: string
+  seats: number
+  price: number
+  capacity?: number | null
+}
+
+export interface UpdateCreatedEventRequest {
+  eventName: string
+  eventDate?: string | null
+  ticketType: string
+  price: number
+  currency?: string
+  template?: string
+  payTo?: string
+  location?: string
+  time?: string
+  host?: string
+  hostContact?: string
+  eventImageUrl?: string
+  ticketClasses: UpdateEventClassInput[]
+  tables: UpdateEventTableInput[]
+}
+
 export interface UpdateTicketStatusRequest {
   status: Ticket['status']
 }

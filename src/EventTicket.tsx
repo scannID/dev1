@@ -114,6 +114,16 @@ function fmtTime(t: string) {
   return `${String(hour).padStart(2, '0')}:${String(m || 0).padStart(2, '0')} ${ampm}`
 }
 
+function parseJsonObject(raw?: string): Record<string, unknown> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
 /** Phone can't open localhost — rewrite API scan URLs to the LAN scan base. */
 function rewriteScanUrl(url: string) {
   if (!url) return url
@@ -222,7 +232,7 @@ function CreatedEventsQrSection({
           Created events
         </h2>
         <p style={{ margin: '4px 0 0', fontSize: 12.5, color: CREATE.muted }}>
-          Manager gate QR (red) only.
+          Tap a card to load and edit that event.
         </p>
       </div>
       <div
@@ -1695,7 +1705,7 @@ function TicketForm({
   onBack,
   onTrackLookup,
 }: {
-  onGenerate: (d: TicketData) => Promise<void>
+  onGenerate: (d: TicketData, editingEventId?: string | null) => Promise<void>
   onBack: () => void
   onTrackLookup: (ticketId: string) => Promise<void>
 }) {
@@ -1731,6 +1741,8 @@ function TicketForm({
   const [trackQuery, setTrackQuery] = useState('')
   const [trackBusy, setTrackBusy] = useState(false)
   const [showTools, setShowTools] = useState(false)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [loadingEdit, setLoadingEdit] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(
     typeof window !== 'undefined' ? window.innerHeight : 900,
   )
@@ -1745,6 +1757,167 @@ function TicketForm({
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
+  }
+
+  function resetFormToCreate() {
+    setForm({
+      eventName: '',
+      date: '',
+      time: '19:00',
+      location: '',
+      host: '',
+      hostContact: '',
+      paymentMethod: '',
+      mobileProvider: 'MTN',
+      mobileNumber: '',
+      bankName: '',
+      bankAccountNumber: '',
+      template: 'classic',
+      ticketClasses: DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
+      tables: [],
+      eventImageUrl: '',
+    })
+    setErrors({})
+    setTouched(false)
+    setOfferTab('classes')
+    setStep(1)
+    setEditingEventId(null)
+    setShowTools(false)
+  }
+
+  function parsePayTo(value: string): Pick<
+    FormState,
+    'paymentMethod' | 'mobileProvider' | 'mobileNumber' | 'bankName' | 'bankAccountNumber'
+  > {
+    const raw = (value || '').trim()
+    if (!raw) {
+      return {
+        paymentMethod: '',
+        mobileProvider: 'MTN',
+        mobileNumber: '',
+        bankName: '',
+        bankAccountNumber: '',
+      }
+    }
+    const [left, right = ''] = raw.split('·').map((p) => p.trim())
+    if (/^mtn$/i.test(left)) {
+      return {
+        paymentMethod: 'MOBILE_MONEY',
+        mobileProvider: 'MTN',
+        mobileNumber: right || raw,
+        bankName: '',
+        bankAccountNumber: '',
+      }
+    }
+    if (/^airtel$/i.test(left)) {
+      return {
+        paymentMethod: 'MOBILE_MONEY',
+        mobileProvider: 'Airtel',
+        mobileNumber: right || raw,
+        bankName: '',
+        bankAccountNumber: '',
+      }
+    }
+    return {
+      paymentMethod: 'BANK_ACCOUNT',
+      mobileProvider: 'MTN',
+      mobileNumber: '',
+      bankName: UG_BANKS.includes(left as (typeof UG_BANKS)[number]) ? left : 'Other',
+      bankAccountNumber: right || raw,
+    }
+  }
+
+  function toDateParts(iso: string | undefined) {
+    if (!iso) return { date: '', time: '19:00' }
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return { date: '', time: '19:00' }
+    return {
+      date: d.toISOString().slice(0, 10),
+      time: d.toISOString().slice(11, 16),
+    }
+  }
+
+  async function loadEventForEdit(eventId: string) {
+    const normalized = normalizeTrackQuery(eventId)
+    if (!normalized) {
+      toast.message('Choose a valid event ID to edit')
+      return
+    }
+    try {
+      setLoadingEdit(true)
+      const master = await ticketsApi.get(normalized)
+      const meta = parseJsonObject(master.metadata)
+      const ticketClassesRaw = Array.isArray(meta.ticketClasses) ? meta.ticketClasses : []
+      const tablesRaw = Array.isArray(meta.tables) ? meta.tables : []
+      const ticketClasses: TicketClass[] = ticketClassesRaw
+        .map((item) => {
+          const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
+          return {
+            id: shortId(),
+            name: typeof obj.name === 'string' ? obj.name : '',
+            fee: String(obj.fee ?? ''),
+            capacity: obj.capacity == null ? '' : String(obj.capacity),
+          }
+        })
+        .filter((c) => c.name.trim())
+      const tables: TableOption[] = tablesRaw
+        .map((item) => {
+          const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
+          return {
+            id: shortId(),
+            name: typeof obj.name === 'string' ? obj.name : '',
+            seats: String(obj.seats ?? ''),
+            price: String(obj.price ?? ''),
+            capacity: obj.capacity == null ? '' : String(obj.capacity),
+          }
+        })
+        .filter((t) => t.name.trim())
+      const payTo = typeof meta.payTo === 'string' ? meta.payTo : ''
+      const payment = parsePayTo(payTo)
+      const dt = toDateParts(master.eventDate)
+      const nextClasses =
+        ticketClasses.length > 0
+          ? ticketClasses
+          : [
+              {
+                id: shortId(),
+                name: master.ticketType || 'Ordinary',
+                fee: String(master.price ?? 0),
+                capacity: '',
+              },
+            ]
+      setForm({
+        eventName: master.eventName || '',
+        date: dt.date,
+        time: dt.time,
+        location: typeof meta.location === 'string' ? meta.location : '',
+        host: typeof meta.host === 'string' ? meta.host : '',
+        hostContact: typeof meta.hostContact === 'string' ? meta.hostContact : '',
+        paymentMethod: payment.paymentMethod,
+        mobileProvider: payment.mobileProvider,
+        mobileNumber: payment.mobileNumber,
+        bankName: payment.bankName,
+        bankAccountNumber: payment.bankAccountNumber,
+        template:
+          meta.template === 'festival' || meta.template === 'minimal' || meta.template === 'gold'
+            ? meta.template
+            : 'classic',
+        ticketClasses: nextClasses,
+        tables,
+        eventImageUrl: typeof meta.eventImageUrl === 'string' ? meta.eventImageUrl : '',
+      })
+      setOfferTab(tables.length > 0 ? 'tables' : 'classes')
+      setStep(1)
+      setTouched(false)
+      setErrors({})
+      setShowTools(false)
+      setEditingEventId(master.id)
+      toast.success(`Editing ${master.eventName}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not load event for editing')
+    } finally {
+      setLoadingEdit(false)
+    }
   }
 
   async function handleTrackSubmit(e: FormEvent) {
@@ -1886,7 +2059,7 @@ function TicketForm({
         ticketId: uid(),
         selectedClass: form.ticketClasses[0]?.name || '',
         eventImageUrl: form.eventImageUrl || undefined,
-      })
+      }, editingEventId)
     } finally {
       setSubmitting(false)
     }
@@ -2065,10 +2238,50 @@ function TicketForm({
 
             <CreatedEventsQrSection
               onOpen={(event) => {
-                void onTrackLookup(event.eventId)
+                void loadEventForEdit(event.eventId)
               }}
             />
           </div>
+        ) : null}
+
+        {editingEventId ? (
+          <div
+            style={{
+              margin: '0 0 12px',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: `0.5px solid ${CREATE.line}`,
+              background: CREATE.card,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              fontSize: 12.5,
+            }}
+          >
+            <span>
+              Editing event <strong style={{ fontFamily: SCANN_MONO }}>#{editingEventId}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={resetFormToCreate}
+              disabled={submitting || loadingEdit}
+              style={{
+                ...tintTealBtn(),
+                background: 'transparent',
+                color: CREATE.muted,
+                border: `0.5px solid ${CREATE.lineStrong}`,
+              }}
+            >
+              Create new instead
+            </button>
+          </div>
+        ) : null}
+
+        {loadingEdit ? (
+          <p style={{ margin: '0 0 10px', fontSize: 12.5, color: CREATE.muted }}>
+            Loading event for editing…
+          </p>
         ) : null}
 
         {step === 1 ? (
@@ -2798,7 +3011,7 @@ function TicketForm({
                     <rect x="3" y="14" width="7" height="7" />
                     <path d="M14 14h3v3h-3zM19 14h2M14 19h2M19 19h2" />
                   </svg>
-                  {submitting ? 'Generating…' : 'Generate ticket code'}
+                  {submitting ? (editingEventId ? 'Saving…' : 'Generating…') : (editingEventId ? 'Save event changes' : 'Generate ticket code')}
                 </button>
               </>
             )
@@ -2850,48 +3063,77 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
     return () => window.clearInterval(timer)
   }, [trackedTicketId])
 
-  async function handleGenerate(data: TicketData) {
+  async function handleGenerate(data: TicketData, editingEventId?: string | null) {
     try {
       setRevokeMessage(null)
       setTrackingOnly(false)
-      const createdTicket = await publicTicketsApi.createEvent({
-        ticketType: data.ticketClasses[0]?.name || 'EVENT',
-        eventName: data.eventName,
-        eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
-        price: Number(data.ticketClasses[0]?.fee || 0),
-        currency: 'UGX',
-        usageLimit: 1000000000,
-        issuedBy: 'public-web',
-        metadata: JSON.stringify({
-          reusable: true,
-          template: data.template,
-          payTo: data.paymentDetails,
-          location: data.location,
-          time: data.time,
-          host: data.host,
-          hostContact: data.hostContact,
-          ticketClasses: data.ticketClasses.map((c) => {
-            const capacity = Number(c.capacity)
-            return {
-              id: c.id,
-              name: c.name,
-              fee: c.fee,
-              ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
-            }
-          }),
-          tables: data.tables.map((t) => {
-            const capacity = Number(t.capacity)
-            return {
-              id: t.id,
-              name: t.name,
-              seats: t.seats,
-              price: t.price,
-              ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
-            }
-          }),
-          ...(data.eventImageUrl ? { eventImageUrl: data.eventImageUrl } : {}),
-        }),
+      const eventDateIso = new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString()
+      const normalizedClasses = data.ticketClasses.map((c) => {
+        const capacity = Number(c.capacity)
+        return {
+          id: c.id,
+          name: c.name,
+          fee: c.fee,
+          ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+        }
       })
+      const normalizedTables = data.tables.map((t) => {
+        const capacity = Number(t.capacity)
+        return {
+          id: t.id,
+          name: t.name,
+          seats: t.seats,
+          price: t.price,
+          ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+        }
+      })
+      const createdTicket = editingEventId
+        ? await ticketsApi.updateEvent(editingEventId, {
+            eventName: data.eventName,
+            eventDate: eventDateIso,
+            ticketType: data.ticketClasses[0]?.name || 'EVENT',
+            price: Number(data.ticketClasses[0]?.fee || 0),
+            currency: 'UGX',
+            template: data.template,
+            payTo: data.paymentDetails,
+            location: data.location,
+            time: data.time,
+            host: data.host,
+            hostContact: data.hostContact,
+            eventImageUrl: data.eventImageUrl || '',
+            ticketClasses: normalizedClasses.map((c) => ({
+              name: c.name,
+              fee: Number(c.fee || 0),
+              ...(typeof c.capacity === 'number' ? { capacity: c.capacity } : {}),
+            })),
+            tables: normalizedTables.map((t) => ({
+              name: t.name,
+              seats: Number(t.seats || 0),
+              price: Number(t.price || 0),
+              ...(typeof t.capacity === 'number' ? { capacity: t.capacity } : {}),
+            })),
+          })
+        : await publicTicketsApi.createEvent({
+            ticketType: data.ticketClasses[0]?.name || 'EVENT',
+            eventName: data.eventName,
+            eventDate: eventDateIso,
+            price: Number(data.ticketClasses[0]?.fee || 0),
+            currency: 'UGX',
+            usageLimit: 1000000000,
+            issuedBy: 'public-web',
+            metadata: JSON.stringify({
+              reusable: true,
+              template: data.template,
+              payTo: data.paymentDetails,
+              location: data.location,
+              time: data.time,
+              host: data.host,
+              hostContact: data.hostContact,
+              ticketClasses: normalizedClasses,
+              tables: normalizedTables,
+              ...(data.eventImageUrl ? { eventImageUrl: data.eventImageUrl } : {}),
+            }),
+          })
 
       const purchaseLink = rewriteScanUrl(createdTicket.qrCodeUrl)
       const managerLink = buildEventManagerGateUrl(createdTicket.id)
@@ -2912,7 +3154,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         eventName: data.eventName,
         purchaseUrl: purchaseLink,
         managerUrl: managerLink,
-        eventDate: new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString(),
+        eventDate: eventDateIso,
         location: data.location,
         host: data.host,
         hostContact: data.hostContact,
@@ -2924,7 +3166,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       } catch {
         setMetrics(null)
       }
-      toast.success('Event ticket QR created successfully')
+      toast.success(editingEventId ? 'Event updated successfully' : 'Event ticket QR created successfully')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create ticket'
       toast.error(message)

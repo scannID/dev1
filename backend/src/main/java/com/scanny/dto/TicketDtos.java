@@ -53,6 +53,36 @@ public class TicketDtos {
         String paymentReference
     ) {}
 
+    public record EventClassInput(
+        String name,
+        Integer fee,
+        Integer capacity
+    ) {}
+
+    public record EventTableInput(
+        String name,
+        Integer seats,
+        Integer price,
+        Integer capacity
+    ) {}
+
+    public record UpdateCreatedEventRequest(
+        String eventName,
+        Instant eventDate,
+        String ticketType,
+        Integer price,
+        String currency,
+        String template,
+        String payTo,
+        String location,
+        String time,
+        String host,
+        String hostContact,
+        String eventImageUrl,
+        List<EventClassInput> ticketClasses,
+        List<EventTableInput> tables
+    ) {}
+
     // Response DTOs
 
     public record TicketScanResponse(

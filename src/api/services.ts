@@ -54,6 +54,7 @@ import type {
   PaginationMeta,
   FeeConfig,
   MerchantBroadcastListResponse,
+  UpdateCreatedEventRequest,
 } from './types'
 
 export type CatalogListParams = {
@@ -320,6 +321,10 @@ export const ticketsApi = {
     return api.post<Ticket>('/tickets', data)
   },
 
+  get: async (ticketId: string): Promise<Ticket> => {
+    return api.get<Ticket>(`/tickets/${encodeURIComponent(ticketId)}`)
+  },
+
   list: async (eventName?: string): Promise<Ticket[]> => {
     const suffix = eventName ? `?eventName=${encodeURIComponent(eventName)}` : ''
     return api.get<Ticket[]>(`/tickets${suffix}`)
@@ -332,6 +337,10 @@ export const ticketsApi = {
 
   updateStatus: async (ticketId: string, status: UpdateTicketStatusRequest['status']): Promise<Ticket> => {
     return api.patch<Ticket>(`/tickets/${ticketId}/status`, { status })
+  },
+
+  updateEvent: async (eventId: string, data: UpdateCreatedEventRequest): Promise<Ticket> => {
+    return api.patch<Ticket>(`/tickets/events/${encodeURIComponent(eventId)}`, data)
   },
 
   scanPayload: async (data: {

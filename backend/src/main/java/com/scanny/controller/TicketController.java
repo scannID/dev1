@@ -71,6 +71,18 @@ public class TicketController {
         }
     }
 
+    @PatchMapping("/events/{eventId}")
+    public ResponseEntity<TicketResponse> updateCreatedEvent(
+            @PathVariable String eventId,
+            @RequestBody TicketDtos.UpdateCreatedEventRequest request) {
+        try {
+            TicketResponse ticket = ticketService.updateCreatedEvent(eventId, request);
+            return ResponseEntity.ok(ticket);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+
     @GetMapping("/{ticketId}")
     public ResponseEntity<TicketResponse> getTicket(@PathVariable String ticketId) {
         try {

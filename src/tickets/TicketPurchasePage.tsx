@@ -6,6 +6,7 @@ import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 
 type Props = { masterQrToken: string }
+const SERVICE_FEE = 700
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -107,6 +108,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const selectedClass = event?.ticketClasses.find((c) => c.name === ticketClass)
   const selectedTable = tables.find((t) => t.name === ticketClass)
   const selectedPrice = selectedClass?.price ?? selectedTable?.price ?? 0
+  const totalPrice = selectedPrice + SERVICE_FEE
   const selectedSoldOut = Boolean(selectedClass?.soldOut || selectedTable?.soldOut)
   const dateLabel = formatEventDate(event?.eventDate ?? null)
 
@@ -284,12 +286,14 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </div>
           ) : null}
 
+          <p className="tk-hint">Service fee: {money(SERVICE_FEE, event.currency)} per transaction.</p>
+
           <button type="submit" className="tk-cta" disabled={submitting || !ticketClass || selectedSoldOut}>
             {submitting
               ? 'Creating…'
               : selectedSoldOut
                 ? 'Sold out'
-                : `Create Ticket ${money(selectedPrice, event.currency)}`}
+                : `Create Ticket ${money(totalPrice, event.currency)}`}
           </button>
         </form>
       </main>
