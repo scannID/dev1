@@ -8,17 +8,11 @@ import com.scanny.exception.ApiException;
 import com.scanny.repository.ReceiptRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,14 +22,10 @@ public class ReceiptService {
     private static final Logger logger = LoggerFactory.getLogger(ReceiptService.class);
     
     private final ReceiptRepository receiptRepository;
-    private final JavaMailSender mailSender;
     private final ObjectMapper objectMapper;
 
-    public ReceiptService(ReceiptRepository receiptRepository, 
-                         Optional<JavaMailSender> mailSender,
-                         ObjectMapper objectMapper) {
+    public ReceiptService(ReceiptRepository receiptRepository, ObjectMapper objectMapper) {
         this.receiptRepository = receiptRepository;
-        this.mailSender = mailSender.orElse(null);
         this.objectMapper = objectMapper;
     }
 
@@ -108,14 +98,9 @@ public class ReceiptService {
         // Refresh to get the generated receipt number from the database trigger
         receiptRepository.refresh(receipt);
         
-        // Auto-send email if requested and email is provided
-        if (Boolean.TRUE.equals(request.sendEmail()) && request.customerEmail() != null && !request.customerEmail().isBlank()) {
-            try {
-                sendReceiptEmail(receipt.getReceiptNumber(), request.customerEmail());
-            } catch (Exception e) {
-                logger.error("Failed to send receipt email for {}", receipt.getReceiptNumber(), e);
-                // Don't fail the receipt generation if email fails
-            }
+        // Receipt emailing is intentionally disabled. Email is reserved for account-creation flows.
+        if (Boolean.TRUE.equals(request.sendEmail())) {
+            logger.info("Receipt email request ignored for {} because receipt emailing is disabled", receipt.getReceiptNumber());
         }
         
         logger.info("Generated receipt {} for business {}", receipt.getReceiptNumber(), receipt.getBusinessId());
@@ -125,56 +110,15 @@ public class ReceiptService {
 
     @Transactional
     public EmailSendResult sendReceiptEmail(String receiptNumber, String recipientEmail) {
-        Receipt receipt = receiptRepository.findByReceiptNumber(receiptNumber)
-                .orElseThrow(() -> new ApiException(404, "Receipt not found"));
-        
-        if (mailSender == null) {
-            logger.warn("Email service not configured. Marking receipt as sent without actually sending.");
-            receipt.setEmailSent(true);
-            receipt.setEmailSentAt(LocalDateTime.now());
-            receipt.setEmailError("Email service not configured");
-            receipt.setStatus(Receipt.ReceiptStatus.SENT);
-            receiptRepository.save(receipt);
-            
-            return new EmailSendResult(false, "Email service not configured", LocalDateTime.now());
+        if (receiptNumber == null || receiptNumber.isBlank()) {
+            throw new ApiException(400, "Receipt number is required");
         }
-        
-        String email = recipientEmail != null ? recipientEmail : receipt.getCustomerEmail();
-        if (email == null || email.isBlank()) {
-            throw new ApiException(400, "No email address provided");
-        }
-        
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
-            helper.setTo(email);
-            helper.setSubject("Receipt " + receipt.getReceiptNumber() + " from " + receipt.getBusinessName());
-            helper.setText(buildEmailBody(receipt), true);
-            
-            mailSender.send(message);
-            
-            // Update receipt
-            receipt.setEmailSent(true);
-            receipt.setEmailSentAt(LocalDateTime.now());
-            receipt.setEmailError(null);
-            receipt.setStatus(Receipt.ReceiptStatus.SENT);
-            receiptRepository.save(receipt);
-            
-            logger.info("Sent receipt email {} to {}", receiptNumber, email);
-            
-            return new EmailSendResult(true, "Email sent successfully", LocalDateTime.now());
-            
-        } catch (MessagingException | MailException e) {
-            logger.error("Failed to send receipt email", e);
-            
-            // Update error
-            receipt.setEmailError(e.getMessage());
-            receipt.setStatus(Receipt.ReceiptStatus.FAILED);
-            receiptRepository.save(receipt);
-            
-            throw new ApiException(500, "Failed to send email: " + e.getMessage());
-        }
+        logger.info("Receipt email request ignored for {} because receipt emailing is disabled", receiptNumber);
+        return new EmailSendResult(
+            false,
+            "Receipt emailing is disabled. Email is reserved for account creation only.",
+            LocalDateTime.now()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -236,97 +180,6 @@ public class ReceiptService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
         return new ReceiptSummary(total, sent, pending, failed, totalAmount);
-    }
-
-    private String buildEmailBody(Receipt receipt) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm");
-        StringBuilder html = new StringBuilder();
-        
-        html.append("<!DOCTYPE html>");
-        html.append("<html><head><style>");
-        html.append("body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }");
-        html.append(".container { max-width: 600px; margin: 0 auto; padding: 20px; }");
-        html.append(".header { background: #3b82f6; color: white; padding: 20px; text-align: center; }");
-        html.append(".content { background: #f9fafb; padding: 20px; }");
-        html.append(".receipt-info { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; }");
-        html.append(".label { font-weight: bold; color: #666; }");
-        html.append(".value { color: #000; }");
-        html.append(".total { font-size: 24px; font-weight: bold; color: #3b82f6; margin: 20px 0; }");
-        html.append(".footer { text-align: center; color: #666; font-size: 12px; padding: 20px; }");
-        html.append("</style></head><body>");
-        
-        html.append("<div class='container'>");
-        html.append("<div class='header'>");
-        html.append("<h1>Payment Receipt</h1>");
-        html.append("<p>").append(receipt.getBusinessName()).append("</p>");
-        html.append("</div>");
-        
-        html.append("<div class='content'>");
-        html.append("<div class='receipt-info'>");
-        html.append("<p><span class='label'>Receipt Number:</span> <span class='value'>").append(receipt.getReceiptNumber()).append("</span></p>");
-        html.append("<p><span class='label'>Date:</span> <span class='value'>").append(receipt.getPaymentDate().format(formatter)).append("</span></p>");
-        
-        if (receipt.getCustomerName() != null) {
-            html.append("<p><span class='label'>Customer:</span> <span class='value'>").append(receipt.getCustomerName()).append("</span></p>");
-        }
-        
-        if (receipt.getPaymentMethod() != null) {
-            html.append("<p><span class='label'>Payment Method:</span> <span class='value'>").append(receipt.getPaymentMethod()).append("</span></p>");
-        }
-        
-        if (receipt.getPaymentReference() != null) {
-            html.append("<p><span class='label'>Reference:</span> <span class='value'>").append(receipt.getPaymentReference()).append("</span></p>");
-        }
-        
-        html.append("</div>");
-        
-        // Items
-        if (receipt.getItems() != null) {
-            html.append("<div class='receipt-info'>");
-            html.append("<h3>Items</h3>");
-            try {
-                List<?> items = objectMapper.readValue(receipt.getItems(), List.class);
-                for (Object item : items) {
-                    html.append("<p>").append(item.toString()).append("</p>");
-                }
-            } catch (JsonProcessingException e) {
-                logger.error("Failed to parse receipt items", e);
-            }
-            html.append("</div>");
-        }
-        
-        // Totals
-        html.append("<div class='receipt-info'>");
-        if (receipt.getSubtotal() != null) {
-            html.append("<p><span class='label'>Subtotal:</span> <span class='value'>").append(receipt.getCurrency()).append(" ").append(receipt.getSubtotal()).append("</span></p>");
-        }
-        if (receipt.getTaxAmount() != null && receipt.getTaxAmount().compareTo(BigDecimal.ZERO) > 0) {
-            html.append("<p><span class='label'>Tax:</span> <span class='value'>").append(receipt.getCurrency()).append(" ").append(receipt.getTaxAmount()).append("</span></p>");
-        }
-        if (receipt.getServiceFee() != null && receipt.getServiceFee().compareTo(BigDecimal.ZERO) > 0) {
-            html.append("<p><span class='label'>Service Fee:</span> <span class='value'>").append(receipt.getCurrency()).append(" ").append(receipt.getServiceFee()).append("</span></p>");
-        }
-        html.append("<p class='total'>Total: ").append(receipt.getCurrency()).append(" ").append(receipt.getTotalAmount()).append("</p>");
-        html.append("</div>");
-        
-        if (receipt.getNotes() != null) {
-            html.append("<div class='receipt-info'>");
-            html.append("<p><span class='label'>Notes:</span></p>");
-            html.append("<p>").append(receipt.getNotes()).append("</p>");
-            html.append("</div>");
-        }
-        
-        html.append("</div>");
-        
-        html.append("<div class='footer'>");
-        html.append("<p>Thank you for your business!</p>");
-        html.append("<p>Powered by Scanny - Digital Receipts</p>");
-        html.append("</div>");
-        
-        html.append("</div>");
-        html.append("</body></html>");
-        
-        return html.toString();
     }
 
     private ReceiptResponse toResponse(Receipt receipt) {

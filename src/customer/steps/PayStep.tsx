@@ -28,8 +28,10 @@ export function PayStep({
   submitting,
   splitEnabled,
   splitShares,
+  feeConsent,
   onSplitEnabled,
   onSplitShares,
+  onFeeConsent,
   onProvider,
   onPhone,
   onSaveNumber,
@@ -47,8 +49,10 @@ export function PayStep({
   submitting: boolean
   splitEnabled: boolean
   splitShares: SplitShareDraft[]
+  feeConsent: boolean
   onSplitEnabled: (enabled: boolean) => void
   onSplitShares: (shares: SplitShareDraft[]) => void
+  onFeeConsent: (value: boolean) => void
   onProvider: (provider: PaymentProvider) => void
   onPhone: (value: string) => void
   onSaveNumber: (value: boolean) => void
@@ -129,6 +133,15 @@ export function PayStep({
           </strong>
         </div>
       </div>
+      <label className="cm-check">
+        <input
+          type="checkbox"
+          checked={feeConsent}
+          onChange={(e) => onFeeConsent(e.target.checked)}
+          disabled={submitting}
+        />
+        <span>I confirm the total includes the service fee shown above.</span>
+      </label>
 
       <section className="split-pay-panel">
         <label className="cm-check">

@@ -1,0 +1,55 @@
+-- Samantha Restaurant: add 40 global main-course items (idempotent)
+INSERT INTO catalog_items (id, business_id, name, category, price, description, available)
+SELECT
+    v.id,
+    'samantha-restaurant',
+    v.name,
+    'Main',
+    v.price,
+    v.description,
+    TRUE
+FROM (
+    VALUES
+        ('samantha-main-001', 'Jollof Rice & Chicken', 24000, 'West African jollof rice with grilled chicken.'),
+        ('samantha-main-002', 'Chicken Biryani', 26000, 'Fragrant basmati rice with spiced chicken.'),
+        ('samantha-main-003', 'Beef Biryani', 27000, 'Layered biryani rice with tender beef.'),
+        ('samantha-main-004', 'Butter Chicken & Naan', 28000, 'Creamy tomato chicken curry served with naan.'),
+        ('samantha-main-005', 'Lamb Rogan Josh', 32000, 'Slow-cooked Kashmiri lamb curry with rice.'),
+        ('samantha-main-006', 'Paneer Tikka Masala', 25000, 'Grilled paneer in rich masala sauce with rice.'),
+        ('samantha-main-007', 'Thai Green Curry Chicken', 29000, 'Coconut green curry with chicken and jasmine rice.'),
+        ('samantha-main-008', 'Pad Thai Prawns', 30000, 'Rice noodles, prawns, peanuts, and tamarind sauce.'),
+        ('samantha-main-009', 'Nasi Goreng Special', 25000, 'Indonesian fried rice with chicken and egg.'),
+        ('samantha-main-010', 'Korean Beef Bulgogi Bowl', 31000, 'Marinated beef with steamed rice and sesame.'),
+        ('samantha-main-011', 'Japanese Chicken Katsu Curry', 28000, 'Crispy chicken cutlet with curry sauce and rice.'),
+        ('samantha-main-012', 'Ramen Chicken Shoyu', 27000, 'Soy broth ramen with chicken and soft egg.'),
+        ('samantha-main-013', 'Chinese Sweet & Sour Chicken', 26000, 'Crispy chicken in sweet-sour glaze with rice.'),
+        ('samantha-main-014', 'Kung Pao Beef', 29000, 'Spicy stir-fried beef, peanuts, and peppers with rice.'),
+        ('samantha-main-015', 'Vietnamese Pho Bo', 24000, 'Rice noodle soup with aromatic beef broth.'),
+        ('samantha-main-016', 'Filipino Chicken Adobo', 25000, 'Soy-vinegar braised chicken with garlic rice.'),
+        ('samantha-main-017', 'Mexican Chicken Fajita Plate', 28000, 'Sizzling chicken fajitas with tortillas and salsa.'),
+        ('samantha-main-018', 'Beef Burrito Bowl', 27000, 'Seasoned beef, rice, beans, corn, and pico de gallo.'),
+        ('samantha-main-019', 'Tacos al Pastor (3pc)', 26000, 'Pork tacos with pineapple salsa and onions.'),
+        ('samantha-main-020', 'Peruvian Lomo Saltado', 32000, 'Stir-fried beef, onions, tomatoes, fries, and rice.'),
+        ('samantha-main-021', 'Brazilian Feijoada', 30000, 'Black bean and beef stew with rice and greens.'),
+        ('samantha-main-022', 'Argentinian Grilled Steak Plate', 38000, 'Char-grilled steak with chimichurri and potatoes.'),
+        ('samantha-main-023', 'Italian Spaghetti Bolognese', 23000, 'Pasta with slow-cooked beef tomato sauce.'),
+        ('samantha-main-024', 'Fettuccine Alfredo Chicken', 26000, 'Creamy Alfredo pasta topped with grilled chicken.'),
+        ('samantha-main-025', 'Lasagna al Forno', 28000, 'Oven-baked layered pasta with beef and cheese.'),
+        ('samantha-main-026', 'Spanish Seafood Paella', 36000, 'Saffron rice with prawns, fish, and mussels.'),
+        ('samantha-main-027', 'Greek Chicken Souvlaki Plate', 29000, 'Skewered chicken with pita, rice, and tzatziki.'),
+        ('samantha-main-028', 'Turkish Doner Plate', 27000, 'Sliced doner meat with rice, salad, and flatbread.'),
+        ('samantha-main-029', 'Lebanese Chicken Shawarma Plate', 26000, 'Marinated chicken with garlic sauce, rice, and pickles.'),
+        ('samantha-main-030', 'Moroccan Lamb Tagine', 34000, 'Aromatic lamb stew with apricot and couscous.'),
+        ('samantha-main-031', 'Ethiopian Doro Wat', 28000, 'Spiced chicken stew served with injera.'),
+        ('samantha-main-032', 'Ugandan Luwombo Chicken', 25000, 'Steamed chicken luwombo with matooke.'),
+        ('samantha-main-033', 'Kenyan Nyama Choma Plate', 30000, 'Grilled beef with kachumbari and ugali.'),
+        ('samantha-main-034', 'Nigerian Egusi Soup & Pounded Yam', 29000, 'Rich melon-seed soup served with pounded yam.'),
+        ('samantha-main-035', 'South African Bobotie', 27000, 'Cape Malay spiced mince bake with yellow rice.'),
+        ('samantha-main-036', 'German Beef Goulash', 30000, 'Paprika beef stew with buttered spaetzle.'),
+        ('samantha-main-037', 'Polish Pierogi & Beef Sauce', 26000, 'Potato-cheese dumplings with savory beef sauce.'),
+        ('samantha-main-038', 'Russian Beef Stroganoff', 31000, 'Creamy mushroom beef over buttered noodles.'),
+        ('samantha-main-039', 'American BBQ Chicken Plate', 28000, 'Smoky BBQ chicken with fries and coleslaw.'),
+        ('samantha-main-040', 'Caribbean Jerk Chicken', 27000, 'Spicy jerk chicken with rice and peas.')
+) AS v(id, name, price, description)
+WHERE EXISTS (SELECT 1 FROM businesses WHERE id = 'samantha-restaurant')
+  AND NOT EXISTS (SELECT 1 FROM catalog_items c WHERE c.id = v.id);

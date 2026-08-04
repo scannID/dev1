@@ -250,8 +250,95 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
             }
         }
 
+        added += addSamanthaWorldMainsIfNeeded(business, existingNames, existingIds);
+
         if (added > 0) {
             businessRepository.save(business);
+        }
+        return added;
+    }
+
+    private int addSamanthaWorldMainsIfNeeded(
+            Business business,
+            Set<String> existingNames,
+            Set<String> existingIds
+    ) {
+        if (!business.isPrimary()) {
+            return 0;
+        }
+        boolean isSamanthaMain = "samantha-restaurant".equals(business.getId())
+                || ("main".equalsIgnoreCase(business.getBranchLabel())
+                && normalize(business.getName()).contains("samantha"));
+        if (!isSamanthaMain) {
+            return 0;
+        }
+
+        record MainFoodSpec(String id, String name, int price, String description) {}
+        List<MainFoodSpec> mains = List.of(
+                new MainFoodSpec("samantha-main-001", "Jollof Rice & Chicken", 24000, "West African jollof rice with grilled chicken."),
+                new MainFoodSpec("samantha-main-002", "Chicken Biryani", 26000, "Fragrant basmati rice with spiced chicken."),
+                new MainFoodSpec("samantha-main-003", "Beef Biryani", 27000, "Layered biryani rice with tender beef."),
+                new MainFoodSpec("samantha-main-004", "Butter Chicken & Naan", 28000, "Creamy tomato chicken curry served with naan."),
+                new MainFoodSpec("samantha-main-005", "Lamb Rogan Josh", 32000, "Slow-cooked Kashmiri lamb curry with rice."),
+                new MainFoodSpec("samantha-main-006", "Paneer Tikka Masala", 25000, "Grilled paneer in rich masala sauce with rice."),
+                new MainFoodSpec("samantha-main-007", "Thai Green Curry Chicken", 29000, "Coconut green curry with chicken and jasmine rice."),
+                new MainFoodSpec("samantha-main-008", "Pad Thai Prawns", 30000, "Rice noodles, prawns, peanuts, and tamarind sauce."),
+                new MainFoodSpec("samantha-main-009", "Nasi Goreng Special", 25000, "Indonesian fried rice with chicken and egg."),
+                new MainFoodSpec("samantha-main-010", "Korean Beef Bulgogi Bowl", 31000, "Marinated beef with steamed rice and sesame."),
+                new MainFoodSpec("samantha-main-011", "Japanese Chicken Katsu Curry", 28000, "Crispy chicken cutlet with curry sauce and rice."),
+                new MainFoodSpec("samantha-main-012", "Ramen Chicken Shoyu", 27000, "Soy broth ramen with chicken and soft egg."),
+                new MainFoodSpec("samantha-main-013", "Chinese Sweet & Sour Chicken", 26000, "Crispy chicken in sweet-sour glaze with rice."),
+                new MainFoodSpec("samantha-main-014", "Kung Pao Beef", 29000, "Spicy stir-fried beef, peanuts, and peppers with rice."),
+                new MainFoodSpec("samantha-main-015", "Vietnamese Pho Bo", 24000, "Rice noodle soup with aromatic beef broth."),
+                new MainFoodSpec("samantha-main-016", "Filipino Chicken Adobo", 25000, "Soy-vinegar braised chicken with garlic rice."),
+                new MainFoodSpec("samantha-main-017", "Mexican Chicken Fajita Plate", 28000, "Sizzling chicken fajitas with tortillas and salsa."),
+                new MainFoodSpec("samantha-main-018", "Beef Burrito Bowl", 27000, "Seasoned beef, rice, beans, corn, and pico de gallo."),
+                new MainFoodSpec("samantha-main-019", "Tacos al Pastor (3pc)", 26000, "Pork tacos with pineapple salsa and onions."),
+                new MainFoodSpec("samantha-main-020", "Peruvian Lomo Saltado", 32000, "Stir-fried beef, onions, tomatoes, fries, and rice."),
+                new MainFoodSpec("samantha-main-021", "Brazilian Feijoada", 30000, "Black bean and beef stew with rice and greens."),
+                new MainFoodSpec("samantha-main-022", "Argentinian Grilled Steak Plate", 38000, "Char-grilled steak with chimichurri and potatoes."),
+                new MainFoodSpec("samantha-main-023", "Italian Spaghetti Bolognese", 23000, "Pasta with slow-cooked beef tomato sauce."),
+                new MainFoodSpec("samantha-main-024", "Fettuccine Alfredo Chicken", 26000, "Creamy Alfredo pasta topped with grilled chicken."),
+                new MainFoodSpec("samantha-main-025", "Lasagna al Forno", 28000, "Oven-baked layered pasta with beef and cheese."),
+                new MainFoodSpec("samantha-main-026", "Spanish Seafood Paella", 36000, "Saffron rice with prawns, fish, and mussels."),
+                new MainFoodSpec("samantha-main-027", "Greek Chicken Souvlaki Plate", 29000, "Skewered chicken with pita, rice, and tzatziki."),
+                new MainFoodSpec("samantha-main-028", "Turkish Doner Plate", 27000, "Sliced doner meat with rice, salad, and flatbread."),
+                new MainFoodSpec("samantha-main-029", "Lebanese Chicken Shawarma Plate", 26000, "Marinated chicken with garlic sauce, rice, and pickles."),
+                new MainFoodSpec("samantha-main-030", "Moroccan Lamb Tagine", 34000, "Aromatic lamb stew with apricot and couscous."),
+                new MainFoodSpec("samantha-main-031", "Ethiopian Doro Wat", 28000, "Spiced chicken stew served with injera."),
+                new MainFoodSpec("samantha-main-032", "Ugandan Luwombo Chicken", 25000, "Steamed chicken luwombo with matooke."),
+                new MainFoodSpec("samantha-main-033", "Kenyan Nyama Choma Plate", 30000, "Grilled beef with kachumbari and ugali."),
+                new MainFoodSpec("samantha-main-034", "Nigerian Egusi Soup & Pounded Yam", 29000, "Rich melon-seed soup served with pounded yam."),
+                new MainFoodSpec("samantha-main-035", "South African Bobotie", 27000, "Cape Malay spiced mince bake with yellow rice."),
+                new MainFoodSpec("samantha-main-036", "German Beef Goulash", 30000, "Paprika beef stew with buttered spaetzle."),
+                new MainFoodSpec("samantha-main-037", "Polish Pierogi & Beef Sauce", 26000, "Potato-cheese dumplings with savory beef sauce."),
+                new MainFoodSpec("samantha-main-038", "Russian Beef Stroganoff", 31000, "Creamy mushroom beef over buttered noodles."),
+                new MainFoodSpec("samantha-main-039", "American BBQ Chicken Plate", 28000, "Smoky BBQ chicken with fries and coleslaw."),
+                new MainFoodSpec("samantha-main-040", "Caribbean Jerk Chicken", 27000, "Spicy jerk chicken with rice and peas.")
+        );
+
+        int added = 0;
+        for (MainFoodSpec spec : mains) {
+            if (existingIds.contains(spec.id()) || existingNames.contains(normalize(spec.name()))) {
+                continue;
+            }
+            CatalogItem item = new CatalogItem();
+            item.setId(spec.id());
+            item.setBusiness(business);
+            item.setName(spec.name());
+            item.setCategory("Main");
+            item.setPrice(spec.price());
+            item.setDescription(spec.description());
+            item.setAvailable(true);
+            item.setItemKind(ItemKind.FOOD);
+            catalogItemRepository.save(item);
+            business.addCustomCategory("Main");
+            existingIds.add(spec.id());
+            existingNames.add(normalize(spec.name()));
+            added++;
+        }
+        if (added > 0) {
+            log.info("Seeded {} Samantha Main world-food items for {}", added, business.getId());
         }
         return added;
     }

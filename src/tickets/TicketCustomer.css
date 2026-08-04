@@ -353,6 +353,58 @@ html.tk-app body {
   color: var(--tk-muted);
 }
 
+.tk-total-strip {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--tk-border);
+  background: #fff;
+}
+
+.tk-total-strip p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--tk-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tk-total-strip p strong {
+  color: var(--tk-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tk-total-strip p.is-total {
+  padding-top: 8px;
+  border-top: 1px dashed var(--tk-border);
+  color: var(--tk-text);
+}
+
+.tk-total-strip p.is-total strong {
+  font-size: 16px;
+}
+
+.tk-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 2px 0 4px;
+  color: var(--tk-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tk-check input {
+  margin-top: 2px;
+}
+
 .tk-providers {
   display: grid;
   grid-template-columns: 1fr 1fr;

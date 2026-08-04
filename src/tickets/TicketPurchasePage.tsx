@@ -42,6 +42,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
   const [holderPhone, setHolderPhone] = useState('')
+  const [feeConsent, setFeeConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -85,6 +86,10 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!event) return
+    if (!feeConsent) {
+      setError('Confirm the total and service fee before continuing')
+      return
+    }
     try {
       setSubmitting(true)
       setError(null)
@@ -280,6 +285,31 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </label>
           </div>
 
+          <div className="tk-total-strip" aria-label="Price breakdown">
+            <p>
+              <span>Ticket subtotal</span>
+              <strong>{money(selectedPrice, event.currency)}</strong>
+            </p>
+            <p>
+              <span>Service fee</span>
+              <strong>{money(SERVICE_FEE, event.currency)}</strong>
+            </p>
+            <p className="is-total">
+              <span>Total to pay</span>
+              <strong>{money(totalPrice, event.currency)}</strong>
+            </p>
+          </div>
+
+          <label className="tk-check">
+            <input
+              type="checkbox"
+              checked={feeConsent}
+              onChange={(e) => setFeeConsent(e.target.checked)}
+              disabled={submitting}
+            />
+            <span>I confirm the total includes the service fee shown above.</span>
+          </label>
+
           {error ? (
             <div className="tk-error" role="alert">
               {error}
@@ -288,12 +318,18 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
 
           <p className="tk-hint">Service fee: {money(SERVICE_FEE, event.currency)} per transaction.</p>
 
-          <button type="submit" className="tk-cta" disabled={submitting || !ticketClass || selectedSoldOut}>
+          <button
+            type="submit"
+            className="tk-cta"
+            disabled={submitting || !ticketClass || selectedSoldOut || !feeConsent}
+          >
             {submitting
               ? 'Creating…'
               : selectedSoldOut
                 ? 'Sold out'
-                : `Create Ticket ${money(totalPrice, event.currency)}`}
+                : !feeConsent
+                  ? 'Confirm total to continue'
+                  : `Create Ticket ${money(totalPrice, event.currency)}`}
           </button>
         </form>
       </main>

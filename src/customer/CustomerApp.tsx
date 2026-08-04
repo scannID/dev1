@@ -159,6 +159,7 @@ export default function CustomerApp({
   const [phone, setPhone] = useState(draft?.phone ?? '')
   const [saveNumber, setSaveNumber] = useState(draft?.saveNumber ?? true)
   const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [feeConsent, setFeeConsent] = useState(false)
 
   const [deviceKnown, setDeviceKnown] = useState(false)
   const [savedDevice, setSavedDevice] = useState<RegisteredDevice | null>(null)
@@ -224,6 +225,10 @@ export default function CustomerApp({
   }, 0)
   const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
   const cartCount = Object.values(cart).reduce((sum, qty) => sum + qty, 0)
+
+  useEffect(() => {
+    setFeeConsent(false)
+  }, [payableTotal])
 
   const persistPaidReceipt = useCallback(
     (orderId: string, total: number, items: CartLine[]) => {
@@ -930,6 +935,10 @@ export default function CustomerApp({
       setError('Choose MTN or Airtel to continue')
       return
     }
+    if (!feeConsent) {
+      setError('Confirm the total and service fee before paying')
+      return
+    }
 
     setPhoneError(null)
     setSubmitting(true)
@@ -1179,6 +1188,7 @@ export default function CustomerApp({
     setSplitEnabled(false)
     setSplitShares([])
     setSplitSummary(null)
+    setFeeConsent(false)
     setError(null)
     setStep('menu')
   }
@@ -1206,6 +1216,7 @@ export default function CustomerApp({
     setSplitEnabled(false)
     setSplitShares([])
     setSplitSummary(null)
+    setFeeConsent(false)
     setError(null)
     setSelectedCategory('all')
     setStep('menu')
@@ -1433,8 +1444,10 @@ export default function CustomerApp({
           submitting={submitting}
           splitEnabled={splitEnabled}
           splitShares={splitShares}
+          feeConsent={feeConsent}
           onSplitEnabled={setSplitEnabled}
           onSplitShares={setSplitShares}
+          onFeeConsent={setFeeConsent}
           onProvider={setProvider}
           onPhone={(v) => {
             setPhone(formatUgPhoneHint(v))
@@ -1511,6 +1524,8 @@ export default function CustomerApp({
                   : splitAllocated < payableTotal
                     ? `Allocate ${currency(payableTotal - splitAllocated)} more`
                     : 'Fix split amounts'
+                : !feeConsent
+                  ? 'Confirm total first'
                 : splitEnabled
                   ? `Prompt ${splitShares.length} payers · ${currency(payTotal)}`
                   : `Pay ${currency(payTotal)}`
@@ -1520,6 +1535,7 @@ export default function CustomerApp({
           disabled={
             submitting
             || !splitReady
+            || !feeConsent
             || (!placedOrderId && (cartCount === 0 || ordersPaused))
           }
         />
