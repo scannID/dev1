@@ -7,6 +7,8 @@ import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TicketStatus;
 import com.scanny.model.enums.TransactionStatus;
 import com.scanny.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,13 +20,17 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class AdminAnalyticsService {
+    private static final Logger logger = LoggerFactory.getLogger(AdminAnalyticsService.class);
 
     private final TicketRepository ticketRepository;
     private final TicketScanRepository ticketScanRepository;
@@ -34,6 +40,7 @@ public class AdminAnalyticsService {
     private final DeviceTransactionRepository deviceTransactionRepository;
     private final OrderRepository orderRepository;
     private final QrScanEventRepository qrScanEventRepository;
+    private final BusinessRepository businessRepository;
 
     public AdminAnalyticsService(
         TicketRepository ticketRepository,
@@ -43,7 +50,8 @@ public class AdminAnalyticsService {
         RegisteredDeviceRepository registeredDeviceRepository,
         DeviceTransactionRepository deviceTransactionRepository,
         OrderRepository orderRepository,
-        QrScanEventRepository qrScanEventRepository
+        QrScanEventRepository qrScanEventRepository,
+        BusinessRepository businessRepository
     ) {
         this.ticketRepository = ticketRepository;
         this.ticketScanRepository = ticketScanRepository;
@@ -53,6 +61,7 @@ public class AdminAnalyticsService {
         this.deviceTransactionRepository = deviceTransactionRepository;
         this.orderRepository = orderRepository;
         this.qrScanEventRepository = qrScanEventRepository;
+        this.businessRepository = businessRepository;
     }
 
     @Transactional(readOnly = true)
@@ -431,6 +440,217 @@ public class AdminAnalyticsService {
             case "yearly" -> buildYearlySeries(scanAts, orderAts, now);
             default -> buildDailySeries(scanAts, orderAts, now);
         };
+    }
+
+    @Transactional(readOnly = true)
+    public AdminAnalyticsDtos.TrafficAnalytics getTrafficAnalytics(String range) {
+        String normalized = normalizeTrafficRange(range);
+        try {
+            Instant now = Instant.now();
+            Instant start = switch (normalized) {
+                case "daily" -> now.minus(1, ChronoUnit.DAYS);
+                case "weekly" -> now.minus(7, ChronoUnit.DAYS);
+                case "monthly" -> now.minus(30, ChronoUnit.DAYS);
+                case "yearly" -> now.minus(365, ChronoUnit.DAYS);
+                default -> now.minus(30, ChronoUnit.DAYS);
+            };
+
+            List<Order> orders = orderRepository.findByCreatedAtAfterOrderByCreatedAtDesc(start);
+            List<QrScanEvent> scans = qrScanEventRepository.findByScannedAtAfterOrderByScannedAtDesc(start);
+            Map<String, Business> businessesById = new HashMap<>();
+            for (Business business : businessRepository.findAll()) {
+                if (business == null || business.getId() == null || business.getId().isBlank()) {
+                    continue;
+                }
+                businessesById.putIfAbsent(business.getId(), business);
+            }
+
+            Map<String, Long> merchantRevenue = new HashMap<>();
+            Map<String, Integer> merchantOrders = new HashMap<>();
+            Map<String, Integer> merchantScans = new HashMap<>();
+            Map<String, String> merchantNames = new HashMap<>();
+            Set<String> activeMerchants = new HashSet<>();
+
+            List<List<Integer>> heat = new ArrayList<>(7);
+            for (int day = 0; day < 7; day++) {
+                List<Integer> hours = new ArrayList<>(24);
+                for (int hour = 0; hour < 24; hour++) {
+                    hours.add(0);
+                }
+                heat.add(hours);
+            }
+
+            int totalOrders = 0;
+            long totalRevenue = 0L;
+
+            for (Order order : orders) {
+                if (order == null) {
+                    continue;
+                }
+                Instant at = order.getCreatedAt();
+                if (!inRange(at, start, now)) {
+                    continue;
+                }
+
+                bumpHeat(heat, at);
+                if (order.getStatus() != OrderStatus.Cancelled) {
+                    totalOrders++;
+                    String merchantId = order.getMerchantId();
+                    if (merchantId != null && !merchantId.isBlank()) {
+                        merchantOrders.merge(merchantId, 1, Integer::sum);
+                        activeMerchants.add(merchantId);
+                        if (order.getBusinessName() != null && !order.getBusinessName().isBlank()) {
+                            merchantNames.putIfAbsent(merchantId, order.getBusinessName());
+                        }
+                    }
+                }
+
+                if (isPaidOrder(order)) {
+                    totalRevenue += order.getTotal();
+                    String merchantId = order.getMerchantId();
+                    if (merchantId != null && !merchantId.isBlank()) {
+                        merchantRevenue.merge(merchantId, (long) order.getTotal(), Long::sum);
+                        activeMerchants.add(merchantId);
+                        if (order.getBusinessName() != null && !order.getBusinessName().isBlank()) {
+                            merchantNames.putIfAbsent(merchantId, order.getBusinessName());
+                        }
+                    }
+                }
+            }
+
+            int totalScans = 0;
+            for (QrScanEvent scan : scans) {
+                if (scan == null) {
+                    continue;
+                }
+                Instant at = scan.getScannedAt();
+                if (!inRange(at, start, now)) {
+                    continue;
+                }
+                totalScans++;
+                bumpHeat(heat, at);
+
+                String businessId = scan.getBusinessId();
+                if (businessId == null || businessId.isBlank()) {
+                    continue;
+                }
+                Business business = businessesById.get(businessId);
+                if (business == null) {
+                    continue;
+                }
+                String merchantId = business.getMerchantId();
+                if (merchantId == null || merchantId.isBlank()) {
+                    continue;
+                }
+                merchantScans.merge(merchantId, 1, Integer::sum);
+                activeMerchants.add(merchantId);
+                if (business.getName() != null && !business.getName().isBlank()) {
+                    merchantNames.putIfAbsent(merchantId, business.getName());
+                }
+            }
+
+            int heatMax = 1;
+            for (List<Integer> row : heat) {
+                for (Integer value : row) {
+                    if (value > heatMax) {
+                        heatMax = value;
+                    }
+                }
+            }
+
+            Set<String> merchantIds = new HashSet<>();
+            merchantIds.addAll(merchantOrders.keySet());
+            merchantIds.addAll(merchantScans.keySet());
+            merchantIds.addAll(merchantRevenue.keySet());
+
+            List<AdminAnalyticsDtos.MerchantTrafficStat> merchantStats = merchantIds.stream()
+                .map(merchantId -> new AdminAnalyticsDtos.MerchantTrafficStat(
+                    merchantId,
+                    merchantNames.getOrDefault(merchantId, merchantId),
+                    merchantScans.getOrDefault(merchantId, 0),
+                    merchantOrders.getOrDefault(merchantId, 0),
+                    merchantRevenue.getOrDefault(merchantId, 0L)
+                ))
+                .toList();
+
+            List<AdminAnalyticsDtos.MerchantTrafficStat> topRevenue = merchantStats.stream()
+                .sorted(Comparator.comparingLong(AdminAnalyticsDtos.MerchantTrafficStat::revenue).reversed())
+                .limit(10)
+                .toList();
+            List<AdminAnalyticsDtos.MerchantTrafficStat> topScans = merchantStats.stream()
+                .sorted(Comparator.comparingInt(AdminAnalyticsDtos.MerchantTrafficStat::scans).reversed())
+                .limit(10)
+                .toList();
+            List<AdminAnalyticsDtos.MerchantTrafficStat> topOrders = merchantStats.stream()
+                .sorted(Comparator.comparingInt(AdminAnalyticsDtos.MerchantTrafficStat::orders).reversed())
+                .limit(10)
+                .toList();
+
+            List<String> dayLabels = List.of("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun");
+            List<Integer> hourLabels = new ArrayList<>(24);
+            for (int hour = 0; hour < 24; hour++) {
+                hourLabels.add(hour);
+            }
+
+            return new AdminAnalyticsDtos.TrafficAnalytics(
+                normalized,
+                new AdminAnalyticsDtos.TrafficSummary(totalScans, totalOrders, totalRevenue, activeMerchants.size()),
+                new AdminAnalyticsDtos.TrafficHeatmap(dayLabels, hourLabels, heat, heatMax),
+                topRevenue,
+                topScans,
+                topOrders
+            );
+        } catch (Exception ex) {
+            logger.warn("Traffic analytics fallback due to error", ex);
+            return emptyTrafficAnalytics(normalized);
+        }
+    }
+
+    private static String normalizeTrafficRange(String range) {
+        if (range == null) {
+            return "daily";
+        }
+        String normalized = range.toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "daily", "weekly", "monthly", "yearly" -> normalized;
+            default -> "daily";
+        };
+    }
+
+    private static void bumpHeat(List<List<Integer>> heat, Instant instant) {
+        var zoned = instant.atZone(ZoneOffset.UTC);
+        int dayIndex = zoned.getDayOfWeek().getValue() - 1; // Monday = 0
+        int hour = zoned.getHour();
+        int current = heat.get(dayIndex).get(hour);
+        heat.get(dayIndex).set(hour, current + 1);
+    }
+
+    private static AdminAnalyticsDtos.TrafficAnalytics emptyTrafficAnalytics(String range) {
+        List<List<Integer>> heat = new ArrayList<>(7);
+        for (int day = 0; day < 7; day++) {
+            List<Integer> row = new ArrayList<>(24);
+            for (int hour = 0; hour < 24; hour++) {
+                row.add(0);
+            }
+            heat.add(row);
+        }
+        List<Integer> hourLabels = new ArrayList<>(24);
+        for (int hour = 0; hour < 24; hour++) {
+            hourLabels.add(hour);
+        }
+        return new AdminAnalyticsDtos.TrafficAnalytics(
+            range,
+            new AdminAnalyticsDtos.TrafficSummary(0, 0, 0L, 0),
+            new AdminAnalyticsDtos.TrafficHeatmap(
+                List.of("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
+                hourLabels,
+                heat,
+                1
+            ),
+            List.of(),
+            List.of(),
+            List.of()
+        );
     }
 
     private AdminAnalyticsDtos.ScansOrdersSeries buildHourlySeries(

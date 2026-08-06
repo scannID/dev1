@@ -193,15 +193,19 @@ public class AdminPlatformService {
         List<AdminPlatformDtos.HourlyScanPoint> hourly = new ArrayList<>();
         for (int hour = 0; hour < 24; hour++) {
             final int h = hour;
-            int count = (int) menuScans.stream()
+            int scanCount = (int) menuScans.stream()
                 .filter(s -> s.getScannedAt().isAfter(startOfToday))
                 .filter(s -> s.getScannedAt().atZone(ZoneOffset.UTC).getHour() == h)
                 .count();
-            count += (int) scans.stream()
+            scanCount += (int) scans.stream()
                 .filter(s -> s.getScannedAt().isAfter(startOfToday))
                 .filter(s -> s.getScannedAt().atZone(ZoneOffset.UTC).getHour() == h)
                 .count();
-            hourly.add(new AdminPlatformDtos.HourlyScanPoint(hour, count));
+            int orderCount = (int) orders.stream()
+                .filter(o -> o.getCreatedAt().isAfter(startOfToday))
+                .filter(o -> o.getCreatedAt().atZone(ZoneOffset.UTC).getHour() == h)
+                .count();
+            hourly.add(new AdminPlatformDtos.HourlyScanPoint(hour, scanCount, orderCount));
         }
 
         Map<String, Long> ordersByBusiness = orders.stream()

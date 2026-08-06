@@ -4,6 +4,7 @@ import { adminApi } from '../api/services'
 import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
+import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 
 function currency(amount: number) {
@@ -48,16 +49,33 @@ export default function ReportsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [reports, revenueOverview] = await Promise.all([
+        const [reportsResult, revenueResult] = await Promise.allSettled([
           adminApi.reports.getOverview(),
           adminApi.revenue.getOverview(),
         ])
         if (cancelled) return
-        setOverview(reports)
-        setRevenue(revenueOverview)
-        setError(null)
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load reports')
+
+        let mainError: string | null = null
+
+        if (reportsResult.status === 'fulfilled') {
+          setOverview(reportsResult.value)
+        } else {
+          setOverview(null)
+          mainError = reportsResult.reason instanceof Error ? reportsResult.reason.message : 'Failed to load reports'
+        }
+
+        if (revenueResult.status === 'fulfilled') {
+          setRevenue(revenueResult.value)
+        } else {
+          setRevenue(null)
+          if (!mainError) {
+            mainError = revenueResult.reason instanceof Error
+              ? revenueResult.reason.message
+              : 'Failed to load revenue overview'
+          }
+        }
+
+        setError(mainError)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -131,7 +149,6 @@ export default function ReportsPage() {
   })
   const monthly = revenue?.monthly ?? []
   const monthlyPagination = usePagination(monthly, { initialPageSize: 20 })
-  const maxOrders = Math.max(...monthly.map((m) => m.transactions), 1)
   const growth = revenue?.currentMonth.growth
 
   return (
@@ -199,16 +216,14 @@ export default function ReportsPage() {
               <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No monthly data yet.</p>
             ) : (
               <>
-                <div className="admin-bar-chart" style={{ height: 120 }}>
-                  {monthly.map((w, i) => (
-                    <div key={w.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{w.transactions}</span>
-                      <div className={`bar ${i === monthly.length - 1 ? 'accent' : ''}`}
-                        style={{ width: '100%', height: `${(w.transactions / maxOrders) * 100}%`, borderRadius: '4px 4px 0 0' }} />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8 }}>
+                <Sparkline
+                  data={monthly.map((w) => w.transactions)}
+                  color="var(--primary)"
+                  className="admin-sparkline"
+                  height={110}
+                  strokeWidth={1.6}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
                   {monthly.map((w) => <span key={w.month} style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{w.month}</span>)}
                 </div>
               </>

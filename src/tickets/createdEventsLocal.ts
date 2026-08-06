@@ -9,6 +9,28 @@ export type LocalCreatedEvent = {
   location?: string
   host?: string
   hostContact?: string
+  /** Original create/edit form values for reliable local re-editing. */
+  formSnapshot?: {
+    date?: string
+    time?: string
+    location?: string
+    host?: string
+    hostContact?: string
+    paymentDetails?: string
+    template?: 'classic' | 'festival' | 'minimal' | 'gold'
+    ticketClasses?: Array<{
+      name?: string
+      fee?: string
+      capacity?: string
+    }>
+    tables?: Array<{
+      name?: string
+      seats?: string
+      price?: string
+      capacity?: string
+    }>
+    eventImageUrl?: string
+  }
   createdAt: string
 }
 

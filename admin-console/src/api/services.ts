@@ -23,6 +23,7 @@ import type {
   TicketEventStats,
   CreatedEventSummary,
   AdminTicket,
+  UpdateCreatedEventRequest,
   AllConfigsResponse,
   ConfigSection,
   ConfigSectionResponse,
@@ -31,6 +32,8 @@ import type {
   ConfigActionResult,
   ScansOrdersRange,
   ScansOrdersSeries,
+  TrafficAnalytics,
+  TrafficRange,
   CookieConsentAnalytics,
   NotificationsResponse,
   AdminBroadcast,
@@ -129,6 +132,10 @@ export const analyticsApi = {
     return api.get<ScansOrdersSeries>(`/admin/analytics/scans-orders?range=${range}`)
   },
 
+  getTrafficAnalytics: async (range: TrafficRange = 'daily'): Promise<TrafficAnalytics> => {
+    return api.get<TrafficAnalytics>(`/admin/analytics/traffic?range=${range}`)
+  },
+
   getCookieConsents: async (range: ScansOrdersRange = 'daily'): Promise<CookieConsentAnalytics> => {
     return api.get<CookieConsentAnalytics>(`/admin/analytics/cookie-consents?range=${range}`)
   },
@@ -205,6 +212,10 @@ export const ticketsApi = {
 
   getAnalytics: async (): Promise<TicketAnalytics> => {
     return api.get<TicketAnalytics>('/admin/analytics/tickets')
+  },
+
+  updateCreatedEvent: async (eventId: string, data: UpdateCreatedEventRequest): Promise<AdminTicket> => {
+    return api.patch<AdminTicket>(`/tickets/events/${encodeURIComponent(eventId)}`, data)
   },
 }
 

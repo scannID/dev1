@@ -361,6 +361,27 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   margin-top: auto;
 }
 
+.admin-sparkline-animated {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: adminSparkIn 420ms ease-out forwards;
+}
+
+.admin-sparkline-secondary {
+  animation-delay: 120ms;
+}
+
+@keyframes adminSparkIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .admin-monthly-chart {
   position: relative;
   height: 140px;

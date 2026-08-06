@@ -116,9 +116,27 @@ function fmtTime(t: string) {
 
 function parseJsonObject(raw?: string): Record<string, unknown> {
   if (!raw) return {}
+  const parse = (input: string): unknown => {
+    try {
+      return JSON.parse(input) as unknown
+    } catch {
+      return null
+    }
+  }
   try {
-    const parsed = JSON.parse(raw) as unknown
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+    const parsed = parse(raw)
+    if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+    // Some older records store metadata as a JSON string inside a JSON string.
+    if (typeof parsed === 'string') {
+      const nested = parse(parsed)
+      if (nested && typeof nested === 'object') return nested as Record<string, unknown>
+    }
+    // Last-resort tolerance for pseudo-JSON using single quotes.
+    const normalized = raw
+      .replace(/([{,]\s*)'([^']+)'\s*:/g, '$1"$2":')
+      .replace(/:\s*'([^']*)'/g, ': "$1"')
+    const lenient = parse(normalized)
+    return lenient && typeof lenient === 'object' ? (lenient as Record<string, unknown>) : {}
   } catch {
     return {}
   }
@@ -156,9 +174,11 @@ async function makeEventQrDataUrl(link: string, size = 320, darkColor = '#000000
 }
 
 function CreatedEventsQrSection({
-  onOpen,
+  onTrack,
+  onEdit,
 }: {
-  onOpen: (event: LocalCreatedEvent) => void
+  onTrack: (event: LocalCreatedEvent) => void
+  onEdit: (event: LocalCreatedEvent) => void
 }) {
   const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadCreatedEvents())
   const [managerQrMap, setManagerQrMap] = useState<Record<string, string>>({})
@@ -232,7 +252,7 @@ function CreatedEventsQrSection({
           Created events
         </h2>
         <p style={{ margin: '4px 0 0', fontSize: 12.5, color: CREATE.muted }}>
-          Tap a card to load and edit that event.
+          Tap the red QR to track tickets for that event. Use the edit icon to edit event details.
         </p>
       </div>
       <div
@@ -256,9 +276,9 @@ function CreatedEventsQrSection({
             >
               <button
                 type="button"
-                onClick={() => onOpen(event)}
+                onClick={() => onTrack(event)}
                 title={event.eventName}
-                aria-label={`Open ${event.eventName}`}
+                aria-label={`Track ${event.eventName}`}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -330,6 +350,31 @@ function CreatedEventsQrSection({
                 >
                   {event.eventId}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onTrack(event)}
+                  title="Track event"
+                  aria-label={`Track ${event.eventName || event.eventId}`}
+                  style={{
+                    flexShrink: 0,
+                    width: 26,
+                    height: 26,
+                    display: 'grid',
+                    placeItems: 'center',
+                    border: 'none',
+                    borderRadius: 7,
+                    background: 'transparent',
+                    color: CREATE.muted,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 3v18h18" />
+                    <path d="M7 14l4-4 3 3 5-6" />
+                  </svg>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1837,26 +1882,105 @@ function TicketForm({
     }
   }
 
-  async function loadEventForEdit(eventId: string) {
-    const normalized = normalizeTrackQuery(eventId)
+  async function loadEventForEdit(eventOrId: string | LocalCreatedEvent) {
+    const sourceEvent = typeof eventOrId === 'string' ? null : eventOrId
+    const sourceSnapshot = sourceEvent?.formSnapshot
+    const snapshotClasses: TicketClass[] = (sourceSnapshot?.ticketClasses || [])
+      .map((c) => ({
+        id: shortId(),
+        name: typeof c?.name === 'string' ? c.name : '',
+        fee: String(c?.fee ?? ''),
+        capacity: c?.capacity == null ? '' : String(c.capacity),
+      }))
+      .filter((c) => c.name.trim())
+    const snapshotTables: TableOption[] = (sourceSnapshot?.tables || [])
+      .map((t) => ({
+        id: shortId(),
+        name: typeof t?.name === 'string' ? t.name : '',
+        seats: String(t?.seats ?? ''),
+        price: String(t?.price ?? ''),
+        capacity: t?.capacity == null ? '' : String(t.capacity),
+      }))
+      .filter((t) => t.name.trim())
+    const normalized = normalizeTrackQuery(typeof eventOrId === 'string' ? eventOrId : eventOrId.eventId)
+    const sourceEventDate = toDateParts(sourceEvent?.eventDate || '')
     if (!normalized) {
       toast.message('Choose a valid event ID to edit')
       return
     }
     try {
       setLoadingEdit(true)
+      // Prefill immediately from local snapshot so users can see what they first submitted.
+      if (sourceSnapshot) {
+        const snapPayment = parsePayTo(sourceSnapshot.paymentDetails || '')
+        setForm({
+          eventName: sourceEvent.eventName || '',
+          date: sourceSnapshot.date || '',
+          time: sourceSnapshot.time || '19:00',
+          location: sourceSnapshot.location || sourceEvent.location || '',
+          host: sourceSnapshot.host || sourceEvent.host || '',
+          hostContact: sourceSnapshot.hostContact || sourceEvent.hostContact || '',
+          paymentMethod: snapPayment.paymentMethod,
+          mobileProvider: snapPayment.mobileProvider,
+          mobileNumber: snapPayment.mobileNumber,
+          bankName: snapPayment.bankName,
+          bankAccountNumber: snapPayment.bankAccountNumber,
+          template:
+            sourceSnapshot.template === 'festival' || sourceSnapshot.template === 'minimal' || sourceSnapshot.template === 'gold'
+              ? sourceSnapshot.template
+              : 'classic',
+          ticketClasses:
+            snapshotClasses.length > 0
+              ? snapshotClasses
+              : DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
+          tables: snapshotTables,
+          eventImageUrl: sourceSnapshot.eventImageUrl || '',
+        })
+        setOfferTab(snapshotTables.length > 0 ? 'tables' : 'classes')
+        setStep(1)
+        setTouched(false)
+        setErrors({})
+        setShowTools(false)
+        setEditingEventId(normalized)
+      }
       const master = await ticketsApi.get(normalized)
-      const meta = parseJsonObject(master.metadata)
-      const ticketClassesRaw = Array.isArray(meta.ticketClasses) ? meta.ticketClasses : []
-      const tablesRaw = Array.isArray(meta.tables) ? meta.tables : []
+      const metaRoot = parseJsonObject(master.metadata)
+      const nestedMeta =
+        metaRoot.metadata && typeof metaRoot.metadata === 'object'
+          ? (metaRoot.metadata as Record<string, unknown>)
+          : {}
+      const meta = { ...nestedMeta, ...metaRoot }
+      const readMetaArray = (...keys: string[]) => {
+        for (const key of keys) {
+          const value = meta[key]
+          if (Array.isArray(value)) return value
+        }
+        return []
+      }
+      const readMetaString = (...keys: string[]) => {
+        for (const key of keys) {
+          const value = meta[key]
+          if (typeof value === 'string' && value.trim()) return value.trim()
+        }
+        return ''
+      }
+      const ticketClassesRaw = readMetaArray('ticketClasses', 'classes', 'classOptions')
+      const tablesRaw = readMetaArray('tables', 'tableOptions')
       const ticketClasses: TicketClass[] = ticketClassesRaw
         .map((item) => {
           const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
           return {
             id: shortId(),
-            name: typeof obj.name === 'string' ? obj.name : '',
-            fee: String(obj.fee ?? ''),
-            capacity: obj.capacity == null ? '' : String(obj.capacity),
+            name:
+              typeof obj.name === 'string'
+                ? obj.name
+                : typeof obj.label === 'string'
+                  ? obj.label
+                  : typeof obj.ticketType === 'string'
+                    ? obj.ticketType
+                    : '',
+            fee: String(obj.fee ?? obj.price ?? obj.amount ?? ''),
+            capacity: obj.capacity == null ? (obj.limit == null ? '' : String(obj.limit)) : String(obj.capacity),
           }
         })
         .filter((c) => c.name.trim())
@@ -1865,19 +1989,59 @@ function TicketForm({
           const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
           return {
             id: shortId(),
-            name: typeof obj.name === 'string' ? obj.name : '',
-            seats: String(obj.seats ?? ''),
+            name:
+              typeof obj.name === 'string'
+                ? obj.name
+                : typeof obj.label === 'string'
+                  ? obj.label
+                  : '',
+            seats: String(obj.seats ?? obj.seatCount ?? ''),
             price: String(obj.price ?? ''),
-            capacity: obj.capacity == null ? '' : String(obj.capacity),
+            capacity: obj.capacity == null ? (obj.limit == null ? '' : String(obj.limit)) : String(obj.capacity),
           }
         })
         .filter((t) => t.name.trim())
-      const payTo = typeof meta.payTo === 'string' ? meta.payTo : ''
+      const normalizeName = (value: string) => value.trim().toLowerCase()
+      const snapshotClassByName = new Map(snapshotClasses.map((c) => [normalizeName(c.name), c]))
+      const mergedClasses: TicketClass[] = ticketClasses.map((c) => {
+        const snap = snapshotClassByName.get(normalizeName(c.name))
+        return {
+          ...c,
+          fee: c.fee !== '' ? c.fee : snap?.fee || '',
+          capacity: c.capacity !== '' ? c.capacity : snap?.capacity || '',
+        }
+      })
+      for (const snap of snapshotClasses) {
+        if (!mergedClasses.some((c) => normalizeName(c.name) === normalizeName(snap.name))) {
+          mergedClasses.push({ ...snap, id: shortId() })
+        }
+      }
+      const snapshotTableByName = new Map(snapshotTables.map((t) => [normalizeName(t.name), t]))
+      const mergedTables: TableOption[] = tables.map((t) => {
+        const snap = snapshotTableByName.get(normalizeName(t.name))
+        return {
+          ...t,
+          seats: t.seats !== '' ? t.seats : snap?.seats || '',
+          price: t.price !== '' ? t.price : snap?.price || '',
+          capacity: t.capacity !== '' ? t.capacity : snap?.capacity || '',
+        }
+      })
+      for (const snap of snapshotTables) {
+        if (!mergedTables.some((t) => normalizeName(t.name) === normalizeName(snap.name))) {
+          mergedTables.push({ ...snap, id: shortId() })
+        }
+      }
+      const payTo =
+        readMetaString('payTo', 'paymentDetails', 'paymentDestination')
+          ? readMetaString('payTo', 'paymentDetails', 'paymentDestination')
+          : sourceSnapshot?.paymentDetails || ''
       const payment = parsePayTo(payTo)
       const dt = toDateParts(master.eventDate)
       const nextClasses =
-        ticketClasses.length > 0
-          ? ticketClasses
+        mergedClasses.length > 0
+          ? mergedClasses
+          : snapshotClasses.length > 0
+            ? snapshotClasses
           : [
               {
                 id: shortId(),
@@ -1886,13 +2050,26 @@ function TicketForm({
                 capacity: '',
               },
             ]
+      const nextTables = mergedTables.length > 0 ? mergedTables : snapshotTables
       setForm({
         eventName: master.eventName || '',
-        date: dt.date,
-        time: dt.time,
-        location: typeof meta.location === 'string' ? meta.location : '',
-        host: typeof meta.host === 'string' ? meta.host : '',
-        hostContact: typeof meta.hostContact === 'string' ? meta.hostContact : '',
+        date: dt.date || readMetaString('date') || sourceSnapshot?.date || sourceEventDate.date || '',
+        time: dt.time || readMetaString('time') || sourceSnapshot?.time || sourceEventDate.time || '19:00',
+        location:
+          readMetaString('location', 'venue') ||
+          sourceSnapshot?.location ||
+          sourceEvent?.location ||
+          '',
+        host:
+          readMetaString('host', 'organizer') ||
+          sourceSnapshot?.host ||
+          sourceEvent?.host ||
+          '',
+        hostContact:
+          readMetaString('hostContact', 'contact', 'hostPhone') ||
+          sourceSnapshot?.hostContact ||
+          sourceEvent?.hostContact ||
+          '',
         paymentMethod: payment.paymentMethod,
         mobileProvider: payment.mobileProvider,
         mobileNumber: payment.mobileNumber,
@@ -1901,12 +2078,21 @@ function TicketForm({
         template:
           meta.template === 'festival' || meta.template === 'minimal' || meta.template === 'gold'
             ? meta.template
-            : 'classic',
+            : meta.ticketTemplate === 'festival' || meta.ticketTemplate === 'minimal' || meta.ticketTemplate === 'gold'
+              ? meta.ticketTemplate
+            : sourceSnapshot?.template === 'festival' ||
+                sourceSnapshot?.template === 'minimal' ||
+                sourceSnapshot?.template === 'gold'
+              ? sourceSnapshot.template
+              : 'classic',
         ticketClasses: nextClasses,
-        tables,
-        eventImageUrl: typeof meta.eventImageUrl === 'string' ? meta.eventImageUrl : '',
+        tables: nextTables,
+        eventImageUrl:
+          readMetaString('eventImageUrl', 'imageUrl') ||
+          sourceSnapshot?.eventImageUrl ||
+          '',
       })
-      setOfferTab(tables.length > 0 ? 'tables' : 'classes')
+      setOfferTab(nextTables.length > 0 ? 'tables' : 'classes')
       setStep(1)
       setTouched(false)
       setErrors({})
@@ -2237,8 +2423,11 @@ function TicketForm({
             </form>
 
             <CreatedEventsQrSection
-              onOpen={(event) => {
-                void loadEventForEdit(event.eventId)
+              onTrack={(event) => {
+                void onTrackLookup(event.eventId)
+              }}
+              onEdit={(event) => {
+                void loadEventForEdit(event)
               }}
             />
           </div>
@@ -3158,6 +3347,27 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         location: data.location,
         host: data.host,
         hostContact: data.hostContact,
+        formSnapshot: {
+          date: data.date,
+          time: data.time,
+          location: data.location,
+          host: data.host,
+          hostContact: data.hostContact,
+          paymentDetails: data.paymentDetails,
+          template: data.template,
+          ticketClasses: data.ticketClasses.map((c) => ({
+            name: c.name,
+            fee: c.fee,
+            capacity: c.capacity,
+          })),
+          tables: data.tables.map((t) => ({
+            name: t.name,
+            seats: t.seats,
+            price: t.price,
+            capacity: t.capacity,
+          })),
+          eventImageUrl: data.eventImageUrl,
+        },
         createdAt: new Date().toISOString(),
       })
       window.dispatchEvent(new Event('kode-created-events'))

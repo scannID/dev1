@@ -1,5 +1,6 @@
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
+import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 import { useQrActivity } from '../hooks/usePlatform'
 
@@ -9,7 +10,13 @@ export default function QRActivityPage() {
   const hourly = data?.hourly ?? []
   const topCodes = data?.topCodes ?? []
   const codesPagination = usePagination(topCodes, { initialPageSize: 20 })
-  const maxScans = Math.max(...hourly.map((h) => h.scans), 1)
+  const hasActivity = hourly.some((h) => h.scans > 0 || h.orders > 0)
+  const scanSeries = hourly.map((point) => point.scans)
+  const orderSeries = hourly.map((point) => point.orders)
+  const peakScans = hourly.reduce((best, point) => (point.scans > best.scans ? point : best), { hour: 0, scans: 0, orders: 0 })
+  const peakOrders = hourly.reduce((best, point) => (point.orders > best.orders ? point : best), { hour: 0, scans: 0, orders: 0 })
+
+  const hourLabel = (hour: number) => `${String(hour).padStart(2, '0')}:00`
 
   return (
     <>
@@ -35,26 +42,46 @@ export default function QRActivityPage() {
       </div>
 
       <div className="admin-card">
-        <div className="admin-card-header"><div><h3>QR Scans — Last 24 Hours</h3><p>Platform-wide scan volume</p></div></div>
+        <div className="admin-card-header"><div><h3>QR Scans + Orders — Last 24 Hours</h3><p>Track peaks to improve busy-hour performance</p></div></div>
         <div style={{ padding: '20px' }}>
-          {hourly.every((h) => h.scans === 0) ? (
-            <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No scans recorded today yet.</p>
-          ) : (
+          {hasActivity ? (
             <>
-              <div className="admin-bar-chart" style={{ height: 160 }}>
-                {hourly.map((point) => (
-                  <div
-                    key={point.hour}
-                    className={`bar ${point.hour >= 20 ? 'accent' : ''}`}
-                    style={{ height: `${(point.scans / maxScans) * 100}%` }}
-                    title={`${point.scans} scans at ${point.hour}:00`}
-                  />
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, fontSize: 12, color: 'var(--muted-foreground)', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span className="status-dot" style={{ background: 'var(--primary)' }} />
+                    Scans
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span className="status-dot" style={{ background: '#16a34a' }} />
+                    Orders
+                  </span>
+                </div>
+                <span>Peak scans: {hourLabel(peakScans.hour)} ({peakScans.scans})</span>
+                <span>Peak orders: {hourLabel(peakOrders.hour)} ({peakOrders.orders})</span>
+              </div>
+              <div className="admin-monthly-chart" style={{ height: 130 }}>
+                <Sparkline
+                  data={scanSeries}
+                  color="var(--primary)"
+                  className="admin-sparkline admin-sparkline-overlay admin-sparkline-animated"
+                  height={120}
+                  strokeWidth={1.8}
+                />
+                <Sparkline
+                  data={orderSeries}
+                  color="#16a34a"
+                  className="admin-sparkline admin-sparkline-overlay admin-sparkline-animated admin-sparkline-secondary"
+                  height={120}
+                  strokeWidth={1.6}
+                />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: 'var(--muted-foreground)' }}>
                 <span>12am</span><span>4am</span><span>8am</span><span>12pm</span><span>4pm</span><span>8pm</span><span>11pm</span>
               </div>
             </>
+          ) : (
+            <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No scans or orders recorded today yet.</p>
           )}
         </div>
       </div>

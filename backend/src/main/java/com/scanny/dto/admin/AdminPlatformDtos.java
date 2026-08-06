@@ -68,7 +68,8 @@ public class AdminPlatformDtos {
 
     public record HourlyScanPoint(
         int hour,
-        int scans
+        int scans,
+        int orders
     ) {}
 
     public record QrActivityResponse(

@@ -135,14 +135,6 @@ function saveLastEventId(eventId: string) {
   }
 }
 
-function loadLastEventId() {
-  try {
-    return normalizeEventRef(localStorage.getItem(LAST_EVENT_KEY) || '')
-  } catch {
-    return ''
-  }
-}
-
 function loadActiveSessionEventId() {
   try {
     return normalizeEventRef(localStorage.getItem(ACTIVE_SESSION_KEY) || '')
@@ -246,9 +238,9 @@ export default function GateScanPage({
 }: Props) {
   const initialEventRef = normalizeEventRef(initialEventId || '')
   const restoredSessionId = initialEventRef ? null : loadActiveSessionEventId()
-  const restoredDraftEventId = initialEventRef || restoredSessionId || loadLastEventId()
   const [sessionEventId, setSessionEventId] = useState<string | null>(restoredSessionId || null)
-  const [eventDraftId, setEventDraftId] = useState<string>(restoredDraftEventId)
+  const [eventIdInput, setEventIdInput] = useState<string>(initialEventRef || '')
+  const [eventLoginBusy, setEventLoginBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
 
@@ -256,7 +248,6 @@ export default function GateScanPage({
   const [, setCameraError] = useState<string | null>(null)
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [resumeMs, setResumeMs] = useState(RESUME_OK_MS)
-  const [ticketCode, setTicketCode] = useState('')
   const [lastNotice, setLastNotice] = useState<ScanNotice | null>(null)
   const [redeemedOpen, setRedeemedOpen] = useState(false)
   const [redeemedLoading, setRedeemedLoading] = useState(false)
@@ -266,8 +257,7 @@ export default function GateScanPage({
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const eventInputRef = useRef<HTMLInputElement | null>(null)
-  const ticketInputRef = useRef<HTMLInputElement | null>(null)
+  const scannerInputRef = useRef<HTMLInputElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanTimerRef = useRef<number | null>(null)
   const scanLoopIdRef = useRef(0)
@@ -281,8 +271,13 @@ export default function GateScanPage({
   const ignoreScansUntilRef = useRef(0)
   const pendingPayloadRef = useRef(extractTicketPayload(initialPayload || ''))
   const submitScanRef = useRef<(payload: string) => Promise<void>>(async () => {})
-  const startCameraRef = useRef<() => Promise<void>>(async () => {})
   const refreshMetricsRef = useRef<(eventId: string) => Promise<void>>(async () => {})
+
+  const focusScannerInput = useCallback(() => {
+    const input = scannerInputRef.current
+    if (!input) return
+    if (document.activeElement !== input) input.focus()
+  }, [])
 
   useEffect(() => {
     sessionEventIdRef.current = sessionEventId
@@ -290,6 +285,7 @@ export default function GateScanPage({
 
   useEffect(() => {
     if (!initialEventRef) return
+    setEventIdInput(initialEventRef)
     setError(null)
   }, [initialEventRef])
 
@@ -555,15 +551,8 @@ export default function GateScanPage({
     pausedRef.current = false
     busyRef.current = false
     ignoreScansUntilRef.current = Date.now() + 450
-    void (async () => {
-      // Stay on this event session — reopen the camera if the track died.
-      const ok = (await wakeVideo()) || (await acquireCamera())
-      if (!ok) return
-      setCameraActive(true)
-      setCameraError(null)
-      startScanLoop()
-    })()
-  }, [acquireCamera, startScanLoop, wakeVideo])
+    focusScannerInput()
+  }, [focusScannerInput])
 
   const dismissVerdict = useCallback(() => {
     if (resumeTimerRef.current != null) {
@@ -591,6 +580,33 @@ export default function GateScanPage({
     [pauseScanning, resumeScanning],
   )
 
+  const activateEventSession = useCallback(async (rawEventId: string) => {
+    const nextEventId = normalizeEventRef(rawEventId)
+    if (!nextEventId) {
+      setError('Scan an event QR first.')
+      return false
+    }
+    try {
+      const data = await publicTicketsApi.track(nextEventId)
+      setSessionEventId(nextEventId)
+      saveLastEventId(nextEventId)
+      saveActiveSessionEventId(nextEventId)
+      setMetrics(data)
+      setError(null)
+      ignoreScansUntilRef.current = Date.now() + 450
+      return true
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message || 'Event ID not found'
+          : err instanceof Error
+            ? err.message
+            : 'Event ID not found'
+      setError(message)
+      return false
+    }
+  }, [])
+
   const submitScan = useCallback(
     async (scannedPayload: string) => {
       const raw = extractTicketPayload(scannedPayload)
@@ -602,17 +618,13 @@ export default function GateScanPage({
       if (!eventId) {
         const candidate = normalizeEventRef(raw)
         if (/^ERI-[A-Z0-9-]+$/i.test(candidate)) {
-          setEventDraftId(candidate)
-          saveLastEventId(candidate)
-          setError(null)
+          await activateEventSession(candidate)
           busyRef.current = false
           return
         }
         const fromManagerLink = extractEventIdFromGateLink(raw)
         if (fromManagerLink) {
-          setEventDraftId(fromManagerLink)
-          saveLastEventId(fromManagerLink)
-          setError(null)
+          await activateEventSession(fromManagerLink)
           busyRef.current = false
           return
         }
@@ -626,9 +638,7 @@ export default function GateScanPage({
               busyRef.current = false
               return
             }
-            setEventDraftId(masterId)
-            saveLastEventId(masterId)
-            setError(null)
+            await activateEventSession(masterId)
           } catch (err) {
             const message =
               err instanceof ApiError
@@ -705,7 +715,7 @@ export default function GateScanPage({
         scheduleResumeScan('bad')
       }
     },
-    [gateLocation, gateName, pauseScanning, refreshMetrics, scheduleResumeScan],
+    [activateEventSession, gateLocation, gateName, pauseScanning, refreshMetrics, scheduleResumeScan],
   )
 
   const startCamera = useCallback(async () => {
@@ -718,63 +728,55 @@ export default function GateScanPage({
     if (ok) startScanLoop()
   }, [acquireCamera, startScanLoop])
 
-  const submitTicketCode = useCallback(async () => {
-    const value = ticketCode.trim()
-    if (!value) return
-    setTicketCode('')
-    setError(null)
-    await submitScan(value)
-  }, [ticketCode, submitScan])
-
-  const startValidationSession = useCallback(async () => {
-    const nextEventId = normalizeEventRef(eventDraftId)
-    if (!nextEventId) {
-      setError('Enter or scan an event ID first.')
+  const loginEventSession = useCallback(async () => {
+    const candidate = normalizeEventRef(eventIdInput)
+    if (!candidate) {
+      setError('Enter an Event ID first.')
       return
     }
+    setEventLoginBusy(true)
     try {
-      const data = await publicTicketsApi.track(nextEventId)
-      setSessionEventId(nextEventId)
-      saveLastEventId(nextEventId)
-      saveActiveSessionEventId(nextEventId)
-      setMetrics(data)
-      setError(null)
-      ignoreScansUntilRef.current = Date.now() + 450
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message || 'Event ID not found'
-          : err instanceof Error
-            ? err.message
-            : 'Event ID not found'
-      setError(message)
+      const ok = await activateEventSession(candidate)
+      if (ok) {
+        setEventIdInput(candidate)
+      }
+    } finally {
+      setEventLoginBusy(false)
     }
-  }, [eventDraftId])
+  }, [activateEventSession, eventIdInput])
 
   // Keep the latest callbacks reachable from the session effect / scan loop
   // without putting them in dependency lists that would restart the camera.
   useEffect(() => {
-    startCameraRef.current = startCamera
     submitScanRef.current = submitScan
     refreshMetricsRef.current = refreshMetrics
-  }, [startCamera, submitScan, refreshMetrics])
+  }, [submitScan, refreshMetrics])
 
-  // Start camera as soon as page mounts.
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      await startCameraRef.current()
-      if (cancelled) return
-      const queued = pendingPayloadRef.current
-      if (queued) {
-        pendingPayloadRef.current = ''
-        await submitScanRef.current(queued)
-      }
-    })()
-    return () => {
-      cancelled = true
+    void startCamera()
+  }, [startCamera])
+
+  // Scanner machine mode: keep focus on the HID scanner input.
+  useEffect(() => {
+    const onWindowFocus = () => focusScannerInput()
+    const onWindowClick = () => focusScannerInput()
+    const id = window.setInterval(() => {
+      focusScannerInput()
+    }, 1200)
+    window.addEventListener('focus', onWindowFocus)
+    window.addEventListener('click', onWindowClick)
+    focusScannerInput()
+    const queued = pendingPayloadRef.current
+    if (queued) {
+      pendingPayloadRef.current = ''
+      void submitScanRef.current(queued)
     }
-  }, [])
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', onWindowFocus)
+      window.removeEventListener('click', onWindowClick)
+    }
+  }, [focusScannerInput])
 
   // Refresh event metrics only while a session is locked.
   useEffect(() => {
@@ -792,26 +794,12 @@ export default function GateScanPage({
   }, [sessionEventId])
 
   useEffect(() => {
+    if (redeemedOpen) return
     const id = window.setTimeout(() => {
-      if (sessionEventId) {
-        ticketInputRef.current?.focus()
-      } else {
-        eventInputRef.current?.focus()
-      }
+      focusScannerInput()
     }, 120)
     return () => window.clearTimeout(id)
-  }, [verdict, sessionEventId])
-
-  useEffect(() => {
-    if (!sessionEventId) return
-    const value = ticketCode.trim().toUpperCase()
-    const scannerLikeCode = /^[A-Z0-9]{4}$/.test(value)
-    if (!scannerLikeCode) return
-    const id = window.setTimeout(() => {
-      void submitTicketCode()
-    }, 140)
-    return () => window.clearTimeout(id)
-  }, [ticketCode, submitTicketCode, sessionEventId])
+  }, [focusScannerInput, redeemedOpen, sessionEventId, verdict])
 
   useEffect(() => {
     if (!redeemedOpen) return
@@ -930,10 +918,20 @@ export default function GateScanPage({
             {!verdict ? (
               <div className="gate-prompt">
                 <span className="gate-dot" />
-                {sessionEventId ? 'Hold the attendee ticket QR in the frame' : ''}
+                {sessionEventId
+                  ? 'Scanner ready: scan attendee ticket barcode/QR now.'
+                  : 'Scanner ready: scan manager event QR to start validation.'}
               </div>
             ) : null}
           </>
+        ) : null}
+        {!cameraActive && !verdict ? (
+          <div className="gate-prompt">
+            <span className="gate-dot" />
+            {sessionEventId
+              ? 'Scanner ready: scan attendee ticket barcode/QR now.'
+              : 'Scanner ready: scan manager event QR to start validation.'}
+          </div>
         ) : null}
 
         {verdict ? (
@@ -976,62 +974,73 @@ export default function GateScanPage({
       </main>
 
       <section className={`gate-manual-entry${!sessionEventId ? ' gate-manual-entry-centered' : ''}`}>
-        {!sessionEventId ? (
+        {sessionEventId ? (
+          <>
+            <label className="gate-manual-label" htmlFor="gate-ticket-id">
+              Ticket ID
+            </label>
+            <input
+              id="gate-ticket-id"
+              ref={scannerInputRef}
+              className="gate-manual-input"
+              placeholder="Ticket ID"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={4}
+              onChange={(e) => {
+                const cleaned = e.currentTarget.value.replace(/[^a-z0-9]/gi, '').toUpperCase()
+                e.currentTarget.value = cleaned
+                if (cleaned.length === 4) {
+                  setError(null)
+                  void submitScan(cleaned)
+                  e.currentTarget.value = ''
+                }
+              }}
+              onBlur={() => {
+                window.setTimeout(() => focusScannerInput(), 30)
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return
+                e.preventDefault()
+                const value = e.currentTarget.value.trim().replace(/[^a-z0-9]/gi, '').toUpperCase()
+                e.currentTarget.value = ''
+                if (!value || value.length !== 4) return
+                setError(null)
+                void submitScan(value)
+              }}
+            />
+          </>
+        ) : (
           <>
             <label className="gate-manual-label" htmlFor="gate-event-id">
               Event ID
             </label>
+            <p className="gate-hint">Enter Event ID, then login to validate.</p>
             <div className="gate-manual-row">
               <input
                 id="gate-event-id"
-                ref={eventInputRef}
                 className="gate-manual-input"
-                value={eventDraftId}
-                onChange={(e) => setEventDraftId(normalizeEventRef(e.target.value))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    void startValidationSession()
-                  }
-                }}
-                placeholder="Scan event QR or type ERI-..."
+                value={eventIdInput}
+                onChange={(e) => setEventIdInput(e.target.value.toUpperCase())}
+                placeholder="ERI-XXXXXX"
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  void loginEventSession()
+                }}
               />
               <button
                 type="button"
                 className="gate-btn gate-btn-primary gate-manual-btn"
-                onClick={() => void startValidationSession()}
-                disabled={!eventDraftId.trim()}
+                onClick={() => void loginEventSession()}
+                disabled={eventLoginBusy}
               >
-                Start Validation
+                {eventLoginBusy ? 'Logging in…' : 'Login to validate'}
               </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <label className="gate-manual-label" htmlFor="gate-ticket-code">
-              Ticket code
-            </label>
-            <div className="gate-manual-row" style={{ gridTemplateColumns: '1fr' }}>
-              <input
-                id="gate-ticket-code"
-                ref={ticketInputRef}
-                className="gate-manual-input"
-                value={ticketCode}
-                onChange={(e) => setTicketCode(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    void submitTicketCode()
-                  }
-                }}
-                placeholder="4-char ticket code"
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-              />
             </div>
           </>
         )}

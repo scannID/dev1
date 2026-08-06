@@ -233,7 +233,7 @@ export interface QrActivityResponse {
     conversionRate: number
     activeQrCodes: number
   }
-  hourly: Array<{ hour: number; scans: number }>
+  hourly: Array<{ hour: number; scans: number; orders: number }>
   topCodes: Array<{
     merchant: string
     merchantId: string
@@ -327,6 +327,36 @@ export interface AdminTicket {
   qrCodeUrl: string
 }
 
+export interface EventClassInput {
+  name: string
+  fee: number
+  capacity?: number | null
+}
+
+export interface EventTableInput {
+  name: string
+  seats: number
+  price: number
+  capacity?: number | null
+}
+
+export interface UpdateCreatedEventRequest {
+  eventName: string
+  eventDate?: string | null
+  ticketType: string
+  price: number
+  currency?: string
+  template?: string
+  payTo?: string
+  location?: string
+  time?: string
+  host?: string
+  hostContact?: string
+  eventImageUrl?: string
+  ticketClasses: EventClassInput[]
+  tables: EventTableInput[]
+}
+
 export type ConfigSection =
   | 'platform'
   | 'auth'
@@ -380,6 +410,39 @@ export interface ScansOrdersSeries {
   orders: number[]
   yMax: number
   xLabels: string[]
+}
+
+export type TrafficRange = 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+export interface TrafficSummary {
+  totalScans: number
+  totalOrders: number
+  totalRevenue: number
+  activeMerchants: number
+}
+
+export interface TrafficHeatmap {
+  dayLabels: string[]
+  hourLabels: number[]
+  matrix: number[][]
+  maxValue: number
+}
+
+export interface MerchantTrafficStat {
+  merchantId: string
+  merchantName: string
+  scans: number
+  orders: number
+  revenue: number
+}
+
+export interface TrafficAnalytics {
+  range: TrafficRange | string
+  summary: TrafficSummary
+  heatmap: TrafficHeatmap
+  topRevenue: MerchantTrafficStat[]
+  topScans: MerchantTrafficStat[]
+  topOrders: MerchantTrafficStat[]
 }
 
 export interface CookieConsentSummary {

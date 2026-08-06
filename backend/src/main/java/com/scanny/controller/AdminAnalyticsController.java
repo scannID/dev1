@@ -45,6 +45,13 @@ public class AdminAnalyticsController {
         return adminAnalyticsService.getScansOrders(range);
     }
 
+    @GetMapping("/analytics/traffic")
+    public AdminAnalyticsDtos.TrafficAnalytics getTrafficAnalytics(
+        @RequestParam(defaultValue = "daily") String range
+    ) {
+        return adminAnalyticsService.getTrafficAnalytics(range);
+    }
+
     @GetMapping("/analytics/cookie-consents")
     public AdminAnalyticsDtos.CookieConsentAnalytics getCookieConsents(
         @RequestParam(defaultValue = "daily") String range

@@ -13,7 +13,8 @@ import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
 import { usePagination } from '../hooks/usePagination'
 import { loadEventTickets, useTicketing } from '../hooks/useTicketing'
-import type { AdminTicket, CreatedEventSummary } from '../api/types'
+import { adminApi } from '../api/services'
+import type { AdminTicket, CreatedEventSummary, UpdateCreatedEventRequest } from '../api/types'
 
 function currency(amount: number, currencyCode = 'UGX') {
   return new Intl.NumberFormat('en-UG', {
@@ -68,13 +69,97 @@ const STATUS_CLASS: Record<string, string> = {
   Refunded: 'bg-muted text-muted-foreground',
 }
 
+type EditableClass = { name: string; fee: string; capacity: string }
+type EditableTable = { name: string; seats: string; price: string; capacity: string }
+type EventEditForm = {
+  eventName: string
+  eventDate: string
+  host: string
+  hostContact: string
+  location: string
+  payTo: string
+  template: string
+  eventImageUrl: string
+  ticketType: string
+  basePrice: string
+  classes: EditableClass[]
+  tables: EditableTable[]
+}
+
+function toDateTimeLocal(iso?: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
+}
+
+function toIntString(value: unknown) {
+  if (value == null) return ''
+  const n = Number(value)
+  return Number.isFinite(n) ? String(Math.trunc(n)) : ''
+}
+
+function buildEditForm(
+  selected: CreatedEventSummary | null,
+  master: AdminTicket | undefined,
+  meta: Record<string, unknown>,
+): EventEditForm {
+  const rawClasses = Array.isArray(meta.ticketClasses) ? meta.ticketClasses : []
+  const rawTables = Array.isArray(meta.tables) ? meta.tables : []
+  const classes: EditableClass[] = rawClasses
+    .map((c) => {
+      const item = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
+      return {
+        name: typeof item.name === 'string' ? item.name : '',
+        fee: toIntString(item.fee),
+        capacity: toIntString(item.capacity),
+      }
+    })
+    .filter((c) => c.name.trim())
+  const tables: EditableTable[] = rawTables
+    .map((t) => {
+      const item = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>
+      return {
+        name: typeof item.name === 'string' ? item.name : '',
+        seats: toIntString(item.seats),
+        price: toIntString(item.price),
+        capacity: toIntString(item.capacity),
+      }
+    })
+    .filter((t) => t.name.trim())
+
+  return {
+    eventName: selected?.eventName ?? master?.eventName ?? '',
+    eventDate: toDateTimeLocal(selected?.eventDate ?? master?.eventDate ?? null),
+    host: typeof meta.host === 'string' ? meta.host : selected?.host ?? '',
+    hostContact: typeof meta.hostContact === 'string' ? meta.hostContact : '',
+    location: typeof meta.location === 'string' ? meta.location : selected?.location ?? '',
+    payTo: typeof meta.payTo === 'string' ? meta.payTo : '',
+    template: typeof meta.template === 'string' ? meta.template : 'classic',
+    eventImageUrl: typeof meta.eventImageUrl === 'string' ? meta.eventImageUrl : '',
+    ticketType: master?.ticketType ?? classes[0]?.name ?? 'EVENT',
+    basePrice: String(master?.price ?? Number(classes[0]?.fee || 0)),
+    classes: classes.length > 0 ? classes : [{ name: master?.ticketType ?? 'Ordinary', fee: String(master?.price ?? 0), capacity: '' }],
+    tables,
+  }
+}
+
 export default function TicketingPage() {
-  const { createdEvents, analytics, loading, error } = useTicketing()
+  const { createdEvents, analytics, loading, error, refresh } = useTicketing()
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<CreatedEventSummary | null>(null)
   const [detailTickets, setDetailTickets] = useState<AdminTicket[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<EventEditForm | null>(null)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -103,9 +188,18 @@ export default function TicketingPage() {
     setDetailLoading(true)
     setDetailError(null)
     setDetailTickets([])
+    setEditing(false)
+    setSaveMessage(null)
+    setEditForm(null)
     try {
       const tickets = await loadEventTickets(event.eventName)
       setDetailTickets(tickets)
+      const selectedMaster = tickets.find((t) => {
+        const meta = parseMeta(t.metadata)
+        return meta.reusable === true || t.usageLimit >= 1_000_000 || t.id === event.eventId
+      })
+      const selectedMeta = parseMeta(selectedMaster?.metadata || tickets[0]?.metadata)
+      setEditForm(buildEditForm(event, selectedMaster, selectedMeta))
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : 'Failed to load event tickets')
     } finally {
@@ -134,6 +228,96 @@ export default function TicketingPage() {
   const location = selected?.location || (typeof meta.location === 'string' ? meta.location : '')
   const payTo = typeof meta.payTo === 'string' ? meta.payTo : ''
   const eventDate = selected?.eventDate || master?.eventDate || attendees[0]?.eventDate
+
+  function updateEditField<K extends keyof EventEditForm>(key: K, value: EventEditForm[K]) {
+    setEditForm((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  async function saveEventEdits() {
+    if (!selected || !editForm) return
+    const classes = editForm.classes
+      .map((c) => ({
+        name: c.name.trim(),
+        fee: Number(c.fee || 0),
+        capacity: c.capacity.trim() ? Number(c.capacity) : null,
+      }))
+      .filter((c) => c.name.length > 0)
+    if (classes.length === 0) {
+      setSaveMessage('Add at least one ticket class before saving.')
+      return
+    }
+    if (classes.some((c) => Number.isNaN(c.fee) || c.fee < 0)) {
+      setSaveMessage('Each ticket class needs a valid non-negative fee.')
+      return
+    }
+    if (classes.some((c) => c.capacity != null && (!Number.isFinite(c.capacity) || c.capacity <= 0))) {
+      setSaveMessage('Class capacity must be greater than 0 when provided.')
+      return
+    }
+    const tables = editForm.tables
+      .map((t) => ({
+        name: t.name.trim(),
+        seats: Number(t.seats || 0),
+        price: Number(t.price || 0),
+        capacity: t.capacity.trim() ? Number(t.capacity) : null,
+      }))
+      .filter((t) => t.name.length > 0)
+    if (tables.some((t) => Number.isNaN(t.seats) || t.seats < 0 || Number.isNaN(t.price) || t.price < 0)) {
+      setSaveMessage('Each table needs valid non-negative seats and price values.')
+      return
+    }
+    if (tables.some((t) => t.capacity != null && (!Number.isFinite(t.capacity) || t.capacity <= 0))) {
+      setSaveMessage('Table capacity must be greater than 0 when provided.')
+      return
+    }
+
+    const payload: UpdateCreatedEventRequest = {
+      eventName: editForm.eventName.trim(),
+      eventDate: editForm.eventDate ? new Date(editForm.eventDate).toISOString() : null,
+      ticketType: editForm.ticketType.trim() || classes[0]?.name || 'EVENT',
+      price: Number(editForm.basePrice || classes[0]?.fee || 0),
+      currency: master?.currency || 'UGX',
+      template: editForm.template.trim() || 'classic',
+      payTo: editForm.payTo.trim(),
+      location: editForm.location.trim(),
+      time: editForm.eventDate ? editForm.eventDate.split('T')[1] || '' : '',
+      host: editForm.host.trim(),
+      hostContact: editForm.hostContact.trim(),
+      eventImageUrl: editForm.eventImageUrl.trim(),
+      ticketClasses: classes.map((c) => ({
+        name: c.name,
+        fee: Math.max(0, Math.trunc(c.fee)),
+        ...(c.capacity != null ? { capacity: Math.trunc(c.capacity) } : {}),
+      })),
+      tables: tables.map((t) => ({
+        name: t.name,
+        seats: Math.max(0, Math.trunc(t.seats)),
+        price: Math.max(0, Math.trunc(t.price)),
+        ...(t.capacity != null ? { capacity: Math.trunc(t.capacity) } : {}),
+      })),
+    }
+    if (!payload.eventName) {
+      setSaveMessage('Event name is required.')
+      return
+    }
+    if (Number.isNaN(payload.price) || payload.price < 0) {
+      setSaveMessage('Base event price must be a valid non-negative number.')
+      return
+    }
+
+    try {
+      setSavingEdit(true)
+      setSaveMessage(null)
+      await adminApi.tickets.updateCreatedEvent(selected.eventId, payload)
+      await Promise.all([openEvent(selected), refresh()])
+      setEditing(false)
+      setSaveMessage('Event updated successfully.')
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : 'Failed to save event changes.')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   return (
     <>
@@ -260,6 +444,9 @@ export default function TicketingPage() {
             setSelected(null)
             setDetailTickets([])
             setDetailError(null)
+            setEditing(false)
+            setEditForm(null)
+            setSaveMessage(null)
           }
         }}
       >
@@ -269,6 +456,45 @@ export default function TicketingPage() {
             <SheetDescription>
               Created event #{selected?.eventId} · tickets auto-delete 24h after event date.
             </SheetDescription>
+            {!detailLoading && !detailError && selected ? (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                {editing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(false)
+                        setSaveMessage(null)
+                        setEditForm(buildEditForm(selected, master, meta))
+                      }}
+                      style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
+                      disabled={savingEdit}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveEventEdits()}
+                      style={{ border: '1px solid #111827', background: '#111827', color: '#fff', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
+                      disabled={savingEdit}
+                    >
+                      {savingEdit ? 'Saving…' : 'Save changes'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditing(true)
+                      setSaveMessage(null)
+                    }}
+                    style={{ border: '1px solid #111827', background: '#111827', color: '#fff', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}
+                  >
+                    Edit event
+                  </button>
+                )}
+              </div>
+            ) : null}
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
@@ -277,6 +503,108 @@ export default function TicketingPage() {
             ) : detailError ? (
               <p style={{ color: 'var(--destructive)', fontSize: 13 }}>{detailError}</p>
             ) : (
+              editing && editForm ? (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {saveMessage ? (
+                    <p style={{ margin: 0, fontSize: 12, color: saveMessage.includes('success') ? 'var(--foreground)' : 'var(--destructive)' }}>
+                      {saveMessage}
+                    </p>
+                  ) : null}
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Event name
+                    <Input value={editForm.eventName} onChange={(e) => updateEditField('eventName', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Event date/time
+                    <Input type="datetime-local" value={editForm.eventDate} onChange={(e) => updateEditField('eventDate', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Host
+                    <Input value={editForm.host} onChange={(e) => updateEditField('host', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Host contact
+                    <Input value={editForm.hostContact} onChange={(e) => updateEditField('hostContact', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Location
+                    <Input value={editForm.location} onChange={(e) => updateEditField('location', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Pay to
+                    <Input value={editForm.payTo} onChange={(e) => updateEditField('payTo', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Ticket type
+                    <Input value={editForm.ticketType} onChange={(e) => updateEditField('ticketType', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Base event price (UGX)
+                    <Input value={editForm.basePrice} onChange={(e) => updateEditField('basePrice', e.target.value)} />
+                  </label>
+                  <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                    Event image URL
+                    <Input value={editForm.eventImageUrl} onChange={(e) => updateEditField('eventImageUrl', e.target.value)} />
+                  </label>
+
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 12 }}>Ticket classes</strong>
+                    {editForm.classes.map((cls, i) => (
+                      <div key={`cls-${i}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
+                        <Input value={cls.name} onChange={(e) => {
+                          const next = [...editForm.classes]
+                          next[i] = { ...next[i], name: e.target.value }
+                          updateEditField('classes', next)
+                        }} placeholder="Class name" />
+                        <Input value={cls.fee} onChange={(e) => {
+                          const next = [...editForm.classes]
+                          next[i] = { ...next[i], fee: e.target.value }
+                          updateEditField('classes', next)
+                        }} placeholder="Fee" />
+                        <Input value={cls.capacity} onChange={(e) => {
+                          const next = [...editForm.classes]
+                          next[i] = { ...next[i], capacity: e.target.value }
+                          updateEditField('classes', next)
+                        }} placeholder="Capacity (optional)" />
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => updateEditField('classes', [...editForm.classes, { name: '', fee: '', capacity: '' }])} style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
+                      + Add class
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <strong style={{ fontSize: 12 }}>Tables</strong>
+                    {editForm.tables.map((tbl, i) => (
+                      <div key={`tbl-${i}`} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
+                        <Input value={tbl.name} onChange={(e) => {
+                          const next = [...editForm.tables]
+                          next[i] = { ...next[i], name: e.target.value }
+                          updateEditField('tables', next)
+                        }} placeholder="Table name" />
+                        <Input value={tbl.seats} onChange={(e) => {
+                          const next = [...editForm.tables]
+                          next[i] = { ...next[i], seats: e.target.value }
+                          updateEditField('tables', next)
+                        }} placeholder="Seats" />
+                        <Input value={tbl.price} onChange={(e) => {
+                          const next = [...editForm.tables]
+                          next[i] = { ...next[i], price: e.target.value }
+                          updateEditField('tables', next)
+                        }} placeholder="Price" />
+                        <Input value={tbl.capacity} onChange={(e) => {
+                          const next = [...editForm.tables]
+                          next[i] = { ...next[i], capacity: e.target.value }
+                          updateEditField('tables', next)
+                        }} placeholder="Capacity (optional)" />
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => updateEditField('tables', [...editForm.tables, { name: '', seats: '', price: '', capacity: '' }])} style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>
+                      + Add table
+                    </button>
+                  </div>
+                </div>
+              ) : (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -371,6 +699,7 @@ export default function TicketingPage() {
                   )}
                 </div>
               </>
+              )
             )}
           </div>
         </SheetContent>

@@ -131,6 +131,37 @@ public class AdminAnalyticsDtos {
         List<String> xLabels
     ) {}
 
+    public record TrafficSummary(
+        int totalScans,
+        int totalOrders,
+        long totalRevenue,
+        int activeMerchants
+    ) {}
+
+    public record TrafficHeatmap(
+        List<String> dayLabels,
+        List<Integer> hourLabels,
+        List<List<Integer>> matrix,
+        int maxValue
+    ) {}
+
+    public record MerchantTrafficStat(
+        String merchantId,
+        String merchantName,
+        int scans,
+        int orders,
+        long revenue
+    ) {}
+
+    public record TrafficAnalytics(
+        String range,
+        TrafficSummary summary,
+        TrafficHeatmap heatmap,
+        List<MerchantTrafficStat> topRevenue,
+        List<MerchantTrafficStat> topScans,
+        List<MerchantTrafficStat> topOrders
+    ) {}
+
     public record CookieConsentSummary(
         int total,
         int accepted,
