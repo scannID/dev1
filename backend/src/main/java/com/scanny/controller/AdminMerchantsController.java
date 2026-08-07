@@ -39,6 +39,14 @@ public class AdminMerchantsController {
         return adminMerchantsService.updateMerchant(merchantId, request);
     }
 
+    @PatchMapping("/{merchantId}/status")
+    public AdminMerchantDtos.MerchantDetails updateMerchantStatus(
+        @PathVariable String merchantId,
+        @RequestBody AdminMerchantDtos.UpdateMerchantStatusRequest request
+    ) {
+        return adminMerchantsService.updateMerchantStatus(merchantId, request);
+    }
+
     @DeleteMapping("/{merchantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMerchant(@PathVariable String merchantId) {

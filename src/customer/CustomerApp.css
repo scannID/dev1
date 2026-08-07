@@ -2192,6 +2192,41 @@ html.cm-app #root {
   text-align: center;
 }
 
+/* ── Receipt barcode ── */
+.cm-receipt-qr-section {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1.5px dashed var(--cm-border);
+}
+
+.cm-receipt-barcode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0 4px;
+}
+
+.cm-receipt-barcode-svg {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--cm-border);
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,.05);
+}
+
+.cm-receipt-barcode-label {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--cm-muted);
+}
+
 .cm-track-overlay {
   position: fixed;
   inset: 0;

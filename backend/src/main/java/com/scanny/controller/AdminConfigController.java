@@ -54,6 +54,25 @@ public class AdminConfigController {
         return adminConfigService.runAction(action);
     }
 
+    /** GET current system busy state — used by the admin UI toggle. */
+    @GetMapping("/system-busy")
+    public AdminConfigDtos.ActionResult getSystemBusy() {
+        return adminConfigService.getSystemBusyStatus();
+    }
+
+    /** POST to enable/disable system busy mode with an optional message body. */
+    @PostMapping("/system-busy")
+    public AdminConfigDtos.ActionResult setSystemBusy(
+        @RequestBody(required = false) Map<String, Object> body
+    ) {
+        boolean enable = body != null && Boolean.TRUE.equals(body.get("busyMode"));
+        if (enable) {
+            String msg = body.get("pauseMessage") instanceof String s ? s : null;
+            return adminConfigService.enableSystemBusy(msg);
+        }
+        return adminConfigService.disableSystemBusy();
+    }
+
     @PutMapping
     public AdminConfigDtos.AllConfigsResponse updateMany(
         @RequestBody Map<String, Map<String, Object>> body,

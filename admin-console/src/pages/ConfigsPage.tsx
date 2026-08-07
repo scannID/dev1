@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useConfigs } from '@/hooks/usePlatform'
+import { configsApi } from '@/api/services'
 import type { ConfigAction, ConfigMap, ConfigSection } from '@/api/types'
 
 function asString(value: unknown, fallback = ''): string {
@@ -47,6 +48,35 @@ export default function ConfigsPage() {
   const [draft, setDraft] = useState<Record<ConfigSection, ConfigMap> | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
+
+  // ── System busy mode state ──
+  const [systemBusy, setSystemBusy] = useState(false)
+  const [busyMessage, setBusyMessage] = useState('')
+  const [busyLoading, setBusyLoading] = useState(true)
+  const [busyToggling, setBusyToggling] = useState(false)
+
+  useEffect(() => {
+    configsApi.getSystemBusy()
+      .then((r) => {
+        setSystemBusy(r.details.busyMode === true)
+        setBusyMessage(typeof r.details.pauseMessage === 'string' ? r.details.pauseMessage : '')
+      })
+      .catch(() => { /* keep defaults */ })
+      .finally(() => setBusyLoading(false))
+  }, [])
+
+  async function toggleSystemBusy(enable: boolean) {
+    setBusyToggling(true)
+    try {
+      const result = await configsApi.setSystemBusy(enable, enable ? busyMessage : undefined)
+      setSystemBusy(result.details.busyMode === true)
+      toast[enable ? 'warning' : 'success'](result.message)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to toggle system busy mode')
+    } finally {
+      setBusyToggling(false)
+    }
+  }
 
   useEffect(() => {
     if (configs) {
@@ -334,6 +364,60 @@ export default function ConfigsPage() {
               {saving === 'notifications' ? 'Saving…' : 'Save'}
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* ── System Busy Mode ── */}
+      <div className="admin-card" style={{ borderColor: systemBusy ? 'oklch(from var(--destructive) l c h / 60%)' : undefined }}>
+        <div className="admin-card-header">
+          <div>
+            <h3 style={{ color: systemBusy ? 'var(--destructive)' : undefined }}>System Busy Mode</h3>
+            <p>Instantly halt all orders, hotel bookings and ticket purchases platform-wide</p>
+          </div>
+          {systemBusy && <Badge variant="destructive">ACTIVE</Badge>}
+          {!systemBusy && !busyLoading && <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">Normal</Badge>}
+        </div>
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: systemBusy ? 'var(--destructive)' : 'var(--foreground)' }}>
+                {busyLoading ? 'Loading…' : systemBusy ? 'All systems are currently PAUSED' : 'All systems are operating normally'}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                Affects restaurants, hotels and ticket sales. Takes effect immediately — no restart needed.
+              </p>
+            </div>
+            <Switch
+              checked={systemBusy}
+              disabled={busyLoading || busyToggling}
+              onCheckedChange={(v) => void toggleSystemBusy(v)}
+            />
+          </div>
+          {systemBusy || busyMessage ? (
+            <>
+              <Separator />
+              <div style={{ display: 'grid', gap: 6 }}>
+                <Label>Pause message shown to customers</Label>
+                <Input
+                  value={busyMessage}
+                  placeholder="The platform is temporarily paused. Please try again shortly."
+                  onChange={(e) => setBusyMessage(e.target.value)}
+                  disabled={busyToggling}
+                />
+              </div>
+              {systemBusy && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-fit"
+                  disabled={busyToggling}
+                  onClick={() => void toggleSystemBusy(true)}
+                >
+                  {busyToggling ? 'Updating…' : 'Update message'}
+                </Button>
+              )}
+            </>
+          ) : null}
         </div>
       </div>
 

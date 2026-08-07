@@ -42,6 +42,7 @@ public class TicketPurchaseService {
     private final ObjectMapper objectMapper;
     private final Environment environment;
     private final long holdTtlMinutes;
+    private final SystemBusyModeService systemBusyModeService;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
@@ -52,13 +53,15 @@ public class TicketPurchaseService {
             TicketService ticketService,
             ObjectMapper objectMapper,
             Environment environment,
-            @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes) {
+            @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes,
+            SystemBusyModeService systemBusyModeService) {
         this.ticketRepository = ticketRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
         this.environment = environment;
         this.holdTtlMinutes = Math.max(1, holdTtlMinutes);
+        this.systemBusyModeService = systemBusyModeService;
     }
 
     @Transactional
@@ -395,6 +398,10 @@ public class TicketPurchaseService {
     }
 
     private Ticket requireEventTemplate(String qrToken) {
+        // System-wide busy mode blocks all ticket purchases.
+        if (systemBusyModeService.isSystemBusy()) {
+            throw new ApiException(503, systemBusyModeService.getPauseMessage());
+        }
         Ticket ticket = ticketRepository.findByQrToken(qrToken.trim())
             .orElseThrow(() -> new ApiException(404, "Event not found"));
         if (!ticket.isEventTemplate()) {

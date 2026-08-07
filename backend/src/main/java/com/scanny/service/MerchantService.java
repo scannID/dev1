@@ -110,6 +110,14 @@ public class MerchantService {
     public MerchantMeResponse getMe(Jwt jwt) {
         UUID keycloakUserId = UUID.fromString(jwt.getSubject());
         MerchantProfile profile = handleLogin(jwt, keycloakUserId);
+
+        // Block suspended or closed accounts before returning any portal data.
+        if (profile.status() == Merchant.MerchantStatus.SUSPENDED) {
+            throw new ApiException(403, "Your account has been suspended. Please contact the system administrator.");
+        }
+        if (profile.status() == Merchant.MerchantStatus.CLOSED) {
+            throw new ApiException(403, "This account has been closed. Please contact the system administrator.");
+        }
         var businesses = businessService.listBusinessesForMerchant(profile.id().toString());
         BusinessResponse business = businesses.isEmpty()
                 ? businessService.getBusinessForMerchant(profile.id().toString())

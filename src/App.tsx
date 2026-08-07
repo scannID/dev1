@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -84,6 +84,7 @@ import {
   InventoryWastePage,
 } from './inventory/InventoryActionPage'
 import { SplitBillPanel } from './operations/SplitBillPanel'
+import { FloorPlanPage } from './floor-plan/FloorPlanPage'
 import { hasPermission, type PermissionId } from './operations/roleCatalog'
 import type { StaffRole } from './api/operations'
 import { resizeImageFile } from './lib/resizeImage'
@@ -279,6 +280,8 @@ function App({
     merchant,
     loading: sessionLoading,
     error: sessionError,
+    accountSuspended,
+    suspendedMessage,
     refreshBusiness,
     refreshBusinesses,
     loadOrders,
@@ -293,6 +296,7 @@ function App({
   const [view, setView] = useState('account')
   const [inventoryNavOpen, setInventoryNavOpen] = useState(false)
   const [operationsNavOpen, setOperationsNavOpen] = useState(false)
+  const [floorPlanNavOpen, setFloorPlanNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
@@ -325,6 +329,9 @@ function App({
       'inventory-transfer',
       'inventory-adjust',
       'inventory-waste',
+      'floor-plan',
+      'floor-plan-live',
+      'floor-plan-edit',
     ])
     const viewPermMap: Record<string, PermissionId> = {
       catalog: 'catalog:read',
@@ -695,6 +702,29 @@ function App({
     )
   }
 
+  if (accountSuspended) {
+    return (
+      <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 24 }}>
+        <div style={{ maxWidth: 440, textAlign: 'center', display: 'grid', gap: 16 }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'oklch(0.96 0.02 30 / 0.2)', border: '1px solid oklch(0.577 0.245 27.325 / 0.3)', display: 'grid', placeItems: 'center', margin: '0 auto' }}>
+            <span style={{ fontSize: 24 }}>🚫</span>
+          </div>
+          <h1 style={{ margin: 0, fontSize: 22, color: 'var(--foreground)' }}>Account suspended</h1>
+          <p style={{ margin: 0, color: 'var(--muted-foreground)', fontSize: 14, lineHeight: 1.6 }}>
+            {suspendedMessage || 'Your account has been suspended. Please contact the system administrator.'}
+          </p>
+          <p style={{ margin: 0, color: 'var(--muted-foreground)', fontSize: 13 }}>
+            If you believe this is a mistake, reach out to{' '}
+            <a href="mailto:alsekx@gmail.com" style={{ color: 'var(--primary)' }}>alsekx@gmail.com</a>
+          </p>
+          <Button type="button" variant="outline" onClick={handleLogout} style={{ width: 'fit-content', margin: '0 auto' }}>
+            Sign out
+          </Button>
+        </div>
+      </main>
+    )
+  }
+
   if (!business.id) {
     return (
       <main className="company-shell" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', padding: 24 }}>
@@ -784,18 +814,21 @@ function App({
                 view === 'inventory-adjust' ||
                 view === 'inventory-waste')
             const operationsChildActive = id === 'operations' && operationViews.has(view)
-            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || operationsChildActive)
+            const floorPlanChildActive = id === 'floor-plan' && (view === 'floor-plan-live' || view === 'floor-plan-edit')
+            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || operationsChildActive || floorPlanChildActive)
             const groupOpen =
               id === 'inventory'
                 ? (inventoryNavOpen || inventoryChildActive)
                 : id === 'operations'
                   ? (operationsNavOpen || operationsChildActive)
-                  : false
+                  : id === 'floor-plan'
+                    ? (floorPlanNavOpen || floorPlanChildActive)
+                    : false
 
             if (children?.length) {
               const defaultChildView = children[0]?.id
               return (
-                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || operationsChildActive) ? ' active-group' : ''}`}>
+                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || operationsChildActive || floorPlanChildActive) ? ' active-group' : ''}`}>
                   <button
                     type="button"
                     className={isActive ? 'active' : ''}
@@ -809,6 +842,9 @@ function App({
                       } else if (id === 'operations') {
                         setOperationsNavOpen((open) => !open)
                         if (!operationsChildActive && defaultChildView) setView(defaultChildView)
+                      } else if (id === 'floor-plan') {
+                        setFloorPlanNavOpen((open) => !open)
+                        if (!floorPlanChildActive) setView('floor-plan-live')
                       }
                     }}
                   >
@@ -1182,6 +1218,18 @@ function App({
                   onBranchCreated={(branchId) => {
                     void refreshBusinesses().then(() => selectBusiness(branchId))
                   }}
+                />
+              </div>
+            )}
+
+            {(view === 'floor-plan-live' || view === 'floor-plan-edit') && (
+              <div className="page-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <FloorPlanPage
+                  businessId={business.id}
+                  businessType={business.type}
+                  staffMode={staffMode}
+                  staffRole={staffRole}
+                  initialMode={view === 'floor-plan-edit' ? 'editor' : 'viewer'}
                 />
               </div>
             )}

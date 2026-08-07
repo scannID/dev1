@@ -10,6 +10,7 @@ import com.scanny.repository.OrderRepository;
 import com.scanny.repository.PlatformConfigRepository;
 import com.scanny.repository.QrScanEventRepository;
 import com.scanny.repository.TicketScanRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,9 @@ public class AdminConfigService {
     public static final Set<String> SECTIONS = Set.of(
         "platform", "auth", "payments", "orders", "qr", "notifications", "features"
     );
+
+    // injected below — field declared ahead of DEFAULTS to keep constructor tidy
+    private final SystemBusyModeService systemBusyModeService;
 
     private static final Map<String, Map<String, Object>> DEFAULTS = Map.of(
         "platform", Map.of(
@@ -90,7 +94,8 @@ public class AdminConfigService {
         TicketScanRepository ticketScanRepository,
         QrScanEventRepository qrScanEventRepository,
         ObjectMapper objectMapper,
-        AuditService auditService
+        AuditService auditService,
+        @Lazy SystemBusyModeService systemBusyModeService
     ) {
         this.platformConfigRepository = platformConfigRepository;
         this.businessRepository = businessRepository;
@@ -99,6 +104,7 @@ public class AdminConfigService {
         this.qrScanEventRepository = qrScanEventRepository;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
+        this.systemBusyModeService = systemBusyModeService;
     }
 
     @Transactional(readOnly = true)
@@ -161,10 +167,48 @@ public class AdminConfigService {
                 Map.of("note", "noop-dev")
             );
             case "reset-platform" -> resetPlatform();
+            case "enable-system-busy" -> enableSystemBusy(null);
+            case "disable-system-busy" -> disableSystemBusy();
             default -> throw new ApiException(400, "Unknown action: " + action);
         };
         auditService.success("ADMIN_CONFIG_ACTION", "config_action", action, Map.of("success", result.success()));
         return result;
+    }
+
+    /** Enable system busy mode with an optional custom message. */
+    @Transactional
+    public AdminConfigDtos.ActionResult enableSystemBusy(String message) {
+        SystemBusyModeService.SystemConfig cfg = systemBusyModeService.enable(message);
+        return new AdminConfigDtos.ActionResult(
+            true,
+            "enable-system-busy",
+            "System busy mode enabled. All orders and ticket purchases are blocked.",
+            Map.of("busyMode", cfg.busyMode(), "pauseMessage", cfg.pauseMessage())
+        );
+    }
+
+    /** Disable system busy mode and restore normal operation. */
+    @Transactional
+    public AdminConfigDtos.ActionResult disableSystemBusy() {
+        systemBusyModeService.disable();
+        return new AdminConfigDtos.ActionResult(
+            true,
+            "disable-system-busy",
+            "System busy mode disabled. Normal operation resumed.",
+            Map.of("busyMode", false)
+        );
+    }
+
+    /** Current system busy status — used by the admin UI to show live state. */
+    @Transactional(readOnly = true)
+    public AdminConfigDtos.ActionResult getSystemBusyStatus() {
+        SystemBusyModeService.SystemConfig cfg = systemBusyModeService.readConfig();
+        return new AdminConfigDtos.ActionResult(
+            true,
+            "get-system-busy-status",
+            cfg.busyMode() ? "System is currently in busy mode." : "System is operating normally.",
+            Map.of("busyMode", cfg.busyMode(), "pauseMessage", cfg.pauseMessage())
+        );
     }
 
     private AdminConfigDtos.ActionResult purgeTestData() {

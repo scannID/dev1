@@ -24,6 +24,7 @@ import { WaveLoader } from './components/WaveLoader'
 import { CookieConsent } from './components/CookieConsent'
 import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
 import { clearStaffSession } from './api/client'
+import ReceiptPage from './receipt/ReceiptPage'
 
 initThemeFromStorage()
 
@@ -88,6 +89,11 @@ function resolveGateScanRoute(): boolean {
   return /^\/ticket\/gate\/?$/.test(window.location.pathname)
 }
 
+function resolveReceiptRoute(): string | null {
+  const match = window.location.pathname.match(/^\/receipt\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 function goToLanding() {
   window.location.href = '/'
 }
@@ -100,6 +106,7 @@ const ticketViewToken = resolveTicketViewRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
 const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
+const receiptOrderId = resolveReceiptRoute()
 
 if (kitchenBusinessId) {
   function KitchenRoot() {
@@ -148,6 +155,14 @@ if (kitchenBusinessId) {
         <KitchenRoot />
         <CookieConsent />
       </>
+    </StrictMode>,
+  )
+} else if (receiptOrderId !== null) {
+  document.documentElement.classList.add('cm-app')
+  applyDarkMode(false)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ReceiptPage />
     </StrictMode>,
   )
 } else if (customerRoute) {

@@ -25,18 +25,46 @@ export function distributeEqually(
   const rem = total % n
   return Array.from({ length: n }, (_, i) => ({
     name: existing[i]?.name?.trim() || `Guest ${i + 1}`,
-    phone: existing[i]?.phone ?? '',
+    phone: existing[i]?.phone ?? '0',
     amount: String(base + (i < rem ? 1 : 0)),
   }))
 }
 
+/**
+ * After the user edits share at `changedIndex`, assign whatever remains
+ * of the total to the last share that isn't the changed one.
+ */
+export function redistributeRemaining(
+  totalUgx: number,
+  shares: SplitShareDraft[],
+  changedIndex: number,
+): SplitShareDraft[] {
+  const total = Math.round(totalUgx)
+  if (shares.length < 2) return shares
+
+  // Target is last share that isn't the one just changed
+  const targetIndex = shares.length - 1 === changedIndex ? shares.length - 2 : shares.length - 1
+
+  // Sum everything except the target
+  const sumExcludingTarget = shares.reduce((sum, s, i) => {
+    if (i === targetIndex) return sum
+    return sum + (Math.round(Number(s.amount)) || 0)
+  }, 0)
+
+  const targetAmount = Math.max(1, total - sumExcludingTarget)
+
+  return shares.map((s, i) =>
+    i === targetIndex ? { ...s, amount: String(targetAmount) } : s,
+  )
+}
+
 export function validateCustomSplit(
-  orderTotalWithFees: number,
+  orderTotal: number,
   shares: SplitShareDraft[],
   validatePhone: (phone: string) => string | null,
 ): SplitValidation {
   const errors: string[] = []
-  const total = Math.round(orderTotalWithFees)
+  const total = Math.round(orderTotal)
 
   if (shares.length < 2 || shares.length > 8) {
     errors.push('Split requires 2–8 guests')

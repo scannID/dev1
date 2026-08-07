@@ -1,0 +1,232 @@
+.rp-shell {
+  min-height: 100dvh;
+  background: #f3f4f6;
+  font-family: 'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif;
+  color: #111827;
+  padding-bottom: 40px;
+}
+
+/* ── Top bar ── */
+.rp-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rp-header-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.rp-brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+/* ── Receipt paper ── */
+.rp-paper {
+  max-width: 420px;
+  margin: 24px auto 0;
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+
+.rp-paper-top {
+  padding: 24px 20px 18px;
+  text-align: center;
+}
+
+.rp-paper-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.rp-paper-biz {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.rp-paper-date {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ── Dividers ── */
+.rp-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0 20px;
+}
+
+.rp-divider--dashed {
+  background: none;
+  border-top: 1.5px dashed #d1d5db;
+}
+
+/* ── Meta grid ── */
+.rp-meta {
+  margin: 0;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-meta > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.rp-meta dt {
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.rp-meta dd {
+  margin: 0;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* ── Items ── */
+.rp-items {
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rp-items-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.rp-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  font-size: 13px;
+  align-items: start;
+}
+
+.rp-item-row span:nth-child(2) {
+  color: #6b7280;
+  text-align: right;
+}
+
+.rp-item-row strong {
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rp-removed {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: normal;
+}
+
+/* ── Totals ── */
+.rp-totals {
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-totals > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.rp-totals > div span:last-child {
+  color: #111827;
+  font-weight: 600;
+}
+
+.rp-grand {
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 15px !important;
+  color: #111827 !important;
+}
+
+.rp-grand strong {
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+/* ── Footnote ── */
+.rp-footnote {
+  margin: 0;
+  padding: 14px 20px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* ── Not-found state ── */
+.rp-not-found {
+  max-width: 360px;
+  margin: 40px auto 0;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.rp-nf-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.rp-not-found h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rp-not-found p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.rp-nf-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}

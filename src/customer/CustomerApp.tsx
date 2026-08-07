@@ -177,6 +177,7 @@ export default function CustomerApp({
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
   const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
   const [ordersPaused, setOrdersPaused] = useState(false)
+  const [accountSuspended, setAccountSuspended] = useState(false)
   const [busyBanner, setBusyBanner] = useState<string | null>(null)
   const [busyEtaRemainingSec, setBusyEtaRemainingSec] = useState<number | null>(null)
 
@@ -264,11 +265,13 @@ export default function CustomerApp({
       busyMode?: boolean
       busyEtaMinutes?: number
       pauseMessage?: string
+      suspended?: boolean
     },
     fallbackBusiness?: Business,
   ) => {
     const accepting = status.acceptingOrders !== false
     const busyMode = Boolean(status.busyMode)
+    const suspended = Boolean(status.suspended)
     const etaMinutes = Math.max(0, Math.round(Number(status.busyEtaMinutes) || 0))
     const pauseMessage = status.pauseMessage?.trim() || ''
     const busyTimerKey = getBusyTimerKey(businessId)
@@ -302,6 +305,7 @@ export default function CustomerApp({
     const manuallyPaused = !busyMode && !accepting
     const intakePaused = effectiveBusyMode || manuallyPaused
     setOrdersPaused(intakePaused)
+    setAccountSuspended(suspended)
     setBusiness((prev) => {
       const base = prev ?? fallbackBusiness
       if (!base) return prev
@@ -323,7 +327,11 @@ export default function CustomerApp({
       )
     } else if (manuallyPaused) {
       setBusyEtaRemainingSec(null)
-      setBusyBanner(pauseMessage || 'This location is not accepting orders right now.')
+      setBusyBanner(
+        suspended
+          ? (pauseMessage || 'This account has been suspended.')
+          : (pauseMessage || 'This location is not accepting orders right now.')
+      )
     } else {
       setBusyEtaRemainingSec(null)
       setBusyBanner(null)
@@ -772,8 +780,20 @@ export default function CustomerApp({
     orderTotal: number,
   ) {
     const { operationsApi } = await import('../api/operations')
+
+    // Normalize share amounts to sum exactly to orderTotal.
+    // The frontend may have calculated against a slightly different total
+    // (e.g. pre-order fee estimate vs actual). Last share absorbs the diff.
+    const rawSum = shares.reduce((s, sh) => s + sh.amount, 0)
+    const diff = orderTotal - rawSum
+    const normalizedShares = shares.map((sh, i) =>
+      i === shares.length - 1
+        ? { ...sh, amount: Math.max(1, sh.amount + diff) }
+        : sh,
+    )
+
     const created = await operationsApi.createPublicCustomSplits(publicId, {
-      shares: shares.map((share) => ({
+      shares: normalizedShares.map((share) => ({
         payerName: share.name,
         payerPhone: share.phone,
         amount: share.amount,
@@ -801,13 +821,14 @@ export default function CustomerApp({
           paymentId: payment.paymentId,
           status: payment.status,
         })
-      } catch {
+      } catch (err) {
         live.push({
           name: draft?.name || split.payerName,
           phone: draft?.phone || split.payerPhone,
           amount: split.amount,
           splitId: split.id,
           status: 'FAILED',
+          failureReason: err instanceof Error ? err.message : 'Payment failed',
         })
       }
     }
@@ -911,15 +932,23 @@ export default function CustomerApp({
       : null
 
     if (splitAllocation) {
-      const validation = validateCustomSplit(payableTotal, splitShares, validatePhone)
-      if (!validation.ok) {
-        const first = validation.errors[0] ?? 'Fix the split before paying'
-        if (/phone|MoMo|number/i.test(first)) {
-          setPhoneError(first)
-        } else {
-          setError(first)
+      // Only validate names and phone numbers before order creation.
+      // Amount totals are normalized against order.total in startSplitPayments.
+      for (let i = 0; i < splitAllocation.length; i++) {
+        const share = splitAllocation[i]
+        if (!share.name.trim()) {
+          setError(`Guest ${i + 1}: name is required`)
+          return
         }
-        return
+        const phoneIssue = validatePhone(share.phone)
+        if (phoneIssue) {
+          setPhoneError(`Guest ${i + 1}: ${phoneIssue}`)
+          return
+        }
+        if (!share.amount || share.amount < 1) {
+          setError(`Guest ${i + 1}: enter an amount`)
+          return
+        }
       }
       // Order contact = first payer
       setPhone(splitAllocation[0].phone)
@@ -1262,7 +1291,7 @@ export default function CustomerApp({
     ? busyCountdownText
       ? (busyCountdownDone ? 'Busy - opening soon' : `Busy - opens in ${busyCountdownText}`)
       : 'Busy - orders paused'
-    : 'Orders paused'
+    : accountSuspended ? 'Account suspended' : 'Orders paused'
   const busyOverlayActive = ordersPaused && !busyCountdownDone
   const busyOverlayMessage = business.busyMode && busyCountdownText
     ? `${busyBanner || 'Kitchen is busy right now.'} Reopening in ${busyCountdownText}.`
@@ -1435,6 +1464,7 @@ export default function CustomerApp({
           cartItems={cartItems}
           cartTotal={cartTotal}
           serviceFeeUgx={serviceFeeUgx}
+          orderTotal={paidTotal || undefined}
           provider={provider}
           phone={phone}
           saveNumber={saveNumber}
@@ -1568,13 +1598,15 @@ export default function CustomerApp({
             <span className="cm-busy-overlay-icon" aria-hidden="true">
               <Clock3 size={20} />
             </span>
-            <h2>{busyCountdownText ? `Busy until ${busyCountdownText}` : 'Currently busy'}</h2>
+            <h2>{accountSuspended ? 'Account suspended' : busyCountdownText ? `Busy until ${busyCountdownText}` : 'Currently busy'}</h2>
             <p>{busyOverlayMessage}</p>
-            <span className="cm-busy-overlay-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
+            {!accountSuspended && (
+              <span className="cm-busy-overlay-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
           </div>
         </div>
       ) : null}

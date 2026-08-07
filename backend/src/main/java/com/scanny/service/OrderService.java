@@ -57,6 +57,7 @@ public class OrderService {
     private final MerchantRepository merchantRepository;
     private final TableService tableService;
     private final InventoryService inventoryService;
+    private final SystemBusyModeService systemBusyModeService;
 
     public OrderService(
             BusinessService businessService,
@@ -68,7 +69,8 @@ public class OrderService {
             FeeService feeService,
             MerchantRepository merchantRepository,
             TableService tableService,
-            InventoryService inventoryService
+            InventoryService inventoryService,
+            SystemBusyModeService systemBusyModeService
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -80,6 +82,7 @@ public class OrderService {
         this.merchantRepository = merchantRepository;
         this.tableService = tableService;
         this.inventoryService = inventoryService;
+        this.systemBusyModeService = systemBusyModeService;
     }
 
     @Transactional(readOnly = true)
@@ -167,15 +170,25 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(String businessId, CreateOrderRequest request) {
+        // System-wide busy mode blocks all orders across all businesses.
+        if (systemBusyModeService.isSystemBusy()) {
+            throw new ApiException(503, systemBusyModeService.getPauseMessage());
+        }
+
         Business business = businessService.requireBusinessLight(businessId);
 
-        boolean intakePaused = !business.isAcceptingOrders() || business.isBusyMode();
-        if (intakePaused) {
-            String fallbackMessage = business.isBusyMode()
-                    ? "Kitchen is busy right now. Please try again shortly."
+        // Block orders for suspended or closed merchant accounts.
+        if (!business.isAcceptingOrders()) {
+            String msg = business.getPauseMessage() != null && !business.getPauseMessage().isBlank()
+                    ? business.getPauseMessage()
                     : "This location is not accepting orders right now.";
+            throw new ApiException(503, msg);
+        }
+
+        boolean intakePaused = business.isBusyMode();
+        if (intakePaused) {
             String message = business.getPauseMessage().isBlank()
-                    ? fallbackMessage
+                    ? "Kitchen is busy right now. Please try again shortly."
                     : business.getPauseMessage();
             throw new ApiException(503, message);
         }

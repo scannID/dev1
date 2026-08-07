@@ -11,6 +11,7 @@ export type SplitShareLive = {
   splitId?: string
   paymentId?: string
   status: PaymentStatus
+  failureReason?: string
 }
 
 function maskPhone(phone: string) {
@@ -138,7 +139,11 @@ export function WaitingStep({
                         : 'split-live-status pending'
                   }
                 >
-                  {share.status === 'PAID' ? 'Paid' : share.status === 'FAILED' ? 'Failed' : 'Prompt sent'}
+                  {share.status === 'PAID'
+                    ? 'Paid'
+                    : share.status === 'FAILED'
+                      ? (share.failureReason ?? 'Failed')
+                      : 'Prompt sent'}
                 </span>
               </li>
             ))}

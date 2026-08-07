@@ -4,7 +4,7 @@ import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
 import type { PaymentProvider } from '../payments'
 import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, formatUgPhoneHint, withServiceFee } from '../utils'
-import { distributeEqually, type SplitShareDraft } from '../splitValidation'
+import { distributeEqually, redistributeRemaining, type SplitShareDraft } from '../splitValidation'
 import type { CartLine } from './CartStep'
 
 export type { SplitShareDraft }
@@ -19,6 +19,7 @@ export function PayStep({
   cartItems,
   cartTotal,
   serviceFeeUgx = DEFAULT_SERVICE_FEE_UGX,
+  orderTotal,
   provider,
   phone,
   saveNumber,
@@ -40,6 +41,8 @@ export function PayStep({
   cartItems: CartLine[]
   cartTotal: number
   serviceFeeUgx?: number
+  /** Actual order total from the backend — used for split allocation so amounts match exactly. */
+  orderTotal?: number
   provider: PaymentProvider
   phone: string
   saveNumber: boolean
@@ -59,11 +62,13 @@ export function PayStep({
 }) {
   const phoneInputRef = useRef<HTMLInputElement | null>(null)
   const payableTotal = withServiceFee(cartTotal, serviceFeeUgx)
+  // Use actual order total for split allocation when available (avoids backend mismatch)
+  const splitTotal = orderTotal ?? payableTotal
   const allocated = splitShares.reduce((sum, share) => sum + (Math.round(Number(share.amount)) || 0), 0)
-  const remaining = payableTotal - allocated
+  const remaining = splitTotal - allocated
 
   function setPeopleCount(count: number) {
-    onSplitShares(distributeEqually(payableTotal, count, splitShares))
+    onSplitShares(distributeEqually(splitTotal, count, splitShares))
   }
 
   function splitEqually() {
@@ -71,7 +76,17 @@ export function PayStep({
   }
 
   function updateShare(index: number, patch: Partial<SplitShareDraft>) {
-    onSplitShares(splitShares.map((share, i) => (i === index ? { ...share, ...patch } : share)))
+    // Keep the leading 0 on phone — if the user clears it, restore the prefix.
+    if ('phone' in patch && patch.phone !== undefined && patch.phone === '') {
+      patch = { ...patch, phone: '0' }
+    }
+    const updated = splitShares.map((share, i) => (i === index ? { ...share, ...patch } : share))
+    // When the user edits an amount, auto-assign the leftover to another share.
+    if ('amount' in patch) {
+      onSplitShares(redistributeRemaining(splitTotal, updated, index))
+    } else {
+      onSplitShares(updated)
+    }
   }
 
   function toggleSplit(enabled: boolean) {
@@ -185,47 +200,80 @@ export function PayStep({
               Split equally
             </button>
             <ul>
-              {splitShares.map((share, index) => (
-                <li key={index} className="split-draft-row split-draft-row-multi">
-                  <input
-                    type="text"
-                    aria-label={`Person ${index + 1} name`}
-                    placeholder={`Guest ${index + 1}`}
-                    value={share.name}
-                    disabled={submitting}
-                    onChange={(e) => updateShare(index, { name: e.target.value })}
-                  />
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    aria-label={`Person ${index + 1} phone`}
-                    placeholder="07XX XXX XXX"
-                    value={share.phone}
-                    disabled={submitting}
-                    onChange={(e) => updateShare(index, { phone: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    aria-label={`Person ${index + 1} amount`}
-                    placeholder="Amount"
-                    value={share.amount}
-                    disabled={submitting}
-                    onChange={(e) => updateShare(index, { amount: e.target.value })}
-                  />
-                </li>
-              ))}
+              {splitShares.map((share, index) => {
+                const shareAmount = Math.round(Number(share.amount)) || 0
+                return (
+                  <li key={index} className="split-draft-row split-draft-row-multi">
+                    <input
+                      type="text"
+                      aria-label={`Person ${index + 1} name`}
+                      placeholder={`Guest ${index + 1}`}
+                      value={share.name}
+                      disabled={submitting}
+                      onChange={(e) => updateShare(index, { name: e.target.value })}
+                    />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      aria-label={`Person ${index + 1} phone`}
+                      placeholder="07XX XXX XXX"
+                      value={share.phone}
+                      disabled={submitting}
+                      onChange={(e) => updateShare(index, { phone: e.target.value })}
+                    />
+                    <div className="split-amount-cell">
+                      <input
+                        type="number"
+                        min="1"
+                        aria-label={`Person ${index + 1} amount`}
+                        placeholder="Amount"
+                        value={share.amount}
+                        disabled={submitting}
+                        onChange={(e) => updateShare(index, { amount: e.target.value })}
+                      />
+                      {shareAmount > 0 && (
+                        <span className="split-amount-hint">{currency(shareAmount)}</span>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
             <div className={`split-remaining ${remaining === 0 ? 'ok' : remaining < 0 ? 'over' : ''}`}>
-              <span>Allocated {currency(allocated)}</span>
+              <span>Allocated {currency(allocated)} of {currency(splitTotal)}</span>
               <strong>
                 {remaining === 0
-                  ? 'Total met — ready to prompt everyone'
+                  ? 'All allocated — ready to pay'
                   : remaining > 0
-                    ? `Remaining ${currency(remaining)}`
+                    ? `${currency(remaining)} unallocated`
                     : `Over by ${currency(Math.abs(remaining))}`}
               </strong>
+              {remaining !== 0 && splitShares.length > 0 && (
+                <button
+                  type="button"
+                  className="customer-secondary-btn"
+                  style={{ marginTop: 4, fontSize: 12, padding: '4px 10px' }}
+                  disabled={submitting}
+                  onClick={() => {
+                    // Assign the full remainder to the last share
+                    const lastIdx = splitShares.length - 1
+                    const othersSum = splitShares
+                      .slice(0, lastIdx)
+                      .reduce((s, sh) => s + (Math.round(Number(sh.amount)) || 0), 0)
+                    const lastAmount = Math.max(1, splitTotal - othersSum)
+                    onSplitShares(
+                      splitShares.map((sh, i) =>
+                        i === lastIdx ? { ...sh, amount: String(lastAmount) } : sh,
+                      ),
+                    )
+                  }}
+                >
+                  {remaining > 0
+                    ? `Assign ${currency(remaining)} to ${splitShares[splitShares.length - 1]?.name || `Guest ${splitShares.length}`}`
+                    : 'Fix allocation'}
+                </button>
+              )}
             </div>
           </>
         ) : null}

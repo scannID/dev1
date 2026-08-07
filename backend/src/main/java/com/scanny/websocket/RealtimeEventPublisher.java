@@ -69,6 +69,10 @@ public class RealtimeEventPublisher {
         publish("admin:metrics", type, null, payload);
     }
 
+    public void publishFloorEvent(String businessId, String type, Object payload) {
+        publish("floor:" + businessId, type, businessId, payload);
+    }
+
     /**
      * Publish once: Redis when available (all replicas fan out via listener),
      * otherwise local fan-out only. Avoids double delivery on the publishing instance.

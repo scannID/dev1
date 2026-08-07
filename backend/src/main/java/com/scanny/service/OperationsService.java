@@ -41,6 +41,7 @@ public class OperationsService {
     private final OperationsAccessService operationsAccessService;
     private final StarterCatalogService starterCatalogService;
     private final BusinessService businessService;
+    private final SystemBusyModeService systemBusyModeService;
     private final String scanBaseUrl;
 
     public OperationsService(
@@ -52,6 +53,7 @@ public class OperationsService {
             OperationsAccessService operationsAccessService,
             StarterCatalogService starterCatalogService,
             BusinessService businessService,
+            SystemBusyModeService systemBusyModeService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
     ) {
         this.businessRepository = businessRepository;
@@ -62,6 +64,7 @@ public class OperationsService {
         this.operationsAccessService = operationsAccessService;
         this.starterCatalogService = starterCatalogService;
         this.businessService = businessService;
+        this.systemBusyModeService = systemBusyModeService;
         this.scanBaseUrl = scanBaseUrl;
     }
 
@@ -348,11 +351,16 @@ public class OperationsService {
     public Map<String, Object> publicOperationsStatus(String businessId) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ApiException(404, "Business was not found."));
+        boolean systemBusy = systemBusyModeService.isSystemBusy();
+        String systemMessage = systemBusy ? systemBusyModeService.getPauseMessage() : "";
+        boolean suspended = !business.isAcceptingOrders() && !systemBusy;
         return Map.of(
-                "acceptingOrders", business.isAcceptingOrders(),
-                "busyMode", business.isBusyMode(),
+                "acceptingOrders", business.isAcceptingOrders() && !systemBusy,
+                "busyMode", business.isBusyMode() || systemBusy,
                 "busyEtaMinutes", business.getBusyEtaMinutes(),
-                "pauseMessage", business.getPauseMessage()
+                "pauseMessage", systemBusy ? systemMessage : business.getPauseMessage(),
+                "systemBusy", systemBusy,
+                "suspended", suspended
         );
     }
 }

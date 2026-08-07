@@ -39,6 +39,8 @@ export function useBusinessData() {
   const [staffRole, setStaffRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [accountSuspended, setAccountSuspended] = useState(false)
+  const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null)
 
   const selectedBusiness = useMemo(() => {
     if (!businesses.length) return null
@@ -158,7 +160,16 @@ export function useBusinessData() {
       }
     } catch (err) {
       console.error('Failed to load session:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load session')
+      // 403 from the backend means the account is suspended or closed.
+      const message = err instanceof Error ? err.message : 'Failed to load session'
+      const is403 = (err as { status?: number })?.status === 403
+      if (is403) {
+        setAccountSuspended(true)
+        setSuspendedMessage(message)
+      } else {
+        setAccountSuspended(false)
+        setError(message)
+      }
       setBusinesses([])
       setOrders([])
       setMerchant(null)
@@ -247,6 +258,8 @@ export function useBusinessData() {
     staffRole,
     loading,
     error,
+    accountSuspended,
+    suspendedMessage,
     refreshBusinesses: loadSession,
     refreshBusiness,
     refreshBranches,

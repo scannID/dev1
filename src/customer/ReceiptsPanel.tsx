@@ -8,6 +8,7 @@ import {
 } from './receipts'
 import { currency } from './utils'
 import { formatRemovedIngredients } from '../lib/catalogCart'
+import { ReceiptBarcode } from './ReceiptBarcode'
 
 function ReceiptCard({
   receipt,
@@ -204,6 +205,10 @@ function ReceiptDetail({
         <p className="cm-receipt-footnote">
           Saved on this device only. Other phones won&apos;t see these receipts.
         </p>
+
+        <div className="cm-receipt-qr-section">
+          <ReceiptBarcode orderId={receipt.orderId} />
+        </div>
       </div>
     </div>
   )

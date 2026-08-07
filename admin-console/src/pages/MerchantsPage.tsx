@@ -4,7 +4,23 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Sheet,
   SheetContent,
@@ -19,6 +35,12 @@ import { PaginationBar } from '../components/PaginationBar'
 import { useMerchants } from '../hooks/useMerchants'
 import { useServerPagination } from '../hooks/useServerPagination'
 import { adminApi } from '../api/services'
+
+type StatusAction = {
+  merchantId: string
+  merchantName: string
+  status: 'SUSPENDED' | 'CLOSED' | 'ACTIVE'
+}
 
 const STATUS_STYLE: Record<string, string> = {
   active: 'bg-emerald-50 text-emerald-700',
@@ -50,6 +72,9 @@ export default function MerchantsPage() {
   })
   const [showAddSheet, setShowAddSheet] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [statusChanging, setStatusChanging] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<StatusAction | null>(null)
+  const [actionReason, setActionReason] = useState('')
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -122,8 +147,33 @@ export default function MerchantsPage() {
     }
   }
 
-  const displayMerchants = merchants.map((m) => ({
-    id: m.id,
+  function openStatusDialog(merchantId: string, merchantName: string, status: 'SUSPENDED' | 'CLOSED' | 'ACTIVE') {
+    setPendingAction({ merchantId, merchantName, status })
+    setActionReason('')
+  }
+
+  async function confirmStatusAction() {
+    if (!pendingAction) return
+    setStatusChanging(pendingAction.merchantId)
+    setPendingAction(null)
+    try {
+      await adminApi.merchants.updateStatus(pendingAction.merchantId, {
+        status: pendingAction.status,
+        reason: actionReason.trim() || undefined,
+      })
+      const label = pendingAction.status === 'ACTIVE' ? 'Activated' : pendingAction.status === 'SUSPENDED' ? 'Suspended' : 'Closed'
+      toast.success(`${label}: ${pendingAction.merchantName}`)
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update account status')
+    } finally {
+      setStatusChanging(null)
+      setActionReason('')
+    }
+  }
+
+
+  const displayMerchants = merchants.map((m) => ({    id: m.id,
     name: m.name,
     owner: m.owner,
     type: m.type,
@@ -218,7 +268,37 @@ export default function MerchantsPage() {
                     </td>
                     <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{m.joined}</td>
                     <td style={{ padding: '10px 16px' }}>
-                      <Button variant="ghost" size="icon-sm"><MoreHorizontal size={14} /></Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-sm" disabled={statusChanging === m.id}>
+                            <MoreHorizontal size={14} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {m.status !== 'active' && (
+                            <DropdownMenuItem onClick={() => openStatusDialog(m.id, m.name, 'ACTIVE')}>
+                              Activate account
+                            </DropdownMenuItem>
+                          )}
+                          {m.status !== 'suspended' && (
+                            <DropdownMenuItem
+                              className="text-amber-600"
+                              onClick={() => openStatusDialog(m.id, m.name, 'SUSPENDED')}
+                            >
+                              Suspend account
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          {m.status !== 'closed' && (
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => openStatusDialog(m.id, m.name, 'CLOSED')}
+                            >
+                              Close account
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))
@@ -230,8 +310,7 @@ export default function MerchantsPage() {
       </div>
 
       <Sheet
-        open={showAddSheet}
-        onOpenChange={(open) => {
+        open={showAddSheet}        onOpenChange={(open) => {
           setShowAddSheet(open)
           if (!open) resetForm()
         }}
@@ -336,6 +415,70 @@ export default function MerchantsPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* ── Account Status Dialog ── */}
+      <Dialog open={!!pendingAction} onOpenChange={(open) => { if (!open) { setPendingAction(null); setActionReason('') } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingAction?.status === 'SUSPENDED' && 'Suspend account'}
+              {pendingAction?.status === 'CLOSED' && 'Close account'}
+              {pendingAction?.status === 'ACTIVE' && 'Activate account'}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingAction?.status === 'SUSPENDED' && (
+                <>
+                  <strong>{pendingAction.merchantName}</strong> will be temporarily blocked. They cannot log in or receive orders until reactivated.
+                </>
+              )}
+              {pendingAction?.status === 'CLOSED' && (
+                <>
+                  <strong>{pendingAction.merchantName}</strong> will be permanently closed. This is intended for merchants leaving the platform. The account can still be reactivated by an admin if needed.
+                </>
+              )}
+              {pendingAction?.status === 'ACTIVE' && (
+                <>
+                  Reactivate <strong>{pendingAction.merchantName}</strong>. They will regain full access and can receive orders again.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingAction?.status !== 'ACTIVE' && (
+            <div className="space-y-2" style={{ marginTop: 4 }}>
+              <Label htmlFor="action-reason">
+                Reason <span style={{ color: 'var(--muted-foreground)', fontWeight: 400 }}>(optional — shown to merchant)</span>
+              </Label>
+              <Textarea
+                id="action-reason"
+                placeholder={
+                  pendingAction?.status === 'SUSPENDED'
+                    ? 'e.g. Payment dispute under review'
+                    : 'e.g. Merchant requested account closure'
+                }
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          )}
+
+          <DialogFooter style={{ marginTop: 8 }}>
+            <Button variant="outline" onClick={() => { setPendingAction(null); setActionReason('') }}>
+              Cancel
+            </Button>
+            <Button
+              variant={pendingAction?.status === 'ACTIVE' ? 'default' : 'destructive'}
+              onClick={() => void confirmStatusAction()}
+              disabled={!!statusChanging}
+            >
+              {pendingAction?.status === 'SUSPENDED' && 'Suspend'}
+              {pendingAction?.status === 'CLOSED' && 'Close account'}
+              {pendingAction?.status === 'ACTIVE' && 'Activate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

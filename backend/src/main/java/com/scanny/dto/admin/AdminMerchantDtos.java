@@ -1,7 +1,6 @@
 package com.scanny.dto.admin;
 
 import com.scanny.entity.Business;
-import java.time.Instant;
 import java.util.List;
 
 public class AdminMerchantDtos {
@@ -18,17 +17,17 @@ public class AdminMerchantDtos {
         String status,
         String joinedAt
     ) {
-        public static MerchantListItem from(Business business, int orders, long revenue) {
+        public static MerchantListItem from(Business business, int orders, long revenue, String status) {
             return new MerchantListItem(
                 business.getId(),
                 business.getName(),
                 business.getOwnerName(),
                 business.getType().name(),
-                "Basic", // Default plan
+                "Basic",
                 orders,
                 revenue,
                 "UGX",
-                "active", // Default status
+                status,
                 business.getCreatedAt().toString()
             );
         }
@@ -79,7 +78,7 @@ public class AdminMerchantDtos {
         String joinedAt,
         String lastActiveAt
     ) {
-        public static MerchantDetails from(Business business, int totalOrders, long totalRevenue) {
+        public static MerchantDetails from(Business business, int totalOrders, long totalRevenue, String status) {
             long avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
             return new MerchantDetails(
                 business.getId(),
@@ -87,11 +86,11 @@ public class AdminMerchantDtos {
                 new MerchantOwner(business.getOwnerName(), "", business.getPhone()),
                 business.getType().name(),
                 "Basic",
-                "active",
+                status,
                 business.getQrToken(),
                 new MerchantStatistics(totalOrders, totalRevenue, avgOrderValue, "UGX"),
                 business.getCreatedAt().toString(),
-                Instant.now().toString() // For now, use current time
+                java.time.Instant.now().toString()
             );
         }
     }

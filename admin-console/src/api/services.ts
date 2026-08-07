@@ -82,6 +82,10 @@ export const merchantsApi = {
     return api.patch(`/admin/merchants/${merchantId}`, data)
   },
 
+  updateStatus: async (merchantId: string, data: { status: string; reason?: string }) => {
+    return api.patch(`/admin/merchants/${merchantId}/status`, data)
+  },
+
   remove: async (merchantId: string) => {
     await api.delete(`/admin/merchants/${merchantId}`)
   },
@@ -234,6 +238,14 @@ export const configsApi = {
 
   runAction: async (action: ConfigAction): Promise<ConfigActionResult> => {
     return api.post<ConfigActionResult>(`/admin/configs/actions/${action}`)
+  },
+
+  getSystemBusy: async (): Promise<ConfigActionResult> => {
+    return api.get<ConfigActionResult>('/admin/configs/system-busy')
+  },
+
+  setSystemBusy: async (busyMode: boolean, pauseMessage?: string): Promise<ConfigActionResult> => {
+    return api.post<ConfigActionResult>('/admin/configs/system-busy', { busyMode, pauseMessage })
   },
 }
 

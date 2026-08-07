@@ -401,6 +401,8 @@ export type ConfigAction =
   | 'clear-qr-scan-logs'
   | 'revoke-all-sessions'
   | 'reset-platform'
+  | 'enable-system-busy'
+  | 'disable-system-busy'
 
 export type ScansOrdersRange = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 

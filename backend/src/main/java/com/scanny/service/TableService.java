@@ -41,6 +41,7 @@ public class TableService {
     private final OperationsAccessService operationsAccessService;
     private final OrderService orderService;
     private final String scanBaseUrl;
+    private final FloorPlanStatusService floorPlanStatusService;
 
     public TableService(
             BusinessRepository businessRepository,
@@ -51,7 +52,8 @@ public class TableService {
             TableSessionOrderRepository sessionOrderRepository,
             OperationsAccessService operationsAccessService,
             @Lazy OrderService orderService,
-            @Value("${scanny.scan-base-url}") String scanBaseUrl
+            @Value("${scanny.scan-base-url}") String scanBaseUrl,
+            @Lazy FloorPlanStatusService floorPlanStatusService
     ) {
         this.businessRepository = businessRepository;
         this.tableRepository = tableRepository;
@@ -62,6 +64,7 @@ public class TableService {
         this.operationsAccessService = operationsAccessService;
         this.orderService = orderService;
         this.scanBaseUrl = scanBaseUrl;
+        this.floorPlanStatusService = floorPlanStatusService;
     }
 
     @Transactional(readOnly = true)
@@ -108,14 +111,23 @@ public class TableService {
 
     @Transactional
     public TableSession openSession(BusinessTable table) {
-        return sessionRepository.findByTableIdAndStatus(table.getId(), TableSessionStatus.Open)
+        TableSession session = sessionRepository.findByTableIdAndStatus(table.getId(), TableSessionStatus.Open)
                 .orElseGet(() -> {
-                    TableSession session = new TableSession();
-                    session.setBusiness(table.getBusiness());
-                    session.setTable(table);
-                    session.setStatus(TableSessionStatus.Open);
-                    return sessionRepository.save(session);
+                    TableSession s = new TableSession();
+                    s.setBusiness(table.getBusiness());
+                    s.setTable(table);
+                    s.setStatus(TableSessionStatus.Open);
+                    return sessionRepository.save(s);
                 });
+
+        // Update floor plan element status to OCCUPIED
+        floorPlanStatusService.onSessionOpened(
+                table.getBusiness().getId(),
+                table.getId(),
+                session
+        );
+
+        return session;
     }
 
     @Transactional(readOnly = true)
@@ -270,8 +282,15 @@ public class TableService {
             throw new ApiException(400, "Order is already paid.");
         }
         String orderId = order.getId();
-        if (!splitPaymentRepository.findByOrderIdOrderByCreatedAtAsc(orderId).isEmpty()) {
-            throw new ApiException(400, "This order already has split payments. Clear or pay them first.");
+        List<OrderSplitPayment> existing = splitPaymentRepository.findByOrderIdOrderByCreatedAtAsc(orderId);
+        if (!existing.isEmpty()) {
+            boolean anyPaid = existing.stream().anyMatch(s -> s.getPaymentStatus() == PaymentStatus.Paid);
+            if (anyPaid) {
+                throw new ApiException(400, "Some shares are already paid. Clear unpaid shares first.");
+            }
+            splitPaymentRepository.deleteAll(existing);
+            order.setSplitGroupId(null);
+            orderRepository.save(order);
         }
 
         int parts = request.parts();
@@ -394,6 +413,12 @@ public class TableService {
         session.setStatus(TableSessionStatus.Closed);
         session.setClosedAt(Instant.now());
         sessionRepository.save(session);
+
+        // Update floor plan element status back to FREE
+        String tableId = session.getTable() != null ? session.getTable().getId() : null;
+        if (tableId != null) {
+            floorPlanStatusService.onSessionClosed(businessId, tableId);
+        }
     }
 
     private OperationsDtos.SplitPaymentResponse markSplitPaidInternal(String orderId, UUID splitId) {
