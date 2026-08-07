@@ -2881,3 +2881,114 @@ html.cm-app #root {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
 }
+
+/* ── Announcements panel ─────────────────────────────────────────────────── */
+
+.cm-ann-overlay {
+  /* slight z-index bump so it layers above other overlays */
+  z-index: 55;
+}
+
+.cm-ann-sheet {
+  /* wider than the tracking sheet — image cards need room */
+  max-width: 520px;
+  padding-top: 20px;
+}
+
+/* Card list */
+.cm-ann-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+/* Individual announcement card */
+.cm-ann-card {
+  border: 1px solid var(--cm-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--cm-bg);
+}
+
+/* Banner image */
+.cm-ann-card-img {
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+}
+
+.cm-ann-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Fallback icon strip when no image */
+.cm-ann-card-icon-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 0 6px;
+  color: var(--cm-accent);
+  opacity: 0.65;
+}
+
+/* Card text area */
+.cm-ann-card-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cm-ann-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--cm-text);
+}
+
+.cm-ann-card-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cm-muted);
+  white-space: pre-wrap;
+}
+
+.cm-ann-card-dates {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--cm-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Empty state */
+.cm-ann-empty {
+  text-align: center;
+  padding: 36px 0 8px;
+  color: var(--cm-muted);
+}
+
+.cm-ann-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  opacity: 0.45;
+}
+
+.cm-ann-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Megaphone button accent when it has active announcements */
+.cm-ann-btn--has {
+  color: var(--cm-accent);
+  border-color: color-mix(in srgb, var(--cm-accent) 35%, var(--cm-border));
+  background: var(--cm-teal-soft);
+}

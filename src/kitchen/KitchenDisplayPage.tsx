@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 import { toast } from 'sonner'
 import { operationsApi, type KitchenOrder } from '../api/operations'
 import type { OrderStatus } from '../api/types'
 import { Button } from '@/components/ui/button'
+import { applyDarkMode, readDarkMode, persistDarkMode } from '../lib/theme'
 
 const STATUS_FLOW: OrderStatus[] = ['Pending', 'Preparing', 'Ready', 'Completed']
 
@@ -45,8 +47,28 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
   const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => Date.now())
+  const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const seenPending = useRef<Set<string>>(new Set())
+
+  // Keep in sync with theme toggled in other tabs (merchant app)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'scanny-dark-mode') {
+        const next = readDarkMode()
+        applyDarkMode(next)
+        setDarkMode(next)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  function toggleTheme() {
+    const next = !darkMode
+    persistDarkMode(next)
+    setDarkMode(next)
+  }
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +154,14 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
         <Button variant="outline" size="sm" onClick={() => void load()}>
           Refresh
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          onClick={toggleTheme}
+        >
+          {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+        </Button>
       </header>
 
       {loading ? <p className="kds-loading">Loading orders…</p> : null}
@@ -193,3 +223,4 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
     </main>
   )
 }
+

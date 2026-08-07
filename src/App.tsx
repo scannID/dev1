@@ -90,6 +90,7 @@ import type { StaffRole } from './api/operations'
 import { resizeImageFile } from './lib/resizeImage'
 import { buildReportData, dailySeries } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
+import { AnnouncementsPanel } from './components/AnnouncementsPanel'
 import './App.css'
 
 // Sparkline component with soft area fill and smooth curves
@@ -302,6 +303,7 @@ function App({
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showAnnouncements, setShowAnnouncements] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
   const {
     broadcasts,
@@ -998,6 +1000,16 @@ function App({
               } } className={undefined}            >
               {darkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
             </Button>
+            {/* Announcements */}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Announcements"
+              title="Announcements"
+              onClick={() => setShowAnnouncements(true)}
+            >
+              <Megaphone className="size-3.5" />
+            </Button>
             {/* Notifications */}
             <Button
               variant="outline"
@@ -1260,6 +1272,13 @@ function App({
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* Announcements drawer */}
+        <AnnouncementsPanel
+          open={showAnnouncements}
+          businessId={business.id}
+          onOpenChange={setShowAnnouncements}
+        />
       </section>
     </main>
   )

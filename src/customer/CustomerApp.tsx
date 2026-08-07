@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Clock3, History, Package, Receipt, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Clock3, History, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { businessApi, devicesApi, feesApi, fxApi, ordersApi } from '../api/services'
+import { businessApi, devicesApi, feesApi, fxApi, ordersApi, announcementsApi } from '../api/services'
 import { operationsApi } from '../api/operations'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
+import type { BusinessAnnouncement } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
 import { KodeMark } from './KodeMark'
@@ -29,6 +30,7 @@ import { validateCustomSplit } from './splitValidation'
 import { WaitingStep, type SplitShareLive } from './steps/WaitingStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
+import { AnnouncementsCustomerPanel } from './AnnouncementsCustomerPanel'
 import {
   cartLineKey,
   isLodgingItem,
@@ -128,6 +130,7 @@ export default function CustomerApp({
   const draft = useMemo(() => loadCheckoutDraft(businessId), [businessId])
   const savedActiveOrder = useMemo(() => loadActiveOrder(businessId), [businessId])
   const resumedDraftRef = useRef(false)
+  const announcementsFetchedRef = useRef(false)
 
   const [business, setBusiness] = useState<Business | null>(null)
   const [items, setItems] = useState<CatalogItem[]>([])
@@ -174,6 +177,8 @@ export default function CustomerApp({
   const [showTracking, setShowTracking] = useState(false)
   const [showReceipts, setShowReceipts] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [announcements, setAnnouncements] = useState<BusinessAnnouncement[]>([])
+  const [showAnnouncements, setShowAnnouncements] = useState(false)
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
   const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
   const [ordersPaused, setOrdersPaused] = useState(false)
@@ -447,6 +452,21 @@ export default function CustomerApp({
       cancelled = true
     }
   }, [businessId, qrToken, applyOperationalStatus])
+
+  // Fetch active announcements — auto-show once after business loads
+  useEffect(() => {
+    if (!business || announcementsFetchedRef.current) return
+    announcementsFetchedRef.current = true
+    announcementsApi.listPublic(businessId).then((list) => {
+      setAnnouncements(list)
+      // Auto-open so customers see announcements immediately when they scan
+      if (list.length > 0) setShowAnnouncements(true)
+    }).catch((err) => {
+      if (import.meta.env.DEV) {
+        console.warn('[Announcements] Failed to load:', err instanceof Error ? err.message : err)
+      }
+    })
+  }, [businessId, business])
 
   useEffect(() => {
     let cancelled = false
@@ -1337,6 +1357,17 @@ export default function CustomerApp({
           ) : null}
           <button
             type="button"
+            className={`cm-track-btn${showAnnouncements ? ' active' : ''}${announcements.length > 0 ? ' cm-ann-btn--has' : ''}`}
+            onClick={() => setShowAnnouncements(true)}
+            aria-label={`${announcements.length} announcement${announcements.length === 1 ? '' : 's'}`}
+          >
+            <Megaphone size={15} />
+            {announcements.length > 0 ? (
+              <span className="cm-badge">{announcements.length}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
             className="cm-track-btn"
             onClick={() => setShowHistory(true)}
             aria-label="Order history"
@@ -1590,6 +1621,13 @@ export default function CustomerApp({
 
       {showHistory ? (
         <OrderHistoryPanel initialPhone={phone} onClose={() => setShowHistory(false)} />
+      ) : null}
+
+      {showAnnouncements ? (
+        <AnnouncementsCustomerPanel
+          announcements={announcements}
+          onClose={() => setShowAnnouncements(false)}
+        />
       ) : null}
       </div>
       {busyOverlayActive ? (

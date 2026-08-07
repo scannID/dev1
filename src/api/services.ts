@@ -55,6 +55,10 @@ import type {
   FeeConfig,
   MerchantBroadcastListResponse,
   UpdateCreatedEventRequest,
+  BusinessAnnouncement,
+  AnnouncementsListResponse,
+  CreateAnnouncementRequest,
+  UpdateAnnouncementRequest,
 } from './types'
 
 export type CatalogListParams = {
@@ -497,6 +501,52 @@ export const fxApi = {
   },
 }
 
+export const announcementsApi = {
+  /** Merchant: list all announcements for a business */
+  list: async (businessId: string): Promise<BusinessAnnouncement[]> => {
+    const response = await api.get<AnnouncementsListResponse>(
+      `/businesses/${businessId}/announcements`,
+    )
+    return response.announcements
+  },
+
+  /** Merchant: create a new announcement */
+  create: async (
+    businessId: string,
+    data: CreateAnnouncementRequest,
+  ): Promise<BusinessAnnouncement> => {
+    return api.post<BusinessAnnouncement>(
+      `/businesses/${businessId}/announcements`,
+      data,
+    )
+  },
+
+  /** Merchant: update an existing announcement */
+  update: async (
+    businessId: string,
+    id: string,
+    data: UpdateAnnouncementRequest,
+  ): Promise<BusinessAnnouncement> => {
+    return api.patch<BusinessAnnouncement>(
+      `/businesses/${businessId}/announcements/${id}`,
+      data,
+    )
+  },
+
+  /** Merchant: delete an announcement */
+  delete: async (businessId: string, id: string): Promise<void> => {
+    await api.delete(`/businesses/${businessId}/announcements/${id}`)
+  },
+
+  /** Public (customer): fetch active announcements for a business by QR token */
+  listPublic: async (businessId: string): Promise<BusinessAnnouncement[]> => {
+    const response = await api.getPublic<AnnouncementsListResponse>(
+      `/businesses/${businessId}/announcements/public`,
+    )
+    return response.announcements
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -510,6 +560,7 @@ export const scannyApi = {
   fees: feesApi,
   fx: fxApi,
   publicTickets: publicTicketsApi,
+  announcements: announcementsApi,
 }
 
 export default scannyApi

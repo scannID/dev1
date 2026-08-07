@@ -39,7 +39,6 @@ export function ReceiptBarcode({ orderId }: { orderId: string }) {
   return (
     <div className="cm-receipt-barcode">
       <svg ref={svgRef} className="cm-receipt-barcode-svg" />
-      <p className="cm-receipt-barcode-label">Scan to verify receipt</p>
     </div>
   )
 }

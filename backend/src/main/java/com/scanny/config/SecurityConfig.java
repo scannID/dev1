@@ -113,6 +113,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/public/**").permitAll()
                 // Temporary: allow public create-event image search (tighten later)
+                .requestMatchers(HttpMethod.GET, "/api/businesses/*/announcements/public").permitAll()
                 .requestMatchers("/api/images/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/tickets/qr/*/scan").hasAnyRole("MERCHANT", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/tickets/scan").hasAnyRole("MERCHANT", "ADMIN")

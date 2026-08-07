@@ -69,15 +69,12 @@ function ReceiptDetail({
   canReorder,
   onBack,
   onReorder,
-  onDelete,
 }: {
   receipt: CustomerReceipt
   canReorder: boolean
   onBack: () => void
   onReorder?: (receipt: CustomerReceipt) => void
-  onDelete?: () => void
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
     <div className="cm-receipt-detail">
@@ -174,38 +171,6 @@ function ReceiptDetail({
           </button>
         ) : null}
 
-        {onDelete ? (
-          confirmDelete ? (
-            <div className="cm-receipt-delete-confirm">
-              <p>Remove this receipt from this device?</p>
-              <div className="cm-receipt-delete-actions">
-                <button
-                  type="button"
-                  className="cm-receipt-keep-btn"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  Keep
-                </button>
-                <button type="button" className="cm-receipt-delete-btn" onClick={onDelete}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="cm-receipt-delete-trigger"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 size={16} /> Delete from this device
-            </button>
-          )
-        ) : null}
-
-        <p className="cm-receipt-footnote">
-          Saved on this device only. Other phones won&apos;t see these receipts.
-        </p>
-
         <div className="cm-receipt-qr-section">
           <ReceiptBarcode orderId={receipt.orderId} />
         </div>
@@ -271,7 +236,6 @@ export function ReceiptsPanel({
             canReorder={Boolean(currentBusinessId && selected.businessId === currentBusinessId && onReorder)}
             onBack={() => setSelectedId(null)}
             onReorder={onReorder}
-            onDelete={onDelete ? () => handleDelete(selected.id) : undefined}
           />
         ) : receipts.length === 0 ? (
           <div className="cm-receipts-empty">

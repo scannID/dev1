@@ -754,3 +754,39 @@ export interface MerchantBroadcastListResponse {
   unread: number
 }
 
+
+// ── Announcements ────────────────────────────────────────────────────────────
+
+export interface BusinessAnnouncement {
+  id: string
+  businessId: string
+  title: string
+  body?: string | null
+  imageUrl?: string | null
+  startsAt: string | null
+  endsAt: string | null
+  active: boolean
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface CreateAnnouncementRequest {
+  title: string
+  body?: string | null
+  imageUrl?: string | null
+  startsAt?: string | null
+  endsAt?: string | null
+}
+
+export interface UpdateAnnouncementRequest {
+  title?: string
+  body?: string | null
+  imageUrl?: string | null
+  startsAt?: string | null
+  endsAt?: string | null
+  active?: boolean
+}
+
+export interface AnnouncementsListResponse {
+  announcements: BusinessAnnouncement[]
+}
