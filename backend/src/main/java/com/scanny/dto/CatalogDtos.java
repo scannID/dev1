@@ -2,6 +2,7 @@ package com.scanny.dto;
 
 import com.scanny.entity.CatalogItem;
 import com.scanny.model.enums.ItemKind;
+import com.scanny.model.enums.RoomStatus;
 import com.scanny.util.CatalogItemImages;
 import com.scanny.util.JsonLists;
 import java.util.List;
@@ -69,7 +70,8 @@ public class CatalogDtos {
         ItemKind itemKind,
         int capacity,
         List<String> amenities,
-        int unitsAvailable
+        int unitsAvailable,
+        RoomStatus roomStatus
     ) {
         public static CatalogItemResponse from(CatalogItem item) {
             List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson()).stream()
@@ -91,7 +93,8 @@ public class CatalogDtos {
                 item.getItemKind(),
                 item.getCapacity(),
                 JsonLists.readStringList(item.getAmenitiesJson()),
-                item.getUnitsAvailable()
+                item.getUnitsAvailable(),
+                item.getRoomStatus()
             );
         }
     }

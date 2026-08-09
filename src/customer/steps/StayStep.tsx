@@ -36,7 +36,15 @@ export function StayStep({
   onAddStay: (itemId: string, checkInDate: string, checkOutDate: string) => void
 }) {
   const lodging = useMemo(
-    () => items.filter((item) => item.available && isLodgingItem(item)),
+    () =>
+      items.filter(
+        (item) =>
+          item.available &&
+          isLodgingItem(item) &&
+          // Only show rooms available for booking — non-VACANT rooms are hidden by the backend
+          // but this guard ensures the customer UI stays correct even on a stale cache.
+          (item.roomStatus === undefined || item.roomStatus === null || item.roomStatus === 'VACANT'),
+      ),
     [items],
   )
   const [selectedId, setSelectedId] = useState<string | null>(null)

@@ -186,4 +186,71 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             @Param("cancelled") OrderStatus cancelled,
             @Param("refunded") PaymentStatus refunded
     );
+
+    /**
+     * Returns all active (non-cancelled, non-refunded) lodging line items for a given
+     * catalog item whose stay window overlaps today, used to surface the current guest
+     * on the Booked Rooms tab.
+     */
+    @EntityGraph(attributePaths = "order")
+    @Query("""
+            SELECT li FROM OrderLineItem li
+            WHERE li.itemId = :itemId
+              AND li.checkInDate IS NOT NULL
+              AND li.checkOutDate IS NOT NULL
+              AND li.order.status <> :cancelled
+              AND li.order.paymentStatus <> :refunded
+              AND li.checkInDate <= :today
+              AND li.checkOutDate > :today
+            ORDER BY li.checkInDate ASC
+            """)
+    List<com.scanny.entity.OrderLineItem> findActiveBookingLinesForItem(
+            @Param("itemId") String itemId,
+            @Param("today") java.time.LocalDate today,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("refunded") PaymentStatus refunded
+    );
+
+    /**
+     * Returns all non-cancelled lodging lines for a business where checkout date
+     * is on or before today and the room is not yet freed (OCCUPIED or BOOKED status
+     * rooms will be found by the scheduler).
+     */
+    @EntityGraph(attributePaths = "order")
+    @Query("""
+            SELECT li FROM OrderLineItem li
+            WHERE li.order.business.id = :businessId
+              AND li.checkOutDate IS NOT NULL
+              AND li.checkOutDate <= :today
+              AND li.order.status <> :cancelled
+              AND li.order.paymentStatus <> :refunded
+            ORDER BY li.checkOutDate ASC
+            """)
+    List<com.scanny.entity.OrderLineItem> findOverdueCheckoutLines(
+            @Param("businessId") String businessId,
+            @Param("today") java.time.LocalDate today,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("refunded") PaymentStatus refunded
+    );
+
+    /**
+     * Finds the nearest upcoming booking line for a room item (checkIn > today).
+     * Used for BOOKED rooms where the guest has not yet arrived.
+     */
+    @EntityGraph(attributePaths = "order")
+    @Query("""
+            SELECT li FROM OrderLineItem li
+            WHERE li.itemId = :itemId
+              AND li.checkInDate IS NOT NULL
+              AND li.checkInDate > :today
+              AND li.order.status <> :cancelled
+              AND li.order.paymentStatus <> :refunded
+            ORDER BY li.checkInDate ASC
+            """)
+    List<com.scanny.entity.OrderLineItem> findUpcomingBookingLinesForItem(
+            @Param("itemId") String itemId,
+            @Param("today") java.time.LocalDate today,
+            @Param("cancelled") OrderStatus cancelled,
+            @Param("refunded") PaymentStatus refunded
+    );
 }

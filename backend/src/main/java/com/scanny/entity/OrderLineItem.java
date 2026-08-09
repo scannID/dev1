@@ -1,7 +1,10 @@
 package com.scanny.entity;
 
+import com.scanny.model.enums.ItemKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -53,6 +56,14 @@ public class OrderLineItem {
     /** Locked recipe COGS for this line (UGX) at payment time. */
     @Column(name = "cost_amount", nullable = false, columnDefinition = "integer default 0")
     private int costAmount = 0;
+
+    /**
+     * Snapshot of the catalog item's kind at order time.
+     * Allows kitchen queries to filter lodging lines without joining back to catalog_items.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_kind", nullable = false, columnDefinition = "VARCHAR(16) DEFAULT 'FOOD'")
+    private ItemKind itemKind = ItemKind.FOOD;
 
     public Long getId() {
         return id;
@@ -149,5 +160,17 @@ public class OrderLineItem {
 
     public void setCostAmount(int costAmount) {
         this.costAmount = Math.max(0, costAmount);
+    }
+
+    public ItemKind getItemKind() {
+        return itemKind == null ? ItemKind.FOOD : itemKind;
+    }
+
+    public void setItemKind(ItemKind itemKind) {
+        this.itemKind = itemKind == null ? ItemKind.FOOD : itemKind;
+    }
+
+    public boolean isLodging() {
+        return getItemKind() == ItemKind.ROOM || getItemKind() == ItemKind.SUITE;
     }
 }

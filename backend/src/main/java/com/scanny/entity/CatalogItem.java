@@ -1,6 +1,7 @@
 package com.scanny.entity;
 
 import com.scanny.model.enums.ItemKind;
+import com.scanny.model.enums.RoomStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -71,6 +72,14 @@ public class CatalogItem {
 
     @Column(name = "track_stock", nullable = false)
     private boolean trackStock = false;
+
+    /**
+     * Room lifecycle status — only meaningful when itemKind is ROOM or SUITE.
+     * Defaults to VACANT. Use {@link #isLodging()} before reading this field.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_status", nullable = false, columnDefinition = "VARCHAR(32) DEFAULT 'VACANT'")
+    private RoomStatus roomStatus = RoomStatus.VACANT;
 
     public String getId() {
         return id;
@@ -223,5 +232,18 @@ public class CatalogItem {
     public boolean isLodging() {
         ItemKind kind = getItemKind();
         return kind == ItemKind.ROOM || kind == ItemKind.SUITE;
+    }
+
+    public RoomStatus getRoomStatus() {
+        return roomStatus == null ? RoomStatus.VACANT : roomStatus;
+    }
+
+    public void setRoomStatus(RoomStatus roomStatus) {
+        this.roomStatus = roomStatus == null ? RoomStatus.VACANT : roomStatus;
+    }
+
+    /** Returns true when this room is available for a new guest booking. */
+    public boolean isAvailableForBooking() {
+        return isLodging() && getRoomStatus() == RoomStatus.VACANT;
     }
 }

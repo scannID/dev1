@@ -15,6 +15,7 @@ import com.scanny.entity.OrderLineItem;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
+import com.scanny.model.enums.RoomStatus;
 import com.scanny.entity.Merchant;
 import com.scanny.payment.model.FeeSplit;
 import com.scanny.repository.CatalogItemRepository;
@@ -230,6 +231,7 @@ public class OrderService {
             OrderLineItem line = new OrderLineItem();
             line.setItemId(item.getId());
             line.setName(item.getName());
+            line.setItemKind(item.getItemKind()); // snapshot kind at order time
             int unitPrice = CatalogPricing.effectivePrice(item.getPrice(), item.getDiscountPercent());
             line.setPrice(unitPrice);
             line.setQuantity(quantity);
@@ -245,6 +247,12 @@ public class OrderService {
                     throw new ApiException(400, "Stay must be at least 1 night for " + item.getName() + ".");
                 }
 
+                // Rooms with a single unit must be VACANT to accept a new booking.
+                int units = Math.max(item.getUnitsAvailable(), 1);
+                if (units == 1 && item.getRoomStatus() != RoomStatus.VACANT) {
+                    throw new ApiException(409, item.getName() + " is not available right now.");
+                }
+
                 long booked = orderRepository.sumOverlappingLodgingUnits(
                         item.getId(),
                         checkIn,
@@ -252,7 +260,6 @@ public class OrderService {
                         OrderStatus.Cancelled,
                         PaymentStatus.Refunded
                 );
-                int units = Math.max(item.getUnitsAvailable(), 1);
                 if (booked + quantity > units) {
                     throw new ApiException(
                             409,
@@ -332,6 +339,7 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         decrementStock(itemsById, lines);
+        markLodgingRoomsBooked(lines, itemsById);
         if (saved.getTableSessionId() != null) {
             tableService.linkOrderToSession(saved.getTableSessionId(), saved.getId());
         }
@@ -684,6 +692,48 @@ public class OrderService {
                                 "lowStockThreshold", item.getLowStockThreshold()
                         )
                 );
+            }
+        }
+    }
+
+    /**
+     * After a booking order is saved, mark every booked lodging item as BOOKED
+     * so it disappears from the customer availability list.
+     *
+     * For room types with multiple units (unitsAvailable > 1) we only mark BOOKED
+     * when all units are now taken (sumOverlappingLodgingUnits == unitsAvailable).
+     * Single-unit rooms are always marked BOOKED immediately.
+     */
+    private void markLodgingRoomsBooked(
+            List<OrderLineItem> lines,
+            Map<String, CatalogItem> itemsById
+    ) {
+        for (OrderLineItem line : lines) {
+            if (!line.isLodging()) {
+                continue;
+            }
+            CatalogItem item = itemsById.get(line.getItemId());
+            if (item == null) {
+                continue;
+            }
+            int units = Math.max(item.getUnitsAvailable(), 1);
+            if (units == 1) {
+                // Single physical room — mark BOOKED straight away.
+                item.setRoomStatus(RoomStatus.BOOKED);
+                catalogItemRepository.save(item);
+            } else {
+                // Multi-unit room type — check if all units are now claimed.
+                long occupiedAfter = orderRepository.sumOverlappingLodgingUnits(
+                        item.getId(),
+                        line.getCheckInDate(),
+                        line.getCheckOutDate(),
+                        OrderStatus.Cancelled,
+                        PaymentStatus.Refunded
+                );
+                if (occupiedAfter >= units) {
+                    item.setRoomStatus(RoomStatus.BOOKED);
+                    catalogItemRepository.save(item);
+                }
             }
         }
     }

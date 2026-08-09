@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -91,6 +91,7 @@ import { resizeImageFile } from './lib/resizeImage'
 import { buildReportData, dailySeries } from './lib/orderAnalytics'
 import { applyDarkMode, persistDarkMode, readDarkMode } from './lib/theme'
 import { AnnouncementsPanel } from './components/AnnouncementsPanel'
+import { BookedRoomsTab } from './components/BookedRoomsTab'
 import './App.css'
 
 // Sparkline component with soft area fill and smooth curves
@@ -298,6 +299,7 @@ function App({
   const [inventoryNavOpen, setInventoryNavOpen] = useState(false)
   const [operationsNavOpen, setOperationsNavOpen] = useState(false)
   const [floorPlanNavOpen, setFloorPlanNavOpen] = useState(false)
+  const [catalogNavOpen, setCatalogNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
@@ -337,6 +339,9 @@ function App({
     ])
     const viewPermMap: Record<string, PermissionId> = {
       catalog: 'catalog:read',
+      'catalog-food': 'catalog:read',
+      'catalog-rooms': 'catalog:read',
+      'catalog-booked': 'catalog:read',
       dashboard: 'orders:read',
       kitchen: 'kitchen:view',
     }
@@ -767,7 +772,13 @@ function App({
         <nav className="side-nav" aria-label="Workspace sections">
           {([
             { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
-            { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId },
+            { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId,
+              // Hotel merchants get Food + Rooms sub-items; others use the flat link
+              children: business.type === 'Hotel' ? [
+                { id: 'catalog-food', label: 'Food', icon: UtensilsCrossed },
+                { id: 'catalog-rooms', label: 'Rooms', icon: BedDouble },
+              ] : undefined,
+            },
             {
               id: 'inventory',
               label: 'Inventory',
@@ -815,22 +826,25 @@ function App({
                 view === 'inventory-transfer' ||
                 view === 'inventory-adjust' ||
                 view === 'inventory-waste')
+            const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms')
             const operationsChildActive = id === 'operations' && operationViews.has(view)
             const floorPlanChildActive = id === 'floor-plan' && (view === 'floor-plan-live' || view === 'floor-plan-edit')
-            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || operationsChildActive || floorPlanChildActive)
+            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || catalogChildActive || operationsChildActive || floorPlanChildActive)
             const groupOpen =
               id === 'inventory'
                 ? (inventoryNavOpen || inventoryChildActive)
-                : id === 'operations'
-                  ? (operationsNavOpen || operationsChildActive)
-                  : id === 'floor-plan'
-                    ? (floorPlanNavOpen || floorPlanChildActive)
-                    : false
+                : id === 'catalog'
+                  ? (catalogNavOpen || catalogChildActive)
+                  : id === 'operations'
+                    ? (operationsNavOpen || operationsChildActive)
+                    : id === 'floor-plan'
+                      ? (floorPlanNavOpen || floorPlanChildActive)
+                      : false
 
             if (children?.length) {
               const defaultChildView = children[0]?.id
               return (
-                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || operationsChildActive || floorPlanChildActive) ? ' active-group' : ''}`}>
+                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || catalogChildActive || operationsChildActive || floorPlanChildActive) ? ' active-group' : ''}`}>
                   <button
                     type="button"
                     className={isActive ? 'active' : ''}
@@ -841,6 +855,9 @@ function App({
                       if (id === 'inventory') {
                         setInventoryNavOpen((open) => !open)
                         if (!inventoryChildActive) setView('inventory')
+                      } else if (id === 'catalog') {
+                        setCatalogNavOpen((open) => !open)
+                        if (!catalogChildActive) setView('catalog-food')
                       } else if (id === 'operations') {
                         setOperationsNavOpen((open) => !open)
                         if (!operationsChildActive && defaultChildView) setView(defaultChildView)
@@ -869,6 +886,7 @@ function App({
                             setShowAddItem(false)
                             setEditingItem(null)
                             if (id === 'inventory') setInventoryNavOpen(true)
+                            if (id === 'catalog') setCatalogNavOpen(true)
                             if (id === 'operations') setOperationsNavOpen(true)
                             setView(childId)
                           }}
@@ -1148,9 +1166,10 @@ function App({
               </div>
             )}
 
-            {view === 'catalog' && (
+            {(view === 'catalog' || view === 'catalog-food' || view === 'catalog-rooms') && (
               <div className="page-content">
                 <CatalogPage
+                  key={view}
                   business={business}
                   onAddItem={(section) => {
                     setEditingItem(null)
@@ -1160,9 +1179,14 @@ function App({
                   onEditItem={(item) => {
                     setShowAddItem(false)
                     setEditingItem(item)
-                    setView('catalog')
                   }}
                   Sparkline={Sparkline}
+                  initialSection={
+                    view === 'catalog-rooms' ? 'lodging'
+                    : view === 'catalog-food' ? 'food'
+                    : undefined
+                  }
+                  hideSectionTabs={view === 'catalog-food' || view === 'catalog-rooms'}
                 />
               </div>
             )}
@@ -2137,14 +2161,21 @@ function CatalogPage({
   onAddItem,
   onEditItem,
   Sparkline,
+  initialSection,
+  hideSectionTabs,
 }: {
   business: Business
   onAddItem: (section: 'food' | 'lodging') => void
   onEditItem: (item: CatalogItem) => void
   Sparkline: (props: { data: number[]; color?: string }) => ReactElement | null
+  initialSection?: 'food' | 'lodging' | 'booked-rooms'
+  /** When true, hide the Food / Rooms / Booked-rooms toggle buttons (sidebar handles it). */
+  hideSectionTabs?: boolean
 }) {
   const isHotel = business.type === 'Hotel'
-  const [catalogSection, setCatalogSection] = useState<'food' | 'lodging'>('food')
+  const [catalogSection, setCatalogSection] = useState<'food' | 'lodging' | 'booked-rooms'>(
+    initialSection ?? 'food'
+  )
   const categories = useMemo(() => {
     const all = businessCategories(business)
     if (!isHotel) return all
@@ -2171,6 +2202,7 @@ function CatalogPage({
 
   useEffect(() => {
     if (!business.id) return
+    if (catalogSection === 'booked-rooms') return  // handled by BookedRoomsTab itself
     let cancelled = false
     async function loadPage() {
       setListLoading(true)
@@ -2229,7 +2261,7 @@ function CatalogPage({
 
   return (
     <section className="catalog-page">
-      {isHotel ? (
+      {isHotel && !hideSectionTabs ? (
         <div className="mb-4 flex flex-wrap gap-2">
           <Button
             type="button"
@@ -2247,9 +2279,23 @@ function CatalogPage({
           >
             Rooms &amp; suites
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={catalogSection === 'booked-rooms' ? 'default' : 'outline'}
+            onClick={() => { setCatalogSection('booked-rooms'); resetFilters() }}
+          >
+            <BedDouble size={14} className="mr-1.5" />
+            Booked rooms
+          </Button>
         </div>
       ) : null}
 
+      {/* Booked Rooms management view — hotel only */}
+      {isHotel && catalogSection === 'booked-rooms' ? (
+        <BookedRoomsTab businessId={business.id} />
+      ) : (
+        <>
       <section className="metric-grid" aria-label="Catalog summary">
         <div>
           <span>Total items</span>
@@ -2403,6 +2449,8 @@ function CatalogPage({
             <PaginationBar pagination={pagination} hideWhenEmpty={false} />
           </div>
         </div>
+        </>
+      )}
       </section>
     )
 }

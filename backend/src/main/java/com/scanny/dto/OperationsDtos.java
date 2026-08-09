@@ -236,6 +236,8 @@ public final class OperationsDtos {
                     order.getTotal(),
                     order.getCreatedAt(),
                     order.getItems().stream()
+                            // Never show room/suite booking lines on the kitchen display.
+                            .filter(item -> !item.isLodging())
                             .map(item -> new KitchenLineItem(item.getName(), item.getQuantity(), ""))
                             .toList(),
                     tableLabel

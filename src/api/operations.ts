@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { OrderStatus } from './types'
+import type { OrderStatus, RoomStatus } from './types'
 
 export type StaffRole = 'MANAGER' | 'CASHIER' | 'KITCHEN' | 'WAITER'
 
@@ -121,6 +121,39 @@ export interface StaffMeResponse {
   staff: StaffMember
   business: import('./types').Business
   businesses: Array<{ businessId: string; businessName: string }>
+}
+
+// ── Hotel ops ─────────────────────────────────────────────────────────────────
+
+export interface ActiveBookingInfo {
+  orderId: string
+  guestName: string
+  guestPhone: string
+  checkIn: string
+  checkOut: string
+  nights: number
+  lineTotal: number
+}
+
+export interface BookedRoom {
+  itemId: string
+  name: string
+  category: string
+  roomStatus: RoomStatus
+  roomStatusLabel: string
+  price: number
+  capacity: number
+  amenities: string[]
+  imageUrl?: string | null
+  currentBooking?: ActiveBookingInfo | null
+}
+
+export interface ExtendStayResult {
+  orderId: string
+  itemId: string
+  newCheckOut: string
+  additionalNights: number
+  additionalCharge: number
 }
 
 export const operationsApi = {
@@ -277,5 +310,28 @@ export const operationsApi = {
     }>('/public/customer/history', {
       headers: { 'X-Customer-Session': sessionToken },
     }),
+
+  // ── Hotel room ops ────────────────────────────────────────────────────────
+
+  listBookedRooms: (businessId: string) =>
+    api.get<{ rooms: BookedRoom[] }>(`/businesses/${businessId}/operations/rooms/booked`).then((r) => r.rooms),
+
+  roomCheckIn: (businessId: string, itemId: string) =>
+    api.post<{ room: BookedRoom }>(`/businesses/${businessId}/operations/rooms/${encodeURIComponent(itemId)}/check-in`, {}).then((r) => r.room),
+
+  roomCheckOut: (businessId: string, itemId: string) =>
+    api.post<{ room: BookedRoom }>(`/businesses/${businessId}/operations/rooms/${encodeURIComponent(itemId)}/check-out`, {}).then((r) => r.room),
+
+  roomToggleMaintenance: (businessId: string, itemId: string) =>
+    api.post<{ room: BookedRoom }>(`/businesses/${businessId}/operations/rooms/${encodeURIComponent(itemId)}/maintenance`, {}).then((r) => r.room),
+
+  roomExtendStay: (businessId: string, itemId: string, newCheckOutDate: string) =>
+    api.post<{ extension: ExtendStayResult }>(`/businesses/${businessId}/operations/rooms/extend`, {
+      itemId,
+      newCheckOutDate,
+    }).then((r) => r.extension),
+
+  updateRoomStatus: (businessId: string, itemId: string, status: RoomStatus) =>
+    api.patch<{ room: BookedRoom }>(`/businesses/${businessId}/operations/rooms/${encodeURIComponent(itemId)}/status`, { status }).then((r) => r.room),
 }
 

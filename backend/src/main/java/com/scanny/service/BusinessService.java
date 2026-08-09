@@ -121,7 +121,11 @@ public class BusinessService {
     public List<CatalogItem> getAvailableMenu(String businessId, String qrToken) {
         Business business = requireBusiness(businessId);
         assertMenuQrAllowed(business, qrToken);
-        return business.getItems().stream().filter(CatalogItem::isAvailable).toList();
+        return business.getItems().stream()
+                .filter(CatalogItem::isAvailable)
+                // Lodging items only appear when VACANT — never show a booked/occupied/maintenance room.
+                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -130,6 +134,8 @@ public class BusinessService {
         Business business = requireBusinessLight(businessId);
         assertMenuQrAllowed(business, qrToken);
         return catalogItemRepository.findByBusiness_IdAndAvailableTrue(businessId).stream()
+                // Lodging items only appear when VACANT — never show a booked/occupied/maintenance room.
+                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
                 .map(CatalogDtos.CatalogItemResponse::from)
                 .toList();
     }
@@ -174,6 +180,8 @@ public class BusinessService {
 
         Map<String, CatalogItem> byId = catalogItemRepository.findByBusinessIdAndIdIn(businessId, orderedIds).stream()
                 .filter(CatalogItem::isAvailable)
+                // Don't surface non-vacant rooms as popular items in the customer booking view.
+                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
                 .collect(Collectors.toMap(CatalogItem::getId, Function.identity(), (a, b) -> a, LinkedHashMap::new));
 
         List<CatalogDtos.CatalogItemResponse> popular = new ArrayList<>();

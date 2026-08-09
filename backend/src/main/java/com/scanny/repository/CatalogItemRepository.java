@@ -50,4 +50,17 @@ public interface CatalogItemRepository extends JpaRepository<CatalogItem, String
     List<CatalogItem> findByBusiness_IdAndAvailableTrue(String businessId);
 
     List<CatalogItem> findByBusiness_IdOrderByNameAsc(String businessId);
+
+    /**
+     * Returns all lodging items (ROOM/SUITE) for a business that are NOT vacant —
+     * used to populate the Booked Rooms management tab.
+     */
+    @Query("""
+            SELECT c FROM CatalogItem c
+            WHERE c.business.id = :businessId
+              AND c.itemKind IN (com.scanny.model.enums.ItemKind.ROOM, com.scanny.model.enums.ItemKind.SUITE)
+              AND c.roomStatus <> com.scanny.model.enums.RoomStatus.VACANT
+            ORDER BY c.name ASC
+            """)
+    List<CatalogItem> findNonVacantLodgingByBusinessId(@Param("businessId") String businessId);
 }

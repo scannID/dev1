@@ -3,6 +3,7 @@ package com.scanny.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.scanny.entity.CatalogItem;
 import com.scanny.model.enums.ItemKind;
+import com.scanny.model.enums.RoomStatus;
 import com.scanny.util.CatalogItemImages;
 import com.scanny.util.JsonLists;
 import java.util.List;
@@ -23,7 +24,8 @@ public record CatalogItemResponse(
         ItemKind itemKind,
         Integer capacity,
         List<String> amenities,
-        Integer unitsAvailable
+        Integer unitsAvailable,
+        RoomStatus roomStatus
 ) {
     public static CatalogItemResponse from(CatalogItem item) {
         List<String> gallery = JsonLists.readStringList(item.getImageUrlsJson()).stream()
@@ -45,7 +47,8 @@ public record CatalogItemResponse(
                 item.getItemKind(),
                 item.isLodging() ? item.getCapacity() : null,
                 item.isLodging() ? JsonLists.readStringList(item.getAmenitiesJson()) : null,
-                item.isLodging() ? item.getUnitsAvailable() : null
+                item.isLodging() ? item.getUnitsAvailable() : null,
+                item.isLodging() ? item.getRoomStatus() : null
         );
     }
 }

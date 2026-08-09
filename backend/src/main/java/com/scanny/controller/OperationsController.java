@@ -1,5 +1,6 @@
 package com.scanny.controller;
 
+import com.scanny.dto.HotelOpsDtos;
 import com.scanny.dto.OperationsDtos;
 import com.scanny.dto.OrderResponse;
 import com.scanny.dto.OrderUpdateDtos;
@@ -7,6 +8,7 @@ import com.scanny.model.enums.OrderStatus;
 import com.scanny.security.OperationsAccessService;
 import com.scanny.service.CatalogCsvService;
 import com.scanny.service.CustomerEngagementService;
+import com.scanny.service.HotelOpsService;
 import com.scanny.service.OperationsService;
 import com.scanny.service.OrderService;
 import com.scanny.service.PrintReceiptService;
@@ -41,6 +43,7 @@ public class OperationsController {
     private final PrintReceiptService printReceiptService;
     private final OrderService orderService;
     private final OperationsAccessService operationsAccessService;
+    private final HotelOpsService hotelOpsService;
 
     public OperationsController(
             OperationsService operationsService,
@@ -50,7 +53,8 @@ public class OperationsController {
             CatalogCsvService catalogCsvService,
             PrintReceiptService printReceiptService,
             OrderService orderService,
-            OperationsAccessService operationsAccessService
+            OperationsAccessService operationsAccessService,
+            HotelOpsService hotelOpsService
     ) {
         this.operationsService = operationsService;
         this.staffService = staffService;
@@ -60,6 +64,7 @@ public class OperationsController {
         this.printReceiptService = printReceiptService;
         this.orderService = orderService;
         this.operationsAccessService = operationsAccessService;
+        this.hotelOpsService = hotelOpsService;
     }
 
     @GetMapping("/branches")
@@ -317,5 +322,67 @@ public class OperationsController {
         operationsAccessService.requireMerchantOrStaff(
                 businessId, staffSession, OperationsAccessService.floorRoles());
         return Map.of("reservation", customerEngagementService.updateReservation(businessId, reservationId, request));
+    }
+
+    // ── Hotel Room Operations ─────────────────────────────────────────────────
+
+    /** List all non-vacant rooms (BOOKED, OCCUPIED, CHECKOUT_PENDING, UNDER_MAINTENANCE). */
+    @GetMapping("/rooms/booked")
+    public Map<String, List<HotelOpsDtos.BookedRoomResponse>> listBookedRooms(
+            @PathVariable String businessId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("rooms", hotelOpsService.listBookedRooms(businessId, staffSession));
+    }
+
+    /** Generic room status update (for admin-level overrides). */
+    @PatchMapping("/rooms/{itemId}/status")
+    public Map<String, HotelOpsDtos.BookedRoomResponse> updateRoomStatus(
+            @PathVariable String businessId,
+            @PathVariable String itemId,
+            @Valid @RequestBody HotelOpsDtos.UpdateRoomStatusRequest request,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("room", hotelOpsService.updateRoomStatus(businessId, itemId, request.status(), staffSession));
+    }
+
+    /** Mark a BOOKED room as OCCUPIED (guest has arrived). */
+    @PostMapping("/rooms/{itemId}/check-in")
+    public Map<String, HotelOpsDtos.BookedRoomResponse> checkIn(
+            @PathVariable String businessId,
+            @PathVariable String itemId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("room", hotelOpsService.checkIn(businessId, itemId, staffSession));
+    }
+
+    /** Mark a room as VACANT (guest has checked out). */
+    @PostMapping("/rooms/{itemId}/check-out")
+    public Map<String, HotelOpsDtos.BookedRoomResponse> checkOut(
+            @PathVariable String businessId,
+            @PathVariable String itemId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("room", hotelOpsService.checkOut(businessId, itemId, staffSession));
+    }
+
+    /** Toggle a room between VACANT and UNDER_MAINTENANCE. */
+    @PostMapping("/rooms/{itemId}/maintenance")
+    public Map<String, HotelOpsDtos.BookedRoomResponse> toggleMaintenance(
+            @PathVariable String businessId,
+            @PathVariable String itemId,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("room", hotelOpsService.toggleMaintenance(businessId, itemId, staffSession));
+    }
+
+    /** Extend a guest's current stay. */
+    @PostMapping("/rooms/extend")
+    public Map<String, HotelOpsDtos.ExtendStayResponse> extendStay(
+            @PathVariable String businessId,
+            @Valid @RequestBody HotelOpsDtos.ExtendStayRequest request,
+            @RequestHeader(value = OperationsAccessService.STAFF_SESSION_HEADER, required = false) String staffSession
+    ) {
+        return Map.of("extension", hotelOpsService.extendStay(businessId, request, staffSession));
     }
 }

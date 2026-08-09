@@ -327,6 +327,8 @@ public class OperationsService {
                 .collect(Collectors.toMap(t -> t.getId(), t -> t.getLabel(), (a, b) -> a));
 
         return orderRepository.findByBusinessIdAndStatusInOrderByCreatedAtAsc(businessId, active).stream()
+                // Skip orders that contain only lodging items — nothing for the kitchen to prepare.
+                .filter(order -> order.getItems().stream().anyMatch(line -> !line.isLodging()))
                 .map(order -> KitchenOrderResponse.from(order, tableLabels.getOrDefault(order.getTableId(), "")))
                 .toList();
     }

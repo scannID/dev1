@@ -4,6 +4,8 @@ export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique' | 'Hotel
 
 export type CatalogItemKind = 'FOOD' | 'ROOM' | 'SUITE'
 
+export type RoomStatus = 'VACANT' | 'BOOKED' | 'OCCUPIED' | 'CHECKOUT_PENDING' | 'UNDER_MAINTENANCE'
+
 export interface CatalogIngredient {
   id: string
   name: string
@@ -26,6 +28,8 @@ export interface CatalogItem {
   capacity?: number
   amenities?: string[]
   unitsAvailable?: number
+  /** Only populated for ROOM/SUITE items — reflects current occupancy lifecycle. */
+  roomStatus?: RoomStatus
 }
 
 export interface Business {

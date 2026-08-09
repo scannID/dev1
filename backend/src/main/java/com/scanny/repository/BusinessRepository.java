@@ -51,4 +51,7 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
 
     @Query("SELECT b FROM Business b WHERE b.merchantId IN :merchantIds OR b.id IN :merchantIds")
     List<Business> findByMerchantIdInOrIdIn(@Param("merchantIds") List<String> merchantIds);
+
+    /** Returns all businesses of a given type (lightweight, no catalog join). */
+    List<Business> findByType(com.scanny.model.enums.BusinessType type);
 }
