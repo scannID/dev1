@@ -46,4 +46,15 @@ public interface QrScanEventRepository extends JpaRepository<QrScanEvent, Long> 
             WHERE e.scannedAt >= :start AND e.scannedAt < :end
             """)
     long countBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    long countByBusinessId(String businessId);
+
+    @Query("""
+            SELECT e FROM QrScanEvent e
+            WHERE e.businessId = :businessId
+            ORDER BY e.scannedAt DESC
+            """)
+    org.springframework.data.domain.Page<QrScanEvent> findByBusinessId(
+            @Param("businessId") String businessId,
+            org.springframework.data.domain.Pageable pageable);
 }

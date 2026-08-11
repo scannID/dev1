@@ -31,6 +31,46 @@ public class AdminMerchantsController {
         return adminMerchantsService.getMerchantDetails(merchantId);
     }
 
+    /** Unified activity feed — orders + payments + scans merged into one timeline. */
+    @GetMapping("/{merchantId}/activity")
+    public AdminMerchantDtos.MerchantActivityResponse getMerchantActivity(
+        @PathVariable String merchantId,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "50") int limit
+    ) {
+        return adminMerchantsService.getMerchantActivity(merchantId, page, limit);
+    }
+
+    /** Paginated order list for one merchant. */
+    @GetMapping("/{merchantId}/orders")
+    public AdminMerchantDtos.MerchantOrdersResponse getMerchantOrders(
+        @PathVariable String merchantId,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int limit
+    ) {
+        return adminMerchantsService.getMerchantOrders(merchantId, page, limit);
+    }
+
+    /** Paginated payment list for one merchant. */
+    @GetMapping("/{merchantId}/payments")
+    public AdminMerchantDtos.MerchantPaymentsResponse getMerchantPayments(
+        @PathVariable String merchantId,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int limit
+    ) {
+        return adminMerchantsService.getMerchantPayments(merchantId, page, limit);
+    }
+
+    /** Paginated QR scan list for one merchant. */
+    @GetMapping("/{merchantId}/scans")
+    public AdminMerchantDtos.MerchantScansResponse getMerchantScans(
+        @PathVariable String merchantId,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int limit
+    ) {
+        return adminMerchantsService.getMerchantScans(merchantId, page, limit);
+    }
+
     @PatchMapping("/{merchantId}")
     public AdminMerchantDtos.MerchantDetails updateMerchant(
         @PathVariable String merchantId,

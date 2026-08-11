@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -428,7 +428,11 @@ function App({
           const openOrders = branchOrders.filter(
             (o) => o.status !== 'Completed' && o.status !== 'Cancelled',
           ).length
-          const kitchenOrders = branchOrders.filter((o) => ['Pending', 'Preparing', 'Ready'].includes(o.status)).length
+          const kitchenOrders = branchOrders.filter(
+            (o) =>
+              ['Pending', 'Preparing', 'Ready'].includes(o.status) &&
+              (!o.items || o.items.some((i: any) => !i.checkInDate && i.itemKind !== 'ROOM' && i.itemKind !== 'SUITE')),
+          ).length
           return [b.id, { openOrders, kitchenOrders }] as const
         } catch {
           return [b.id, { openOrders: 0, kitchenOrders: 0 }] as const
@@ -533,7 +537,9 @@ function App({
     (order) => order.status !== 'Completed' && order.status !== 'Cancelled',
   ).length
   const kitchenCount = businessOrders.filter(
-    (order) => order.status === 'Pending' || order.status === 'Preparing' || order.status === 'Ready',
+    (order) =>
+      (order.status === 'Pending' || order.status === 'Preparing' || order.status === 'Ready') &&
+      (!order.items || order.items.some((i: any) => !i.checkInDate && i.itemKind !== 'ROOM' && i.itemKind !== 'SUITE')),
   ).length
   const paidTotal = businessOrders
     .filter((order) => order.paymentStatus === 'Paid')
@@ -773,10 +779,11 @@ function App({
           {([
             { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
             { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId,
-              // Hotel merchants get Food + Rooms sub-items; others use the flat link
+              // Hotel merchants get Food + Rooms + Booked rooms sub-items; others use the flat link
               children: business.type === 'Hotel' ? [
                 { id: 'catalog-food', label: 'Food', icon: UtensilsCrossed },
                 { id: 'catalog-rooms', label: 'Rooms', icon: BedDouble },
+                { id: 'catalog-booked', label: 'Booked rooms', icon: CalendarCheck },
               ] : undefined,
             },
             {
@@ -826,7 +833,7 @@ function App({
                 view === 'inventory-transfer' ||
                 view === 'inventory-adjust' ||
                 view === 'inventory-waste')
-            const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms')
+            const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms' || view === 'catalog-booked')
             const operationsChildActive = id === 'operations' && operationViews.has(view)
             const floorPlanChildActive = id === 'floor-plan' && (view === 'floor-plan-live' || view === 'floor-plan-edit')
             const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || catalogChildActive || operationsChildActive || floorPlanChildActive)
@@ -964,7 +971,9 @@ function App({
                 : 'Merchant · Edit item')}
               {!editingItem && showAddItem && 'Merchant · Add item'}
               {!editingItem && !showAddItem && view === 'account' && 'Merchant · Overview'}
-              {!editingItem && !showAddItem && view === 'catalog' && 'Merchant · Catalog'}
+              {!editingItem && !showAddItem && view === 'catalog-food' && 'Merchant · Catalog · Food'}
+              {!editingItem && !showAddItem && view === 'catalog-rooms' && 'Merchant · Catalog · Rooms'}
+              {!editingItem && !showAddItem && view === 'catalog-booked' && 'Merchant · Booked rooms'}
               {!editingItem && !showAddItem && view === 'inventory' && 'Merchant · Inventory'}
               {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Merchant · Inventory · Transfer'}
               {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Merchant · Inventory · Adjust'}
@@ -980,7 +989,9 @@ function App({
                 : 'Edit item')}
               {!editingItem && showAddItem && 'Add item'}
               {!editingItem && !showAddItem && view === 'account' && `${timeGreeting}, ${welcomeName}`}
-              {!editingItem && !showAddItem && view === 'catalog' && 'Catalog'}
+              {!editingItem && !showAddItem && view === 'catalog-food' && 'Food catalog'}
+              {!editingItem && !showAddItem && view === 'catalog-rooms' && 'Rooms & suites'}
+              {!editingItem && !showAddItem && view === 'catalog-booked' && 'Booked rooms'}
               {!editingItem && !showAddItem && view === 'inventory' && 'Inventory'}
               {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Transfer'}
               {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Adjust'}
@@ -1166,7 +1177,7 @@ function App({
               </div>
             )}
 
-            {(view === 'catalog' || view === 'catalog-food' || view === 'catalog-rooms') && (
+            {(view === 'catalog' || view === 'catalog-food' || view === 'catalog-rooms' || view === 'catalog-booked') && (
               <div className="page-content">
                 <CatalogPage
                   key={view}
@@ -1182,11 +1193,12 @@ function App({
                   }}
                   Sparkline={Sparkline}
                   initialSection={
-                    view === 'catalog-rooms' ? 'lodging'
+                    view === 'catalog-booked' ? 'booked-rooms'
+                    : view === 'catalog-rooms' ? 'lodging'
                     : view === 'catalog-food' ? 'food'
                     : undefined
                   }
-                  hideSectionTabs={view === 'catalog-food' || view === 'catalog-rooms'}
+                  hideSectionTabs={view === 'catalog-food' || view === 'catalog-rooms' || view === 'catalog-booked'}
                 />
               </div>
             )}
@@ -2361,7 +2373,7 @@ function CatalogPage({
                 Clear filters
               </Button>
             )}
-            <Button size="sm" className="h-8" onClick={() => onAddItem(catalogSection)}>
+            <Button size="sm" className="h-8" onClick={() => onAddItem(catalogSection === 'lodging' ? 'lodging' : 'food')}>
               <Plus className="size-3.5" />
               {catalogSection === 'lodging' ? 'Add room / suite' : 'Add item'}
             </Button>

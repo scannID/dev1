@@ -32,9 +32,11 @@ import {
 import { toast } from 'sonner'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
+import { MerchantActivityPanel } from '../components/MerchantActivityPanel'
 import { useMerchants } from '../hooks/useMerchants'
 import { useServerPagination } from '../hooks/useServerPagination'
 import { adminApi } from '../api/services'
+import type { Merchant } from '../api/types'
 
 type StatusAction = {
   merchantId: string
@@ -75,6 +77,7 @@ export default function MerchantsPage() {
   const [statusChanging, setStatusChanging] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<StatusAction | null>(null)
   const [actionReason, setActionReason] = useState('')
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null)
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -86,6 +89,7 @@ export default function MerchantsPage() {
     mobileNumber: '',
     bankName: '',
     bankAccountNumber: '',
+    serviceFeeMerchantPercent: 0,
     termsAccepted: true,
   })
 
@@ -104,6 +108,7 @@ export default function MerchantsPage() {
       mobileNumber: '',
       bankName: '',
       bankAccountNumber: '',
+      serviceFeeMerchantPercent: 0,
       termsAccepted: true,
     })
   }
@@ -133,6 +138,7 @@ export default function MerchantsPage() {
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         paymentDestination,
+        serviceFeeMerchantPercent: formData.serviceFeeMerchantPercent,
         termsAccepted: formData.termsAccepted,
       })
 
@@ -249,6 +255,20 @@ export default function MerchantsPage() {
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.1s', cursor: 'pointer' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--muted)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                    onClick={() => {
+                      setSelectedMerchant({
+                        id: m.id,
+                        name: m.name,
+                        owner: m.owner,
+                        type: m.type,
+                        plan: m.plan,
+                        orders: m.orders,
+                        revenue: 0,
+                        currency: 'UGX',
+                        status: m.status,
+                        joinedAt: '',
+                      })
+                    }}
                   >
                     <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>{m.id}</td>
                     <td style={{ padding: '10px 16px', fontWeight: 500, color: 'var(--foreground)' }}>{m.name}</td>
@@ -267,7 +287,7 @@ export default function MerchantsPage() {
                       </Badge>
                     </td>
                     <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{m.joined}</td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon-sm" disabled={statusChanging === m.id}>
@@ -402,6 +422,36 @@ export default function MerchantsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Service fee commission split */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label htmlFor="serviceFeeMerchantPercent">
+                  Service Fee Commission — Merchant Share
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="serviceFeeMerchantPercent"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={formData.serviceFeeMerchantPercent}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        serviceFeeMerchantPercent: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                      })
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formData.serviceFeeMerchantPercent > 0
+                      ? `Merchant receives ${formData.serviceFeeMerchantPercent}% of the service fee. Platform keeps ${100 - formData.serviceFeeMerchantPercent}%.`
+                      : 'Platform keeps 100% of the service fee (default).'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <SheetFooter className="border-t border-border px-6 py-4 sm:flex-row sm:justify-end">
@@ -416,8 +466,7 @@ export default function MerchantsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Account Status Dialog ── */}
-      <Dialog open={!!pendingAction} onOpenChange={(open) => { if (!open) { setPendingAction(null); setActionReason('') } }}>
+      {/* ── Account Status Dialog ── */}      <Dialog open={!!pendingAction} onOpenChange={(open) => { if (!open) { setPendingAction(null); setActionReason('') } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -479,6 +528,13 @@ export default function MerchantsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Merchant Activity Panel ── */}
+      <MerchantActivityPanel
+        merchant={selectedMerchant}
+        open={selectedMerchant !== null}
+        onClose={() => setSelectedMerchant(null)}
+      />
     </>
   )
 }

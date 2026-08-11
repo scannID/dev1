@@ -155,6 +155,14 @@ public class Merchant {
     @Column(name = "allow_takeaway")
     private Boolean allowTakeaway = true;
 
+    /**
+     * Merchant's share of the service fee, expressed as a percentage (0–100).
+     * The platform retains the remainder. Default 0 = platform keeps the full fee.
+     * Example: 30 means 30% of the service fee is added to the merchant payout.
+     */
+    @Column(name = "service_fee_merchant_percent", nullable = false, columnDefinition = "INTEGER DEFAULT 0")
+    private int serviceFeeMerchantPercent = 0;
+
     // Marketing
     @Column(name = "referral_code", unique = true, length = 20)
     private String referralCode;
@@ -575,6 +583,18 @@ public class Merchant {
 
     public void setAllowTakeaway(Boolean allowTakeaway) {
         this.allowTakeaway = allowTakeaway;
+    }
+
+    public int getServiceFeeMerchantPercent() {
+        return serviceFeeMerchantPercent;
+    }
+
+    /**
+     * Sets the merchant's share of the service fee (0–100). Values outside
+     * that range are clamped so the field stays well-formed.
+     */
+    public void setServiceFeeMerchantPercent(int serviceFeeMerchantPercent) {
+        this.serviceFeeMerchantPercent = Math.max(0, Math.min(100, serviceFeeMerchantPercent));
     }
 
     public String getReferralCode() {

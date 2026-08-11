@@ -114,4 +114,87 @@ public class AdminMerchantDtos {
         String status,
         String reason
     ) {}
+
+    // ── Merchant Activity Feed ────────────────────────────────────────────────
+
+    /**
+     * One entry in the unified merchant activity timeline.
+     * {@code kind} is one of: ORDER | PAYMENT | SCAN | LOGIN | COMMISSION | AUDIT
+     */
+    public record ActivityEntry(
+        String id,
+        String kind,
+        String title,
+        String detail,
+        String status,
+        long amountUgx,       // 0 when not applicable
+        String occurredAt
+    ) {}
+
+    /** Aggregate stats shown at the top of the activity panel. */
+    public record MerchantActivitySummary(
+        long totalOrders,
+        long paidOrders,
+        long totalRevenue,        // UGX — sum of paid order totals
+        long totalCommission,     // UGX — merchant's cut of service fees across paid orders
+        long totalScans,
+        long totalPayments,
+        long failedPayments,
+        String lastLoginAt,       // ISO string or null
+        String currency
+    ) {}
+
+    /** Complete activity response: summary stats + paged timeline entries. */
+    public record MerchantActivityResponse(
+        MerchantActivitySummary summary,
+        List<ActivityEntry> events,
+        PaginationInfo pagination
+    ) {}
+
+    // ── Per-section list responses ────────────────────────────────────────────
+
+    public record OrderRow(
+        String id,
+        String customerName,
+        String status,
+        String paymentStatus,
+        long total,
+        long merchantPayout,
+        long serviceFee,
+        long platformFee,
+        String createdAt
+    ) {}
+
+    public record PaymentRow(
+        String id,
+        String orderId,
+        String provider,
+        String status,
+        long amount,
+        long merchantPayout,
+        long platformFee,
+        String customerPhone,
+        String createdAt
+    ) {}
+
+    public record ScanRow(
+        String businessId,
+        String occurredAt
+    ) {}
+
+    public record MerchantOrdersResponse(
+        List<OrderRow> orders,
+        PaginationInfo pagination
+    ) {}
+
+    public record MerchantPaymentsResponse(
+        List<PaymentRow> payments,
+        PaginationInfo pagination
+    ) {}
+
+    public record MerchantScansResponse(
+        List<ScanRow> scans,
+        long totalScans,
+        PaginationInfo pagination
+    ) {}
 }

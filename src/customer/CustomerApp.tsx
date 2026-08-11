@@ -28,6 +28,7 @@ import { StayStep } from './steps/StayStep'
 import { PayStep, type SplitShareDraft } from './steps/PayStep'
 import { validateCustomSplit } from './splitValidation'
 import { WaitingStep, type SplitShareLive } from './steps/WaitingStep'
+import { StayBookedStep } from './steps/StayBookedStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
 import { AnnouncementsCustomerPanel } from './AnnouncementsCustomerPanel'
@@ -173,6 +174,14 @@ export default function CustomerApp({
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('PENDING')
   const [paidTotal, setPaidTotal] = useState(0)
+  // Snapshot of stay booking details captured at payment time so they remain
+  // available after the cart is cleared on the confirmation screen.
+  const [staySnapshot, setStaySnapshot] = useState<{
+    roomName: string | null
+    checkInDate: string | null
+    checkOutDate: string | null
+    nights: number | null
+  } | null>(null)
   const [fulfillmentStatus, setFulfillmentStatus] = useState<OrderStatus>('Pending')
   const [showTracking, setShowTracking] = useState(false)
   const [showReceipts, setShowReceipts] = useState(false)
@@ -1036,6 +1045,17 @@ export default function CustomerApp({
       setPlacedOrderId(order.id)
       setPaidTotal(order.total || payableTotal)
       toast.success('Order placed successfully')
+
+      // Snapshot stay details before the cart is cleared on payment confirmation.
+      if (checkoutMode === 'stay' && cartItems.length > 0) {
+        const stayItem = cartItems[0]
+        setStaySnapshot({
+          roomName: stayItem.name ?? null,
+          checkInDate: stayItem.checkInDate ?? null,
+          checkOutDate: stayItem.checkOutDate ?? null,
+          nights: stayItem.nights ?? null,
+        })
+      }
       if (order.publicId) {
         setOrderPublicId(order.publicId)
         saveActiveOrder(businessId, {
@@ -1233,6 +1253,7 @@ export default function CustomerApp({
     setPaymentId(null)
     setPaymentStatus('PENDING')
     setPaidTotal(0)
+    setStaySnapshot(null)
     setFulfillmentStatus('Pending')
     setSplitEnabled(false)
     setSplitShares([])
@@ -1518,7 +1539,29 @@ export default function CustomerApp({
         />
       )}
 
-      {step === 'waiting' && placedOrderId && (
+      {step === 'waiting' && placedOrderId && checkoutMode === 'stay' && (
+        <StayBookedStep
+          businessName={business.name}
+          orderId={placedOrderId}
+          total={paidTotal || payableTotal}
+          provider={provider}
+          phone={phone}
+          status={paymentStatus}
+          checkInDate={staySnapshot?.checkInDate ?? cartItems[0]?.checkInDate ?? null}
+          checkOutDate={staySnapshot?.checkOutDate ?? cartItems[0]?.checkOutDate ?? null}
+          nights={staySnapshot?.nights ?? cartItems[0]?.nights ?? null}
+          roomName={staySnapshot?.roomName ?? cartItems[0]?.name ?? null}
+          error={error}
+          onRetry={() => void retryPayment()}
+          onChangeNumber={() => {
+            setStep('pay')
+            setError(null)
+          }}
+          onDone={orderMore}
+        />
+      )}
+
+      {step === 'waiting' && placedOrderId && checkoutMode !== 'stay' && (
         <WaitingStep
           businessName={business.name}
           paymentReference={business.paymentReference}
@@ -1542,7 +1585,28 @@ export default function CustomerApp({
         />
       )}
 
-      {step === 'done' && (
+      {step === 'done' && checkoutMode === 'stay' && placedOrderId && (
+        <StayBookedStep
+          businessName={business.name}
+          orderId={placedOrderId}
+          total={paidTotal}
+          provider={provider}
+          phone={phone}
+          status="PAID"
+          checkInDate={staySnapshot?.checkInDate ?? null}
+          checkOutDate={staySnapshot?.checkOutDate ?? null}
+          nights={staySnapshot?.nights ?? null}
+          roomName={staySnapshot?.roomName ?? null}
+          onRetry={() => void retryPayment()}
+          onChangeNumber={() => {
+            setStep('pay')
+            setError(null)
+          }}
+          onDone={orderMore}
+        />
+      )}
+
+      {step === 'done' && checkoutMode !== 'stay' && (
         <DoneStep
           businessName={business.name}
           orderId={placedOrderId}

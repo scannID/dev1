@@ -519,3 +519,78 @@ export interface PublishBroadcastRequest {
   severity?: BroadcastSeverity
   expiresAt?: string | null
 }
+
+// ── Merchant Activity Panel types ─────────────────────────────────────────
+
+export interface ActivityEntry {
+  id: string
+  kind: 'ORDER' | 'PAYMENT' | 'SCAN' | 'LOGIN' | 'COMMISSION' | 'AUDIT'
+  title: string
+  detail: string
+  status: string
+  amountUgx: number
+  occurredAt: string
+}
+
+export interface MerchantActivitySummary {
+  totalOrders: number
+  paidOrders: number
+  totalRevenue: number
+  totalCommission: number
+  totalScans: number
+  totalPayments: number
+  failedPayments: number
+  lastLoginAt: string | null
+  currency: string
+}
+
+export interface MerchantActivityResponse {
+  summary: MerchantActivitySummary
+  events: ActivityEntry[]
+  pagination: { page: number; limit: number; total: number; pages: number }
+}
+
+export interface MerchantOrderRow {
+  id: string
+  customerName: string
+  status: string
+  paymentStatus: string
+  total: number
+  merchantPayout: number
+  serviceFee: number
+  platformFee: number
+  createdAt: string
+}
+
+export interface MerchantOrdersResponse {
+  orders: MerchantOrderRow[]
+  pagination: { page: number; limit: number; total: number; pages: number }
+}
+
+export interface MerchantPaymentRow {
+  id: string
+  orderId: string
+  provider: string
+  status: string
+  amount: number
+  merchantPayout: number
+  platformFee: number
+  customerPhone: string
+  createdAt: string
+}
+
+export interface MerchantPaymentsResponse {
+  payments: MerchantPaymentRow[]
+  pagination: { page: number; limit: number; total: number; pages: number }
+}
+
+export interface MerchantScanRow {
+  businessId: string
+  occurredAt: string
+}
+
+export interface MerchantScansResponse {
+  scans: MerchantScanRow[]
+  totalScans: number
+  pagination: { page: number; limit: number; total: number; pages: number }
+}

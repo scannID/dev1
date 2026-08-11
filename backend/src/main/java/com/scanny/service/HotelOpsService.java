@@ -60,6 +60,7 @@ public class HotelOpsService {
     /**
      * Returns all rooms/suites that are currently BOOKED, OCCUPIED,
      * CHECKOUT_PENDING, or UNDER_MAINTENANCE, together with the active guest booking.
+     * For BOOKED rooms with a future check-in, the upcoming booking line is shown.
      */
     @Transactional(readOnly = true)
     public List<HotelOpsDtos.BookedRoomResponse> listBookedRooms(String businessId, String staffSession) {
@@ -70,7 +71,12 @@ public class HotelOpsService {
 
         return nonVacant.stream()
                 .map(item -> {
+                    // Try today's active line first; fall back to the next upcoming booking
+                    // so BOOKED rooms with a future check-in still show their reservation.
                     OrderLineItem activeLine = findActiveLine(item.getId(), today);
+                    if (activeLine == null && item.getRoomStatus() == com.scanny.model.enums.RoomStatus.BOOKED) {
+                        activeLine = findLatestFutureLine(item.getId());
+                    }
                     return HotelOpsDtos.BookedRoomResponse.from(item, activeLine);
                 })
                 .toList();

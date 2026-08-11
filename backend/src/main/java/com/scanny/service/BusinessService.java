@@ -18,8 +18,10 @@ import com.scanny.util.CodeUtils;
 import com.scanny.util.CatalogCategories;
 import com.scanny.util.WaitEstimate;
 import com.scanny.model.enums.OrderStatus;
+import com.scanny.model.enums.PaymentStatus;
 import com.scanny.repository.OrderRepository;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -117,14 +119,24 @@ public class BusinessService {
                 .orElseThrow(() -> new ApiException(404, "Business was not found."));
     }
 
+    private boolean isRoomAvailableToday(CatalogItem item) {
+        if (!item.isLodging()) {
+            return true;
+        }
+        // A room must be explicitly VACANT to appear in the customer-facing menu.
+        // BOOKED, OCCUPIED, CHECKOUT_PENDING, and UNDER_MAINTENANCE are all hidden
+        // from customers until the room is checked out and returns to VACANT.
+        return item.getRoomStatus() == com.scanny.model.enums.RoomStatus.VACANT;
+    }
+
     @Transactional(readOnly = true)
     public List<CatalogItem> getAvailableMenu(String businessId, String qrToken) {
         Business business = requireBusiness(businessId);
         assertMenuQrAllowed(business, qrToken);
         return business.getItems().stream()
                 .filter(CatalogItem::isAvailable)
-                // Lodging items only appear when VACANT — never show a booked/occupied/maintenance room.
-                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
+                // Lodging items only appear when vacant or check-out date reached.
+                .filter(this::isRoomAvailableToday)
                 .toList();
     }
 
@@ -134,8 +146,8 @@ public class BusinessService {
         Business business = requireBusinessLight(businessId);
         assertMenuQrAllowed(business, qrToken);
         return catalogItemRepository.findByBusiness_IdAndAvailableTrue(businessId).stream()
-                // Lodging items only appear when VACANT — never show a booked/occupied/maintenance room.
-                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
+                // Lodging items only appear when vacant or check-out date reached.
+                .filter(this::isRoomAvailableToday)
                 .map(CatalogDtos.CatalogItemResponse::from)
                 .toList();
     }
@@ -181,7 +193,7 @@ public class BusinessService {
         Map<String, CatalogItem> byId = catalogItemRepository.findByBusinessIdAndIdIn(businessId, orderedIds).stream()
                 .filter(CatalogItem::isAvailable)
                 // Don't surface non-vacant rooms as popular items in the customer booking view.
-                .filter(item -> !item.isLodging() || item.isAvailableForBooking())
+                .filter(this::isRoomAvailableToday)
                 .collect(Collectors.toMap(CatalogItem::getId, Function.identity(), (a, b) -> a, LinkedHashMap::new));
 
         List<CatalogDtos.CatalogItemResponse> popular = new ArrayList<>();

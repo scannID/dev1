@@ -33,6 +33,12 @@ public class MerchantDtos {
         String businessDescription,
         String businessAddress,
         String referralCode,
+
+        /**
+         * Percentage of the service fee that is shared back to the merchant (0–100).
+         * Null / absent means 0 — the platform retains the full service fee.
+         */
+        Integer serviceFeeMerchantPercent,
         
         @NotNull(message = "You must accept the terms and conditions")
         Boolean termsAccepted

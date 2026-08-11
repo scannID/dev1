@@ -42,6 +42,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class OrderService {
@@ -291,7 +293,7 @@ public class OrderService {
         }
 
         int subtotal = lines.stream().mapToInt(OrderLineItem::getLineTotal).sum();
-        FeeSplit fees = feeService.split(subtotal);
+        FeeSplit fees = feeService.split(subtotal, business.getMerchantId());
         String merchantMomo = resolveMerchantMomo(business.getMerchantId());
 
         Order order = new Order();
@@ -339,7 +341,18 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         decrementStock(itemsById, lines);
-        markLodgingRoomsBooked(lines, itemsById);
+        boolean hasLodging = markLodgingRoomsBooked(lines, itemsById);
+        if (hasLodging) {
+            // Evict AFTER the transaction commits so the re-populated cache
+            // sees the committed room_status = BOOKED, not the stale VACANT value.
+            final String bId = businessId;
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    businessService.evictMenuCache(bId);
+                }
+            });
+        }
         if (saved.getTableSessionId() != null) {
             tableService.linkOrderToSession(saved.getTableSessionId(), saved.getId());
         }
@@ -704,10 +717,11 @@ public class OrderService {
      * when all units are now taken (sumOverlappingLodgingUnits == unitsAvailable).
      * Single-unit rooms are always marked BOOKED immediately.
      */
-    private void markLodgingRoomsBooked(
+    private boolean markLodgingRoomsBooked(
             List<OrderLineItem> lines,
             Map<String, CatalogItem> itemsById
     ) {
+        boolean anyBooked = false;
         for (OrderLineItem line : lines) {
             if (!line.isLodging()) {
                 continue;
@@ -716,6 +730,7 @@ public class OrderService {
             if (item == null) {
                 continue;
             }
+            anyBooked = true;
             int units = Math.max(item.getUnitsAvailable(), 1);
             if (units == 1) {
                 // Single physical room — mark BOOKED straight away.
@@ -736,5 +751,6 @@ public class OrderService {
                 }
             }
         }
+        return anyBooked;
     }
 }

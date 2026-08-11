@@ -39,6 +39,10 @@ import type {
   AdminBroadcast,
   AdminBroadcastListResponse,
   PublishBroadcastRequest,
+  MerchantActivityResponse,
+  MerchantOrdersResponse,
+  MerchantPaymentsResponse,
+  MerchantScansResponse,
 } from './types'
 
 export const dashboardApi = {
@@ -76,6 +80,30 @@ export const merchantsApi = {
 
   get: async (merchantId: string): Promise<Merchant> => {
     return api.get<Merchant>(`/admin/merchants/${merchantId}`)
+  },
+
+  activity: async (merchantId: string, page = 1, limit = 50): Promise<MerchantActivityResponse> => {
+    return api.get<MerchantActivityResponse>(
+      `/admin/merchants/${merchantId}/activity?page=${page}&limit=${limit}`
+    )
+  },
+
+  orders: async (merchantId: string, page = 1, limit = 20): Promise<MerchantOrdersResponse> => {
+    return api.get<MerchantOrdersResponse>(
+      `/admin/merchants/${merchantId}/orders?page=${page}&limit=${limit}`
+    )
+  },
+
+  payments: async (merchantId: string, page = 1, limit = 20): Promise<MerchantPaymentsResponse> => {
+    return api.get<MerchantPaymentsResponse>(
+      `/admin/merchants/${merchantId}/payments?page=${page}&limit=${limit}`
+    )
+  },
+
+  scans: async (merchantId: string, page = 1, limit = 20): Promise<MerchantScansResponse> => {
+    return api.get<MerchantScansResponse>(
+      `/admin/merchants/${merchantId}/scans?page=${page}&limit=${limit}`
+    )
   },
 
   update: async (merchantId: string, data: { name?: string; plan?: string; status?: string }) => {

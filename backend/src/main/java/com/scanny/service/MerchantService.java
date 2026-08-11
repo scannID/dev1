@@ -81,6 +81,11 @@ public class MerchantService {
         if (request.referralCode() != null && !request.referralCode().isBlank()) {
             merchant.setReferredBy(request.referralCode());
         }
+
+        // Set merchant service-fee commission split if specified
+        if (request.serviceFeeMerchantPercent() != null) {
+            merchant.setServiceFeeMerchantPercent(request.serviceFeeMerchantPercent());
+        }
         
         // Initial status
         merchant.setStatus(Merchant.MerchantStatus.PENDING_VERIFICATION);
