@@ -416,15 +416,27 @@ public class AdminMerchantsService {
     }
 
     private String resolveMerchantStatus(Business business) {
-        return tryFindMerchant(business.getMerchantId())
-            .map(m -> statusToString(m.getStatus()))
-            .orElse(business.isAcceptingOrders() ? "active" : "suspended");
+        Optional<Merchant> merchantOpt = tryFindMerchant(business.getMerchantId());
+        if (merchantOpt.isPresent()) {
+            Merchant.MerchantStatus merchantStatus = merchantOpt.get().getStatus();
+            if (merchantStatus != Merchant.MerchantStatus.ACTIVE) {
+                return statusToString(merchantStatus);
+            }
+        }
+        return business.isAcceptingOrders() ? "active" : "suspended";
     }
 
     private String resolveStatusString(Business business, Map<String, Merchant.MerchantStatus> statusMap) {
         String mid = business.getMerchantId();
         if (mid != null && statusMap.containsKey(mid)) {
-            return statusToString(statusMap.get(mid));
+            Merchant.MerchantStatus merchantStatus = statusMap.get(mid);
+            // If the Merchant account is already suspended/closed, that wins.
+            if (merchantStatus != Merchant.MerchantStatus.ACTIVE) {
+                return statusToString(merchantStatus);
+            }
+            // Merchant is ACTIVE but this specific branch may have been individually
+            // suspended — reflect that via acceptingOrders.
+            return business.isAcceptingOrders() ? "active" : "suspended";
         }
         return business.isAcceptingOrders() ? "active" : "suspended";
     }
