@@ -353,11 +353,19 @@ public class AdminMerchantsService {
             throw new ApiException(400, "Invalid status. Use: ACTIVE, SUSPENDED, CLOSED, PENDING_VERIFICATION");
         }
 
-        Optional<Merchant> merchantOpt = tryFindMerchant(business.getMerchantId());
-        if (merchantOpt.isPresent()) {
-            Merchant merchant = merchantOpt.get();
-            merchant.setStatus(newStatus);
-            merchantRepository.save(merchant);
+        // Only propagate status to the shared Merchant record when the targeted
+        // business is the primary (or only) branch.  Changing a non-primary branch
+        // must never bleed through to sibling branches via the shared Merchant row.
+        boolean isPrimaryBranch = business.isPrimary()
+                || businessRepository.countByMerchantId(business.getMerchantId()) == 1;
+
+        if (isPrimaryBranch) {
+            Optional<Merchant> merchantOpt = tryFindMerchant(business.getMerchantId());
+            if (merchantOpt.isPresent()) {
+                Merchant merchant = merchantOpt.get();
+                merchant.setStatus(newStatus);
+                merchantRepository.save(merchant);
+            }
         }
 
         if (newStatus == Merchant.MerchantStatus.SUSPENDED || newStatus == Merchant.MerchantStatus.CLOSED) {

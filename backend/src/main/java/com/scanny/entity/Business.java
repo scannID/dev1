@@ -43,6 +43,9 @@ public class Business {
     @Column(name = "busy_eta_minutes", nullable = false)
     private int busyEtaMinutes = 0;
 
+    @Column(name = "busy_mode_expires_at")
+    private Instant busyModeExpiresAt = null;
+
     @Column(name = "pause_message", nullable = false)
     private String pauseMessage = "";
 
@@ -159,6 +162,14 @@ public class Business {
 
     public void setBusyEtaMinutes(int busyEtaMinutes) {
         this.busyEtaMinutes = Math.max(0, busyEtaMinutes);
+    }
+
+    public Instant getBusyModeExpiresAt() {
+        return busyModeExpiresAt;
+    }
+
+    public void setBusyModeExpiresAt(Instant busyModeExpiresAt) {
+        this.busyModeExpiresAt = busyModeExpiresAt;
     }
 
     public String getPauseMessage() {

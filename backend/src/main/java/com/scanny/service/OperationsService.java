@@ -20,6 +20,8 @@ import com.scanny.security.OperationsAccessService;
 import com.scanny.service.StarterCatalogService;
 import com.scanny.util.CatalogCategories;
 import com.scanny.util.CodeUtils;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -301,6 +303,17 @@ public class OperationsService {
         }
         if (business.isBusyMode() && business.getPauseMessage().isBlank()) {
             business.setPauseMessage("We're busy — orders may take longer.");
+        }
+
+        // Set server-side expiry when entering busy mode so the business
+        // auto-resumes even if the merchant closes the browser before the
+        // client-side countdown fires.
+        if (business.isBusyMode() && !wasBusy) {
+            int eta = business.getBusyEtaMinutes() > 0 ? business.getBusyEtaMinutes() : 20;
+            business.setBusyModeExpiresAt(Instant.now().plus(eta, ChronoUnit.MINUTES));
+        } else if (!business.isBusyMode()) {
+            // Revoking busy mode — clear the expiry.
+            business.setBusyModeExpiresAt(null);
         }
 
         Business saved = businessRepository.save(business);

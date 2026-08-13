@@ -54,4 +54,8 @@ public interface BusinessRepository extends JpaRepository<Business, String> {
 
     /** Returns all businesses of a given type (lightweight, no catalog join). */
     List<Business> findByType(com.scanny.model.enums.BusinessType type);
+
+    /** Finds all businesses currently in busy mode whose server-side expiry has passed. */
+    @Query("SELECT b FROM Business b WHERE b.busyMode = true AND b.busyModeExpiresAt IS NOT NULL AND b.busyModeExpiresAt <= :now")
+    List<Business> findExpiredBusyModeBusinesses(@Param("now") Instant now);
 }

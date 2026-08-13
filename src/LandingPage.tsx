@@ -1,906 +1,2057 @@
-import { type CSSProperties, useState, useEffect, useRef } from 'react'
-import { KodeDeviceStack } from './KodeDeviceStack'
-import { SiteFooter } from './marketing/SiteFooter'
+import { useState, useEffect } from 'react'
+import {
+  Scissors,
+  Check,
+  QrCode,
+  ClipboardList,
+  ShoppingBag,
+  CreditCard,
+} from 'lucide-react'
 
-/* ─── Design tokens (follow global light/dark via CSS vars) ─────────── */
-type LandingTokens = {
-  bg: string
-  bgAlt: string
-  text: string
-  textAlt: string
-  muted: string
-  border: string
-  teal: string
-  tealLt: string
-  tealXlt: string
+/* ─────────────────────────────────────────────────────────────
+   Concept: a kitchen order ticket, not a SaaS dashboard.
+   Paper, modern Outfit typography, a rubber stamp, a spike of tickets.
+   ───────────────────────────────────────────────────────────── */
+
+const C = {
+  paper: '#efe6d2',
+  paperLt: '#f7f1e3',
+  ink: '#26201a',
+  inkSoft: '#6b5e4e',
+  stamp: '#b23425',
+  spike: '#8a7355',
+  ok: '#3f5c3c',
 }
 
-const C: LandingTokens = {
-  bg:      '#ffffff',
-  bgAlt:   '#ffffff',
-  text:    'var(--foreground)',
-  textAlt: 'var(--foreground)',
-  muted:   'var(--muted-foreground)',
-  border:  'transparent',
-  teal:    'var(--primary)',
-  tealLt:  'var(--primary)',
-  tealXlt: 'var(--accent)',
-}
+/* ─────────────────────────────────────────────────────────────
+   Zigzag ticket edge
+   ───────────────────────────────────────────────────────────── */
 
-/* ─── Inline styles ─────────────────────────────────────────────────── */
-const getStyles = (tokens: LandingTokens): Record<string, CSSProperties> => ({
-  page: { fontFamily: "'Outfit Variable', sans-serif", background: 'transparent', color: tokens.text, overflowX: 'hidden', minHeight: '100vh', position: 'relative' },
-  nav: { background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: 'none', position: 'sticky', top: 0, zIndex: 50, overflow: 'visible' },
-  navInner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', maxWidth: 1160, margin: '0 auto', height: 60, gap: 16, overflow: 'visible' },
-  logo: { display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' },
-  logoMark: { width: 32, height: 32, borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  logoText: { color: tokens.text, fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' },
-  navLinks: { display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 },
-  navLink: { color: tokens.muted, fontSize: 14, textDecoration: 'none' },
-  navCta: { background: '#ffffff', color: '#e86a17', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', display: 'inline-flex', alignItems: 'center', gap: 8 },
-  hero: { background: 'transparent', padding: '100px 48px 100px', position: 'relative', overflow: 'hidden' },
-  heroInner: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, alignItems: 'center', maxWidth: '100%' },
-  eyebrow: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)', color: tokens.tealLt, fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, marginBottom: 20, letterSpacing: '0.02em' },
-  heroH1: { color: tokens.text, fontSize: 'clamp(30px,4vw,48px)', fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', margin: '0 0 16px' },
-  heroSub: { color: tokens.muted, fontSize: 'clamp(14px,1.7vw,17px)', lineHeight: 1.6, margin: '0 0 36px', maxWidth: 420 },
-  ctaRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  ctaPrimary: { background: '#ffffff', color: '#e86a17', padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid color-mix(in srgb, var(--primary) 28%, transparent)', cursor: 'pointer' },
-  ctaSecondary: { background: 'transparent', color: tokens.text, padding: '13px 28px', borderRadius: 10, fontSize: 15, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, border: `1.5px solid ${tokens.border}`, cursor: 'pointer' },
-})
+function Zigzag({ color = C.paperLt, flip = false }) {
+  const teeth = 26
 
-/* ─── Stripe-style fluid mesh gradient background ───────────────────── */
-function MeshGradientBackground() {
+  const pts = Array.from({ length: teeth }, (_, i) => {
+    const x = (i / teeth) * 100
+    const y = i % 2 === 0 ? 0 : 100
+    return `${x},${y}`
+  }).join(' ')
+
   return (
-    <div className="scanny-mesh" aria-hidden>
-      <div className="scanny-mesh__base" />
-      <div className="scanny-mesh__blob scanny-mesh__blob--violet" />
-      <div className="scanny-mesh__blob scanny-mesh__blob--pink" />
-      <div className="scanny-mesh__blob scanny-mesh__blob--blue" />
-      <div className="scanny-mesh__blob scanny-mesh__blob--peach" />
-      <div className="scanny-mesh__blob scanny-mesh__blob--lilac" />
-      <div className="scanny-mesh__wash" />
-      <style>{`
-        .scanny-mesh {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          overflow: hidden;
-          pointer-events: none;
-        }
-        .scanny-mesh__base {
-          position: absolute;
-          inset: 0;
-          background:
-            radial-gradient(120% 80% at 10% 0%, #fce7f3 0%, transparent 55%),
-            radial-gradient(100% 70% at 90% 10%, #e0e7ff 0%, transparent 50%),
-            radial-gradient(90% 60% at 50% 100%, #ffedd5 0%, transparent 55%),
-            linear-gradient(160deg, #faf5ff 0%, #f0f9ff 45%, #fff7ed 100%);
-        }
-        .scanny-mesh__blob {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(80px);
-          mix-blend-mode: multiply;
-          opacity: 0.72;
-          will-change: transform;
-        }
-        .scanny-mesh__blob--violet {
-          width: min(58vw, 720px);
-          height: min(58vw, 720px);
-          top: -12%;
-          left: -8%;
-          background: radial-gradient(circle, #8b5cf6 0%, #a78bfa 35%, transparent 70%);
-          animation: KodeMeshA 22s ease-in-out infinite;
-        }
-        .scanny-mesh__blob--pink {
-          width: min(52vw, 640px);
-          height: min(52vw, 640px);
-          top: 8%;
-          right: -10%;
-          background: radial-gradient(circle, #ec4899 0%, #f472b6 40%, transparent 72%);
-          animation: KodeMeshB 26s ease-in-out infinite;
-        }
-        .scanny-mesh__blob--blue {
-          width: min(60vw, 760px);
-          height: min(60vw, 760px);
-          bottom: -18%;
-          left: 18%;
-          background: radial-gradient(circle, #38bdf8 0%, #7dd3fc 38%, transparent 70%);
-          animation: KodeMeshC 24s ease-in-out infinite;
-        }
-        .scanny-mesh__blob--peach {
-          width: min(48vw, 580px);
-          height: min(48vw, 580px);
-          bottom: 10%;
-          right: 5%;
-          background: radial-gradient(circle, #fdba74 0%, #fed7aa 42%, transparent 72%);
-          animation: KodeMeshD 20s ease-in-out infinite;
-        }
-        .scanny-mesh__blob--lilac {
-          width: min(40vw, 480px);
-          height: min(40vw, 480px);
-          top: 38%;
-          left: 36%;
-          background: radial-gradient(circle, #c4b5fd 0%, #ddd6fe 45%, transparent 70%);
-          opacity: 0.55;
-          animation: KodeMeshE 28s ease-in-out infinite;
-        }
-        .scanny-mesh__wash {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.35) 100%);
-        }
-        @keyframes KodeMeshA {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(12%, 18%) scale(1.12); }
-          66% { transform: translate(22%, 6%) scale(0.94); }
-        }
-        @keyframes KodeMeshB {
-          0%, 100% { transform: translate(0, 0) scale(1.05); }
-          40% { transform: translate(-16%, 14%) scale(0.92); }
-          70% { transform: translate(-8%, 22%) scale(1.1); }
-        }
-        @keyframes KodeMeshC {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(14%, -18%) scale(1.15); }
-        }
-        @keyframes KodeMeshD {
-          0%, 100% { transform: translate(0, 0) scale(0.96); }
-          35% { transform: translate(-18%, -12%) scale(1.08); }
-          65% { transform: translate(-6%, -22%) scale(1); }
-        }
-        @keyframes KodeMeshE {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-20%, 10%) scale(1.2); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .scanny-mesh__blob { animation: none !important; }
-        }
-      `}</style>
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      style={{
+        width: '100%',
+        height: 10,
+        display: 'block',
+        transform: flip ? 'scaleY(-1)' : 'none',
+      }}
+    >
+      <polygon points={`0,100 ${pts} 100,100`} fill={color} />
+    </svg>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Punch holes
+   ───────────────────────────────────────────────────────────── */
+
+function PunchHoles() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-evenly',
+        padding: '0 6px',
+      }}
+    >
+      {Array.from({ length: 14 }, (_, i) => (
+        <div
+          key={i}
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            background: C.paper,
+          }}
+        />
+      ))}
     </div>
   )
 }
 
-/* ─── QR Mockup ─────────────────────────────────────────────────────── */
-function _QRMockup({ C: tokens }: { C: LandingTokens }) {
-  const [scanLine, setScanLine] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setScanLine(v => (v + 1) % 100), 18)
-    return () => clearInterval(id)
-  }, [])
+/* ─────────────────────────────────────────────────────────────
+   Signature: a live printing order ticket
+   ───────────────────────────────────────────────────────────── */
 
-  const qrPattern = [
-    [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,0,1,0,1,0,0,1,0,0,0,0,0,1],
-    [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,0,0,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,1,0,1,1,0,1,0,1,1,1,0,1],
-    [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
-    [0,0,0,0,0,0,0,0,1,1,0,1,0,0,0,0,0,0,0,0,0],
-    [1,1,0,1,1,0,1,1,1,0,1,0,1,1,0,1,1,0,1,1,0],
-    [0,1,0,0,1,0,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0],
-    [1,0,1,1,0,1,1,0,1,0,1,0,1,0,1,0,1,1,0,0,1],
-    [0,0,1,0,1,0,0,1,1,1,0,1,1,0,0,1,0,0,1,0,0],
-    [1,1,0,1,0,1,1,0,1,0,0,0,1,1,0,1,1,0,1,1,0],
-    [0,0,0,0,0,0,0,0,1,0,1,1,0,0,0,0,0,0,0,0,0],
-    [1,1,1,1,1,1,1,0,1,1,0,0,1,0,1,0,0,1,1,0,1],
-    [1,0,0,0,0,0,1,0,0,0,1,0,0,1,0,1,0,0,0,1,0],
-    [1,0,1,1,1,0,1,1,1,0,0,1,1,0,1,0,1,1,0,0,1],
-    [1,0,1,1,1,0,1,0,0,1,1,0,0,0,0,1,0,0,1,0,0],
-    [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,0,0,1,0,1,0],
-    [1,0,0,0,0,0,1,0,0,1,0,1,0,1,0,1,0,0,0,1,0],
-    [1,1,1,1,1,1,1,0,1,0,0,0,1,1,0,0,1,1,1,0,1],
-  ]
-  const cell = 10
-  const size = qrPattern.length * cell
-  const isDark = typeof document !== 'undefined' && document.body.classList.contains('dark-mode')
-  const qrFill = isDark ? '#e7ece4' : '#0d1612'
+const orderLines = [
+  { qty: '2x', item: 'Rolex, extra onion' },
+  { qty: '1x', item: 'Chicken luwombo' },
+  { qty: '3x', item: 'Nile Special' },
+  { qty: '1x', item: 'Passion juice' },
+]
 
-  return (
-    <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <div style={{ position: 'absolute', width: 340, height: 340, background: `radial-gradient(circle, color-mix(in srgb, ${tokens.teal} 20%, transparent) 0%, transparent 70%)`, borderRadius: '50%', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' }} />
-      <div style={{ background: tokens.bgAlt, borderRadius: 20, padding: '36px 36px 28px', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', position: 'relative', zIndex: 2, border: `1px solid ${tokens.border}` }}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: tokens.teal, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Scan to Order</span>
-          <div style={{ fontSize: 12, color: tokens.muted, marginTop: 2 }}>Brew House Café</div>
-        </div>
-        <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 8 }}>
-          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} xmlns="http://www.w3.org/2000/svg">
-            {qrPattern.map((row, ri) =>
-              row.map((val, ci) =>
-                val ? <rect key={`${ri}-${ci}`} x={ci * cell + 1} y={ri * cell + 1} width={cell - 2} height={cell - 2} rx={1.5} fill={qrFill} /> : null
-              )
-            )}
-          </svg>
-          <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${tokens.teal}, transparent)`, top: `${scanLine}%`, opacity: 0.9, transition: 'top 18ms linear', boxShadow: `0 0 8px ${tokens.teal}` }} />
-        </div>
-        <div style={{ textAlign: 'center', marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: tokens.teal }} />
-          <span style={{ fontSize: 11, color: tokens.muted, fontWeight: 500 }}>kode.com/menu/brewhousecafe</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ─── Interactive cursor field (blank-area hover) ───────────────────── */
-function isBlankHoverTarget(el: Element | null) {
-  if (!el) return true
-  const interactive = el.closest(
-    'a, button, input, textarea, select, label, [role="button"], .scanny-device-stack, .scanny-footer, nav, img, svg'
-  )
-  return !interactive
-}
-
-type Particle = {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  r: number
-  base: number
-}
-
-function CursorField() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
+  const [visible, setVisible] = useState(0)
+  const [stamped, setStamped] = useState(false)
 
   useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const coarse = window.matchMedia('(pointer: coarse)').matches
-    const canvas = canvasRef.current
-    if (reduce || coarse || !canvas) return
+    let cancelled = false
+    let printInterval: ReturnType<typeof setInterval> | undefined
+    let stampTimeout: ReturnType<typeof setTimeout> | undefined
+    let resetTimeout: ReturnType<typeof setTimeout> | undefined
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    function runCycle() {
+      setVisible(0)
+      setStamped(false)
+      onStamped?.(false)
 
-    const mouse = { x: -9999, y: -9999, active: false }
-    let raf = 0
-    let w = 0
-    let h = 0
-    let particles: Particle[] = []
+      let i = 0
 
-    const colors = [
-      '139, 92, 246',
-      '236, 72, 153',
-      '56, 189, 248',
-      '251, 146, 60',
-    ]
+      printInterval = setInterval(() => {
+        if (cancelled) return
 
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      w = window.innerWidth
-      h = window.innerHeight
-      canvas.width = Math.floor(w * dpr)
-      canvas.height = Math.floor(h * dpr)
-      canvas.style.width = `${w}px`
-      canvas.style.height = `${h}px`
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        i += 1
+        setVisible(i)
 
-      const count = Math.min(90, Math.floor((w * h) / 18000))
-      particles = Array.from({ length: count }, () => {
-        const base = 1.2 + Math.random() * 1.8
-        return {
-          x: Math.random() * w,
-          y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.25,
-          vy: (Math.random() - 0.5) * 0.25,
-          r: base,
-          base,
+        if (i >= orderLines.length) {
+          if (printInterval) clearInterval(printInterval)
+
+          stampTimeout = setTimeout(() => {
+            if (!cancelled) { setStamped(true); onStamped?.(true) }
+          }, 500)
+
+          resetTimeout = setTimeout(() => {
+            if (!cancelled) runCycle()
+          }, 7000)
         }
-      })
+      }, 480)
     }
 
-    const onMove = (e: MouseEvent) => {
-      mouse.x = e.clientX
-      mouse.y = e.clientY
-      mouse.active = isBlankHoverTarget(e.target as Element)
-    }
-    const onLeave = () => {
-      mouse.active = false
-    }
-
-    const draw = () => {
-      ctx.clearRect(0, 0, w, h)
-
-      for (const p of particles) {
-        p.x += p.vx
-        p.y += p.vy
-
-        if (p.x < -20) p.x = w + 20
-        if (p.x > w + 20) p.x = -20
-        if (p.y < -20) p.y = h + 20
-        if (p.y > h + 20) p.y = -20
-
-        if (mouse.active) {
-          const dx = mouse.x - p.x
-          const dy = mouse.y - p.y
-          const dist = Math.hypot(dx, dy) || 1
-          const radius = 160
-          if (dist < radius) {
-            const force = (1 - dist / radius) * 0.085
-            // Soft swirl + attract
-            p.vx += dx * force * 0.04 - dy * force * 0.03
-            p.vy += dy * force * 0.04 + dx * force * 0.03
-            p.r = p.base + (1 - dist / radius) * 2.2
-          } else {
-            p.r += (p.base - p.r) * 0.08
-          }
-        } else {
-          p.r += (p.base - p.r) * 0.08
-        }
-
-        p.vx *= 0.96
-        p.vy *= 0.96
-        p.vx += (Math.random() - 0.5) * 0.02
-        p.vy += (Math.random() - 0.5) * 0.02
-      }
-
-      // Links near cursor / between close particles
-      for (let i = 0; i < particles.length; i++) {
-        const a = particles[i]
-        for (let j = i + 1; j < particles.length; j++) {
-          const b = particles[j]
-          const dx = a.x - b.x
-          const dy = a.y - b.y
-          const dist = Math.hypot(dx, dy)
-          if (dist > 110) continue
-          const nearCursor =
-            mouse.active &&
-            Math.hypot((a.x + b.x) / 2 - mouse.x, (a.y + b.y) / 2 - mouse.y) < 180
-          if (!nearCursor && dist > 70) continue
-          const alpha = nearCursor ? 0.22 * (1 - dist / 110) : 0.08 * (1 - dist / 70)
-          ctx.beginPath()
-          ctx.moveTo(a.x, a.y)
-          ctx.lineTo(b.x, b.y)
-          ctx.strokeStyle = `rgba(99, 102, 241, ${alpha})`
-          ctx.lineWidth = nearCursor ? 1.2 : 0.7
-          ctx.stroke()
-        }
-      }
-
-      particles.forEach((p, i) => {
-        const near =
-          mouse.active ? Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / 160) : 0
-        const rgb = colors[i % colors.length]
-        const alpha = 0.2 + near * 0.55
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${rgb}, ${alpha})`
-        ctx.fill()
-        if (near > 0.35) {
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.r * 3.2, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(${rgb}, ${near * 0.12})`
-          ctx.fill()
-        }
-      })
-
-      // Soft core at cursor when blank
-      if (mouse.active) {
-        const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 90)
-        g.addColorStop(0, 'rgba(255,255,255,0.35)')
-        g.addColorStop(0.35, 'rgba(167,139,250,0.16)')
-        g.addColorStop(1, 'rgba(167,139,250,0)')
-        ctx.beginPath()
-        ctx.fillStyle = g
-        ctx.arc(mouse.x, mouse.y, 90, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      raf = requestAnimationFrame(draw)
-    }
-
-    resize()
-    draw()
-    window.addEventListener('resize', resize)
-    window.addEventListener('mousemove', onMove, { passive: true })
-    document.documentElement.addEventListener('mouseleave', onLeave)
+    runCycle()
 
     return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMove)
-      document.documentElement.removeEventListener('mouseleave', onLeave)
+      cancelled = true
+      if (printInterval) clearInterval(printInterval)
+      if (stampTimeout) clearTimeout(stampTimeout)
+      if (resetTimeout) clearTimeout(resetTimeout)
     }
   }, [])
-
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden
-      className="scanny-cursor-field"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 2,
-        pointerEvents: 'none',
-        width: '100%',
-        height: '100%',
-      }}
-    />
-  )
-}
-
-/* ─── Venue marquee (Uganda restaurants & hotels) ───────────────────── */
-type Venue = { name: string; logo: string }
-
-const venueRowA: Venue[] = [
-  { name: 'Serena Hotel Kampala', logo: '/venues/serena.svg' },
-  { name: 'Cafe Javas', logo: '/venues/javas.svg' },
-  { name: 'Speke Resort Munyonyo', logo: '/venues/speke.png' },
-  { name: 'Yujo Izakaya', logo: '/venues/yujo.svg' },
-  { name: 'Sheraton Kampala', logo: '/venues/sheraton.png' },
-  { name: 'The Lawns', logo: '/venues/lawns.svg' },
-  { name: 'Protea Hotel Kampala', logo: '/venues/protea.svg' },
-  { name: 'Faze 2', logo: '/venues/faze2.svg' },
-]
-
-const venueRowB: Venue[] = [
-  { name: 'Kampala Hilton', logo: '/venues/hilton.png' },
-  { name: 'Prunes Restaurant', logo: '/venues/prunes.svg' },
-  { name: 'Four Points by Sheraton', logo: '/venues/fourpoints.png' },
-  { name: 'Mediterraneo', logo: '/venues/mediterraneo.svg' },
-  { name: 'Hotel Africana', logo: '/venues/africana.png' },
-  { name: 'Cayenne', logo: '/venues/cayenne.svg' },
-  { name: 'Lake Victoria Serena', logo: '/venues/serena.svg' },
-  { name: 'Mama Ashanti', logo: '/venues/mamaashanti.svg' },
-]
-
-function VenuePill({ venue }: { venue: Venue }) {
-  const [failed, setFailed] = useState(false)
-  const initial = venue.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
   return (
     <div
       style={{
-        flexShrink: 0,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 18px',
-        whiteSpace: 'nowrap',
+        position: 'relative',
+        width: 300,
+        transform: 'rotate(1.2deg)',
       }}
     >
       <div
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: 7,
+          boxShadow: '0 30px 60px rgba(38,32,26,0.25)',
+          borderRadius: 3,
           overflow: 'hidden',
-          background: 'rgba(255,255,255,0.9)',
-          boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
         }}
       >
-        {!failed ? (
-          <img
-            src={venue.logo}
-            alt=""
-            width={28}
-            height={28}
-            onError={() => setFailed(true)}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        <Zigzag />
+
+        <div
+          style={{
+            background: C.paperLt,
+            padding: '22px 26px 30px',
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div
+            style={{
+              textAlign: 'center',
+              marginBottom: 4,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Outfit', sans-serif",
+                fontSize: 22,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                color: C.ink,
+              }}
+            >
+              KODE
+            </div>
+
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: C.inkSoft,
+                letterSpacing: '0.1em',
+              }}
+            >
+              BREW HOUSE CAFÉ · ONE CODE, ALL ORDERS
+            </div>
+          </div>
+
+          <div
+            style={{
+              borderTop: `1px dashed ${C.ink}55`,
+              margin: '14px 0',
+            }}
           />
-        ) : (
-          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.02em' }}>
-            {initial}
-          </span>
-        )}
+
+          <div
+            style={{
+              minHeight: orderLines.length * 22,
+            }}
+          >
+            {orderLines.map((l, i) => (
+              <div
+                key={l.item}
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  fontSize: 12.5,
+                  color: C.ink,
+                  padding: '3px 0',
+                  opacity: i < visible ? 1 : 0,
+                  transform:
+                    i < visible
+                      ? 'translateY(0)'
+                      : 'translateY(4px)',
+                  transition:
+                    'opacity .25s ease, transform .25s ease',
+                }}
+              >
+                <span
+                  style={{
+                    color: C.stamp,
+                    fontWeight: 700,
+                    width: 22,
+                  }}
+                >
+                  {l.qty}
+                </span>
+
+                <span>{l.item}</span>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderTop: `1px dashed ${C.ink}55`,
+              margin: '14px 0',
+            }}
+          />
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 11,
+              fontWeight: 500,
+              color: C.inkSoft,
+            }}
+          >
+            <span>ORDER № 0482</span>
+
+            <span>
+              {visible < orderLines.length
+                ? 'PRINTING…'
+                : 'IN KITCHEN'}
+            </span>
+          </div>
+
+          {/* Barcode-style QR nod */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 1.5,
+              marginTop: 16,
+              justifyContent: 'center',
+            }}
+          >
+            {Array.from({ length: 34 }, (_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: 2,
+                  height: (i * 7) % 5 === 0 ? 20 : 12,
+                  background: C.ink,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <Zigzag flip />
       </div>
-      <span
+
+      {/* Rubber stamp */}
+      <div
         style={{
-          fontSize: 'clamp(12px, 1.4vw, 15px)',
-          fontWeight: 600,
-          letterSpacing: '-0.02em',
-          color: 'var(--foreground)',
-          opacity: 0.78,
+          position: 'absolute',
+          top: 34,
+          right: -18,
+          transform: `rotate(-16deg) scale(${
+            stamped ? 1 : 0
+          })`,
+          transition:
+            'transform .35s cubic-bezier(.34,1.6,.64,1)',
+          pointerEvents: 'none',
         }}
       >
-        {venue.name}
-      </span>
+        <div
+          style={{
+            border: `3px solid ${C.stamp}`,
+            borderRadius: 8,
+            color: C.stamp,
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 800,
+            fontSize: 15,
+            letterSpacing: '0.08em',
+            padding: '4px 12px',
+            opacity: 0.85,
+          }}
+        >
+          CONFIRMED
+        </div>
+      </div>
     </div>
   )
 }
 
-function MarqueeRow({
-  items,
-  reverse = false,
-  duration = 40,
-}: {
-  items: Venue[]
-  reverse?: boolean
-  duration?: number
-}) {
-  const loop = [...items, ...items]
+/* ─────────────────────────────────────────────────────────────
+   Order tracker — slides out from the receipt after CONFIRMED
+   ───────────────────────────────────────────────────────────── */
+
+const trackSteps = [
+  { key: 'received', label: 'Received' },
+  { key: 'ready',    label: 'Ready' },
+  { key: 'complete', label: 'Complete' },
+]
+
+function OrderTracker({ visible: show, onComplete }: { visible: boolean; onComplete?: () => void }) {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    if (!show) { setStep(0); return }
+    let s = 0
+    setStep(0)
+    const iv = setInterval(() => {
+      s += 1
+      if (s >= trackSteps.length) {
+        clearInterval(iv)
+        setTimeout(() => onComplete?.(), 900)
+      }
+      setStep(s)
+    }, 1400)
+    return () => clearInterval(iv)
+  }, [show])
+
   return (
-    <div className="scanny-marquee-track" style={{ overflow: 'hidden', width: '100%' }}>
+    <div style={{
+      overflow: 'hidden',
+      maxWidth: show ? 220 : 0,
+      opacity: show ? 1 : 0,
+      transform: show ? 'translateX(0)' : 'translateX(30px)',
+      transition: 'max-width 0.5s cubic-bezier(.4,0,.2,1), opacity 0.45s ease, transform 0.45s ease',
+      flexShrink: 0,
+    }}>
+      <div style={{
+        background: C.paperLt,
+        border: `1px dashed ${C.ink}33`,
+        borderRadius: 12,
+        padding: '18px 16px',
+        width: 200,
+        marginLeft: 12,
+        boxSizing: 'border-box',
+      }}>
+        <div style={{
+          fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+          color: C.inkSoft, marginBottom: 18,
+          fontFamily: "'Outfit', sans-serif",
+        }}>
+          ORDER № 0482 · TRACKING
+        </div>
+
+        {/* Vertical step list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {trackSteps.map((s, i) => {
+            const done = i < step
+            const active = i === step
+            return (
+              <div key={s.key} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Circle */}
+                  <div style={{
+                    width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                    border: `2px solid ${done || active ? C.stamp : `${C.ink}22`}`,
+                    background: done ? C.stamp : active ? `${C.stamp}15` : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.4s ease',
+                    boxShadow: active ? `0 0 0 4px ${C.stamp}18` : 'none',
+                  }}>
+                    {done && (
+                      <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 5l2.5 2.5L8 3" stroke={C.paperLt} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {active && !done && (
+                      <div style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: C.stamp,
+                        animation: 'kodePulseDot 1s ease-in-out infinite',
+                      }} />
+                    )}
+                  </div>
+                  {/* Label */}
+                  <span style={{
+                    fontSize: 11, fontWeight: done || active ? 700 : 400,
+                    color: done || active ? C.ink : `${C.ink}55`,
+                    fontFamily: "'Outfit', sans-serif",
+                    letterSpacing: '0.03em',
+                    transition: 'color 0.3s ease',
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+                {/* Vertical connector */}
+                {i < trackSteps.length - 1 && (
+                  <div style={{
+                    width: 2, height: 22, marginLeft: 12,
+                    background: done ? C.stamp : `${C.ink}18`,
+                    borderRadius: 1,
+                    transition: 'background 0.4s ease',
+                  }} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Order scene — receipt → tracker slides in from right → ticket book
+   ───────────────────────────────────────────────────────────── */
+
+type ScenePhase = 'receipt' | 'tracker' | 'tickets'
+
+function OrderScene() {
+  const [phase, setPhase] = useState<ScenePhase>('receipt')
+  const [confirmed, setConfirmed] = useState(false)
+
+  function handleTrackComplete() {
+    setPhase('tickets')
+  }
+
+  function handleTicketsDone() {
+    setPhase('receipt')
+    setConfirmed(false)
+  }
+
+  function handleStamped(v: boolean) {
+    setConfirmed(v)
+    if (v) setPhase('tracker')
+  }
+
+  return (
+    <div style={{ position: 'relative', width: 560, minHeight: 420 }}>
+
+      {/* ── Receipt + tracker side by side (phases: receipt, tracker) ── */}
+      <div style={{
+        position: phase === 'tickets' ? 'absolute' : 'relative',
+        inset: 0,
+        opacity: phase === 'tickets' ? 0 : 1,
+        transform: phase === 'tickets' ? 'scale(0.96) translateY(8px)' : 'scale(1) translateY(0)',
+        transition: 'opacity 0.5s ease, transform 0.5s ease',
+        pointerEvents: phase === 'tickets' ? 'none' : 'auto',
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 0,
+      }}>
+        <OrderTicket onStamped={handleStamped} />
+        <OrderTracker visible={confirmed} onComplete={handleTrackComplete} />
+      </div>
+
+      {/* ── Ticket book (phase: tickets) ── */}
+      <div style={{
+        position: phase !== 'tickets' ? 'absolute' : 'relative',
+        inset: 0,
+        width: 420,
+        opacity: phase === 'tickets' ? 1 : 0,
+        transform: phase === 'tickets' ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(8px)',
+        transition: 'opacity 0.55s ease 0.15s, transform 0.55s ease 0.15s',
+        pointerEvents: phase === 'tickets' ? 'auto' : 'none',
+      }}>
+        <TicketBook onDone={handleTicketsDone} />
+      </div>
+
+    </div>
+  )
+}
+
+function EventTicketStub() {
+  const [sold, setSold] = useState(0)
+  const target = 214
+
+  useEffect(() => {
+    let cancelled = false
+    let iv: ReturnType<typeof setInterval> | undefined
+
+    function runCount() {
+      let n = 0
+      setSold(0)
+
+      iv = setInterval(() => {
+        if (cancelled) return
+
+        n += Math.ceil(target / 40)
+
+        if (n >= target) {
+          n = target
+
+          if (iv) clearInterval(iv)
+
+          setTimeout(() => {
+            if (!cancelled) runCount()
+          }, 3800)
+        }
+
+        setSold(n)
+      }, 45)
+    }
+
+    runCount()
+
+    return () => {
+      cancelled = true
+
+      if (iv) clearInterval(iv)
+    }
+  }, [])
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        maxWidth: 460,
+        margin: '0 auto',
+        boxShadow: '0 24px 50px rgba(38,32,26,0.2)',
+        transform: 'rotate(-0.6deg)',
+      }}
+    >
       <div
-        className={`scanny-marquee-strip${reverse ? ' scanny-marquee-strip--reverse' : ''}`}
-        style={{ animationDuration: `${duration}s` }}
+        style={{
+          background: C.paperLt,
+          flex: 1,
+          padding: '22px 24px',
+          fontFamily: "'Outfit', sans-serif",
+          position: 'relative',
+        }}
       >
-        {loop.map((venue, i) => (
-          <VenuePill key={`${venue.name}-${i}`} venue={venue} />
+        <div
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 700,
+            fontSize: 12,
+            color: C.stamp,
+            letterSpacing: '0.12em',
+            marginBottom: 6,
+          }}
+        >
+          ADMIT ONE · EVENT TICKET
+        </div>
+
+        <div
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 800,
+            fontSize: 24,
+            letterSpacing: '-0.02em',
+            color: C.ink,
+            marginBottom: 4,
+          }}
+        >
+          RIVERSIDE SESSIONS
+        </div>
+
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: C.inkSoft,
+            marginBottom: 14,
+          }}
+        >
+          JINJA · SAT 24 OCT · GATE 7:00 PM
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: 18,
+            fontSize: 10.5,
+            fontWeight: 500,
+            color: C.inkSoft,
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color: C.ink,
+                fontWeight: 700,
+              }}
+            >
+              GENERAL
+            </div>
+            UGX 40,000
+          </div>
+
+          <div>
+            <div
+              style={{
+                color: C.ink,
+                fontWeight: 700,
+              }}
+            >
+              VIP
+            </div>
+            UGX 120,000
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 10,
+            fontWeight: 600,
+            color: C.ok,
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: C.ok,
+              animation:
+                'kodePulseDot 1.4s ease-in-out infinite',
+            }}
+          />
+
+          {sold} SOLD, LIVE
+        </div>
+      </div>
+
+      {/* Perforation */}
+      <div
+        style={{
+          position: 'relative',
+          width: 0,
+        }}
+      >
+        {Array.from({ length: 9 }, (_, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: -4,
+              top: i * 26 + 6,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: C.paper,
+            }}
+          />
+        ))}
+      </div>
+
+      <div
+        style={{
+          background: C.ink,
+          color: C.paperLt,
+          width: 96,
+          padding: '18px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          animation:
+            'kodeGatePulse 2.6s ease-in-out infinite',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 1.5,
+          }}
+        >
+          {Array.from({ length: 25 }, (_, i) => (
+            <div
+              key={i}
+              style={{
+                width: 5,
+                height: 5,
+                background:
+                  (i * 7) % 3 === 0
+                    ? C.paperLt
+                    : 'transparent',
+              }}
+            />
+          ))}
+        </div>
+
+        <span
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 600,
+            fontSize: 8.5,
+            letterSpacing: '0.06em',
+            writingMode: 'vertical-rl',
+          }}
+        >
+          SCAN AT GATE
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Ticket Book — real paper-stack flip with borders
+   ───────────────────────────────────────────────────────────── */
+
+const bookEvents = [
+  {
+    title: 'RIVERSIDE SESSIONS',
+    detail: 'JINJA · SAT 24 OCT · GATE 7:00 PM',
+    tier1: 'GENERAL', price1: 'UGX 40,000',
+    tier2: 'VIP',     price2: 'UGX 120,000',
+    sold: 214,
+  },
+  {
+    title: 'NEON GARDEN RAVE',
+    detail: 'KAMPALA · FRI 7 NOV · GATE 9:00 PM',
+    tier1: 'REGULAR', price1: 'UGX 30,000',
+    tier2: 'TABLE',   price2: 'UGX 300,000',
+    sold: 88,
+  },
+  {
+    title: 'LAKE BREEZE BRUNCH',
+    detail: 'ENTEBBE · SUN 16 NOV · 11:00 AM',
+    tier1: 'BRUNCH',  price1: 'UGX 55,000',
+    tier2: 'COUPLE',  price2: 'UGX 90,000',
+    sold: 57,
+  },
+  {
+    title: 'AFROBEATS FRIDAY',
+    detail: 'KAMPALA · FRI 21 NOV · GATE 8:00 PM',
+    tier1: 'STANDARD',  price1: 'UGX 25,000',
+    tier2: 'VIP BOOTH', price2: 'UGX 200,000',
+    sold: 341,
+  },
+]
+
+function TicketBook({ onDone }: { onDone?: () => void } = {}) {
+  const [current, setCurrent] = useState(0)
+  const [phase, setPhase] = useState<'idle' | 'peel' | 'land'>('idle')
+  const [soldCount, setSoldCount] = useState(0)
+  const total = bookEvents.length
+  const maxFlips = 3
+
+  // page-turn cycle — runs maxFlips times then calls onDone
+  useEffect(() => {
+    let count = 0
+    function doFlip() {
+      if (count >= maxFlips) { onDone?.(); return }
+      setPhase('peel')
+      setTimeout(() => {
+        setCurrent((c) => (c + 1) % total)
+        setPhase('land')
+        setTimeout(() => {
+          setPhase('idle')
+          count++
+          // schedule next flip
+          setTimeout(doFlip, 2200)
+        }, 400)
+      }, 400)
+    }
+    const initial = setTimeout(doFlip, 2200)
+    return () => clearTimeout(initial)
+  }, []) // run once on mount
+
+  // sold counter
+  useEffect(() => {
+    const target = bookEvents[current].sold
+    let n = 0
+    setSoldCount(0)
+    const iv = setInterval(() => {
+      n += Math.ceil(target / 30)
+      if (n >= target) { n = target; clearInterval(iv) }
+      setSoldCount(n)
+    }, 30)
+    return () => clearInterval(iv)
+  }, [current])
+
+  const ev = bookEvents[current]
+  const next = bookEvents[(current + 1) % total]
+
+  // The "stack" behind — 4 paper layers peeking
+  const stackOffsets = [
+    { x: 6,  y: 6,  rot: 2.2 },
+    { x: 12, y: 12, rot: 4.2 },
+    { x: 18, y: 17, rot: 6.0 },
+    { x: 24, y: 22, rot: 7.8 },
+  ]
+
+  return (
+    <div style={{ position: 'relative', width: 380, height: 420 }}>
+
+      {/* Back paper stack layers */}
+      {stackOffsets.map((o, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            top: o.y,
+            left: o.x,
+            borderRadius: 16,
+            background: i === 0 ? '#f0e8d8' : i === 1 ? '#e8dfc8' : '#ddd5bb',
+            boxShadow: '0 8px 24px rgba(38,32,26,0.12)',
+            border: `1.5px solid ${C.spike}44`,
+            transform: `rotate(${o.rot}deg)`,
+          }}
+        />
+      ))}
+
+      {/* Next card — lands from above when peeling */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          height: 420,
+          borderRadius: 16,
+          background: C.paperLt,
+          border: `2px solid ${C.spike}55`,
+          boxShadow: '0 20px 48px rgba(38,32,26,0.18)',
+          overflow: 'hidden',
+          transform: phase === 'land' ? 'translateY(-18px) rotate(-1deg) scale(0.97)' : 'none',
+          transition: phase === 'land' ? 'transform 0.38s cubic-bezier(.2,.9,.3,1)' : 'none',
+          opacity: phase === 'peel' ? 0 : 1,
+        }}
+      >
+        <TicketBookPage ev={next} soldCount={0} fading={false} />
+      </div>
+
+      {/* Current card — peels away on exit */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          height: 420,
+          borderRadius: 16,
+          background: C.paperLt,
+          border: `2px solid ${C.spike}55`,
+          boxShadow: '0 28px 56px rgba(38,32,26,0.26)',
+          overflow: 'hidden',
+          transformOrigin: 'bottom center',
+          transform: phase === 'peel'
+            ? 'translateY(-24px) rotateX(12deg) scale(0.95)'
+            : 'none',
+          transition: phase === 'peel'
+            ? 'transform 0.38s cubic-bezier(.4,0,.6,1), opacity 0.38s ease'
+            : 'transform 0.28s ease',
+          opacity: phase === 'peel' ? 0 : 1,
+          perspective: 800,
+        }}
+      >
+        <TicketBookPage ev={ev} soldCount={soldCount} fading={phase === 'peel'} />
+      </div>
+
+      {/* Border decorations — rounded corners */}
+      <div style={{
+        position: 'absolute', top: -7, right: -7,
+        width: 32, height: 32,
+        borderTop: `3px solid ${C.stamp}`,
+        borderRight: `3px solid ${C.stamp}`,
+        borderRadius: '0 14px 0 0',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: -7, right: -7,
+        width: 32, height: 32,
+        borderBottom: `3px solid ${C.stamp}`,
+        borderRight: `3px solid ${C.stamp}`,
+        borderRadius: '0 0 14px 0',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: -7, left: -7,
+        width: 32, height: 32,
+        borderBottom: `3px solid ${C.stamp}`,
+        borderLeft: `3px solid ${C.stamp}`,
+        borderRadius: '0 0 0 14px',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', top: -7, left: -7,
+        width: 32, height: 32,
+        borderTop: `3px solid ${C.stamp}`,
+        borderLeft: `3px solid ${C.stamp}`,
+        borderRadius: '14px 0 0 0',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Page dots */}
+      <div style={{ position: 'absolute', bottom: -26, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5 }}>
+        {bookEvents.map((_, i) => (
+          <span key={i} style={{
+            width: i === current ? 18 : 5,
+            height: 5,
+            borderRadius: 3,
+            background: i === current ? C.stamp : `${C.ink}2a`,
+            transition: 'all .35s ease',
+          }} />
         ))}
       </div>
     </div>
   )
 }
 
-function VenueCarousel({ C }: { C: LandingTokens }) {
+function TicketBookPage({ ev, soldCount, fading }: {
+  ev: typeof bookEvents[0],
+  soldCount: number,
+  fading: boolean,
+}) {
   return (
-    <section
+    <div style={{
+      padding: '26px 26px 60px',
+      fontFamily: "'Outfit', sans-serif",
+      position: 'relative',
+      height: 420,
+      boxSizing: 'border-box',
+    }}>
+      {/* Top strip */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: C.stamp }}>ADMIT ONE</span>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {Array.from({ length: 10 }, (_, i) => (
+            <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: `${C.ink}28` }} />
+          ))}
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: C.inkSoft }}>KODE</span>
+      </div>
+
+      <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
+
+      {/* Event name */}
+      <div style={{
+        fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em',
+        color: C.ink, lineHeight: 1.1, marginBottom: 8,
+        opacity: fading ? 0 : 1, transition: 'opacity 0.2s ease',
+      }}>
+        {ev.title}
+      </div>
+
+      <div style={{ fontSize: 11.5, fontWeight: 500, color: C.inkSoft, letterSpacing: '0.07em', marginBottom: 20 }}>
+        {ev.detail}
+      </div>
+
+      {/* Tiers */}
+      <div style={{ display: 'flex', gap: 28, marginBottom: 20 }}>
+        {[{ label: ev.tier1, price: ev.price1 }, { label: ev.tier2, price: ev.price2 }].map(({ label, price }) => (
+          <div key={label}>
+            <div style={{ fontWeight: 700, fontSize: 11, color: C.ink, letterSpacing: '0.07em' }}>{label}</div>
+            <div style={{ fontWeight: 500, fontSize: 13, color: C.inkSoft, marginTop: 3 }}>{price}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
+
+      {/* Live sold + barcode row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.ok }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', background: C.ok,
+            animation: 'kodePulseDot 1.4s ease-in-out infinite',
+          }} />
+          {soldCount} SOLD
+        </div>
+        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+          {Array.from({ length: 24 }, (_, i) => (
+            <div key={i} style={{
+              width: 2,
+              height: (i * 7) % 5 === 0 ? 22 : 13,
+              background: C.ink, opacity: 0.5,
+            }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom scan strip — pinned to bottom */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: C.ink, padding: '10px 26px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        borderRadius: '0 0 16px 16px',
+      }}>
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: C.paper, opacity: 0.6 }}>
+          SCAN AT GATE
+        </span>
+        <div style={{ display: 'flex', gap: 2 }}>
+          {Array.from({ length: 20 }, (_, i) => (
+            <div key={i} style={{ width: 2, height: (i * 3) % 2 === 0 ? 12 : 7, background: C.paper, opacity: 0.4 }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Steps
+   ───────────────────────────────────────────────────────────── */
+
+const steps = [
+  {
+    n: '01',
+    title: 'Build your catalog',
+    body: 'Items, prices, photos. Save and it’s live.',
+  },
+  {
+    n: '02',
+    title: 'Share your QR',
+    body: 'On the table. Customers scan and order.',
+  },
+  {
+    n: '03',
+    title: 'Run the counter',
+    body: 'Tickets print in. Mark ready, mark paid.',
+  },
+]
+
+function TicketStack() {
+  const rot = [-6, 2, -2]
+
+  return (
+    <div
       style={{
-        position: 'relative',
-        zIndex: 1,
-        padding: '28px 0 48px',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 26,
+        flexWrap: 'wrap',
+        padding: '20px 0 10px',
+      }}
+    >
+      {steps.map((s, i) => (
+        <div
+          key={s.n}
+          style={{
+            background: C.paperLt,
+            width: 220,
+            borderRadius: 2,
+            padding: '18px 18px 22px',
+            transform: `rotate(${rot[i]}deg)`,
+            boxShadow:
+              '0 14px 30px rgba(38,32,26,0.18)',
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <PunchHoles />
+
+          <div
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontWeight: 800,
+              fontSize: 30,
+              color: `${C.ink}33`,
+              marginTop: 10,
+            }}
+          >
+            {s.n}
+          </div>
+
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 14,
+              color: C.ink,
+              margin: '6px 0 8px',
+            }}
+          >
+            {s.title}
+          </div>
+
+          <div
+            style={{
+              fontSize: 11.5,
+              fontWeight: 400,
+              lineHeight: 1.6,
+              color: C.inkSoft,
+            }}
+          >
+            {s.body}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Features
+   ───────────────────────────────────────────────────────────── */
+
+const topFeatures = [
+  {
+    Icon: QrCode,
+    title: 'Instant QR generation',
+    body: 'One code, live the moment you sign up.',
+  },
+  {
+    Icon: ClipboardList,
+    title: 'Live order dashboard',
+    body: 'Orders land in real time — pending to ready in a tap.',
+  },
+  {
+    Icon: ShoppingBag,
+    title: 'Catalog management',
+    body: 'Edit items anytime, customers see it instantly.',
+  },
+  {
+    Icon: CreditCard,
+    title: 'Payment tracking',
+    body: 'Mark paid, unpaid, or refunded. Revenue at a glance.',
+  },
+]
+
+function FeatureCards() {
+  const rot = [-1.4, 0.8, -0.6, 1.2]
+
+  return (
+    <div
+      style={{
+        maxWidth: 1040,
+        margin: '0 auto',
+      }}
+    >
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily: "'Outfit', sans-serif",
+          fontWeight: 800,
+          fontSize: 20,
+          letterSpacing: '0.08em',
+          color: C.ink,
+          marginBottom: 30,
+        }}
+      >
+        WHAT'S INCLUDED
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            window.innerWidth < 760
+              ? 'repeat(2, 1fr)'
+              : 'repeat(4, 1fr)',
+          gap: 20,
+        }}
+      >
+        {topFeatures.map(
+          ({ Icon, title, body }, i) => (
+            <div
+              key={title}
+              style={{
+                position: 'relative',
+                background: C.paperLt,
+                borderRadius: 4,
+                padding: '24px 20px 22px',
+                boxShadow:
+                  '0 14px 30px rgba(38,32,26,0.14)',
+                transform: `rotate(${rot[i]}deg)`,
+              }}
+            >
+              <Zigzag />
+
+              <div
+                style={{
+                  padding: '18px 0 4px',
+                }}
+              >
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 8,
+                    background: `${C.stamp}18`,
+                    border: `1.5px solid ${C.stamp}55`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <Icon
+                    size={17}
+                    color={C.stamp}
+                    strokeWidth={2}
+                  />
+                </div>
+
+                <div
+                  style={{
+                    fontFamily: "'Outfit', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    letterSpacing: '0.02em',
+                    color: C.ink,
+                    marginBottom: 8,
+                  }}
+                >
+                  {title.toUpperCase()}
+                </div>
+
+                <p
+                  style={{
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 11.5,
+                    fontWeight: 400,
+                    lineHeight: 1.6,
+                    color: C.inkSoft,
+                    margin: 0,
+                  }}
+                >
+                  {body}
+                </p>
+              </div>
+
+              <Zigzag flip />
+            </div>
+          )
+        )}
+      </div>
+
+      <div
+        style={{
+          textAlign: 'center',
+          marginTop: 32,
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: 11.5,
+          fontWeight: 500,
+          color: C.inkSoft,
+          letterSpacing: '0.08em',
+        }}
+      >
+        + EVENT TICKET SALES & SCANNING, ONE PLAN
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Venues
+   ───────────────────────────────────────────────────────────── */
+
+const venues = [
+  { name: 'Serena Hotel', city: 'Kampala' },
+  { name: 'Cafe Javas', city: 'Kampala' },
+  { name: 'Speke Resort Munyonyo', city: 'Kampala' },
+  { name: 'Sheraton Kampala', city: 'Kampala' },
+  { name: 'Source of the Nile Grill', city: 'Jinja' },
+  { name: 'Lake Victoria Serena', city: 'Entebbe' },
+  { name: 'Igongo Cultural Centre', city: 'Mbarara' },
+  { name: 'Acholi Inn', city: 'Gulu' },
+]
+
+function Manifest() {
+  const loop = [...venues, ...venues]
+
+  return (
+    <div
+      style={{
         overflow: 'hidden',
+        borderTop: `1px dashed ${C.ink}44`,
+        borderBottom: `1px dashed ${C.ink}44`,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          width: 'max-content',
+          animation:
+            'kodeManifest 32s linear infinite',
+        }}
+      >
+        {loop.map((v, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              gap: 10,
+              alignItems: 'baseline',
+              padding: '14px 30px',
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: C.inkSoft,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ color: C.stamp }}>
+              {String(
+                (i % venues.length) + 1
+              ).padStart(2, '0')}
+            </span>
+
+            <span
+              style={{
+                color: C.ink,
+                fontWeight: 600,
+              }}
+            >
+              {v.name}
+            </span>
+
+            <span>· {v.city.toUpperCase()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Main
+   ───────────────────────────────────────────────────────────── */
+
+type KodeLandingTicketProps = {
+  onGetStarted?: () => void
+  onCreateEventTicket?: () => void
+}
+
+export default function KodeLandingTicket({
+  onGetStarted,
+  onCreateEventTicket,
+}: KodeLandingTicketProps = {}) {
+  return (
+    <div
+      style={{
+        background: C.paper,
+        color: C.ink,
+        minHeight: '100vh',
+        overflowX: 'hidden',
+        fontFamily: "'Outfit', sans-serif",
       }}
     >
       <style>{`
-        .scanny-marquee-strip {
-          display: flex;
-          width: max-content;
-          animation: KodeMarqueeLeft linear infinite;
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
+        * {
+          box-sizing: border-box;
         }
-        .scanny-marquee-strip--reverse {
-          animation-name: KodeMarqueeRight;
+
+        body {
+          margin: 0;
+          font-family: 'Outfit', sans-serif;
         }
-        @keyframes KodeMarqueeLeft {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+
+        button,
+        input,
+        textarea,
+        select {
+          font-family: 'Outfit', sans-serif;
         }
-        @keyframes KodeMarqueeRight {
-          from { transform: translateX(-50%); }
-          to { transform: translateX(0); }
-        }
-        .scanny-marquee-fade {
-          pointer-events: none;
-          position: absolute;
-          inset: 0;
-          z-index: 2;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0.55) 0%,
-            transparent 12%,
-            transparent 88%,
-            rgba(255,255,255,0.55) 100%
-          );
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .scanny-marquee-strip {
-            animation: none !important;
+
+        @keyframes kodeManifest {
+          from {
+            transform: translateX(0);
+          }
+
+          to {
+            transform: translateX(-50%);
           }
         }
+
+        @keyframes kodeDeckIn {
+          from {
+            opacity: 0;
+            transform: translateY(18px) rotate(-4deg);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0) rotate(0deg);
+          }
+        }
+
+        @keyframes kodePulseDot {
+          0%,
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+
+          50% {
+            opacity: 0.4;
+            transform: scale(0.75);
+          }
+        }
+
+        @keyframes kodeGatePulse {
+          0%,
+          100% {
+            box-shadow:
+              inset 0 0 0 0 rgba(246,237,225,0);
+          }
+
+          50% {
+            box-shadow:
+              inset 0 0 14px 0 rgba(246,237,225,0.15);
+          }
+        }
+
+        .kode-stamp-btn {
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease;
+        }
+
+        .kode-stamp-btn:hover {
+          transform: rotate(-2deg) scale(1.03);
+        }
       `}</style>
 
-      <p
+      {/* Subtle paper grain */}
+      <div
         style={{
-          textAlign: 'center',
-          color: C.muted,
-          fontSize: 13,
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          margin: '0 0 28px',
+          position: 'fixed',
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: 'none',
+          opacity: 0.5,
+          backgroundImage: `repeating-linear-gradient(
+            0deg,
+            ${C.ink}05 0 1px,
+            transparent 1px 3px
+          )`,
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
         }}
       >
-        Trusted by leading venues across Uganda
-      </p>
-
-      <div style={{ position: 'relative' }}>
-        <div className="scanny-marquee-fade" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <MarqueeRow items={venueRowA} duration={38} />
-          <MarqueeRow items={venueRowB} reverse duration={44} />
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ─── How it works section ──────────────────────────────────────────── */
-const steps = [
-  { n: '01', title: 'Build your catalog', body: 'Add items with prices and availability. Changes go live instantly.' },
-  { n: '02', title: 'Share your QR', body: 'Display your code. Customers scan and order from their phone.' },
-  { n: '03', title: 'Run your dashboard', body: 'Track orders, update status, and manage payments in real time.' },
-]
-
-function HowItWorks({ C }: { C: LandingTokens }) {
-  return (
-    <section style={{ background: 'transparent', padding: '80px 24px', position: 'relative', zIndex: 1 }}>
-      <div style={{ maxWidth: 1160, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <p style={{ color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>How it works</p>
-          <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>Live in minutes</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 40 }}>
-          {steps.map(s => (
-            <div key={s.n} style={{ padding: '8px 4px' }}>
-              <span style={{ color: C.tealLt, fontSize: 13, fontWeight: 800, display: 'block', marginBottom: 16 }}>{s.n}</span>
-              <h3 style={{ color: C.text, fontSize: 18, fontWeight: 700, margin: '0 0 10px', letterSpacing: '-0.01em' }}>{s.title}</h3>
-              <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.65, margin: 0 }}>{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ─── Features section ───────────────────────────────────────────────── */
-const features = [
-  { icon: '⚡', title: 'Instant QR generation',    body: 'Every business gets a unique QR code and customer URL the moment they sign up.' },
-  { icon: '📋', title: 'Live order dashboard',      body: 'Orders arrive in real time. Update status from Pending to Ready with one click.' },
-  { icon: '🛍️', title: 'Catalog management',       body: 'Add, edit, or hide items anytime. Changes go live immediately for customers.' },
-  { icon: '💳', title: 'Payment tracking',          body: 'Mark orders as Paid, Unpaid, or Refunded. See revenue at a glance.' },
-  { icon: '📊', title: 'Order analytics',           body: 'Track open orders, paid sales, and completed orders from summary cards.' },
-  { icon: '📱', title: 'Mobile-first experience',   body: 'Customers order from any phone browser — no app download needed.' },
-]
-
-function Features({ C }: { C: LandingTokens }) {
-  return (
-    <section style={{ background: C.bg, padding: '80px 24px' }}>
-      <div style={{ maxWidth: 1160, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <p style={{ color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>Features</p>
-          <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>Everything you need, nothing you don't</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-          {features.map(f => (
-            <div key={f.title} style={{ background: C.bgAlt, border: `1px solid ${C.border}`, borderRadius: 14, padding: '24px 22px', transition: 'border-color 0.2s' }}>
-              <div style={{ fontSize: 28, marginBottom: 14 }}>{f.icon}</div>
-              <h3 style={{ color: C.text, fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>{f.title}</h3>
-              <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: 0 }}>{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ─── Business types section ─────────────────────────────────────────── */
-const bizTypes = [
-  { emoji: '🍽️', type: 'Restaurant', desc: 'Table-side ordering with real-time kitchen updates and payment tracking.' },
-  { emoji: '🍹', type: 'Bar',        desc: 'Seat or area ordering. Perfect for high-volume venues and late nights.' },
-  { emoji: '🎓', type: 'School',     desc: 'Canteen menus, lunch orders, and uniform or supply catalogs.' },
-  { emoji: '👗', type: 'Boutique',   desc: 'Product catalogs with delivery or pickup notes built in.' },
-]
-
-function BusinessTypes({ C }: { C: LandingTokens }) {
-  return (
-    <section style={{ background: C.bgAlt, padding: '80px 24px', borderTop: `1px solid ${C.border}` }}>
-      <div style={{ maxWidth: 1160, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <p style={{ color: C.tealLt, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 12px' }}>Business types</p>
-          <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,42px)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>Built for your kind of business</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
-          {bizTypes.map(b => (
-            <div key={b.type} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: '32px 24px', textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>{b.emoji}</div>
-              <h3 style={{ color: C.text, fontSize: 17, fontWeight: 700, margin: '0 0 10px' }}>{b.type}</h3>
-              <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: 0 }}>{b.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ─── CTA section ────────────────────────────────────────────────────── */
-function CtaSection({ onGetStarted, C }: { onGetStarted: () => void; C: LandingTokens }) {
-  const S = getStyles(C)
-  return (
-    <section style={{ background: C.bg, padding: '80px 24px', borderTop: `1px solid ${C.border}` }}>
-      <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: `${C.teal}22`, border: `1px solid ${C.teal}44`, color: C.tealLt, fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 20, marginBottom: 24, letterSpacing: '0.02em' }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.tealLt, display: 'inline-block' }} />
-          Ready to start
-        </div>
-        <h2 style={{ color: C.text, fontSize: 'clamp(28px,4vw,44px)', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 16px' }}>Ready to go live?</h2>
-        <p style={{ color: C.muted, fontSize: 17, lineHeight: 1.6, margin: '0 0 36px' }}>
-          Set up your QR menu in under 5 minutes. No credit card, no installs, no friction.
-        </p>
-        <button onClick={onGetStarted} style={{ ...S.ctaPrimary, fontSize: 16, padding: '15px 36px', margin: '0 auto' }} className="cta-primary">
-          <span className="cta-primary__label">Get started</span>
-          <svg className="cta-primary__arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <p style={{ color: C.muted, fontSize: 13, margin: '18px 0 0', opacity: 0.7 }}>No credit card required · Set up in 5 minutes</p>
-      </div>
-    </section>
-  )
-}
-
-/* ─── Top nav ────────────────────────────────────────────────────────── */
-function TopNav({
-  onGetStarted,
-  onCreateEventTicket,
-  S,
-}: {
-  onGetStarted: () => void
-  onCreateEventTicket: () => void
-  S: Record<string, CSSProperties>
-}) {
-  return (
-    <nav style={S.nav}>
-      <style>{`
-        .scanny-nav-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-shrink: 0;
-          margin-left: auto;
-        }
-        .scanny-nav-event {
-          background: transparent;
-          color: var(--foreground);
-          padding: 8px 14px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          text-decoration: none;
-          cursor: pointer;
-          border: 1px solid color-mix(in srgb, var(--foreground) 16%, transparent);
-          white-space: nowrap;
-          font-family: inherit;
-          display: inline-flex;
-          flex-direction: row;
-          align-items: center;
-          gap: 8px;
-        }
-        .scanny-nav-event:hover {
-          background: color-mix(in srgb, var(--foreground) 5%, transparent);
-        }
-        .scanny-nav-event__ticket {
-          display: inline-flex;
-          flex-shrink: 0;
-          order: 1;
-          position: relative;
-          z-index: 1;
-          color: #ea580c;
-          transform-origin: center;
-          animation: KodeTicketFloat 1.8s ease-in-out infinite;
-        }
-        .scanny-nav-event__label {
-          order: 0;
-        }
-        .scanny-nav-event:hover .scanny-nav-event__ticket {
-          animation: KodeTicketPop 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-        }
-        @keyframes KodeTicketFloat {
-          0%, 100% { transform: translateY(0) rotate(-6deg); }
-          50% { transform: translateY(-2px) rotate(4deg); }
-        }
-        @keyframes KodeTicketPop {
-          0% { transform: translateY(0) rotate(-6deg) scale(1); }
-          45% { transform: translateY(-3px) rotate(10deg) scale(1.12); }
-          100% { transform: translateY(0) rotate(-4deg) scale(1); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .scanny-nav-event__ticket { animation: none !important; }
-        }
-      `}</style>
-      <div style={S.navInner}>
-        <a href="#" style={S.logo}>
-          <div style={S.logoMark}>
-            <img src="/kode-icon.svg" alt="" width={32} height={32} style={{ width: '100%', height: '100%', display: 'block' }} />
-          </div>
-          <span style={S.logoText}>Kode</span>
-        </a>
-
-        <div className="scanny-nav-actions">
-          <button type="button" onClick={onCreateEventTicket} className="scanny-nav-event">
-            <span className="scanny-nav-event__label">Event ticketing</span>
-            <span className="scanny-nav-event__ticket" aria-hidden>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M2.5 4.25C2.5 3.56 3.06 3 3.75 3H12.25C12.94 3 13.5 3.56 13.5 4.25V6.1a1.35 1.35 0 0 0 0 2.55v1.85c0 .69-.56 1.25-1.25 1.25H3.75C3.06 11.75 2.5 11.19 2.5 10.5V8.65a1.35 1.35 0 0 0 0-2.55V4.25Z"
-                  stroke="currentColor"
-                  strokeWidth="1.35"
-                  strokeLinejoin="round"
+        {/* HEADER */}
+        <header
+          style={{
+            borderBottom: `1px dashed ${C.ink}44`,
+            padding: '18px 24px',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1100,
+              margin: '0 auto',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <a
+              href="#"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                textDecoration: 'none',
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                }}
+              >
+                <img
+                  src="/kode-icon.svg"
+                  alt=""
+                  width={28}
+                  height={28}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'block',
+                  }}
                 />
-                <path d="M9.75 3.35v8.05" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeDasharray="1.6 1.7" />
-                <path d="M4.5 5.5h3M4.5 7.5h2.25" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-            </span>
-          </button>
-          <button onClick={onGetStarted} style={S.navCta} className="cta-primary">
-            <span className="cta-primary__label">Get started</span>
-            <svg className="cta-primary__arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </nav>
-  )
-}
+              </div>
 
-/* ─── Main export ────────────────────────────────────────────────────── */
-export default function LandingPage({
-  onGetStarted,
-  onCreateEventTicket,
-}: {
-  onGetStarted: () => void
-  onCreateEventTicket: () => void
-}) {
-  const S = getStyles(C)
-  
-  return (
-    <div style={S.page} className="scanny-force-light">
-      <MeshGradientBackground />
-      <CursorField />
-      <style>{`
-        * { box-sizing: border-box; }
-        a:hover { opacity: 0.85; }
-        .cta-primary {
-          display: inline-flex !important;
-          flex-direction: row;
-          align-items: center;
-          gap: 8px;
-        }
-        .cta-primary:hover  { filter: brightness(0.95); transform: translateY(-1px); }
-        .cta-primary__arrow {
-          display: block;
-          flex-shrink: 0;
-          order: 1;
-          position: relative;
-          z-index: 1;
-          animation: ctaArrowNudge 1.1s ease-in-out infinite;
-        }
-        .cta-primary__label {
-          order: 0;
-        }
-        @keyframes ctaArrowNudge {
-          0%, 100% { transform: translateX(0); opacity: 0.85; }
-          50% { transform: translateX(3px); opacity: 1; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .cta-primary__arrow { animation: none !important; }
-        }
-        .cta-secondary:hover { border-color: ${C.border} !important; }
-        @media (max-width: 768px) {
-          .hero-grid   { grid-template-columns: 1fr !important; }
-          .hero-visual { display: none !important; }
-          .nav-links-desktop { display: none !important; }
-        }
-      `}</style>
+              <span
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 24,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  color: C.ink,
+                }}
+              >
+                KODE
+              </span>
+            </a>
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-      {/* NAV */}
-      <TopNav onGetStarted={onGetStarted} onCreateEventTicket={onCreateEventTicket} S={S} />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <button
+                onClick={onCreateEventTicket}
+                className="kode-stamp-btn"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px dashed ${C.ink}66`,
+                  color: C.ink,
+                  borderRadius: 6,
+                  padding: '7px 14px',
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  letterSpacing: '0.03em',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <Scissors size={12} />
+                EVENT TICKETING
+              </button>
 
-      {/* HERO */}
-      <section style={S.hero}>
-        <div style={{ ...S.heroInner, position: 'relative', zIndex: 1 }} className="hero-grid">
-          <div>
-            <h1 style={S.heroH1}>
-              One scan.<br />
-              <span style={{ color: '#e86a17' }}>Total control.</span>
-            </h1>
-            <p style={{ ...S.heroSub, fontWeight: 600 }}>
-              Gone are the days.
-            </p>
+              <button
+                className="kode-stamp-btn"
+                style={{
+                  background: 'transparent',
+                  border: `2.5px solid ${C.stamp}`,
+                  color: C.stamp,
+                  borderRadius: 8,
+                  padding: '7px 16px',
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  transform: 'rotate(-2deg)',
+                }}
+                onClick={onGetStarted}
+              >
+                GET STARTED
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }} className="hero-visual">
-            <KodeDeviceStack />
+        </header>
+
+        {/* HERO */}
+        <section
+          style={{
+            padding: 'clamp(50px,8vw,90px) 0 60px',
+          }}
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                window.innerWidth < 860
+                  ? '1fr'
+                  : '1fr auto',
+              alignItems: 'center',
+              gap: 0,
+            }}
+          >
+            <div style={{ paddingLeft: 'clamp(24px, 6vw, 100px)', maxWidth: 580 }}>
+              <div
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: C.stamp,
+                  letterSpacing: '0.1em',
+                  marginBottom: 20,
+                }}
+              >
+              
+              </div>
+
+              <h1
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontWeight: 800,
+                  fontSize: 'clamp(46px,7vw,78px)',
+                  lineHeight: 0.98,
+                  letterSpacing: '-0.04em',
+                  margin: '0 0 28px',
+                }}
+              >
+                ONE SCAN.
+                <br />
+                <span style={{ color: C.stamp }}>
+                  TOTAL CONTROL.
+                </span>
+              </h1>
+
+              <p
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 17,
+                  fontWeight: 400,
+                  lineHeight: 1.7,
+                  color: C.inkSoft,
+                  maxWidth: 420,
+                  margin: '0 0 40px',
+                  opacity: 0.85,
+                }}
+              >
+                One code. Orders to your counter, tickets
+                at the gate — no app, no queue.
+              </p>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 14,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                }}
+              >
+                <button
+                  className="kode-stamp-btn"
+                  style={{
+                    background: C.ink,
+                    color: C.paperLt,
+                    border: 'none',
+                    padding: '13px 26px',
+                    fontFamily: "'Outfit', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    letterSpacing: '0.05em',
+                    cursor: 'pointer',
+                    borderRadius: 3,
+                  }}
+                  onClick={onGetStarted}
+                >
+                  GET STARTED
+                </button>
+
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: C.inkSoft,
+                  }}
+                >
+                
+              
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                paddingRight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <OrderScene />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <VenueCarousel C={C} />
+        <Manifest />
 
-      <span id="how" />
-      <HowItWorks C={C} />
-      <SiteFooter />
+        {/* STEPS */}
+        <section
+          style={{
+            padding: '80px 24px 40px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: C.stamp,
+              letterSpacing: '0.1em',
+              marginBottom: 10,
+            }}
+          >
+            THE SPIKE
+          </div>
+
+          <h2
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontWeight: 700,
+              fontSize: 'clamp(18px,2.5vw,26px)',
+              letterSpacing: '-0.01em',
+              color: C.inkSoft,
+              margin: '0 0 8px',
+            }}
+          >
+            Three tickets to live
+          </h2>
+
+          <TicketStack />
+        </section>
+
+        {/* EVENT TICKETING */}
+        <section
+          style={{
+            padding: '20px 24px 90px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: C.stamp,
+              letterSpacing: '0.1em',
+              marginBottom: 10,
+            }}
+          >
+            ALSO ON KODE
+          </div>
+
+          <h2
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontWeight: 700,
+              fontSize: 'clamp(18px,2.5vw,26px)',
+              letterSpacing: '-0.01em',
+              color: C.inkSoft,
+              margin: '0 0 8px',
+            }}
+          >
+            Sell event tickets the same way
+          </h2>
+
+          <p
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 11.5,
+              fontWeight: 400,
+              lineHeight: 1.6,
+              color: C.inkSoft,
+              maxWidth: 360,
+              margin: '0 auto 28px',
+              opacity: 0.8,
+            }}
+          >
+            Same platform, same QR — sell tickets, scan at the gate, watch sales live.
+          </p>
+
+          <EventTicketStub />
+        </section>
+
+        {/* FEATURES */}
+        <section
+          style={{
+            padding: '0 24px 90px',
+          }}
+        >
+          <FeatureCards />
+        </section>
+
+        {/* CTA */}
+        <section
+          style={{
+            padding: '0 24px 90px',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 560,
+              margin: '0 auto',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                borderTop: `2px dashed ${C.ink}66`,
+                position: 'relative',
+                paddingTop: 34,
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -11,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: C.paper,
+                  padding: '0 10px',
+                  color: C.inkSoft,
+                }}
+              >
+                <Scissors size={16} />
+              </span>
+
+              <h2
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontWeight: 800,
+                  fontSize:
+                    'clamp(28px,4vw,42px)',
+                  letterSpacing: '-0.03em',
+                  margin: '0 0 14px',
+                }}
+              >
+                READY TO OPEN THE COUNTER?
+              </h2>
+
+              <p
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 400,
+                  lineHeight: 1.7,
+                  color: C.inkSoft,
+                  margin: '0 0 28px',
+                }}
+              >
+                Menus or tickets — five minutes to your
+                first scan. No card, no install.
+              </p>
+
+              <button
+                className="kode-stamp-btn"
+                style={{
+                  background: C.stamp,
+                  color: C.paperLt,
+                  border: 'none',
+                  padding: '15px 34px',
+                  borderRadius: 3,
+                  fontFamily:
+                    "'Outfit', sans-serif",
+                  fontWeight: 800,
+                  fontSize: 17,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+                onClick={onGetStarted}
+              >
+                GET STARTED
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+        <footer
+          style={{
+            borderTop: `1px dashed ${C.ink}44`,
+            padding: '48px 24px 26px',
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1100,
+              margin: '0 auto',
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns:
+                  window.innerWidth < 700
+                    ? '1fr'
+                    : '1.3fr 1fr 1fr 1fr',
+                gap: 32,
+                paddingBottom: 32,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily:
+                      "'Outfit', sans-serif",
+                    fontSize: 22,
+                    fontWeight: 800,
+                    letterSpacing: '0.06em',
+                    color: C.ink,
+                    marginBottom: 10,
+                  }}
+                >
+                  KODE
+                </div>
+
+                <p
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 400,
+                    lineHeight: 1.7,
+                    color: C.inkSoft,
+                    maxWidth: 260,
+                    margin: 0,
+                  }}
+                >
+                  One QR for menus, orders, and event
+                  tickets — built for venues across Uganda.
+                </p>
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    color: C.ink,
+                    marginBottom: 12,
+                  }}
+                >
+                  PRODUCT
+                </div>
+
+                {[
+                  'QR Menus',
+                  'Order Dashboard',
+                  'Event Ticketing',
+                  'Payments',
+                ].map((l) => (
+                  <div
+                    key={l}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 400,
+                      color: C.inkSoft,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {l}
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    color: C.ink,
+                    marginBottom: 12,
+                  }}
+                >
+                  COMPANY
+                </div>
+
+                {['About', 'Contact', 'Support'].map(
+                  (l) => (
+                    <div
+                      key={l}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 400,
+                        color: C.inkSoft,
+                        marginBottom: 8,
+                      }}
+                    >
+                      {l}
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    color: C.ink,
+                    marginBottom: 12,
+                  }}
+                >
+                  LEGAL
+                </div>
+
+                {[
+                  'Terms of Service',
+                  'Privacy Policy',
+                ].map((l) => (
+                  <div
+                    key={l}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 400,
+                      color: C.inkSoft,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {l}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderTop: `1px dashed ${C.ink}44`,
+                paddingTop: 20,
+                display: 'flex',
+                flexDirection:
+                  window.innerWidth < 700
+                    ? 'column'
+                    : 'row',
+                gap: 8,
+                justifyContent: 'space-between',
+                fontSize: 11,
+                fontWeight: 400,
+                color: C.inkSoft,
+              }}
+            >
+              <span>
+                © {new Date().getFullYear()} QBI Labs SMC.
+                All rights reserved.
+              </span>
+
+              <span>
+                Kode is a product of QBI Labs SMC ·
+                Kampala, Uganda
+              </span>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   )
