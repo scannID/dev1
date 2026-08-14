@@ -1,0 +1,16 @@
+{
+  "name": "kode-og-server",
+  "version": "1.0.0",
+  "description": "Lightweight Node server that serves the Kode SPA static files and injects real OG/Twitter meta tags for social crawler requests on dynamic routes (/ticket/:token, /pay/:token).",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  }
+}

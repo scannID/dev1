@@ -11,7 +11,7 @@
 
 kode.com {
 	import scanny_common
-	reverse_proxy merchant:80
+	reverse_proxy merchant:3000
 }
 
 admin.kode.com {
