@@ -3,6 +3,7 @@ import { quickPaymentsApi } from '../api/services'
 import type { QuickPaymentCode } from '../api/types'
 import { LoadingSpinner, InlineSpinner } from '../components/LoadingSpinner'
 import { KodeMark } from '../customer/KodeMark'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -21,6 +22,15 @@ export default function QuickPayCustomer({ qrToken }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [txnRef, setTxnRef] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  // Page title updates once the code loads — show description + amount
+  usePageMeta({
+    title: code ? `Pay ${code.amount.toLocaleString()} ${code.currency} — ${code.description}` : 'Quick payment',
+    description: code
+      ? `Scan to pay ${code.amount.toLocaleString()} ${code.currency} for ${code.description} via mobile money.`
+      : 'Scan this QR to make a mobile money payment — no app required.',
+    robots: 'noindex, nofollow',
+  })
 
   useEffect(() => {
     let cancelled = false

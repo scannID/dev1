@@ -1,0 +1,45 @@
+# Kode — llms.txt
+# https://llmstxt.org
+
+## What is Kode?
+
+Kode (https://kode.ug) is a QR-powered commerce platform built for restaurants, bars, event venues, and other hospitality businesses in Uganda.
+
+## What it does
+
+- **QR menus and ordering**: Merchants generate a QR code that customers scan with any phone camera. No app download required. Customers browse the menu, add items to a cart, and submit an order that arrives in real time on the merchant's kitchen/counter screen.
+- **Kitchen display system (KDS)**: Orders appear live on a dedicated kitchen screen. Staff mark items as preparing, ready, and completed. The customer's phone shows live order status.
+- **Event ticketing**: Merchants create events, set ticket tiers (General, VIP, etc.), and share a QR. Customers scan to purchase tickets via mobile money. At the gate, staff scan printed or digital tickets to validate entry.
+- **Quick payments**: Anyone — no account required — can create a fixed-price payment QR code for one-off collections (parking fees, tips, donations, entry fees). Customers scan and pay via mobile money. The QR creator tracks payments using an emailed tracking number.
+- **Payment tracking**: Supports MTN Mobile Money and Airtel Money. All transactions are tracked with statuses (Pending, Processing, Completed, Failed).
+- **Merchant dashboard**: Authenticated merchants manage their catalog (items, categories, photos), view orders, manage tables, configure floor plans, and see revenue analytics.
+- **Admin console**: Separate web console for platform operators to manage businesses, users, roles, and platform-level analytics.
+
+## Who it is for
+
+- Restaurants, cafés, bars, and hotels in Uganda wanting digital menus and orders without a tablet app per table.
+- Event promoters wanting to sell and validate tickets without a separate ticketing service.
+- Anyone needing a quick payment collection QR (parking lot operators, market stalls, event organisers).
+
+## Technology
+
+- Frontend: React 19 SPA (Vite, TypeScript, Tailwind CSS)
+- Backend: Java 21 / Spring Boot 3.4 REST + WebSocket API
+- Auth: Keycloak 26 (OpenID Connect / JWT)
+- Database: PostgreSQL 16
+- Realtime: Redis pub/sub for horizontally scaled WebSocket delivery
+- Payments: MTN MoMo and Airtel Money APIs
+
+## Company
+
+Operated by QBI Labs SMC, Kampala, Uganda.
+
+## Key URLs
+
+- Home / landing: https://kode.ug/
+- How it works: https://kode.ug/how-it-works
+- Pricing: https://kode.ug/pricing
+- Help centre: https://kode.ug/help
+- Privacy policy: https://kode.ug/privacy
+- Terms of service: https://kode.ug/terms
+- Contact: https://kode.ug/contact

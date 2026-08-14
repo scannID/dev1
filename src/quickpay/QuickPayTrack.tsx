@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPayTrackingMetrics, QuickPaymentTransaction } from '../api/types'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 export const DEMO_TRACKING_NUMBER = 'TRK-DEMO2026'
 
@@ -166,6 +167,14 @@ export default function QuickPayTrack({ trackingNumber: initial, onBack }: Props
   const [isDemo, setIsDemo] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  usePageMeta({
+    title: metrics ? `Payment tracker — ${metrics.description}` : 'Track your payment QR',
+    description: metrics
+      ? `${metrics.completedPayments} payments collected for ${metrics.description}. Total: ${metrics.totalCollected.toLocaleString()} ${metrics.currency}.`
+      : 'Enter your tracking number to see payments, totals, and transaction history for your payment QR.',
+    canonicalPath: initial ? `/track/${initial}` : '/track/',
+  })
 
   async function load(number: string) {
     const trimmed = number.trim().toUpperCase()

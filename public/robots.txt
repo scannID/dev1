@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+
+# Block private/internal app routes from indexing
+Disallow: /kitchen/
+Disallow: /ticket/gate
+Disallow: /receipt/
+Disallow: /b/
+
+# AI crawlers — allowed (no reason to block)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://kode.ug/sitemap.xml

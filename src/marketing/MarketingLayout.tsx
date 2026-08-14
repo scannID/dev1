@@ -2,6 +2,8 @@ import type { CSSProperties } from 'react'
 import { marketingPages } from './MarketingPages'
 import { SiteFooter } from './SiteFooter'
 import { navigateMarketing, type MarketingSlug } from './routes'
+import { marketingMeta } from './marketingMeta'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 type Props = {
   slug: MarketingSlug
@@ -14,7 +16,14 @@ const pageFont: CSSProperties = {
 
 export default function MarketingLayout({ slug, onGetStarted }: Props) {
   const page = marketingPages[slug]
+  const meta = marketingMeta[slug]
   const maxWidth = page.narrow ? 720 : 880
+
+  usePageMeta({
+    title: meta.title,
+    description: meta.description,
+    canonicalPath: `/${slug}`,
+  })
 
   return (
     <div

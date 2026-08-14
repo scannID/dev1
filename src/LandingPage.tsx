@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   CreditCard,
 } from 'lucide-react'
+import { usePageMeta } from './hooks/usePageMeta'
 
 /* ─────────────────────────────────────────────────────────────
    Concept: a kitchen order ticket, not a SaaS dashboard.
@@ -1147,7 +1148,7 @@ function FeatureCards() {
         margin: '0 auto',
       }}
     >
-      <div
+      <h2
         style={{
           textAlign: 'center',
           fontFamily: "'Outfit', sans-serif",
@@ -1159,7 +1160,7 @@ function FeatureCards() {
         }}
       >
         WHAT'S INCLUDED
-      </div>
+      </h2>
 
       <div
         style={{
@@ -1212,7 +1213,7 @@ function FeatureCards() {
                   />
                 </div>
 
-                <div
+                <h3
                   style={{
                     fontFamily: "'Outfit', sans-serif",
                     fontWeight: 800,
@@ -1223,7 +1224,7 @@ function FeatureCards() {
                   }}
                 >
                   {title.toUpperCase()}
-                </div>
+                </h3>
 
                 <p
                   style={{
@@ -1347,6 +1348,14 @@ export default function KodeLandingTicket({
   onGetStarted,
   onCreateEventTicket,
 }: KodeLandingTicketProps = {}) {
+  usePageMeta({
+    title: 'Kode — QR ordering and event ticketing for Uganda',
+    description:
+      'One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda.',
+    canonicalPath: '/',
+    suppressSuffix: true,
+  })
+
   return (
     <div
       style={{

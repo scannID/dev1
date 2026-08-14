@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
+import { usePageMeta } from './hooks/usePageMeta'
 import { ticketsApi, publicTicketsApi, imagesApi } from './api/services'
 import type {
   EventTicketRecentAttendee,
@@ -3217,6 +3218,13 @@ function TicketForm({
 
 /* ─── Page root ─────────────────────────────────────────────────────── */
 export default function EventTicketPage({ onBack }: { onBack: () => void }) {
+  usePageMeta({
+    title: 'Create and sell event tickets',
+    description:
+      'Create an event, set ticket tiers, and get a shareable QR in minutes. Customers buy tickets on their phone; you scan at the gate. No app required.',
+    canonicalPath: '/create-event',
+  })
+
   const [ticket, setTicket] = useState<TicketData | null>(null)
   const [qr, setQr] = useState('')
   const [managerQr, setManagerQr] = useState('')

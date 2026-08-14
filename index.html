@@ -2,13 +2,107 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Favicon — SVG primary, PNG fallbacks, Apple touch -->
     <link rel="icon" type="image/svg+xml" href="/kode-icon.svg" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/kode-icon-512.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/kode-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- PWA -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#FF6A1A" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="QR-powered ordering for restaurants, bars, and events. Let customers scan and order from their phone." />
-    <title>Kode — QR ordering for your business</title>
+
+    <!-- Primary SEO — updated per-route by usePageMeta; these are the landing-page defaults -->
+    <title>Kode — QR ordering and event ticketing for Uganda</title>
+    <meta name="description" content="One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda." />
+    <link rel="canonical" href="https://kode.ug/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kode" />
+    <meta property="og:url" content="https://kode.ug/" />
+    <meta property="og:title" content="Kode — QR ordering and event ticketing for Uganda" />
+    <meta property="og:description" content="One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda." />
+    <meta property="og:image" content="https://kode.ug/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_UG" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Kode — QR ordering and event ticketing for Uganda" />
+    <meta name="twitter:description" content="One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate." />
+    <meta name="twitter:image" content="https://kode.ug/og-image.png" />
+
+    <!-- Structured data — Organization + SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://kode.ug/#organization",
+          "name": "Kode",
+          "legalName": "QBI Labs SMC",
+          "url": "https://kode.ug",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://kode.ug/kode-icon.svg",
+            "width": 512,
+            "height": 512
+          },
+          "description": "QR-powered commerce platform for restaurants, bars, and event venues across Uganda.",
+          "foundingLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": "Kampala",
+              "addressCountry": "UG"
+            }
+          },
+          "areaServed": {
+            "@type": "Country",
+            "name": "Uganda"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://kode.ug/#app",
+          "name": "Kode",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "url": "https://kode.ug",
+          "publisher": { "@id": "https://kode.ug/#organization" },
+          "description": "One QR code for menus, orders, event tickets, and payments. No app install required for customers.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "UGX",
+            "description": "Free to get started"
+          },
+          "featureList": [
+            "QR-powered digital menus",
+            "Real-time kitchen order dashboard",
+            "Event ticket sales and gate scanning",
+            "Mobile money payment tracking"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://kode.ug/#website",
+          "url": "https://kode.ug",
+          "name": "Kode",
+          "publisher": { "@id": "https://kode.ug/#organization" },
+          "inLanguage": "en-UG"
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

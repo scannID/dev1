@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPaymentCode } from '../api/types'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -15,6 +16,13 @@ type Props = {
 }
 
 export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
+  usePageMeta({
+    title: 'Create a payment QR',
+    description:
+      'Generate a fixed-price payment QR code in seconds — no account needed. Collect parking fees, tips, donations, or entry fees via mobile money.',
+    canonicalPath: '/create-payment',
+  })
+
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [ownerName, setOwnerName] = useState('')

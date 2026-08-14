@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <!--
+    SPA fallback for static hosting (Netlify, Vercel, nginx, etc.).
+    When the host can't find a file for the requested path it serves this file.
+    The React app then mounts, resolveIsUnknownPath() returns true, and the
+    on-brand NotFoundPage component is rendered client-side.
+
+    For Netlify: add a _redirects file with: /* /index.html 200
+    For Vercel:  add vercel.json with rewrites pointing /* to /index.html
+    For nginx:   try_files $uri $uri/ /index.html;
+    This 404.html acts as the final safety net for hosts that support it natively.
+  -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page not found — Kode</title>
+    <script>
+      // Preserve the original path so the SPA can read it after redirect.
+      sessionStorage.setItem('kode-404-path', window.location.pathname + window.location.search)
+      window.location.replace('/')
+    </script>
+  </head>
+  <body></body>
+</html>

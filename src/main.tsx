@@ -4,7 +4,7 @@ import './index.css'
 import App from './App'
 import LandingPage from './LandingPage'
 import MarketingLayout from './marketing/MarketingLayout'
-import { slugFromPathname, type MarketingSlug } from './marketing/routes'
+import { slugFromPathname, MARKETING_SLUGS, type MarketingSlug } from './marketing/routes'
 import CustomerMenu from './CustomerMenu'
 import QuickPayTrack from './quickpay/QuickPayTrack'
 import QuickPayCustomer from './quickpay/QuickPayCustomer'
@@ -12,6 +12,7 @@ import TicketPurchasePage from './tickets/TicketPurchasePage'
 import TicketViewPage from './tickets/TicketViewPage'
 import GateScanPage from './tickets/GateScanPage'
 import EventTicketPage from './EventTicket'
+import NotFoundPage from './NotFoundPage'
 import keycloak, {
   hasPortalSession,
   initKeycloak,
@@ -94,6 +95,25 @@ function resolveReceiptRoute(): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+/**
+ * Returns true when the current pathname is not the root, not a known
+ * functional route prefix, and not a marketing slug — i.e. genuinely unknown.
+ * Used to render the 404 page instead of silently falling back to landing.
+ */
+function resolveIsUnknownPath(): boolean {
+  const p = window.location.pathname.replace(/\/+$/, '') || '/'
+  if (p === '/') return false
+  // All functional route prefixes handled earlier in main.tsx
+  const knownPrefixes = [
+    '/kitchen/', '/receipt/', '/b/', '/pay/', '/track/',
+    '/ticket/', '/create-event', '/ticket/gate',
+  ]
+  if (knownPrefixes.some((prefix) => p === prefix.replace(/\/$/, '') || p.startsWith(prefix))) return false
+  // Marketing slugs
+  if (MARKETING_SLUGS.some((slug) => p === `/${slug}`)) return false
+  return true
+}
+
 function goToLanding() {
   window.location.href = '/'
 }
@@ -107,6 +127,7 @@ const ticketMasterToken = resolveTicketPurchaseRoute()
 const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
 const receiptOrderId = resolveReceiptRoute()
+const isUnknownPath = resolveIsUnknownPath()
 
 if (kitchenBusinessId) {
   function KitchenRoot() {
@@ -378,6 +399,10 @@ if (kitchenBusinessId) {
       return <AuthBootScreen mode={phase} />
     }
 
+    // 404 — unknown path, render before the Keycloak boot/landing logic
+    if (isUnknownPath) {
+      return <NotFoundPage onGoHome={() => { window.location.href = '/' }} />
+    }
     if (phase === 'app') {
       return (
         <App

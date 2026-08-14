@@ -4,6 +4,7 @@ import type { TicketEventInfo } from '../api/types'
 import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
+import { usePageMeta } from '../hooks/usePageMeta'
 
 type Props = { masterQrToken: string }
 const SERVICE_FEE = 700
@@ -37,6 +38,14 @@ function formatEventDate(iso: string | null) {
 export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [event, setEvent] = useState<TicketEventInfo | null>(null)
   const [loading, setLoading] = useState(true)
+
+  usePageMeta({
+    title: event ? `Buy tickets — ${event.eventName}` : 'Buy event tickets',
+    description: event
+      ? `Get your tickets for ${event.eventName}. Select your tier and pay via mobile money — ticket delivered instantly.`
+      : 'Scan to buy tickets for this event. Pay via mobile money — no app required.',
+    robots: 'noindex, nofollow',
+  })
   const [error, setError] = useState<string | null>(null)
   const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
   const [ticketClass, setTicketClass] = useState('')

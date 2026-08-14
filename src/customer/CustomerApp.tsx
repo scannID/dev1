@@ -1304,7 +1304,7 @@ export default function CustomerApp({
     return (
       <div className="cm-page cm-centered">
         <KodeMark />
-        <h2>Menu unavailable</h2>
+        <h1>Menu unavailable</h1>
         <p className="cm-muted">{error || 'This QR code is invalid or expired.'}</p>
       </div>
     )
@@ -1349,10 +1349,10 @@ export default function CustomerApp({
           ) : (
             <KodeMark size={26} />
           )}
-          <div className="cm-brand-text">
+          <h1 className="cm-brand-text">
             <span className="cm-brand-name">Kode</span>
             <span className="cm-brand-biz">{business.name}</span>
-          </div>
+          </h1>
           {showBusyHeaderBadge ? (
             <span
               className={`cm-status-chip${business.busyMode ? ' busy blink' : ' paused'}`}
