@@ -3177,21 +3177,24 @@ function TicketForm({
                   onClick={() => void handleGenerate()}
                   style={{
                     width: '100%',
-                    height: 54,
+                    height: 62,
                     marginTop: 28,
+                    marginBottom: 8,
                     borderRadius: 14,
                     border: 'none',
                     background: CREATE.tealDeep,
                     color: '#fff',
-                    fontSize: 15,
-                    fontWeight: 600,
+                    fontSize: 17,
+                    fontWeight: 700,
                     cursor: submitting ? 'wait' : 'pointer',
                     opacity: submitting ? 0.8 : 1,
                     fontFamily: 'inherit',
+                    letterSpacing: '0.01em',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
+                    flexShrink: 0,
                   }}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

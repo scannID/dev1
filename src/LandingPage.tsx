@@ -1630,8 +1630,7 @@ export default function KodeLandingTicket({
                   opacity: 0.85,
                 }}
               >
-                One code. Orders to your counter, tickets
-                at the gate — no app, no queue.
+                Just Scan. Zero Friction
               </p>
 
               <div

@@ -192,7 +192,7 @@ export default function QuickPayCreate({ onBack, onOpenTrack }: Props) {
 
             {error ? <p className="scanny-error" role="alert">{error}</p> : null}
 
-            <button type="submit" disabled={submitting} className="scanny-btn scanny-btn-primary">
+            <button type="submit" disabled={submitting} className="scanny-btn scanny-btn-primary" style={{ width: '100%', height: 54, borderRadius: 14, fontSize: 16, marginTop: 8 }}>
               {submitting ? 'Generating…' : 'Generate QR'}
             </button>
           </form>
