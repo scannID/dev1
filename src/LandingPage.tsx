@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Scissors,
   Check,
@@ -294,9 +294,8 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
           position: 'absolute',
           top: 34,
           right: -18,
-          transform: `rotate(-16deg) scale(${
-            stamped ? 1 : 0
-          })`,
+          transform: `rotate(-16deg) scale(${stamped ? 1 : 0
+            })`,
           transition:
             'transform .35s cubic-bezier(.34,1.6,.64,1)',
           pointerEvents: 'none',
@@ -328,7 +327,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
 
 const trackSteps = [
   { key: 'received', label: 'Received' },
-  { key: 'ready',    label: 'Ready' },
+  { key: 'ready', label: 'Ready' },
   { key: 'complete', label: 'Complete' },
 ]
 
@@ -395,7 +394,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
                   }}>
                     {done && (
                       <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 5l2.5 2.5L8 3" stroke={C.paperLt} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 5l2.5 2.5L8 3" stroke={C.paperLt} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
                     {active && !done && (
@@ -479,7 +478,7 @@ function OrderScene() {
         <OrderTracker visible={confirmed} onComplete={handleTrackComplete} />
       </div>
 
-      {/* ── Ticket book (phase: tickets) ── */}
+      {/* ── Ticket book (phase: tickets) — split-flap departures board ── */}
       <div style={{
         position: phase !== 'tickets' ? 'absolute' : 'relative',
         inset: 0,
@@ -488,8 +487,10 @@ function OrderScene() {
         transform: phase === 'tickets' ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(8px)',
         transition: 'opacity 0.55s ease 0.15s, transform 0.55s ease 0.15s',
         pointerEvents: phase === 'tickets' ? 'auto' : 'none',
+        display: 'flex',
+        alignItems: 'center',
       }}>
-        <TicketBook onDone={handleTicketsDone} />
+        <DeparturesBoard onDone={handleTicketsDone} />
       </div>
 
     </div>
@@ -729,293 +730,241 @@ function EventTicketStub() {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Ticket Book — real paper-stack flip with borders
+   Ticket Book replacement — "DEPARTURES BOARD" split-flap widget
+   A split-flap board, like a train/gate arrivals display. Bolder,
+   more mechanical, higher contrast than the paper-ticket look —
+   plays on "gate", "scan at gate", and events feeling like things
+   you're boarding. The title flips letter by letter; the sold
+   counter flips digit by digit. Cycles through a few events, then
+   calls onDone so the parent scene can reset back to the receipt.
    ───────────────────────────────────────────────────────────── */
 
-const bookEvents = [
-  {
-    title: 'RIVERSIDE SESSIONS',
-    detail: 'JINJA · SAT 24 OCT · GATE 7:00 PM',
-    tier1: 'GENERAL', price1: 'UGX 40,000',
-    tier2: 'VIP',     price2: 'UGX 120,000',
-    sold: 214,
-  },
-  {
-    title: 'NEON GARDEN RAVE',
-    detail: 'KAMPALA · FRI 7 NOV · GATE 9:00 PM',
-    tier1: 'REGULAR', price1: 'UGX 30,000',
-    tier2: 'TABLE',   price2: 'UGX 300,000',
-    sold: 88,
-  },
-  {
-    title: 'LAKE BREEZE BRUNCH',
-    detail: 'ENTEBBE · SUN 16 NOV · 11:00 AM',
-    tier1: 'BRUNCH',  price1: 'UGX 55,000',
-    tier2: 'COUPLE',  price2: 'UGX 90,000',
-    sold: 57,
-  },
-  {
-    title: 'AFROBEATS FRIDAY',
-    detail: 'KAMPALA · FRI 21 NOV · GATE 8:00 PM',
-    tier1: 'STANDARD',  price1: 'UGX 25,000',
-    tier2: 'VIP BOOTH', price2: 'UGX 200,000',
-    sold: 341,
-  },
+const FB = {
+  board: '#1b1815',
+  boardEdge: '#0f0d0b',
+  flap: '#ece5d3',
+  flapDim: '#d9d1bd',
+  ink: '#221e19',
+  amber: '#d9a441',
+  ok: '#7fae6f',
+}
+
+const flapEvents = [
+  { title: 'RIVERSIDE SESSIONS', venue: 'JINJA', date: 'SAT 24 OCT  7:00 PM', tier1: 'GENERAL', price1: '40,000', tier2: 'VIP', price2: '120,000', sold: 214 },
+  { title: 'NEON GARDEN RAVE', venue: 'KAMPALA', date: 'FRI 07 NOV  9:00 PM', tier1: 'REGULAR', price1: '30,000', tier2: 'TABLE', price2: '300,000', sold: 88 },
+  { title: 'LAKE BREEZE BRUNCH', venue: 'ENTEBBE', date: 'SUN 16 NOV  11:00 AM', tier1: 'BRUNCH', price1: '55,000', tier2: 'COUPLE', price2: '90,000', sold: 57 },
+  { title: 'AFROBEATS FRIDAY', venue: 'KAMPALA', date: 'FRI 21 NOV  8:00 PM', tier1: 'STANDARD', price1: '25,000', tier2: 'VIP BOOTH', price2: '200,000', sold: 341 },
 ]
 
-function TicketBook({ onDone }: { onDone?: () => void } = {}) {
-  const [current, setCurrent] = useState(0)
-  const [phase, setPhase] = useState<'idle' | 'peel' | 'land'>('idle')
-  const [soldCount, setSoldCount] = useState(0)
-  const total = bookEvents.length
-  const maxFlips = 3
+const FLAP_TITLE_WIDTH = 19 // fixed-width flap row for the title
 
-  // page-turn cycle — runs maxFlips times then calls onDone
+function flapPad(str: string, len: number) {
+  const s = str.toUpperCase().slice(0, len)
+  return s + ' '.repeat(len - s.length)
+}
+
+/* Single flap cell — flips on character change */
+function FlapChar({ char, delay = 0, size = 15 }: { char: string; delay?: number; size?: number }) {
+  const [display, setDisplay] = useState(char)
+  const [flip, setFlip] = useState(false)
+  const prev = useRef(char)
+
   useEffect(() => {
-    let count = 0
-    function doFlip() {
-      if (count >= maxFlips) { onDone?.(); return }
-      setPhase('peel')
-      setTimeout(() => {
-        setCurrent((c) => (c + 1) % total)
-        setPhase('land')
-        setTimeout(() => {
-          setPhase('idle')
-          count++
-          // schedule next flip
-          setTimeout(doFlip, 2200)
-        }, 400)
-      }, 400)
-    }
-    const initial = setTimeout(doFlip, 2200)
-    return () => clearTimeout(initial)
-  }, []) // run once on mount
-
-  // sold counter
-  useEffect(() => {
-    const target = bookEvents[current].sold
-    let n = 0
-    setSoldCount(0)
-    const iv = setInterval(() => {
-      n += Math.ceil(target / 30)
-      if (n >= target) { n = target; clearInterval(iv) }
-      setSoldCount(n)
-    }, 30)
-    return () => clearInterval(iv)
-  }, [current])
-
-  const ev = bookEvents[current]
-  const next = bookEvents[(current + 1) % total]
-
-  // The "stack" behind — 4 paper layers peeking
-  const stackOffsets = [
-    { x: 6,  y: 6,  rot: 2.2 },
-    { x: 12, y: 12, rot: 4.2 },
-    { x: 18, y: 17, rot: 6.0 },
-    { x: 24, y: 22, rot: 7.8 },
-  ]
+    if (char === prev.current) return
+    prev.current = char
+    const t0 = setTimeout(() => {
+      setFlip(true)
+      const t1 = setTimeout(() => setDisplay(char), 130)
+      const t2 = setTimeout(() => setFlip(false), 260)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
+    }, delay)
+    return () => clearTimeout(t0)
+  }, [char, delay])
 
   return (
-    <div style={{ position: 'relative', width: 380, height: 420 }}>
-
-      {/* Back paper stack layers */}
-      {stackOffsets.map((o, i) => (
-        <div
-          key={i}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            top: o.y,
-            left: o.x,
-            borderRadius: 16,
-            background: i === 0 ? '#f0e8d8' : i === 1 ? '#e8dfc8' : '#ddd5bb',
-            boxShadow: '0 8px 24px rgba(38,32,26,0.12)',
-            border: `1.5px solid ${C.spike}44`,
-            transform: `rotate(${o.rot}deg)`,
-          }}
-        />
-      ))}
-
-      {/* Next card — lands from above when peeling */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          height: 420,
-          borderRadius: 16,
-          background: C.paperLt,
-          border: `2px solid ${C.spike}55`,
-          boxShadow: '0 20px 48px rgba(38,32,26,0.18)',
-          overflow: 'hidden',
-          transform: phase === 'land' ? 'translateY(-18px) rotate(-1deg) scale(0.97)' : 'none',
-          transition: phase === 'land' ? 'transform 0.38s cubic-bezier(.2,.9,.3,1)' : 'none',
-          opacity: phase === 'peel' ? 0 : 1,
-        }}
-      >
-        <TicketBookPage ev={next} soldCount={0} fading={false} />
-      </div>
-
-      {/* Current card — peels away on exit */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          height: 420,
-          borderRadius: 16,
-          background: C.paperLt,
-          border: `2px solid ${C.spike}55`,
-          boxShadow: '0 28px 56px rgba(38,32,26,0.26)',
-          overflow: 'hidden',
-          transformOrigin: 'bottom center',
-          transform: phase === 'peel'
-            ? 'translateY(-24px) rotateX(12deg) scale(0.95)'
-            : 'none',
-          transition: phase === 'peel'
-            ? 'transform 0.38s cubic-bezier(.4,0,.6,1), opacity 0.38s ease'
-            : 'transform 0.28s ease',
-          opacity: phase === 'peel' ? 0 : 1,
-          perspective: 800,
-        }}
-      >
-        <TicketBookPage ev={ev} soldCount={soldCount} fading={phase === 'peel'} />
-      </div>
-
-      {/* Border decorations — rounded corners */}
-      <div style={{
-        position: 'absolute', top: -7, right: -7,
-        width: 32, height: 32,
-        borderTop: `3px solid ${C.stamp}`,
-        borderRight: `3px solid ${C.stamp}`,
-        borderRadius: '0 14px 0 0',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: -7, right: -7,
-        width: 32, height: 32,
-        borderBottom: `3px solid ${C.stamp}`,
-        borderRight: `3px solid ${C.stamp}`,
-        borderRadius: '0 0 14px 0',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: -7, left: -7,
-        width: 32, height: 32,
-        borderBottom: `3px solid ${C.stamp}`,
-        borderLeft: `3px solid ${C.stamp}`,
-        borderRadius: '0 0 0 14px',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', top: -7, left: -7,
-        width: 32, height: 32,
-        borderTop: `3px solid ${C.stamp}`,
-        borderLeft: `3px solid ${C.stamp}`,
-        borderRadius: '14px 0 0 0',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Page dots */}
-      <div style={{ position: 'absolute', bottom: -26, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 5 }}>
-        {bookEvents.map((_, i) => (
-          <span key={i} style={{
-            width: i === current ? 18 : 5,
-            height: 5,
-            borderRadius: 3,
-            background: i === current ? C.stamp : `${C.ink}2a`,
-            transition: 'all .35s ease',
-          }} />
-        ))}
-      </div>
+    <div style={{
+      position: 'relative', width: size * 0.72, height: size * 1.15,
+      background: FB.flap, borderRadius: 2,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      overflow: 'hidden',
+      boxShadow: '0 1px 0 rgba(0,0,0,0.4)',
+      perspective: 120,
+      flexShrink: 0,
+    }}>
+      {/* center seam */}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'rgba(0,0,0,0.35)', zIndex: 3 }} />
+      {/* subtle top/bottom shading like real flap halves */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.15), transparent 50%, rgba(0,0,0,0.08) 51%, transparent)' }} />
+      <span style={{
+        position: 'relative', zIndex: 2,
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontWeight: 700,
+        fontSize: size * 0.62,
+        color: FB.ink,
+        transform: flip ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transition: 'transform 0.13s ease-in',
+        display: 'inline-block',
+      }}>
+        {display === ' ' ? '\u00A0' : display}
+      </span>
     </div>
   )
 }
 
-function TicketBookPage({ ev, soldCount, fading }: {
-  ev: typeof bookEvents[0],
-  soldCount: number,
-  fading: boolean,
-}) {
+function FlapWord({ text, width, size = 15, gap = 2 }: { text: string; width: number; size?: number; gap?: number }) {
+  const chars = flapPad(text, width).split('')
+  return (
+    <div style={{ display: 'flex', gap }}>
+      {chars.map((c, i) => (
+        <FlapChar key={i} char={c} delay={i * 35} size={size} />
+      ))}
+    </div>
+  )
+}
+
+/* A whole-line flap for less critical rows (venue/date, tiers) */
+function FlapLine({ text, size = 11 }: { text: string; size?: number }) {
+  const [display, setDisplay] = useState(text)
+  const [flip, setFlip] = useState(false)
+  const prev = useRef(text)
+
+  useEffect(() => {
+    if (text === prev.current) return
+    prev.current = text
+    setFlip(true)
+    const t1 = setTimeout(() => setDisplay(text), 140)
+    const t2 = setTimeout(() => setFlip(false), 280)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [text])
+
   return (
     <div style={{
-      padding: '26px 26px 60px',
-      fontFamily: "'Outfit', sans-serif",
-      position: 'relative',
-      height: 420,
-      boxSizing: 'border-box',
+      background: FB.flap, borderRadius: 3, padding: '5px 10px',
+      position: 'relative', overflow: 'hidden', display: 'inline-block',
     }}>
-      {/* Top strip */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: C.stamp }}>ADMIT ONE</span>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {Array.from({ length: 10 }, (_, i) => (
-            <div key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: `${C.ink}28` }} />
-          ))}
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: C.inkSoft }}>KODE</span>
-      </div>
-
-      <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
-
-      {/* Event name */}
-      <div style={{
-        fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em',
-        color: C.ink, lineHeight: 1.1, marginBottom: 8,
-        opacity: fading ? 0 : 1, transition: 'opacity 0.2s ease',
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'rgba(0,0,0,0.3)' }} />
+      <span style={{
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontWeight: 600, fontSize: size, color: FB.ink, letterSpacing: '0.04em',
+        display: 'inline-block',
+        transform: flip ? 'rotateX(-85deg)' : 'rotateX(0deg)',
+        transition: 'transform 0.16s ease-in',
       }}>
-        {ev.title}
-      </div>
+        {display}
+      </span>
+    </div>
+  )
+}
 
-      <div style={{ fontSize: 11.5, fontWeight: 500, color: C.inkSoft, letterSpacing: '0.07em', marginBottom: 20 }}>
-        {ev.detail}
-      </div>
+/* Digit counter that flips up as it climbs, like a mechanical tally */
+function FlapNumber({ value, digits = 3, size = 15 }: { value: number; digits?: number; size?: number }) {
+  const str = String(value).padStart(digits, '0').split('')
+  return (
+    <div style={{ display: 'flex', gap: 2 }}>
+      {str.map((d, i) => (
+        <FlapChar key={i} char={d} delay={i * 25} size={size} />
+      ))}
+    </div>
+  )
+}
 
-      {/* Tiers */}
-      <div style={{ display: 'flex', gap: 28, marginBottom: 20 }}>
-        {[{ label: ev.tier1, price: ev.price1 }, { label: ev.tier2, price: ev.price2 }].map(({ label, price }) => (
-          <div key={label}>
-            <div style={{ fontWeight: 700, fontSize: 11, color: C.ink, letterSpacing: '0.07em' }}>{label}</div>
-            <div style={{ fontWeight: 500, fontSize: 13, color: C.inkSoft, marginTop: 3 }}>{price}</div>
+function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
+  const [idx, setIdx] = useState(0)
+  const [sold, setSold] = useState(flapEvents[0].sold)
+  const flipCount = useRef(0)
+  const maxFlips = 3 // matches the old TicketBook cadence before handing back to the receipt
+
+  useEffect(() => {
+    flipCount.current = 0
+    const iv = setInterval(() => {
+      flipCount.current += 1
+      if (flipCount.current >= maxFlips) {
+        clearInterval(iv)
+        // let the last flap settle before the scene resets
+        setTimeout(() => onDone?.(), 1800)
+        return
+      }
+      setIdx((i) => (i + 1) % flapEvents.length)
+    }, 3600)
+    return () => clearInterval(iv)
+  }, [])
+
+  useEffect(() => {
+    const target = flapEvents[idx].sold
+    let n = 0
+    setSold(0)
+    const iv = setInterval(() => {
+      n += Math.ceil(target / 14)
+      if (n >= target) { n = target; clearInterval(iv) }
+      setSold(n)
+    }, 55)
+    return () => clearInterval(iv)
+  }, [idx])
+
+  const ev = flapEvents[idx]
+
+  return (
+    <div style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <div style={{
+        width: 400, margin: '0 auto',
+        background: `linear-gradient(180deg, #26221d, ${FB.board})`,
+        border: `10px solid ${FB.boardEdge}`,
+        borderRadius: 10,
+        boxShadow: '0 30px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.03)',
+        padding: '20px 18px 22px',
+        boxSizing: 'border-box',
+      }}>
+        {/* header strip */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: FB.amber }}>NOW SELLING</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: FB.ok, boxShadow: `0 0 6px ${FB.ok}` }} />
+            <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.12em', color: '#a89f8c' }}>LIVE</span>
           </div>
-        ))}
+        </div>
+
+        {/* title — per-character flap */}
+        <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+          <FlapWord text={ev.title} width={FLAP_TITLE_WIDTH} size={19} />
+        </div>
+
+        {/* venue / date */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <FlapLine text={ev.venue} />
+          <FlapLine text={ev.date} />
+        </div>
+
+        {/* tiers */}
+        <div style={{ display: 'flex', gap: 18, marginBottom: 18 }}>
+          {[{ l: ev.tier1, p: ev.price1 }, { l: ev.tier2, p: ev.price2 }].map(({ l, p }) => (
+            <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: '#8a8172' }}>{l}</span>
+              <FlapLine text={`UGX ${p}`} size={12} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: '1px dashed rgba(236,229,211,0.15)', marginBottom: 16 }} />
+
+        {/* sold counter — digit flaps */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <FlapNumber value={sold} digits={3} size={17} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#a89f8c' }}>SOLD</span>
+          </div>
+          <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', color: '#6d6555' }}>GATE 07</span>
+        </div>
       </div>
 
-      <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
-
-      {/* Live sold + barcode row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.ok }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%', background: C.ok,
-            animation: 'kodePulseDot 1.4s ease-in-out infinite',
+      {/* dots */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 14 }}>
+        {flapEvents.map((_, i) => (
+          <span key={i} style={{
+            width: i === idx ? 18 : 5, height: 5, borderRadius: 3,
+            background: i === idx ? FB.amber : 'rgba(236,229,211,0.2)',
+            transition: 'all .35s ease',
           }} />
-          {soldCount} SOLD
-        </div>
-        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
-          {Array.from({ length: 24 }, (_, i) => (
-            <div key={i} style={{
-              width: 2,
-              height: (i * 7) % 5 === 0 ? 22 : 13,
-              background: C.ink, opacity: 0.5,
-            }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Bottom scan strip — pinned to bottom */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: C.ink, padding: '10px 26px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        borderRadius: '0 0 16px 16px',
-      }}>
-        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: C.paper, opacity: 0.6 }}>
-          SCAN AT GATE
-        </span>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {Array.from({ length: 20 }, (_, i) => (
-            <div key={i} style={{ width: 2, height: (i * 3) % 2 === 0 ? 12 : 7, background: C.paper, opacity: 0.4 }} />
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   )
@@ -1367,7 +1316,7 @@ export default function KodeLandingTicket({
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@600;700&display=swap');
 
         * {
           box-sizing: border-box;
@@ -1517,12 +1466,12 @@ export default function KodeLandingTicket({
                 style={{
                   fontFamily: "'Outfit', sans-serif",
                   fontSize: 24,
-                  fontWeight: 800,
+                  fontWeight: 600,
                   letterSpacing: '0.06em',
                   color: C.ink,
                 }}
               >
-                KODE
+                Kode
               </span>
             </a>
 
@@ -1552,8 +1501,8 @@ export default function KodeLandingTicket({
                   gap: 7,
                 }}
               >
-                <Scissors size={12} />
-                EVENT TICKETING
+                <Scissors size={14} />
+                Event Tickeing
               </button>
 
               <button
@@ -1573,7 +1522,7 @@ export default function KodeLandingTicket({
                 }}
                 onClick={onGetStarted}
               >
-                GET STARTED
+                Get Started
               </button>
             </div>
           </div>
@@ -1607,15 +1556,15 @@ export default function KodeLandingTicket({
                   marginBottom: 20,
                 }}
               >
-              
+
               </div>
 
               <h1
                 style={{
                   fontFamily: "'Outfit', sans-serif",
-                  fontWeight: 800,
+                  fontWeight: 500,
                   fontSize: 'clamp(46px,7vw,78px)',
-                  lineHeight: 0.98,
+                  lineHeight: 0.85,
                   letterSpacing: '-0.04em',
                   margin: '0 0 28px',
                 }}
@@ -1630,7 +1579,7 @@ export default function KodeLandingTicket({
               <p
                 style={{
                   fontFamily: "'Outfit', sans-serif",
-                  fontSize: 17,
+                  fontSize: 20,
                   fontWeight: 400,
                   lineHeight: 1.7,
                   color: C.inkSoft,
@@ -1666,7 +1615,7 @@ export default function KodeLandingTicket({
                   }}
                   onClick={onGetStarted}
                 >
-                  GET STARTED
+                  Get Started
                 </button>
 
                 <span
@@ -1680,8 +1629,8 @@ export default function KodeLandingTicket({
                     color: C.inkSoft,
                   }}
                 >
-                
-              
+
+
                 </span>
               </div>
             </div>
@@ -1876,7 +1825,7 @@ export default function KodeLandingTicket({
                 }}
                 onClick={onGetStarted}
               >
-                GET STARTED
+                Get Started
               </button>
             </div>
           </div>
