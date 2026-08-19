@@ -493,6 +493,8 @@ export interface TicketPurchaseRequest {
   holderName: string
   holderEmail?: string
   holderPhone: string
+  /** Mobile money number to debit. Defaults to holderPhone if omitted. */
+  paymentPhone?: string
   provider?: string
 }
 

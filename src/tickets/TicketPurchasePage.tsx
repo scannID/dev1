@@ -5,6 +5,8 @@ import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 import { usePageMeta } from '../hooks/usePageMeta'
+import { MoMoPhoneInput, detectProvider } from '../components/MoMoPhoneInput'
+import '../components/MoMoPhoneInput.css'
 
 type Props = { masterQrToken: string }
 const SERVICE_FEE = 700
@@ -35,9 +37,27 @@ function formatEventDate(iso: string | null) {
   }
 }
 
+function LockIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  )
+}
+
 export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [event, setEvent] = useState<TicketEventInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
+  const [ticketClass, setTicketClass] = useState('')
+  const [holderName, setHolderName] = useState('')
+  const [holderPhone, setHolderPhone] = useState('')
+  const [paymentPhone, setPaymentPhone] = useState('0')
+  const [feeConsent, setFeeConsent] = useState(false)
+  const paymentProvider = detectProvider(paymentPhone || holderPhone)
+  const [submitting, setSubmitting] = useState(false)
 
   usePageMeta({
     title: event ? `Buy tickets — ${event.eventName}` : 'Buy event tickets',
@@ -46,13 +66,6 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       : 'Scan to buy tickets for this event. Pay via mobile money — no app required.',
     robots: 'noindex, nofollow',
   })
-  const [error, setError] = useState<string | null>(null)
-  const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
-  const [ticketClass, setTicketClass] = useState('')
-  const [holderName, setHolderName] = useState('')
-  const [holderPhone, setHolderPhone] = useState('')
-  const [feeConsent, setFeeConsent] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.add('tk-app')
@@ -108,6 +121,8 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         holderName: holderName.trim(),
         holderEmail: '',
         holderPhone: holderPhone.trim(),
+        paymentPhone: paymentPhone.trim() || undefined,
+        provider: paymentProvider ?? undefined,
       })
       window.location.href = result.viewUrl
     } catch (err) {
@@ -160,6 +175,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             <span>{event.host?.trim() || 'Hosted event'}</span>
           </div>
         </div>
+        <span className="tk-topbar-badge">Verified event</span>
       </header>
 
       <main className="tk-main">
@@ -212,7 +228,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </div>
           ) : null}
 
-          <p className="tk-section-label">{buyTab === 'tables' && hasTables ? 'Table' : 'Ticket'}</p>
+          <p className="tk-section-label">{buyTab === 'tables' && hasTables ? 'Choose a table' : 'Choose a ticket'}</p>
           <div
             className="tk-class-grid"
             role="radiogroup"
@@ -232,12 +248,17 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                       onClick={() => setTicketClass(t.name)}
                       disabled={submitting || Boolean(t.soldOut)}
                     >
-                      <span>
-                        <strong>{t.name}</strong>
-                        {t.seats > 0 ? <em className="tk-card-meta">{t.seats} seats</em> : null}
-                        {stock ? <em className={`tk-card-meta${t.soldOut ? ' is-danger' : ''}`}>{stock}</em> : null}
+                      <span className="tk-radio" aria-hidden="true" />
+                      <span className="tk-class-card-body">
+                        <span className="tk-class-card-main">
+                          <strong>{t.name}</strong>
+                          {t.seats > 0 ? <em className="tk-card-meta">{t.seats} seats</em> : null}
+                          {stock ? (
+                            <em className={`tk-card-meta${t.soldOut ? ' is-danger' : ''}`}>{stock}</em>
+                          ) : null}
+                        </span>
+                        <span className="tk-class-card-price">{money(t.price, event.currency)}</span>
                       </span>
-                      <span>{money(t.price, event.currency)}</span>
                     </button>
                   )
                 })
@@ -254,16 +275,24 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                       onClick={() => setTicketClass(c.name)}
                       disabled={submitting || Boolean(c.soldOut)}
                     >
-                      <span>
-                        <strong>{c.name}</strong>
-                        {stock ? <em className={`tk-card-meta${c.soldOut ? ' is-danger' : ''}`}>{stock}</em> : null}
+                      <span className="tk-radio" aria-hidden="true" />
+                      <span className="tk-class-card-body">
+                        <span className="tk-class-card-main">
+                          <strong>{c.name}</strong>
+                          {stock ? (
+                            <em className={`tk-card-meta${c.soldOut ? ' is-danger' : ''}`}>{stock}</em>
+                          ) : null}
+                        </span>
+                        <span className="tk-class-card-price">{money(c.price, event.currency)}</span>
                       </span>
-                      <span>{money(c.price, event.currency)}</span>
                     </button>
                   )
                 })}
           </div>
 
+          <div className="tk-perf" role="presentation" />
+
+          <p className="tk-section-label">Your details</p>
           <div className="tk-fields">
             <label className="tk-field">
               Your name
@@ -282,14 +311,35 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               <input
                 type="tel"
                 value={holderPhone}
-                onChange={(e) => setHolderPhone(e.target.value)}
-                placeholder="e.g. +256 700 000 000"
+                onChange={(e) => {
+                  const v = e.target.value
+                  setHolderPhone(!v ? '0' : !v.startsWith('0') ? '0' + v.replace(/^0*/, '') : v)
+                }}
+                placeholder="07XX XXX XXX"
                 autoComplete="tel"
                 required
                 disabled={submitting}
               />
               <p className="tk-hint">
-                Use your WhatsApp number with country code, e.g. +2567… — ticket + QR are sent here.
+                Ticket + QR will be sent here via WhatsApp.
+              </p>
+            </label>
+
+            <label className="tk-field" htmlFor="tk-payment-phone">
+              Mobile money number to pay from
+              <MoMoPhoneInput
+                id="tk-payment-phone"
+                value={paymentPhone}
+                onChange={setPaymentPhone}
+                placeholder="07XX XXX XXX"
+                required
+                disabled={submitting}
+                aria-describedby="tk-payment-phone-hint"
+              />
+              <p className="tk-hint" id="tk-payment-phone-hint">
+                {paymentProvider
+                  ? `${paymentProvider} detected — this number will be charged.`
+                  : 'Start with 0 — e.g. 0771 234 567. We detect MTN or Airtel automatically.'}
               </p>
             </label>
           </div>
@@ -325,8 +375,6 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             </div>
           ) : null}
 
-          <p className="tk-hint">Service fee: {money(SERVICE_FEE, event.currency)} per transaction.</p>
-
           <button
             type="submit"
             className="tk-cta"
@@ -338,8 +386,15 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 ? 'Sold out'
                 : !feeConsent
                   ? 'Confirm total to continue'
-                  : `Create Ticket ${money(totalPrice, event.currency)}`}
+                  : paymentProvider
+                    ? `Pay via ${paymentProvider} · ${money(totalPrice, event.currency)}`
+                    : `Create ticket · ${money(totalPrice, event.currency)}`}
           </button>
+
+          <p className="tk-trust-note">
+            <LockIcon />
+            Secure checkout · Ticket and QR delivered instantly on WhatsApp
+          </p>
         </form>
       </main>
     </div>

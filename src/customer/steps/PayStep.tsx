@@ -6,6 +6,8 @@ import type { PaymentProvider } from '../payments'
 import { currency, usdEquiv, DEFAULT_SERVICE_FEE_UGX, formatUgPhoneHint, withServiceFee } from '../utils'
 import { distributeEqually, redistributeRemaining, type SplitShareDraft } from '../splitValidation'
 import type { CartLine } from './CartStep'
+import { MoMoPhoneInput, detectProvider } from '../../components/MoMoPhoneInput'
+import '../../components/MoMoPhoneInput.css'
 
 export type { SplitShareDraft }
 
@@ -212,15 +214,12 @@ export function PayStep({
                       disabled={submitting}
                       onChange={(e) => updateShare(index, { name: e.target.value })}
                     />
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      aria-label={`Person ${index + 1} phone`}
-                      placeholder="07XX XXX XXX"
+                    <MoMoPhoneInput
                       value={share.phone}
+                      onChange={(v) => updateShare(index, { phone: v })}
+                      placeholder="07XX XXX XXX"
                       disabled={submitting}
-                      onChange={(e) => updateShare(index, { phone: e.target.value })}
+                      aria-label={`Person ${index + 1} phone`}
                     />
                     <div className="split-amount-cell">
                       <input
@@ -320,17 +319,18 @@ export function PayStep({
 
           <label className="cm-field">
             Mobile money number
-            <input
-              ref={phoneInputRef}
+            <MoMoPhoneInput
               value={phone}
-              onChange={(e) => onPhone(e.target.value)}
+              onChange={(v) => {
+                onPhone(v)
+                const p = detectProvider(v)
+                if (p === 'MTN' || p === 'Airtel') onProvider(p)
+              }}
               placeholder="07XX XXX XXX"
-              inputMode="tel"
-              autoComplete="tel"
               required
-              aria-required="true"
-              aria-invalid={Boolean(phoneError)}
               disabled={submitting}
+              inputClassName=""
+              aria-invalid={Boolean(phoneError)}
             />
             {phoneError ? <span className="cm-field-error">{phoneError}</span> : null}
           </label>

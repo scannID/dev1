@@ -4,6 +4,8 @@ import type { QuickPaymentCode } from '../api/types'
 import { LoadingSpinner, InlineSpinner } from '../components/LoadingSpinner'
 import { KodeMark } from '../customer/KodeMark'
 import { usePageMeta } from '../hooks/usePageMeta'
+import { MoMoPhoneInput } from '../components/MoMoPhoneInput'
+import '../components/MoMoPhoneInput.css'
 
 function money(amount: number, currency: string) {
   return `${amount.toLocaleString()} ${currency}`
@@ -18,7 +20,7 @@ export default function QuickPayCustomer({ qrToken }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('0')
   const [submitting, setSubmitting] = useState(false)
   const [txnRef, setTxnRef] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -153,12 +155,13 @@ export default function QuickPayCustomer({ qrToken }: Props) {
               </label>
               <label className="scanny-field">
                 <span className="scanny-label">Mobile money number <span className="req">*</span></span>
-                <input
-                  required
-                  className="scanny-input"
+                <MoMoPhoneInput
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="+256700123456"
+                  onChange={setCustomerPhone}
+                  placeholder="07XX XXX XXX"
+                  required
+                  disabled={submitting}
+                  inputClassName="scanny-input"
                 />
               </label>
               {error ? <p className="scanny-error" role="alert">{error}</p> : null}

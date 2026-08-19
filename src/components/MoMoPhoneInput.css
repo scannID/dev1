@@ -1,0 +1,62 @@
+/* ── MoMoPhoneInput ─────────────────────────────────────────────────────────
+   Shared styles for the provider-detecting phone input.
+   Used in TicketCustomer.css context, CustomerApp.css context, and
+   the scanny-* utility class context (QuickPayCustomer).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.momo-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.momo-input {
+  /* Intentionally unstyled — consuming context applies its own input styles.
+     The wrapper just positions the badge on top. */
+  width: 100%;
+  /* Right padding reserves space for the badge so text doesn't run under it */
+  padding-right: 72px !important;
+}
+
+/* ── Badge ─────────────────────────────────────────────────────────────────── */
+
+.momo-badge {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  pointer-events: none;
+  user-select: none;
+  animation: momo-badge-pop 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes momo-badge-pop {
+  from { opacity: 0; transform: translateY(-50%) scale(0.7); }
+  to   { opacity: 1; transform: translateY(-50%) scale(1);   }
+}
+
+.momo-badge img {
+  display: block;
+  height: 22px;
+  width: auto;
+  object-fit: contain;
+}
+
+.momo-badge-mtn {
+  background: #ffcb05;
+}
+
+.momo-badge-airtel {
+  background: #e2001a;
+}
+
+.momo-badge-airtel img {
+  height: 16px;
+  filter: brightness(0) invert(1);
+}
