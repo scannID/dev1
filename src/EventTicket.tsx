@@ -2836,34 +2836,6 @@ function TicketForm({
                     </div>
                   </div>
 
-                  {/* Virtual queue toggle */}
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    cursor: 'pointer',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    border: `1.5px solid ${form.queueEnabled ? CREATE.teal : CREATE.line}`,
-                    background: form.queueEnabled ? `${CREATE.teal}0d` : 'transparent',
-                    transition: 'border-color 0.15s, background 0.15s',
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.queueEnabled)}
-                      onChange={(e) => set('queueEnabled', e.target.checked)}
-                      style={{ marginTop: 2, accentColor: CREATE.teal, flexShrink: 0, width: 16, height: 16 }}
-                      aria-label="Enable virtual waiting room"
-                    />
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: CREATE.ink }}>
-                        Enable virtual waiting room
-                      </p>
-                      <p style={{ margin: '3px 0 0', fontSize: 12, color: CREATE.muted, lineHeight: 1.5 }}>
-                        When demand is high, customers join a queue instead of hitting the purchase endpoint directly. Tickets are issued sequentially — prevents overselling and crashes on popular launches.
-                      </p>
-                    </div>
-                  </label>
                 </div>
               </SectionCard>
 
