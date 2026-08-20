@@ -486,9 +486,12 @@ export function MerchantActivityPanel({
                 )}
               </div>
             </div>
+            {/* Refresh icon sits right next to the sheet's built-in close (X) button */}
             <Button
-              variant="ghost" size="sm"
-              style={{ gap: 4, fontSize: 12 }}
+              variant="ghost"
+              size="icon"
+              aria-label="Refresh"
+              style={{ position: 'absolute', right: 44, top: 12 }}
               onClick={() => {
                 setSummary(null)
                 setActiveTab('overview')
@@ -500,7 +503,7 @@ export function MerchantActivityPanel({
                 }
               }}
             >
-              <RefreshCw size={13} /> Refresh
+              <RefreshCw size={15} />
             </Button>
           </div>
         </SheetHeader>
