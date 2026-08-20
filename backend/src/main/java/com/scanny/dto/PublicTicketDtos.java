@@ -89,7 +89,11 @@ public class PublicTicketDtos {
         String holderPhone,
         String paymentPhone,
         String provider,
-        String presaleCode
+        String presaleCode,
+        /** How many tickets to purchase in one transaction (1–10, defaults to 1). */
+        Integer quantity,
+        /** Waitlist claim token — bypasses sold-out check for this request. */
+        String claimToken
     ) {
         public PurchaseRequest(
             String masterQrToken,
@@ -100,7 +104,7 @@ public class PublicTicketDtos {
             String provider,
             String presaleCode
         ) {
-            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, presaleCode);
+            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, presaleCode, 1, null);
         }
 
         public PurchaseRequest(
@@ -111,7 +115,7 @@ public class PublicTicketDtos {
             String holderPhone,
             String provider
         ) {
-            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, null);
+            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, null, 1, null);
         }
     }
 
@@ -132,8 +136,25 @@ public class PublicTicketDtos {
         String paymentId,
         PaymentIntentStatus paymentStatus,
         String message,
-        String viewUrl
-    ) {}
+        String viewUrl,
+        /** All ticket IDs when quantity > 1. First entry matches attendeeTicketId. */
+        java.util.List<String> ticketIds,
+        /** View URLs for all tickets when quantity > 1. */
+        java.util.List<String> viewUrls
+    ) {
+        /** Convenience constructor for single-ticket purchases (quantity = 1). */
+        public PurchaseResponse(
+            String attendeeTicketId,
+            String ticketCode,
+            String paymentId,
+            PaymentIntentStatus paymentStatus,
+            String message,
+            String viewUrl
+        ) {
+            this(attendeeTicketId, ticketCode, paymentId, paymentStatus, message, viewUrl,
+                java.util.List.of(attendeeTicketId), java.util.List.of(viewUrl));
+        }
+    }
 
     public record TransferInitiateResponse(
         String transferToken,
@@ -220,6 +241,21 @@ public class PublicTicketDtos {
         String viewUrl,
         String qrPayload,
         String gateUrl
+    ) {}
+
+    public record WaitlistJoinRequest(
+        String masterTicketId,
+        String ticketClass,
+        String holderName,
+        String holderPhone
+    ) {}
+
+    public record WaitlistJoinResponse(
+        boolean success,
+        String message,
+        int position,
+        /** Waitlist entry ID — use to leave the waitlist. */
+        String waitlistId
     ) {}
 
     public record RedeemedAttendee(

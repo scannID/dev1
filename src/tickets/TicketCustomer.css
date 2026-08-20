@@ -1437,3 +1437,119 @@ html.tk-app body {
 .tk-transfer-wa-btn:hover {
   opacity: 0.9;
 }
+
+/* ── Waitlist ─────────────────────────────────────────────────────────────── */
+
+.tk-waitlist-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: var(--tk-radius-md);
+  border: 2px dashed var(--tk-gold);
+  background: transparent;
+  color: var(--tk-gold);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+  margin-top: 10px;
+}
+
+.tk-waitlist-btn:hover:not(:disabled) {
+  background: var(--tk-gold-soft);
+}
+
+.tk-waitlist-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tk-waitlist-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 36px 24px;
+}
+
+.tk-waitlist-icon {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.tk-waitlist-success h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* ── Quantity stepper ─────────────────────────────────────────────────────── */
+
+.tk-qty-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 4px;
+  flex-wrap: wrap;
+}
+
+.tk-qty-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tk-text);
+}
+
+.tk-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1.5px solid var(--tk-border);
+  border-radius: var(--tk-radius-sm);
+  overflow: hidden;
+}
+
+.tk-qty-btn {
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: var(--tk-bg-elev);
+  color: var(--tk-text);
+  font-size: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease;
+  flex-shrink: 0;
+}
+
+.tk-qty-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tk-gold) 12%, var(--tk-bg-elev));
+}
+
+.tk-qty-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tk-qty-value {
+  min-width: 36px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tk-text);
+  padding: 0 4px;
+  background: #fff;
+}
+
+/* ── Transfer accept page polish ─────────────────────────────────────────── */
+
+.tk-muted-note {
+  font-size: 14px;
+  color: var(--tk-muted);
+  line-height: 1.6;
+}

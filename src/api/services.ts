@@ -483,8 +483,15 @@ export const publicTicketsApi = {
     return api.post<TicketScanValidationResponse>('/tickets/public/validate', data)
   },
 
-  redeemed: async (eventId: string, q?: string): Promise<GateRedeemedAttendee[]> => {
-    const id = eventId.trim().replace(/^#/, '')
+  joinWaitlist: async (data: import('./types').WaitlistJoinRequest): Promise<import('./types').WaitlistJoinResponse> => {
+    return api.post('/tickets/public/waitlist', data)
+  },
+
+  leaveWaitlist: async (waitlistId: string): Promise<void> => {
+    await api.delete(`/tickets/public/waitlist/${encodeURIComponent(waitlistId)}`)
+  },
+
+  redeemed: async (eventId: string, q?: string): Promise<GateRedeemedAttendee[]> => {    const id = eventId.trim().replace(/^#/, '')
     const suffix = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''
     return api.get<GateRedeemedAttendee[]>(
       `/tickets/public/redeemed/${encodeURIComponent(id)}${suffix}`

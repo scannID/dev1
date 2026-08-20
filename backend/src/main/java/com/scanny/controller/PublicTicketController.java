@@ -68,6 +68,18 @@ public class PublicTicketController {
         return ResponseEntity.ok(ticketPurchaseService.acceptTransfer(request));
     }
 
+    @PostMapping("/waitlist")
+    public ResponseEntity<PublicTicketDtos.WaitlistJoinResponse> joinWaitlist(
+            @RequestBody PublicTicketDtos.WaitlistJoinRequest request) {
+        return ResponseEntity.ok(ticketPurchaseService.joinWaitlist(request));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/waitlist/{waitlistId}")
+    public ResponseEntity<Void> leaveWaitlist(@PathVariable String waitlistId) {
+        ticketPurchaseService.leaveWaitlist(waitlistId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/events")
     public ResponseEntity<TicketResponse> createEvent(@RequestBody TicketDtos.CreateTicketRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ticketPurchaseService.createPublicEvent(request));

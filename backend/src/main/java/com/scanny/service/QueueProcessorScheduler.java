@@ -50,7 +50,9 @@ public class QueueProcessorScheduler {
                         entry.getHolderPhone(),
                         entry.getPaymentPhone(),
                         entry.getProvider(),
-                        entry.getPresaleCode()
+                        entry.getPresaleCode(),
+                        1,
+                        null
                 );
 
                 result = ticketPurchaseService.startPurchase(purchaseRequest);

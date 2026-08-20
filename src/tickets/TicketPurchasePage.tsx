@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
-import type { TicketEventInfo, QueueStatusResponse } from '../api/types'
+import type { TicketEventInfo, QueueStatusResponse, WaitlistJoinResponse } from '../api/types'
 import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
@@ -161,6 +161,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [queueEntry, setQueueEntry] = useState<QueueStatusResponse | null>(null)
+  const [waitlistEntry, setWaitlistEntry] = useState<WaitlistJoinResponse | null>(null)
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false)
+  const [quantity, setQuantity] = useState(1)
   const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
@@ -246,6 +249,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         paymentPhone: paymentPhone.trim() || undefined,
         provider: paymentProvider ?? undefined,
         presaleCode: presaleCode.trim() || undefined,
+        quantity: quantity > 1 ? quantity : undefined,
       }
 
       if (event.queueEnabled) {
@@ -253,6 +257,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         setQueueEntry(qRes)
       } else {
         const result = await publicTicketsApi.purchase(payload)
+        // For group bookings, redirect to the first ticket's view URL
         window.location.href = result.viewUrl
       }
     } catch (err) {
@@ -326,6 +331,36 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
             eventName={event.eventName}
             onReset={() => setQueueEntry(null)}
           />
+        </main>
+      </div>
+    )
+  }
+
+  if (waitlistEntry) {
+    return (
+      <div className="tk-shell">
+        <header className="tk-topbar">
+          <div className="tk-brand">
+            <KodeMark size={28} />
+            <div>
+              <strong>Kode</strong>
+              <span>{event.host?.trim() || 'Hosted event'}</span>
+            </div>
+          </div>
+        </header>
+        <main className="tk-main">
+          <div className="tk-panel tk-enter tk-waitlist-success">
+            <div className="tk-waitlist-icon" aria-hidden="true">🎟️</div>
+            <h2>You're on the waitlist!</h2>
+            <p className="tk-hint">{waitlistEntry.message}</p>
+            <p className="tk-hint" style={{ marginTop: 8 }}>
+              Position: <strong>#{waitlistEntry.position}</strong>
+            </p>
+            <button type="button" className="tk-cta" style={{ marginTop: 20 }}
+              onClick={() => { window.location.href = '/' }}>
+              Back to home
+            </button>
+          </div>
         </main>
       </div>
     )
@@ -568,17 +603,40 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <div className="tk-total-strip" aria-label="Price breakdown">
             <p>
               <span>Ticket subtotal</span>
-              <strong>{money(selectedPrice, event.currency)}</strong>
+              <strong>{money(selectedPrice * quantity, event.currency)}</strong>
             </p>
             <p>
-              <span>Service fee</span>
-              <strong>{money(SERVICE_FEE, event.currency)}</strong>
+              <span>Service fee × {quantity}</span>
+              <strong>{money(SERVICE_FEE * quantity, event.currency)}</strong>
             </p>
             <p className="is-total">
               <span>Total to pay</span>
-              <strong>{money(totalPrice, event.currency)}</strong>
+              <strong>{money(totalPrice * quantity, event.currency)}</strong>
             </p>
           </div>
+
+          {/* Quantity stepper — only show when not sold out and class is available */}
+          {!selectedSoldOut && isSaleOpen ? (
+            <div className="tk-qty-row" aria-label="Ticket quantity">
+              <span className="tk-qty-label">Quantity</span>
+              <div className="tk-qty-stepper">
+                <button type="button" className="tk-qty-btn"
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  disabled={quantity <= 1 || submitting}
+                  aria-label="Decrease quantity">−</button>
+                <span className="tk-qty-value">{quantity}</span>
+                <button type="button" className="tk-qty-btn"
+                  onClick={() => setQuantity(q => Math.min(10, q + 1))}
+                  disabled={quantity >= 10 || submitting}
+                  aria-label="Increase quantity">+</button>
+              </div>
+              {quantity > 1 ? (
+                <p className="tk-hint" style={{ marginTop: 6, gridColumn: '1 / -1' }}>
+                  Each person gets their own ticket and QR code, all sent to your WhatsApp.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="tk-check">
             <input
@@ -621,9 +679,41 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                     : !feeConsent
                       ? 'Confirm total to continue'
                       : paymentProvider
-                        ? `Pay via ${paymentProvider} · ${money(totalPrice, event.currency)}`
-                        : `Create ticket · ${money(totalPrice, event.currency)}`}
+                        ? `Pay via ${paymentProvider} · ${money(totalPrice * quantity, event.currency)}`
+                        : `Create ticket${quantity > 1 ? ` × ${quantity}` : ''} · ${money(totalPrice * quantity, event.currency)}`}
           </button>
+
+          {/* Waitlist button — shown when selected class is sold out */}
+          {selectedSoldOut && isSaleOpen && holderName.trim() && holderPhone.length > 3 ? (
+            <button
+              type="button"
+              className="tk-waitlist-btn"
+              disabled={waitlistSubmitting}
+              onClick={async () => {
+                try {
+                  setWaitlistSubmitting(true)
+                  setError(null)
+                  const res = await publicTicketsApi.joinWaitlist({
+                    masterTicketId: event.masterTicketId,
+                    ticketClass,
+                    holderName: holderName.trim(),
+                    holderPhone: holderPhone.trim(),
+                  })
+                  setWaitlistEntry(res)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Could not join waitlist')
+                } finally {
+                  setWaitlistSubmitting(false)
+                }
+              }}
+            >
+              {waitlistSubmitting ? 'Joining…' : '🔔 Notify me when a ticket opens up'}
+            </button>
+          ) : selectedSoldOut && isSaleOpen ? (
+            <p className="tk-hint" style={{ textAlign: 'center', marginTop: 6 }}>
+              Fill in your name and WhatsApp number above to join the waitlist.
+            </p>
+          ) : null}
 
           <p className="tk-trust-note">
             Ticket delivered instantly on WhatsApp

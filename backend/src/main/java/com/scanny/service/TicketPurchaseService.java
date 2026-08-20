@@ -12,8 +12,7 @@ import com.scanny.model.enums.TicketStatus;
 import com.scanny.payment.PaymentIntentStatus;
 import com.scanny.entity.TicketQueueEntry;
 import com.scanny.repository.TicketQueueRepository;
-import com.scanny.repository.TicketRepository;
-import com.scanny.util.PhoneUtils;
+import com.scanny.repository.TicketRepository;import com.scanny.util.PhoneUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -46,6 +45,7 @@ public class TicketPurchaseService {
     private final Environment environment;
     private final long holdTtlMinutes;
     private final SystemBusyModeService systemBusyModeService;
+    private final TicketWaitlistService ticketWaitlistService;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
@@ -58,7 +58,8 @@ public class TicketPurchaseService {
             ObjectMapper objectMapper,
             Environment environment,
             @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes,
-            SystemBusyModeService systemBusyModeService) {
+            SystemBusyModeService systemBusyModeService,
+            TicketWaitlistService ticketWaitlistService) {
         this.ticketRepository = ticketRepository;
         this.ticketQueueRepository = ticketQueueRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
@@ -67,6 +68,7 @@ public class TicketPurchaseService {
         this.environment = environment;
         this.holdTtlMinutes = Math.max(1, holdTtlMinutes);
         this.systemBusyModeService = systemBusyModeService;
+        this.ticketWaitlistService = ticketWaitlistService;
     }
 
     @Transactional
@@ -141,13 +143,15 @@ public class TicketPurchaseService {
         String name = requireText(request.holderName(), "Your name is required");
         String phone = requirePhone(request.holderPhone());
         String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
-        org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
-                .info("Ticket purchase start phone={} event={}", phone, master.getEventName());
+        int quantity = (request.quantity() == null || request.quantity() < 1) ? 1
+                       : Math.min(request.quantity(), 10);  // cap at 10 per transaction
 
-        if (ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
+        org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                .info("Ticket purchase start phone={} event={} qty={}", phone, master.getEventName(), quantity);
+
+        // Skip duplicate-phone check for group bookings (qty>1 may be buying for friends)
+        if (quantity == 1 && ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
                 master.getEventName(), phone, PaymentStatus.Paid)) {
-            // Local H2 retests: allow repurchase so WhatsApp delivery can be tried again.
-            // Production/dev Postgres keeps one paid ticket per phone per event.
             if (!h2ProfileActive()) {
                 throw new ApiException(409, "This WhatsApp number already has a paid ticket for this event. Check WhatsApp or use a different number.");
             }
@@ -160,56 +164,92 @@ public class TicketPurchaseService {
         if (basePrice < 0) {
             throw new ApiException(400, "Unknown ticket class or table");
         }
-        int price = basePrice + SERVICE_FEE_PER_TRANSACTION;
+        int pricePerTicket = basePrice + SERVICE_FEE_PER_TRANSACTION;
 
         Integer capacity = resolveSelectionCapacity(masterMeta, ticketClass);
-        assertInventoryAvailable(master.getId(), ticketClass, capacity, now);
 
-        Ticket attendee = new Ticket();
-        attendee.setId(generateUniqueTicketId());
-        attendee.setQrToken(generateQrToken());
-        attendee.setAccessToken(generateAccessToken());
-        attendee.setMasterTicketId(master.getId());
-        attendee.setTicketType(ticketClass);
-        attendee.setEventName(master.getEventName());
-        attendee.setEventDate(master.getEventDate());
-        attendee.setHolderName(name);
-        attendee.setHolderPhone(phone);
-        attendee.setHolderEmail(email);
-        attendee.setPrice(price);
-        attendee.setCurrency(master.getCurrency());
-        attendee.setUsageLimit(1);
-        attendee.setUsageCount(0);
-        attendee.setExpiresAt(master.getExpiresAt());
-        attendee.setStatus(TicketStatus.Active);
-        attendee.setPaymentStatus(PaymentStatus.Unpaid);
-        attendee.setHoldExpiresAt(now.plus(holdTtlMinutes, ChronoUnit.MINUTES));
-        attendee.setIssuedBy("public-purchase");
-        attendee.setMetadata(serializeAttendeeMetadata(masterMeta, ticketClass));
-        attendee.setCreatedAt(now);
+        // Claim token bypasses the sold-out check for one ticket
+        boolean hasValidClaim = request.claimToken() != null
+            && ticketWaitlistService.isValidClaimToken(master.getId(), ticketClass, request.claimToken());
 
-        attendee = ticketRepository.save(attendee);
+        if (!hasValidClaim) {
+            // For group bookings, assert that `quantity` slots are all available
+            assertInventoryAvailableForQuantity(master.getId(), ticketClass, capacity, quantity, now);
+        }
 
-        // Local instant-pay path: convert hold → sold in the same transaction.
+        // Create all attendee tickets
+        List<String> ticketIds = new ArrayList<>();
+        List<String> viewUrls = new ArrayList<>();
         String paymentId = generateImmediatePaymentId();
-        attendee.setPaymentStatus(PaymentStatus.Paid);
-        attendee.setPaymentReference(paymentId);
-        attendee.setHoldExpiresAt(null);
-        attendee.setUpdatedAt(Instant.now());
-        ticketRepository.save(attendee);
 
-        String viewUrl = buildViewUrl(attendee.getAccessToken());
-        String ticketId = attendee.getId();
+        for (int i = 0; i < quantity; i++) {
+            Ticket attendee = new Ticket();
+            attendee.setId(generateUniqueTicketId());
+            attendee.setQrToken(generateQrToken());
+            attendee.setAccessToken(generateAccessToken());
+            attendee.setMasterTicketId(master.getId());
+            attendee.setTicketType(ticketClass);
+            attendee.setEventName(master.getEventName());
+            attendee.setEventDate(master.getEventDate());
+            // For group bookings beyond the first ticket, mark as "guest of <name>"
+            attendee.setHolderName(quantity > 1 && i > 0 ? name + " (guest " + (i + 1) + ")" : name);
+            attendee.setHolderPhone(phone);
+            attendee.setHolderEmail(email);
+            attendee.setPrice(pricePerTicket);
+            attendee.setCurrency(master.getCurrency());
+            attendee.setUsageLimit(1);
+            attendee.setUsageCount(0);
+            attendee.setExpiresAt(master.getExpiresAt());
+            attendee.setStatus(TicketStatus.Active);
+            attendee.setPaymentStatus(PaymentStatus.Unpaid);
+            attendee.setHoldExpiresAt(now.plus(holdTtlMinutes, ChronoUnit.MINUTES));
+            attendee.setIssuedBy("public-purchase");
+            attendee.setMetadata(serializeAttendeeMetadata(masterMeta, ticketClass));
+            attendee.setCreatedAt(now);
+
+            attendee = ticketRepository.save(attendee);
+
+            // Instant-pay
+            attendee.setPaymentStatus(PaymentStatus.Paid);
+            attendee.setPaymentReference(paymentId);
+            attendee.setHoldExpiresAt(null);
+            attendee.setUpdatedAt(Instant.now());
+            ticketRepository.save(attendee);
+
+            ticketIds.add(attendee.getId());
+            viewUrls.add(buildViewUrl(attendee.getAccessToken()));
+        }
+
+        // Consume claim token if used
+        if (hasValidClaim) {
+            ticketWaitlistService.consumeClaimToken(request.claimToken());
+        }
+
         ticketService.refreshStatsBroadcast();
 
+        String firstId = ticketIds.get(0);
+        String firstViewUrl = viewUrls.get(0);
         return new PublicTicketDtos.PurchaseResponse(
-            ticketId,
-            shortCodeForTicketId(ticketId),
+            firstId,
+            shortCodeForTicketId(firstId),
             paymentId,
             PaymentIntentStatus.Paid,
-            "Ticket created and marked paid",
-            viewUrl
+            quantity > 1
+                ? quantity + " tickets created and marked paid"
+                : "Ticket created and marked paid",
+            firstViewUrl,
+            ticketIds,
+            viewUrls
         );
+    }
+
+    /** Waitlist delegation. */
+    public PublicTicketDtos.WaitlistJoinResponse joinWaitlist(PublicTicketDtos.WaitlistJoinRequest request) {
+        return ticketWaitlistService.join(request);
+    }
+
+    public void leaveWaitlist(String waitlistId) {
+        ticketWaitlistService.leave(waitlistId);
     }
 
     @Transactional
@@ -725,6 +765,22 @@ public class TicketPurchaseService {
         long held = ticketRepository.countActiveHoldsByMasterAndType(masterId, selection, now);
         if (sold + held >= capacity) {
             throw new ApiException(409, "Sold out — no more tickets left for " + selection);
+        }
+    }
+
+    private void assertInventoryAvailableForQuantity(String masterId, String selection, Integer capacity, int quantity, Instant now) {
+        if (capacity == null) {
+            return;
+        }
+        long sold = ticketRepository.countSoldByMasterAndType(masterId, selection);
+        long held = ticketRepository.countActiveHoldsByMasterAndType(masterId, selection, now);
+        long available = capacity - sold - held;
+        if (available <= 0) {
+            throw new ApiException(409, "Sold out — no more tickets left for " + selection);
+        }
+        if (available < quantity) {
+            throw new ApiException(409, "Only " + available + " ticket(s) left for " + selection
+                + ". Reduce your quantity.");
         }
     }
 

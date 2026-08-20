@@ -510,6 +510,10 @@ export interface TicketPurchaseRequest {
   paymentPhone?: string
   provider?: string
   presaleCode?: string
+  /** How many tickets to buy (1–10). Default 1. */
+  quantity?: number
+  /** Waitlist claim token — bypasses sold-out check for one purchase. */
+  claimToken?: string
 }
 
 export interface TicketPurchaseResponse {
@@ -519,6 +523,24 @@ export interface TicketPurchaseResponse {
   paymentStatus: PaymentIntentStatus
   message: string
   viewUrl: string
+  /** All ticket IDs when quantity > 1. */
+  ticketIds?: string[]
+  /** View URLs for all tickets when quantity > 1. */
+  viewUrls?: string[]
+}
+
+export interface WaitlistJoinRequest {
+  masterTicketId: string
+  ticketClass: string
+  holderName: string
+  holderPhone: string
+}
+
+export interface WaitlistJoinResponse {
+  success: boolean
+  message: string
+  position: number
+  waitlistId: string | null
 }
 
 export interface QueueStatusResponse {
