@@ -713,9 +713,8 @@ public class OrderService {
      * After a booking order is saved, mark every booked lodging item as BOOKED
      * so it disappears from the customer availability list.
      *
-     * For room types with multiple units (unitsAvailable > 1) we only mark BOOKED
-     * when all units are now taken (sumOverlappingLodgingUnits == unitsAvailable).
-     * Single-unit rooms are always marked BOOKED immediately.
+     * Always marks BOOKED — availability was already enforced by
+     * sumOverlappingLodgingUnits before the order was saved.
      */
     private boolean markLodgingRoomsBooked(
             List<OrderLineItem> lines,
@@ -730,25 +729,26 @@ public class OrderService {
             if (item == null) {
                 continue;
             }
-            anyBooked = true;
+            // Always mark BOOKED — sumOverlappingLodgingUnits already gated the
+            // booking. For multi-unit rooms, if a unit was just taken we still want
+            // the status to reflect BOOKED so the merchant sees it in Booked Rooms.
+            // The room returns to VACANT only when all bookings are checked out.
             int units = Math.max(item.getUnitsAvailable(), 1);
-            if (units == 1) {
-                // Single physical room — mark BOOKED straight away.
+            long occupiedAfter = orderRepository.sumOverlappingLodgingUnits(
+                    item.getId(),
+                    line.getCheckInDate(),
+                    line.getCheckOutDate(),
+                    OrderStatus.Cancelled,
+                    PaymentStatus.Refunded
+            );
+            if (units == 1 || occupiedAfter >= units) {
                 item.setRoomStatus(RoomStatus.BOOKED);
                 catalogItemRepository.save(item);
+                anyBooked = true;
             } else {
-                // Multi-unit room type — check if all units are now claimed.
-                long occupiedAfter = orderRepository.sumOverlappingLodgingUnits(
-                        item.getId(),
-                        line.getCheckInDate(),
-                        line.getCheckOutDate(),
-                        OrderStatus.Cancelled,
-                        PaymentStatus.Refunded
-                );
-                if (occupiedAfter >= units) {
-                    item.setRoomStatus(RoomStatus.BOOKED);
-                    catalogItemRepository.save(item);
-                }
+                // Still slots left in a multi-unit room type — don't hide from menu,
+                // but the booking is recorded so the next buyer sees reduced availability.
+                anyBooked = true;
             }
         }
         return anyBooked;
