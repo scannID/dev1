@@ -63,6 +63,7 @@ import type {
   AnnouncementsListResponse,
   CreateAnnouncementRequest,
   UpdateAnnouncementRequest,
+  PaymentProvidersResponse,
 } from './types'
 
 export type CatalogListParams = {
