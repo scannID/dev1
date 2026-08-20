@@ -1,4 +1,4 @@
-﻿// API Service Functions — paths/payloads aligned with Spring controllers
+// API Service Functions — paths/payloads aligned with Spring controllers
 
 import { api } from './client'
 import type {
@@ -43,9 +43,13 @@ import type {
   PaymentInitiateRequest,
   PaymentInitiateResponse,
   PaymentStatusResponse,
-  PaymentProvidersResponse,
   TicketPurchaseRequest,
   TicketPurchaseResponse,
+  QueueStatusResponse,
+  TransferInitiateResponse,
+  TransferInfoResponse,
+  TransferAcceptRequest,
+  TransferAcceptResponse,
   TicketEventInfo,
   AttendeeTicketView,
   EventTicketTrackingMetrics,
@@ -433,8 +437,28 @@ export const publicTicketsApi = {
     return api.post<TicketPurchaseResponse>('/tickets/public/purchase', data)
   },
 
+  joinQueue: async (data: TicketPurchaseRequest): Promise<QueueStatusResponse> => {
+    return api.post<QueueStatusResponse>('/tickets/public/queue', data)
+  },
+
+  getQueueStatus: async (queueToken: string): Promise<QueueStatusResponse> => {
+    return api.get<QueueStatusResponse>(`/tickets/public/queue/${encodeURIComponent(queueToken)}`)
+  },
+
   view: async (accessToken: string): Promise<AttendeeTicketView> => {
     return api.get<AttendeeTicketView>(`/tickets/public/view/${encodeURIComponent(accessToken)}`)
+  },
+
+  initiateTransfer: async (accessToken: string): Promise<TransferInitiateResponse> => {
+    return api.post<TransferInitiateResponse>(`/tickets/public/view/${encodeURIComponent(accessToken)}/transfer`)
+  },
+
+  getTransferInfo: async (transferToken: string): Promise<TransferInfoResponse> => {
+    return api.get<TransferInfoResponse>(`/tickets/public/transfer/${encodeURIComponent(transferToken)}`)
+  },
+
+  acceptTransfer: async (data: TransferAcceptRequest): Promise<TransferAcceptResponse> => {
+    return api.post<TransferAcceptResponse>('/tickets/public/transfer/accept', data)
   },
 
   createEvent: async (data: CreateTicketRequest): Promise<Ticket> => {

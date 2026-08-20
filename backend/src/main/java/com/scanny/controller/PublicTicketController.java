@@ -38,9 +38,34 @@ public class PublicTicketController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/queue")
+    public ResponseEntity<PublicTicketDtos.QueueStatusResponse> queue(@Valid @RequestBody PublicTicketDtos.PurchaseRequest request) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ticketPurchaseService.joinQueue(request));
+    }
+
+    @GetMapping("/queue/{queueToken}")
+    public ResponseEntity<PublicTicketDtos.QueueStatusResponse> queueStatus(@PathVariable String queueToken) {
+        return ResponseEntity.ok(ticketPurchaseService.getQueueStatus(queueToken));
+    }
+
     @GetMapping("/view/{accessToken}")
     public ResponseEntity<PublicTicketDtos.AttendeeTicketView> view(@PathVariable String accessToken) {
         return ResponseEntity.ok(ticketPurchaseService.getAttendeeView(accessToken));
+    }
+
+    @PostMapping("/view/{accessToken}/transfer")
+    public ResponseEntity<PublicTicketDtos.TransferInitiateResponse> initiateTransfer(@PathVariable String accessToken) {
+        return ResponseEntity.ok(ticketPurchaseService.initiateTransfer(accessToken));
+    }
+
+    @GetMapping("/transfer/{transferToken}")
+    public ResponseEntity<PublicTicketDtos.TransferInfoResponse> getTransferInfo(@PathVariable String transferToken) {
+        return ResponseEntity.ok(ticketPurchaseService.getTransferInfo(transferToken));
+    }
+
+    @PostMapping("/transfer/accept")
+    public ResponseEntity<PublicTicketDtos.TransferAcceptResponse> acceptTransfer(@RequestBody PublicTicketDtos.TransferAcceptRequest request) {
+        return ResponseEntity.ok(ticketPurchaseService.acceptTransfer(request));
     }
 
     @PostMapping("/events")

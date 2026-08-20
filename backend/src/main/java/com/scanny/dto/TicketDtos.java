@@ -56,15 +56,26 @@ public class TicketDtos {
     public record EventClassInput(
         String name,
         Integer fee,
-        Integer capacity
-    ) {}
+        Integer capacity,
+        String saleEndsAt,
+        String presaleCode
+    ) {
+        public EventClassInput(String name, Integer fee, Integer capacity) {
+            this(name, fee, capacity, null, null);
+        }
+    }
 
     public record EventTableInput(
         String name,
         Integer seats,
         Integer price,
-        Integer capacity
-    ) {}
+        Integer capacity,
+        String saleEndsAt
+    ) {
+        public EventTableInput(String name, Integer seats, Integer price, Integer capacity) {
+            this(name, seats, price, capacity, null);
+        }
+    }
 
     public record UpdateCreatedEventRequest(
         String eventName,
@@ -79,9 +90,30 @@ public class TicketDtos {
         String host,
         String hostContact,
         String eventImageUrl,
+        Instant saleStartsAt,
+        Instant saleEndsAt,
         List<EventClassInput> ticketClasses,
         List<EventTableInput> tables
-    ) {}
+    ) {
+        public UpdateCreatedEventRequest(
+            String eventName,
+            Instant eventDate,
+            String ticketType,
+            Integer price,
+            String currency,
+            String template,
+            String payTo,
+            String location,
+            String time,
+            String host,
+            String hostContact,
+            String eventImageUrl,
+            List<EventClassInput> ticketClasses,
+            List<EventTableInput> tables
+        ) {
+            this(eventName, eventDate, ticketType, price, currency, template, payTo, location, time, host, hostContact, eventImageUrl, null, null, ticketClasses, tables);
+        }
+    }
 
     // Response DTOs
 

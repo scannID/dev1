@@ -1020,3 +1020,420 @@ html.tk-app body {
     transition: none !important;
   }
 }
+
+/* ---------------------------------- sale windows & countdown ---------------------------------- */
+
+.tk-sale-window {
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border-radius: var(--tk-radius-md);
+  border: 1px solid var(--tk-border);
+  background: var(--tk-panel-2);
+  text-align: center;
+}
+
+.tk-sale-window.is-upcoming {
+  border-color: #fdba74;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.tk-sale-window.is-closed {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.tk-sale-window-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--tk-gold);
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.tk-sale-window.is-closed .tk-sale-window-badge {
+  background: var(--tk-danger);
+}
+
+.tk-sale-window p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--tk-text);
+}
+
+.tk-sale-window.is-closed p {
+  margin: 0;
+  color: #991b1b;
+  font-weight: 550;
+}
+
+.tk-countdown {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.tk-countdown-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 48px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid rgba(234, 88, 12, 0.25);
+  border-radius: var(--tk-radius-sm);
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.08);
+}
+
+.tk-countdown-segment span {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--tk-gold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.tk-countdown-segment label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--tk-muted);
+  margin-top: 2px;
+}
+
+.tk-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.tk-badge-pill.is-early {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.tk-badge-pill.is-presale {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+/* ---------------------------------- Virtual Queue / Waiting Room ---------------------------------- */
+
+.tk-queue-panel {
+  background: var(--tk-bg-elev);
+  border: 1.5px solid var(--tk-gold-soft);
+  border-radius: var(--tk-radius-lg);
+  padding: 32px 24px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 0 20px rgba(234, 88, 12, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tk-queue-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--tk-gold) 0%, var(--tk-gold-bright) 50%, var(--tk-gold) 100%);
+  animation: tk-shimmer 2s infinite linear;
+}
+
+.tk-queue-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tk-gold);
+  background: var(--tk-gold-soft);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin: 0;
+}
+
+.tk-queue-pos-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tk-gold-soft) 0%, transparent 70%);
+  border: 2px solid var(--tk-gold);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: tk-pulse 2.5s infinite ease-in-out;
+}
+
+.tk-queue-pos-number {
+  font-family: var(--tk-font-display);
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--tk-gold);
+  line-height: 1;
+}
+
+.tk-queue-pos-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tk-muted);
+}
+
+.tk-queue-headline {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tk-text);
+}
+
+.tk-queue-sub {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--tk-muted);
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+.tk-queue-eta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #065f46;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.tk-queue-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--tk-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.tk-queue-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--tk-gold) 0%, var(--tk-gold-bright) 100%);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  animation: tk-pulse 2s infinite ease-in-out;
+}
+
+.tk-queue-warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--tk-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes tk-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.2);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 10px rgba(234, 88, 12, 0);
+  }
+}
+
+@keyframes tk-shimmer {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* ---------------------------------- Ticket Transfer & Modal ---------------------------------- */
+
+.tk-transfer-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(234, 88, 12, 0.08);
+  border: 1px solid rgba(234, 88, 12, 0.3);
+  color: var(--tk-gold);
+  border-radius: var(--tk-radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tk-transfer-trigger-btn:hover {
+  background: var(--tk-gold);
+  color: #ffffff;
+  border-color: var(--tk-gold);
+}
+
+.tk-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.tk-modal-content {
+  width: 100%;
+  max-width: 420px;
+  background: var(--tk-bg-elev);
+  border: 1px solid var(--tk-border);
+  border-radius: var(--tk-radius-lg);
+  padding: 24px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: tk-modal-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tk-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tk-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tk-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tk-text);
+}
+
+.tk-modal-close {
+  background: none;
+  border: none;
+  color: var(--tk-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tk-modal-close:hover {
+  color: var(--tk-text);
+  background: var(--tk-bg);
+}
+
+.tk-modal-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--tk-muted);
+  line-height: 1.5;
+}
+
+.tk-transfer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tk-transfer-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tk-transfer-input {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: var(--tk-radius-sm);
+  border: 1px solid var(--tk-border);
+  background: var(--tk-bg);
+  color: var(--tk-text);
+  outline: none;
+  min-width: 0;
+}
+
+.tk-transfer-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--tk-bg);
+  border: 1px solid var(--tk-border);
+  border-radius: var(--tk-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tk-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tk-transfer-copy-btn:hover {
+  border-color: var(--tk-gold);
+  color: var(--tk-gold);
+}
+
+.tk-transfer-wa-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--tk-radius-md);
+  border: none;
+  background: #25d366;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.tk-transfer-wa-btn:hover {
+  opacity: 0.9;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
-import { ArrowRight, Check, Clock } from 'lucide-react'
+import { ArrowRight, Check, CheckCheck, Clock, Copy, Send, Share2, X } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
 import type { AttendeeTicketView } from '../api/types'
 import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
@@ -83,6 +83,40 @@ export default function TicketViewPage({ accessToken }: Props) {
   const [qr, setQr] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferUrl, setTransferUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+
+  const handleOpenTransfer = async () => {
+    setShowTransferModal(true)
+    setTransferLoading(true)
+    setTransferError(null)
+    setCopied(false)
+    try {
+      const res = await publicTicketsApi.initiateTransfer(accessToken)
+      setTransferUrl(res.transferUrl)
+    } catch (err: any) {
+      setTransferError(err.message || 'Could not generate transfer link.')
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  const handleCopy = () => {
+    if (!transferUrl) return
+    navigator.clipboard.writeText(transferUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  const handleShareWhatsApp = () => {
+    if (!transferUrl || !ticket) return
+    const text = `Hey, here is your ticket for ${ticket.eventName} (${ticket.ticketType}): ${transferUrl}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
 
   useEffect(() => {
     document.documentElement.classList.add('tk-app')
@@ -203,55 +237,21 @@ export default function TicketViewPage({ accessToken }: Props) {
       </header>
 
       <main className="tk-main">
-        <header className="tk-hero tk-enter">
-          {visual.eventImageUrl ? (
-            <div className="tk-hero-art">
-              <img src={visual.eventImageUrl} alt="" />
-            </div>
-          ) : null}
-          <p className="tk-hero-kicker">{paid ? 'Entry pass' : 'Almost there'}</p>
-          <h1>{ticket.eventName}</h1>
-          <p className="tk-hero-meta">
-            {ticket.ticketType}
-            {ticket.holderName ? ` · ${ticket.holderName}` : ''}
-          </p>
-        </header>
-
-        <div className="tk-status-row tk-enter">
-          {paid ? (
-            <span className="tk-pill tk-pill-ok">
-              <Check size={14} strokeWidth={2.5} aria-hidden />
-              Paid
-            </span>
-          ) : (
-            <span className="tk-pill tk-pill-pending">
-              <Clock size={14} strokeWidth={2.5} aria-hidden />
-              Pending
-            </span>
-          )}
-          {paid ? (
-            <p className="tk-status-note">
-              Sent via WhatsApp to <strong>{ticket.holderPhone || '—'}</strong>
-            </p>
-          ) : (
-            <p className="tk-status-note">
-              Complete the Mobile Money approval on your phone to unlock this pass.
-            </p>
-          )}
-        </div>
-
-        {ticket.ticketCode ? (
-          <section className="tk-ticket-code tk-enter" aria-label="Ticket code">
-            <span className="tk-ticket-code-label">Ticket code</span>
-            <strong className="tk-ticket-code-value">{ticket.ticketCode}</strong>
-          </section>
-        ) : null}
-
         {paid ? (
           <div className="tk-enter">
             <TicketPassFrame>
               <TicketRenderer d={visual} qr={qr} />
             </TicketPassFrame>
+
+            <div className="tk-status-row tk-enter">
+              <span className="tk-pill tk-pill-ok">
+                <Check size={14} strokeWidth={2.5} aria-hidden />
+                Paid
+              </span>
+              <p className="tk-status-note">
+                Sent via WhatsApp to <strong>{ticket.holderPhone || '—'}</strong>
+              </p>
+            </div>
 
             <div className="tk-pass-meta">
               <div>
@@ -264,33 +264,134 @@ export default function TicketViewPage({ accessToken }: Props) {
               </div>
             </div>
 
+            {ticket.status === 'Active' ? (
+              <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  className="tk-transfer-trigger-btn"
+                  onClick={handleOpenTransfer}
+                >
+                  <Send size={14} />
+                  <span>Transfer Ticket</span>
+                </button>
+              </div>
+            ) : null}
+
             <p className="tk-foot-note">Show this QR at entry. A copy is also in your email.</p>
           </div>
         ) : (
-          <div className="tk-panel tk-wait tk-enter">
-            <div className="tk-wait-ring" aria-hidden>
-              <Clock size={28} color="var(--tk-gold-bright)" strokeWidth={1.75} />
+          <>
+            <header className="tk-hero tk-enter">
+              <p className="tk-hero-kicker">Almost there</p>
+              <h1>{ticket.eventName}</h1>
+              <p className="tk-hero-meta">
+                {ticket.ticketType}
+                {ticket.holderName ? ` · ${ticket.holderName}` : ''}
+              </p>
+            </header>
+
+            <div className="tk-status-row tk-enter">
+              <span className="tk-pill tk-pill-pending">
+                <Clock size={14} strokeWidth={2.5} aria-hidden />
+                Pending
+              </span>
+              <p className="tk-status-note">
+                Complete the Mobile Money approval on your phone to unlock this pass.
+              </p>
             </div>
-            <h2>Waiting for payment</h2>
-            <p>
-              Approve the prompt on your phone. This page updates automatically when payment
-              clears.
-            </p>
-            <p className="tk-ref">Ticket {ticket.ticketCode || ticket.id}</p>
-            {ticket.purchaseUrl ? (
-              <button
-                type="button"
-                className="tk-btn-cancel"
-                onClick={() => {
-                  window.location.href = ticket.purchaseUrl!
-                }}
-              >
-                Cancel — back to tickets
-              </button>
+
+            {ticket.ticketCode ? (
+              <section className="tk-ticket-code tk-enter" aria-label="Ticket code">
+                <span className="tk-ticket-code-label">Ticket code</span>
+                <strong className="tk-ticket-code-value">{ticket.ticketCode}</strong>
+              </section>
             ) : null}
-          </div>
+
+            <div className="tk-panel tk-wait tk-enter">
+              <div className="tk-wait-ring" aria-hidden>
+                <Clock size={28} color="var(--tk-gold-bright)" strokeWidth={1.75} />
+              </div>
+              <h2>Waiting for payment</h2>
+              <p>
+                Approve the prompt on your phone. This page updates automatically when payment
+                clears.
+              </p>
+              <p className="tk-ref">Ticket {ticket.ticketCode || ticket.id}</p>
+              {ticket.purchaseUrl ? (
+                <button
+                  type="button"
+                  className="tk-btn-cancel"
+                  onClick={() => {
+                    window.location.href = ticket.purchaseUrl!
+                  }}
+                >
+                  Back to tickets
+                </button>
+              ) : null}
+            </div>
+          </>
         )}
       </main>
+
+      {showTransferModal ? (
+        <div className="tk-modal-overlay" onClick={() => setShowTransferModal(false)}>
+          <div className="tk-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="tk-modal-header">
+              <h3>Transfer this ticket</h3>
+              <button
+                type="button"
+                className="tk-modal-close"
+                onClick={() => setShowTransferModal(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="tk-modal-desc">
+              Share this link with the recipient. Once they enter their name and phone number, this pass is invalidated and their new ticket will be generated.
+            </p>
+
+            {transferLoading ? (
+              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--tk-gold)', fontSize: 14 }}>
+                Generating transfer link…
+              </div>
+            ) : transferError ? (
+              <div className="tk-error" style={{ textAlign: 'left' }}>
+                {transferError}
+              </div>
+            ) : transferUrl ? (
+              <div className="tk-transfer-box">
+                <div className="tk-transfer-input-row">
+                  <input
+                    type="text"
+                    readOnly
+                    value={transferUrl}
+                    className="tk-transfer-input"
+                  />
+                  <button
+                    type="button"
+                    className="tk-transfer-copy-btn"
+                    onClick={handleCopy}
+                  >
+                    {copied ? <CheckCheck size={16} color="#10b981" /> : <Copy size={16} />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="tk-transfer-wa-btn"
+                  onClick={handleShareWhatsApp}
+                >
+                  <Share2 size={16} />
+                  <span>Share via WhatsApp</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

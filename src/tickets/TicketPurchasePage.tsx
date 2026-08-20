@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
-import type { TicketEventInfo } from '../api/types'
+import type { TicketEventInfo, QueueStatusResponse } from '../api/types'
 import { KodeMark } from '../customer/KodeMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
@@ -37,12 +37,122 @@ function formatEventDate(iso: string | null) {
   }
 }
 
-function LockIcon() {
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return null
+  }
+}
+
+function getCountdown(targetIso: string | null | undefined) {
+  if (!targetIso) return null
+  const diff = new Date(targetIso).getTime() - Date.now()
+  if (diff <= 0) return null
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
+  const minutes = Math.floor((diff / (1000 * 60)) % 60)
+  const seconds = Math.floor((diff / 1000) % 60)
+  return {
+    days: String(days).padStart(2, '0'),
+    hours: String(hours).padStart(2, '0'),
+    minutes: String(minutes).padStart(2, '0'),
+    seconds: String(seconds).padStart(2, '0'),
+  }
+}
+
+function QueueWaitingStep({
+  queueToken,
+  initialPosition,
+  initialWaitSeconds,
+  eventName,
+  onReset,
+}: {
+  queueToken: string
+  initialPosition?: number | null
+  initialWaitSeconds?: number | null
+  eventName: string
+  onReset: () => void
+}) {
+  const [position, setPosition] = useState<number | null>(initialPosition ?? 1)
+  const [waitSeconds, setWaitSeconds] = useState<number | null>(initialWaitSeconds ?? 6)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const res = await publicTicketsApi.getQueueStatus(queueToken)
+        if (cancelled) return
+        if (res.position != null) setPosition(res.position)
+        if (res.estimatedWaitSeconds != null) setWaitSeconds(res.estimatedWaitSeconds)
+
+        if (res.status === 'Complete' && res.viewUrl) {
+          window.location.href = res.viewUrl
+        } else if (res.status === 'Failed') {
+          setError(res.errorMessage || 'Ticket purchase failed. Please try again.')
+        } else if (res.status === 'Expired') {
+          setError('Your spot in line has expired. Please rejoin the queue.')
+        }
+      } catch (err: any) {
+        // network retry
+      }
+    }
+
+    const timer = window.setInterval(poll, 2500)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [queueToken])
+
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="4" y="11" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="2" />
-    </svg>
+    <div className="tk-queue-panel tk-enter">
+      <p className="tk-queue-kicker">Virtual Waiting Room</p>
+
+      <div className="tk-queue-pos-ring">
+        <span className="tk-queue-pos-number">{position ?? 1}</span>
+        <span className="tk-queue-pos-label">In line</span>
+      </div>
+
+      <h2 className="tk-queue-headline">You're in line for {eventName}</h2>
+      <p className="tk-queue-sub">
+        High demand launch. Orders are being processed sequentially to guarantee fair access.
+      </p>
+
+      {waitSeconds != null && waitSeconds > 0 ? (
+        <div className="tk-queue-eta-badge">
+          <span>⏱ Estimated wait: ~{waitSeconds} seconds</span>
+        </div>
+      ) : null}
+
+      <div className="tk-queue-progress-bar">
+        <div
+          className="tk-queue-progress-fill"
+          style={{ width: `${Math.max(15, 100 - ((position ?? 1) - 1) * 20)}%` }}
+        />
+      </div>
+
+      {error ? (
+        <div className="tk-error" style={{ width: '100%', textAlign: 'center', marginTop: 12 }}>
+          <p style={{ margin: '0 0 10px' }}>{error}</p>
+          <button type="button" className="tk-btn-submit" onClick={onReset}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        <p className="tk-queue-warning">
+          🔒 Do not close or refresh this tab. Your position is held.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -50,14 +160,17 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [event, setEvent] = useState<TicketEventInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [queueEntry, setQueueEntry] = useState<QueueStatusResponse | null>(null)
   const [buyTab, setBuyTab] = useState<'classes' | 'tables'>('classes')
   const [ticketClass, setTicketClass] = useState('')
   const [holderName, setHolderName] = useState('')
   const [holderPhone, setHolderPhone] = useState('')
   const [paymentPhone, setPaymentPhone] = useState('0')
+  const [presaleCode, setPresaleCode] = useState('')
   const [feeConsent, setFeeConsent] = useState(false)
   const paymentProvider = detectProvider(paymentPhone || holderPhone)
   const [submitting, setSubmitting] = useState(false)
+  const [now, setNow] = useState(Date.now())
 
   usePageMeta({
     title: event ? `Buy tickets — ${event.eventName}` : 'Buy event tickets',
@@ -74,6 +187,11 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       document.documentElement.classList.remove('tk-app')
       document.body.classList.remove('tk-app')
     }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -112,10 +230,14 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       setError('Confirm the total and service fee before continuing')
       return
     }
+    if (selectedClass?.presaleRequired && !presaleCode.trim()) {
+      setError('Presale code is required for this ticket class')
+      return
+    }
     try {
       setSubmitting(true)
       setError(null)
-      const result = await publicTicketsApi.purchase({
+      const payload = {
         masterQrToken,
         ticketClass,
         holderName: holderName.trim(),
@@ -123,8 +245,16 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         holderPhone: holderPhone.trim(),
         paymentPhone: paymentPhone.trim() || undefined,
         provider: paymentProvider ?? undefined,
-      })
-      window.location.href = result.viewUrl
+        presaleCode: presaleCode.trim() || undefined,
+      }
+
+      if (event.queueEnabled) {
+        const qRes = await publicTicketsApi.joinQueue(payload)
+        setQueueEntry(qRes)
+      } else {
+        const result = await publicTicketsApi.purchase(payload)
+        window.location.href = result.viewUrl
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start purchase')
     } finally {
@@ -140,6 +270,15 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const totalPrice = selectedPrice + SERVICE_FEE
   const selectedSoldOut = Boolean(selectedClass?.soldOut || selectedTable?.soldOut)
   const dateLabel = formatEventDate(event?.eventDate ?? null)
+
+  const isSaleUpcoming = Boolean(
+    event?.saleStartsAt && new Date(event.saleStartsAt).getTime() > now
+  )
+  const isSaleClosed = Boolean(
+    event?.saleEndsAt && new Date(event.saleEndsAt).getTime() <= now
+  )
+  const isSaleOpen = event?.saleOpen ?? (!isSaleUpcoming && !isSaleClosed)
+  const countdown = isSaleUpcoming ? getCountdown(event?.saleStartsAt) : null
 
   if (loading) {
     return (
@@ -164,6 +303,33 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   }
 
   if (!event) return null
+
+  if (queueEntry) {
+    return (
+      <div className="tk-shell">
+        <header className="tk-topbar">
+          <div className="tk-brand">
+            <KodeMark size={28} />
+            <div>
+              <strong>Kode</strong>
+              <span>{event.host?.trim() || 'Hosted event'}</span>
+            </div>
+          </div>
+          <span className="tk-topbar-badge">Waiting room</span>
+        </header>
+
+        <main className="tk-main">
+          <QueueWaitingStep
+            queueToken={queueEntry.queueToken}
+            initialPosition={queueEntry.position}
+            initialWaitSeconds={queueEntry.estimatedWaitSeconds}
+            eventName={event.eventName}
+            onReset={() => setQueueEntry(null)}
+          />
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="tk-shell">
@@ -193,6 +359,24 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         </header>
 
         <form onSubmit={handleSubmit} className="tk-panel tk-enter" noValidate>
+          {isSaleUpcoming && countdown ? (
+            <div className="tk-sale-window is-upcoming">
+              <span className="tk-sale-window-badge">Sales Opening Soon</span>
+              <p>Ticket sales open on <strong>{formatDateTime(event.saleStartsAt)}</strong></p>
+              <div className="tk-countdown" aria-label="Countdown until sales open">
+                <div className="tk-countdown-segment"><span>{countdown.days}</span><label>Days</label></div>
+                <div className="tk-countdown-segment"><span>{countdown.hours}</span><label>Hours</label></div>
+                <div className="tk-countdown-segment"><span>{countdown.minutes}</span><label>Mins</label></div>
+                <div className="tk-countdown-segment"><span>{countdown.seconds}</span><label>Secs</label></div>
+              </div>
+            </div>
+          ) : isSaleClosed ? (
+            <div className="tk-sale-window is-closed">
+              <span className="tk-sale-window-badge">Sales Closed</span>
+              <p>Ticket sales for this event have closed.</p>
+            </div>
+          ) : null}
+
           {hasTables ? (
             <div className="tk-tabs" role="tablist" aria-label="Buy general tickets or tables">
               <button
@@ -208,7 +392,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                       '',
                   )
                 }}
-                disabled={submitting}
+                disabled={submitting || !isSaleOpen}
               >
                 General
               </button>
@@ -221,7 +405,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                   setBuyTab('tables')
                   setTicketClass(tables.find((t) => !t.soldOut)?.name ?? tables[0]?.name ?? '')
                 }}
-                disabled={submitting}
+                disabled={submitting || !isSaleOpen}
               >
                 Tables
               </button>
@@ -238,22 +422,31 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               ? tables.map((t) => {
                   const active = t.name === ticketClass
                   const stock = stockLabel(t)
+                  const isExpired = Boolean(t.saleEndsAt && new Date(t.saleEndsAt).getTime() <= now)
+                  const isEarly = Boolean(t.saleEndsAt && new Date(t.saleEndsAt).getTime() > now)
+                  const isUnavailable = Boolean(t.soldOut || isExpired || !isSaleOpen)
+
                   return (
                     <button
                       key={t.name}
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      className={`tk-class-card${active ? ' is-selected' : ''}${t.soldOut ? ' is-sold-out' : ''}`}
+                      className={`tk-class-card${active ? ' is-selected' : ''}${isUnavailable ? ' is-sold-out' : ''}`}
                       onClick={() => setTicketClass(t.name)}
-                      disabled={submitting || Boolean(t.soldOut)}
+                      disabled={submitting || isUnavailable}
                     >
                       <span className="tk-radio" aria-hidden="true" />
                       <span className="tk-class-card-body">
                         <span className="tk-class-card-main">
                           <strong>{t.name}</strong>
                           {t.seats > 0 ? <em className="tk-card-meta">{t.seats} seats</em> : null}
-                          {stock ? (
+                          {isEarly ? (
+                            <span className="tk-badge-pill is-early">Early package</span>
+                          ) : null}
+                          {isExpired ? (
+                            <em className="tk-card-meta is-danger">Package ended</em>
+                          ) : stock ? (
                             <em className={`tk-card-meta${t.soldOut ? ' is-danger' : ''}`}>{stock}</em>
                           ) : null}
                         </span>
@@ -265,21 +458,32 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               : event.ticketClasses.map((c) => {
                   const active = c.name === ticketClass
                   const stock = stockLabel(c)
+                  const isExpired = Boolean(c.saleEndsAt && new Date(c.saleEndsAt).getTime() <= now)
+                  const isEarly = Boolean(c.saleEndsAt && new Date(c.saleEndsAt).getTime() > now)
+                  const isUnavailable = Boolean(c.soldOut || isExpired || !isSaleOpen)
+
                   return (
                     <button
                       key={c.name}
                       type="button"
                       role="radio"
                       aria-checked={active}
-                      className={`tk-class-card${active ? ' is-selected' : ''}${c.soldOut ? ' is-sold-out' : ''}`}
+                      className={`tk-class-card${active ? ' is-selected' : ''}${isUnavailable ? ' is-sold-out' : ''}`}
                       onClick={() => setTicketClass(c.name)}
-                      disabled={submitting || Boolean(c.soldOut)}
+                      disabled={submitting || isUnavailable}
                     >
                       <span className="tk-radio" aria-hidden="true" />
                       <span className="tk-class-card-body">
                         <span className="tk-class-card-main">
                           <strong>{c.name}</strong>
-                          {stock ? (
+                          {c.presaleRequired ? (
+                            <span className="tk-badge-pill is-presale">Presale code</span>
+                          ) : isEarly ? (
+                            <span className="tk-badge-pill is-early">Early Bird</span>
+                          ) : null}
+                          {isExpired ? (
+                            <em className="tk-card-meta is-danger">Sales ended</em>
+                          ) : stock ? (
                             <em className={`tk-card-meta${c.soldOut ? ' is-danger' : ''}`}>{stock}</em>
                           ) : null}
                         </span>
@@ -290,6 +494,25 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 })}
           </div>
 
+          {selectedClass?.presaleRequired ? (
+            <div className="tk-fields" style={{ marginTop: 12 }}>
+              <label className="tk-field">
+                Presale Access Code
+                <input
+                  value={presaleCode}
+                  onChange={(e) => setPresaleCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code (e.g. VIPKODE25)"
+                  autoCapitalize="characters"
+                  required
+                  disabled={submitting || !isSaleOpen}
+                />
+                <p className="tk-hint">
+                  This tier requires an exclusive presale access code.
+                </p>
+              </label>
+            </div>
+          ) : null}
+
           <div className="tk-perf" role="presentation" />
 
           <p className="tk-section-label">Your details</p>
@@ -299,10 +522,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               <input
                 value={holderName}
                 onChange={(e) => setHolderName(e.target.value)}
-                placeholder="e.g. Jane"
                 autoComplete="name"
                 required
-                disabled={submitting}
+                disabled={submitting || !isSaleOpen}
               />
             </label>
 
@@ -315,13 +537,12 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                   const v = e.target.value
                   setHolderPhone(!v ? '0' : !v.startsWith('0') ? '0' + v.replace(/^0*/, '') : v)
                 }}
-                placeholder="07XX XXX XXX"
                 autoComplete="tel"
                 required
-                disabled={submitting}
+                disabled={submitting || !isSaleOpen}
               />
               <p className="tk-hint">
-                Ticket + QR will be sent here via WhatsApp.
+                Ticket will be sent here via WhatsApp.
               </p>
             </label>
 
@@ -333,13 +554,13 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
                 onChange={setPaymentPhone}
                 placeholder="07XX XXX XXX"
                 required
-                disabled={submitting}
+                disabled={submitting || !isSaleOpen}
                 aria-describedby="tk-payment-phone-hint"
               />
               <p className="tk-hint" id="tk-payment-phone-hint">
                 {paymentProvider
                   ? `${paymentProvider} detected — this number will be charged.`
-                  : 'Start with 0 — e.g. 0771 234 567. We detect MTN or Airtel automatically.'}
+                  : 'Enter Valid Number.'}
               </p>
             </label>
           </div>
@@ -364,7 +585,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               type="checkbox"
               checked={feeConsent}
               onChange={(e) => setFeeConsent(e.target.checked)}
-              disabled={submitting}
+              disabled={submitting || !isSaleOpen}
             />
             <span>I confirm the total includes the service fee shown above.</span>
           </label>
@@ -378,25 +599,38 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <button
             type="submit"
             className="tk-cta"
-            disabled={submitting || !ticketClass || selectedSoldOut || !feeConsent}
+            disabled={
+              submitting ||
+              !isSaleOpen ||
+              !ticketClass ||
+              selectedSoldOut ||
+              !feeConsent ||
+              Boolean(selectedClass?.presaleRequired && !presaleCode.trim())
+            }
           >
             {submitting
               ? 'Creating…'
-              : selectedSoldOut
-                ? 'Sold out'
-                : !feeConsent
-                  ? 'Confirm total to continue'
-                  : paymentProvider
-                    ? `Pay via ${paymentProvider} · ${money(totalPrice, event.currency)}`
-                    : `Create ticket · ${money(totalPrice, event.currency)}`}
+              : !isSaleOpen
+                ? isSaleUpcoming
+                  ? 'Sales open soon'
+                  : 'Sales closed'
+                : selectedSoldOut
+                  ? 'Sold out'
+                  : selectedClass?.presaleRequired && !presaleCode.trim()
+                    ? 'Enter presale code to continue'
+                    : !feeConsent
+                      ? 'Confirm total to continue'
+                      : paymentProvider
+                        ? `Pay via ${paymentProvider} · ${money(totalPrice, event.currency)}`
+                        : `Create ticket · ${money(totalPrice, event.currency)}`}
           </button>
 
           <p className="tk-trust-note">
-            <LockIcon />
-            Secure checkout · Ticket and QR delivered instantly on WhatsApp
+            Ticket delivered instantly on WhatsApp
           </p>
         </form>
       </main>
     </div>
   )
 }
+

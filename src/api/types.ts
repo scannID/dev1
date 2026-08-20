@@ -1,4 +1,4 @@
-﻿// TypeScript types for Scanny API — aligned with backend DTOs
+// TypeScript types for Scanny API — aligned with backend DTOs
 
 export type BusinessType = 'Restaurant' | 'Bar' | 'School' | 'Boutique' | 'Hotel'
 
@@ -403,6 +403,8 @@ export interface UpdateEventClassInput {
   name: string
   fee: number
   capacity?: number | null
+  saleEndsAt?: string | null
+  presaleCode?: string | null
 }
 
 export interface UpdateEventTableInput {
@@ -410,6 +412,7 @@ export interface UpdateEventTableInput {
   seats: number
   price: number
   capacity?: number | null
+  saleEndsAt?: string | null
 }
 
 export interface UpdateCreatedEventRequest {
@@ -425,6 +428,9 @@ export interface UpdateCreatedEventRequest {
   host?: string
   hostContact?: string
   eventImageUrl?: string
+  saleStartsAt?: string | null
+  saleEndsAt?: string | null
+  queueEnabled?: boolean
   ticketClasses: UpdateEventClassInput[]
   tables: UpdateEventTableInput[]
 }
@@ -460,6 +466,8 @@ export interface TicketClassOption {
   held?: number
   remaining?: number | null
   soldOut?: boolean
+  saleEndsAt?: string | null
+  presaleRequired?: boolean
 }
 
 export interface TicketTableOption {
@@ -471,6 +479,7 @@ export interface TicketTableOption {
   held?: number
   remaining?: number | null
   soldOut?: boolean
+  saleEndsAt?: string | null
 }
 
 export interface TicketEventInfo {
@@ -485,6 +494,10 @@ export interface TicketEventInfo {
   purchaseUrl: string
   eventImageUrl?: string | null
   host?: string | null
+  saleStartsAt?: string | null
+  saleEndsAt?: string | null
+  saleOpen?: boolean
+  queueEnabled?: boolean
 }
 
 export interface TicketPurchaseRequest {
@@ -496,6 +509,7 @@ export interface TicketPurchaseRequest {
   /** Mobile money number to debit. Defaults to holderPhone if omitted. */
   paymentPhone?: string
   provider?: string
+  presaleCode?: string
 }
 
 export interface TicketPurchaseResponse {
@@ -505,6 +519,46 @@ export interface TicketPurchaseResponse {
   paymentStatus: PaymentIntentStatus
   message: string
   viewUrl: string
+}
+
+export interface QueueStatusResponse {
+  queueToken: string
+  status: 'Waiting' | 'Processing' | 'Complete' | 'Failed' | 'Expired' | string
+  position?: number | null
+  totalInQueue?: number | null
+  estimatedWaitSeconds?: number | null
+  attendeeTicketId?: string | null
+  viewUrl?: string | null
+  errorMessage?: string | null
+}
+
+export interface TransferInitiateResponse {
+  transferToken: string
+  transferUrl: string
+  expiresAt: string
+}
+
+export interface TransferInfoResponse {
+  eventName: string
+  eventDate: string | null
+  ticketType: string
+  originalHolderName: string
+  expiresAt: string | null
+  valid: boolean
+  message: string | null
+}
+
+export interface TransferAcceptRequest {
+  transferToken: string
+  newHolderName: string
+  newHolderPhone: string
+  newHolderEmail?: string
+}
+
+export interface TransferAcceptResponse {
+  attendeeTicketId: string
+  viewUrl: string
+  message: string
 }
 
 export interface AttendeeTicketView {

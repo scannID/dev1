@@ -24,6 +24,7 @@ public class RateLimitService {
     private final int menuScanPerMin;
     private final int devicesPerMin;
     private final int ticketScanPerMin;
+    private final int ticketPurchasePerMin;
     private final int websocketPerMin;
     private final int quickPayCreatePerMin;
     private final int paymentsInitiatePerMin;
@@ -40,6 +41,7 @@ public class RateLimitService {
             @Value("${scanny.rate-limit.menu-scan-per-min:120}") int menuScanPerMin,
             @Value("${scanny.rate-limit.devices-per-min:20}") int devicesPerMin,
             @Value("${scanny.rate-limit.ticket-scan-per-min:60}") int ticketScanPerMin,
+            @Value("${scanny.rate-limit.ticket-purchase-per-min:20}") int ticketPurchasePerMin,
             @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin,
             @Value("${scanny.rate-limit.quick-pay-create-per-min:10}") int quickPayCreatePerMin,
             @Value("${scanny.rate-limit.payments-initiate-per-min:20}") int paymentsInitiatePerMin,
@@ -54,6 +56,7 @@ public class RateLimitService {
         this.menuScanPerMin = menuScanPerMin;
         this.devicesPerMin = devicesPerMin;
         this.ticketScanPerMin = ticketScanPerMin;
+        this.ticketPurchasePerMin = ticketPurchasePerMin;
         this.websocketPerMin = websocketPerMin;
         this.quickPayCreatePerMin = quickPayCreatePerMin;
         this.paymentsInitiatePerMin = paymentsInitiatePerMin;
@@ -101,6 +104,9 @@ public class RateLimitService {
         }
         if (path.contains("/tickets") && path.endsWith("/scan") && "POST".equalsIgnoreCase(method)) {
             return "ticket-scan:" + ticketScanPerMin;
+        }
+        if ("POST".equalsIgnoreCase(method) && (path.equals("/api/tickets/public/purchase") || path.equals("/api/tickets/public/queue"))) {
+            return "ticket-purchase:" + ticketPurchasePerMin;
         }
         if (path.startsWith("/ws/")) {
             return "websocket:" + websocketPerMin;

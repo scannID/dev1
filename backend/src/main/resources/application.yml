@@ -78,6 +78,7 @@ scanny:
     menu-scan-per-min: ${RATE_LIMIT_MENU_SCAN_PER_MIN:120}
     devices-per-min: ${RATE_LIMIT_DEVICES_PER_MIN:20}
     ticket-scan-per-min: ${RATE_LIMIT_TICKET_SCAN_PER_MIN:60}
+    ticket-purchase-per-min: ${RATE_LIMIT_TICKET_PURCHASE_PER_MIN:20}
     websocket-per-min: ${RATE_LIMIT_WEBSOCKET_PER_MIN:30}
     quick-pay-create-per-min: ${RATE_LIMIT_QUICK_PAY_CREATE_PER_MIN:10}
     payments-initiate-per-min: ${RATE_LIMIT_PAYMENTS_INITIATE_PER_MIN:20}

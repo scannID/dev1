@@ -104,6 +104,38 @@ public class Ticket {
     @Column(name = "hold_expires_at")
     private Instant holdExpiresAt;
 
+    /**
+     * When ticket sales open for this event (master only).
+     * Null means sales are open from creation time.
+     */
+    @Column(name = "sale_starts_at")
+    private Instant saleStartsAt;
+
+    /**
+     * When ticket sales close for this event (master only).
+     * Null means no automatic close — the merchant must manually cancel the event.
+     */
+    @Column(name = "sale_ends_at")
+    private Instant saleEndsAt;
+
+    /**
+     * One-time transfer token generated when the holder initiates a transfer.
+     */
+    @Column(name = "transfer_token")
+    private String transferToken;
+
+    /**
+     * Expiration timestamp for the active transfer token (typically 24h).
+     */
+    @Column(name = "transfer_expires_at")
+    private Instant transferExpiresAt;
+
+    /**
+     * Prior holder's phone number if this ticket was transferred.
+     */
+    @Column(name = "transferred_from_phone")
+    private String transferredFromPhone;
+
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("scannedAt DESC")
     private List<TicketScan> scans = new ArrayList<>();
@@ -340,5 +372,45 @@ public class Ticket {
             && !isExpired() 
             && usageCount < usageLimit
             && paymentStatus == PaymentStatus.Paid;
+    }
+
+    public Instant getSaleStartsAt() {
+        return saleStartsAt;
+    }
+
+    public void setSaleStartsAt(Instant saleStartsAt) {
+        this.saleStartsAt = saleStartsAt;
+    }
+
+    public Instant getSaleEndsAt() {
+        return saleEndsAt;
+    }
+
+    public void setSaleEndsAt(Instant saleEndsAt) {
+        this.saleEndsAt = saleEndsAt;
+    }
+
+    public String getTransferToken() {
+        return transferToken;
+    }
+
+    public void setTransferToken(String transferToken) {
+        this.transferToken = transferToken;
+    }
+
+    public Instant getTransferExpiresAt() {
+        return transferExpiresAt;
+    }
+
+    public void setTransferExpiresAt(Instant transferExpiresAt) {
+        this.transferExpiresAt = transferExpiresAt;
+    }
+
+    public String getTransferredFromPhone() {
+        return transferredFromPhone;
+    }
+
+    public void setTransferredFromPhone(String transferredFromPhone) {
+        this.transferredFromPhone = transferredFromPhone;
     }
 }

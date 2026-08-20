@@ -10,6 +10,8 @@ import com.scanny.exception.ApiException;
 import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TicketStatus;
 import com.scanny.payment.PaymentIntentStatus;
+import com.scanny.entity.TicketQueueEntry;
+import com.scanny.repository.TicketQueueRepository;
 import com.scanny.repository.TicketRepository;
 import com.scanny.util.PhoneUtils;
 import java.time.Instant;
@@ -37,6 +39,7 @@ public class TicketPurchaseService {
     private static final int SERVICE_FEE_PER_TRANSACTION = 700;
 
     private final TicketRepository ticketRepository;
+    private final TicketQueueRepository ticketQueueRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final TicketService ticketService;
     private final ObjectMapper objectMapper;
@@ -49,6 +52,7 @@ public class TicketPurchaseService {
 
     public TicketPurchaseService(
             TicketRepository ticketRepository,
+            TicketQueueRepository ticketQueueRepository,
             WhatsAppNotificationService whatsAppNotificationService,
             TicketService ticketService,
             ObjectMapper objectMapper,
@@ -56,6 +60,7 @@ public class TicketPurchaseService {
             @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes,
             SystemBusyModeService systemBusyModeService) {
         this.ticketRepository = ticketRepository;
+        this.ticketQueueRepository = ticketQueueRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
         this.ticketService = ticketService;
         this.objectMapper = objectMapper;
@@ -94,6 +99,14 @@ public class TicketPurchaseService {
         List<PublicTicketDtos.TicketClassOption> classes = parseClasses(
             meta, master.getTicketType(), master.getPrice(), master.getId(), now);
         List<PublicTicketDtos.TicketTableOption> tables = parseTables(meta, master.getId(), now);
+
+        Instant saleStartsAt = master.getSaleStartsAt();
+        Instant saleEndsAt = master.getSaleEndsAt();
+        boolean saleOpen = (saleStartsAt == null || !now.isBefore(saleStartsAt))
+            && (saleEndsAt == null || !now.isAfter(saleEndsAt));
+        boolean queueEnabled = Boolean.TRUE.equals(meta.get("queueEnabled"))
+            || "true".equalsIgnoreCase(String.valueOf(meta.get("queueEnabled")));
+
         return new PublicTicketDtos.EventInfoResponse(
             master.getId(),
             master.getEventName(),
@@ -105,13 +118,25 @@ public class TicketPurchaseService {
             stringMeta(meta, "payTo", ""),
             customerUrl + "/ticket/" + master.getQrToken(),
             stringMeta(meta, "eventImageUrl", ""),
-            stringMeta(meta, "host", "")
+            stringMeta(meta, "host", ""),
+            saleStartsAt != null ? saleStartsAt.toString() : null,
+            saleEndsAt != null ? saleEndsAt.toString() : null,
+            saleOpen,
+            queueEnabled
         );
     }
 
     @Transactional
     public PublicTicketDtos.PurchaseResponse startPurchase(PublicTicketDtos.PurchaseRequest request) {
         Ticket master = requireEventTemplateForUpdate(request.masterQrToken());
+        Instant now = Instant.now();
+        if (master.getSaleStartsAt() != null && now.isBefore(master.getSaleStartsAt())) {
+            throw new ApiException(423, "Ticket sales open on " + master.getSaleStartsAt());
+        }
+        if (master.getSaleEndsAt() != null && now.isAfter(master.getSaleEndsAt())) {
+            throw new ApiException(410, "Ticket sales for this event have closed");
+        }
+
         String email = optionalEmail(request.holderEmail());
         String name = requireText(request.holderName(), "Your name is required");
         String phone = requirePhone(request.holderPhone());
@@ -129,13 +154,14 @@ public class TicketPurchaseService {
         }
 
         Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
+        validateClassSaleConstraints(masterMeta, ticketClass, request.presaleCode(), now);
+
         int basePrice = resolveSelectionPrice(masterMeta, ticketClass, master.getPrice());
         if (basePrice < 0) {
             throw new ApiException(400, "Unknown ticket class or table");
         }
         int price = basePrice + SERVICE_FEE_PER_TRANSACTION;
 
-        Instant now = Instant.now();
         Integer capacity = resolveSelectionCapacity(masterMeta, ticketClass);
         assertInventoryAvailable(master.getId(), ticketClass, capacity, now);
 
@@ -221,6 +247,275 @@ public class TicketPurchaseService {
             org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
                     .warn("WhatsApp delivery error for {}: {}", attendeeTicketId, ex.toString());
         }
+    }
+
+    @Transactional
+    public PublicTicketDtos.QueueStatusResponse joinQueue(PublicTicketDtos.PurchaseRequest request) {
+        Ticket master = requireEventTemplate(request.masterQrToken());
+        Instant now = Instant.now();
+        if (master.getSaleStartsAt() != null && now.isBefore(master.getSaleStartsAt())) {
+            throw new ApiException(423, "Ticket sales open on " + master.getSaleStartsAt());
+        }
+        if (master.getSaleEndsAt() != null && now.isAfter(master.getSaleEndsAt())) {
+            throw new ApiException(410, "Ticket sales for this event have closed");
+        }
+
+        String name = requireText(request.holderName(), "Your name is required");
+        String phone = requirePhone(request.holderPhone());
+        String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
+
+        if (ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
+                master.getEventName(), phone, PaymentStatus.Paid)) {
+            if (!h2ProfileActive()) {
+                throw new ApiException(409, "This WhatsApp number already has a paid ticket for this event. Check WhatsApp or use a different number.");
+            }
+        }
+
+        Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
+        validateClassSaleConstraints(masterMeta, ticketClass, request.presaleCode(), now);
+
+        String queueId = "Q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
+        TicketQueueEntry entry = new TicketQueueEntry();
+        entry.setId(queueId);
+        entry.setMasterId(master.getId());
+        entry.setTicketClass(ticketClass);
+        entry.setHolderName(name);
+        entry.setHolderPhone(phone);
+        entry.setHolderEmail(optionalEmail(request.holderEmail()));
+        entry.setPaymentPhone(request.paymentPhone());
+        entry.setProvider(request.provider());
+        entry.setPresaleCode(request.presaleCode());
+        entry.setStatus("Waiting");
+        entry.setQueuedAt(now);
+        entry.setExpiresAt(now.plus(15, ChronoUnit.MINUTES));
+        ticketQueueRepository.save(entry);
+
+        long waitingAhead = ticketQueueRepository.countWaitingAhead(master.getId(), "Waiting", entry.getQueuedAt(), entry.getId());
+        long totalWaiting = ticketQueueRepository.countByMasterIdAndStatus(master.getId(), "Waiting");
+        int position = (int) waitingAhead + 1;
+        int waitSeconds = Math.max(2, position * 2);
+
+        return new PublicTicketDtos.QueueStatusResponse(
+            queueId,
+            "Waiting",
+            position,
+            totalWaiting,
+            waitSeconds,
+            null,
+            null,
+            null
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PublicTicketDtos.QueueStatusResponse getQueueStatus(String queueToken) {
+        if (queueToken == null || queueToken.isBlank()) {
+            throw new ApiException(400, "Queue token is required");
+        }
+        TicketQueueEntry entry = ticketQueueRepository.findById(queueToken.trim())
+            .orElseThrow(() -> new ApiException(404, "Queue entry not found"));
+
+        if ("Waiting".equalsIgnoreCase(entry.getStatus())) {
+            long waitingAhead = ticketQueueRepository.countWaitingAhead(
+                entry.getMasterId(), "Waiting", entry.getQueuedAt(), entry.getId());
+            long totalWaiting = ticketQueueRepository.countByMasterIdAndStatus(entry.getMasterId(), "Waiting");
+            int position = (int) waitingAhead + 1;
+            int waitSeconds = Math.max(2, position * 2);
+            return new PublicTicketDtos.QueueStatusResponse(
+                entry.getId(),
+                "Waiting",
+                position,
+                totalWaiting,
+                waitSeconds,
+                null,
+                null,
+                null
+            );
+        } else if ("Processing".equalsIgnoreCase(entry.getStatus())) {
+            return new PublicTicketDtos.QueueStatusResponse(
+                entry.getId(),
+                "Processing",
+                1,
+                1L,
+                1,
+                null,
+                null,
+                null
+            );
+        } else if ("Complete".equalsIgnoreCase(entry.getStatus())) {
+            return new PublicTicketDtos.QueueStatusResponse(
+                entry.getId(),
+                "Complete",
+                0,
+                0L,
+                0,
+                entry.getAttendeeTicketId(),
+                entry.getViewUrl(),
+                null
+            );
+        } else if ("Expired".equalsIgnoreCase(entry.getStatus())) {
+            return new PublicTicketDtos.QueueStatusResponse(
+                entry.getId(),
+                "Expired",
+                null,
+                null,
+                null,
+                null,
+                null,
+                entry.getErrorMessage() != null ? entry.getErrorMessage() : "Queue session expired"
+            );
+        } else {
+            return new PublicTicketDtos.QueueStatusResponse(
+                entry.getId(),
+                "Failed",
+                null,
+                null,
+                null,
+                null,
+                null,
+                entry.getErrorMessage() != null ? entry.getErrorMessage() : "Purchase failed"
+            );
+        }
+    }
+
+    @Transactional
+    public PublicTicketDtos.TransferInitiateResponse initiateTransfer(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new ApiException(400, "Access token is required");
+        }
+        Ticket ticket = ticketRepository.findByAccessToken(accessToken.trim())
+            .orElseThrow(() -> new ApiException(404, "Ticket not found"));
+
+        if (ticket.getMasterTicketId() == null) {
+            throw new ApiException(400, "Event templates cannot be transferred");
+        }
+        if (ticket.getPaymentStatus() != PaymentStatus.Paid) {
+            throw new ApiException(400, "Only paid tickets can be transferred");
+        }
+        if (ticket.getStatus() != TicketStatus.Active) {
+            throw new ApiException(400, "Ticket is " + ticket.getStatus() + " and cannot be transferred");
+        }
+        if (ticket.isExpired()) {
+            throw new ApiException(400, "Ticket has expired and cannot be transferred");
+        }
+
+        String transferToken = "XFR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
+        Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
+
+        ticket.setTransferToken(transferToken);
+        ticket.setTransferExpiresAt(expiresAt);
+        ticketRepository.save(ticket);
+
+        String transferUrl = customerUrl + "/ticket/transfer/" + transferToken;
+        return new PublicTicketDtos.TransferInitiateResponse(transferToken, transferUrl, expiresAt.toString());
+    }
+
+    @Transactional(readOnly = true)
+    public PublicTicketDtos.TransferInfoResponse getTransferInfo(String transferToken) {
+        if (transferToken == null || transferToken.isBlank()) {
+            throw new ApiException(400, "Transfer token is required");
+        }
+        Ticket ticket = ticketRepository.findByTransferToken(transferToken.trim())
+            .orElseThrow(() -> new ApiException(404, "Invalid or expired transfer link"));
+
+        Instant now = Instant.now();
+        if (ticket.getTransferExpiresAt() != null && now.isAfter(ticket.getTransferExpiresAt())) {
+            return new PublicTicketDtos.TransferInfoResponse(
+                ticket.getEventName(),
+                ticket.getEventDate() != null ? ticket.getEventDate().toString() : null,
+                ticket.getTicketType(),
+                ticket.getHolderName(),
+                null,
+                false,
+                "This transfer link has expired."
+            );
+        }
+
+        if (ticket.getStatus() != TicketStatus.Active || ticket.getPaymentStatus() != PaymentStatus.Paid) {
+            return new PublicTicketDtos.TransferInfoResponse(
+                ticket.getEventName(),
+                ticket.getEventDate() != null ? ticket.getEventDate().toString() : null,
+                ticket.getTicketType(),
+                ticket.getHolderName(),
+                null,
+                false,
+                "This ticket is no longer eligible for transfer."
+            );
+        }
+
+        return new PublicTicketDtos.TransferInfoResponse(
+            ticket.getEventName(),
+            ticket.getEventDate() != null ? ticket.getEventDate().toString() : null,
+            ticket.getTicketType(),
+            ticket.getHolderName(),
+            ticket.getTransferExpiresAt() != null ? ticket.getTransferExpiresAt().toString() : null,
+            true,
+            null
+        );
+    }
+
+    @Transactional
+    public PublicTicketDtos.TransferAcceptResponse acceptTransfer(PublicTicketDtos.TransferAcceptRequest request) {
+        if (request == null || request.transferToken() == null || request.transferToken().isBlank()) {
+            throw new ApiException(400, "Transfer token is required");
+        }
+        Ticket ticket = ticketRepository.findByTransferToken(request.transferToken().trim())
+            .orElseThrow(() -> new ApiException(404, "Invalid or expired transfer link"));
+
+        Instant now = Instant.now();
+        if (ticket.getTransferExpiresAt() != null && now.isAfter(ticket.getTransferExpiresAt())) {
+            throw new ApiException(410, "This transfer link has expired");
+        }
+        if (ticket.getStatus() != TicketStatus.Active || ticket.getPaymentStatus() != PaymentStatus.Paid) {
+            throw new ApiException(400, "This ticket is not active or not paid and cannot be transferred");
+        }
+
+        String newName = requireText(request.newHolderName(), "Recipient name is required");
+        String newPhone = requirePhone(request.newHolderPhone());
+        String newEmail = optionalEmail(request.newHolderEmail());
+
+        String previousHolderPhone = ticket.getHolderPhone();
+        String previousHolderName = ticket.getHolderName();
+
+        ticket.setTransferredFromPhone(previousHolderPhone);
+        ticket.setHolderName(newName);
+        ticket.setHolderPhone(newPhone);
+        ticket.setHolderEmail(newEmail);
+        ticket.setTransferToken(null);
+        ticket.setTransferExpiresAt(null);
+
+        // Invalidate old link by rotating access token
+        String newAccessToken = UUID.randomUUID().toString().replace("-", "");
+        ticket.setAccessToken(newAccessToken);
+
+        Ticket saved = ticketRepository.save(ticket);
+        String viewUrl = customerUrl + "/ticket/view/" + saved.getAccessToken();
+
+        // Deliver new pass to recipient
+        try {
+            deliverTicketWhatsApp(saved.getId(), viewUrl);
+        } catch (Exception ex) {
+            org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                .warn("TRANSFER_RECIPIENT_WHATSAPP_FAILED err={}", ex.getMessage());
+        }
+
+        // Notify previous holder that transfer succeeded
+        if (previousHolderPhone != null && !previousHolderPhone.isBlank()) {
+            try {
+                String transferNote = "Your ticket for " + saved.getEventName() + " (" + saved.getTicketType()
+                    + ") has been successfully transferred to " + newName + ".";
+                whatsAppNotificationService.sendText(previousHolderPhone, transferNote);
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                    .warn("TRANSFER_SENDER_WHATSAPP_FAILED err={}", ex.getMessage());
+            }
+        }
+
+        return new PublicTicketDtos.TransferAcceptResponse(
+            saved.getId(),
+            viewUrl,
+            "Ticket successfully transferred to " + newName
+        );
     }
 
     @Transactional(readOnly = true)
@@ -397,12 +692,14 @@ public class TicketPurchaseService {
         return normalized;
     }
 
-    private Ticket requireEventTemplate(String qrToken) {
+    private Ticket requireEventTemplate(String qrTokenOrId) {
         // System-wide busy mode blocks all ticket purchases.
         if (systemBusyModeService.isSystemBusy()) {
             throw new ApiException(503, systemBusyModeService.getPauseMessage());
         }
-        Ticket ticket = ticketRepository.findByQrToken(qrToken.trim())
+        String clean = qrTokenOrId.trim();
+        Ticket ticket = ticketRepository.findByQrToken(clean)
+            .or(() -> ticketRepository.findById(clean))
             .orElseThrow(() -> new ApiException(404, "Event not found"));
         if (!ticket.isEventTemplate()) {
             throw new ApiException(400, "This QR is an individual ticket, not an event purchase link");
@@ -507,6 +804,8 @@ public class TicketPurchaseService {
                     if (!name.isBlank() && !"null".equalsIgnoreCase(name)) {
                         Integer capacity = parseOptionalCapacity(map.get("capacity"));
                         InventorySnapshot inv = inventoryFor(masterId, name, capacity, now);
+                        String saleEndsAt = parseOptionalString(map.get("saleEndsAt"));
+                        boolean presaleRequired = parsePresaleRequired(map);
                         classes.add(new PublicTicketDtos.TicketClassOption(
                             name,
                             price,
@@ -514,7 +813,9 @@ public class TicketPurchaseService {
                             inv.sold(),
                             inv.held(),
                             inv.remaining(),
-                            inv.soldOut()
+                            inv.soldOut(),
+                            saleEndsAt,
+                            presaleRequired
                         ));
                     }
                 }
@@ -529,7 +830,9 @@ public class TicketPurchaseService {
                 inv.sold(),
                 inv.held(),
                 inv.remaining(),
-                inv.soldOut()
+                inv.soldOut(),
+                null,
+                false
             ));
         }
         return classes;
@@ -555,6 +858,7 @@ public class TicketPurchaseService {
                 int price = parsePrice(map.get("price"), 0);
                 Integer capacity = parseOptionalCapacity(map.get("capacity"));
                 InventorySnapshot inv = inventoryFor(masterId, name, capacity, now);
+                String saleEndsAt = parseOptionalString(map.get("saleEndsAt"));
                 tables.add(new PublicTicketDtos.TicketTableOption(
                     name,
                     seats,
@@ -563,7 +867,8 @@ public class TicketPurchaseService {
                     inv.sold(),
                     inv.held(),
                     inv.remaining(),
-                    inv.soldOut()
+                    inv.soldOut(),
+                    saleEndsAt
                 ));
             }
         }
@@ -630,6 +935,60 @@ public class TicketPurchaseService {
         return null;
     }
 
+    private void validateClassSaleConstraints(Map<String, Object> meta, String selection, String providedCode, Instant now) {
+        Object rawClasses = meta.get("ticketClasses");
+        if (rawClasses instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.equalsIgnoreCase(selection)) {
+                        String saleEndsAtStr = parseOptionalString(map.get("saleEndsAt"));
+                        if (saleEndsAtStr != null) {
+                            Instant classEnd = null;
+                            try {
+                                classEnd = Instant.parse(saleEndsAtStr);
+                            } catch (Exception ignored) {
+                            }
+                            if (classEnd != null && now.isAfter(classEnd)) {
+                                throw new ApiException(410, "Sales for ticket class " + selection + " have ended");
+                            }
+                        }
+                        String presaleCode = parseOptionalString(map.get("presaleCode"));
+                        boolean presaleReq = parsePresaleRequired(map);
+                        if (presaleReq && presaleCode != null && !presaleCode.isBlank()) {
+                            if (providedCode == null || !presaleCode.trim().equalsIgnoreCase(providedCode.trim())) {
+                                throw new ApiException(403, "Invalid presale code for " + selection);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+        Object rawTables = meta.get("tables");
+        if (rawTables instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    String name = String.valueOf(map.get("name"));
+                    if (name.equalsIgnoreCase(selection)) {
+                        String saleEndsAtStr = parseOptionalString(map.get("saleEndsAt"));
+                        if (saleEndsAtStr != null) {
+                            Instant tableEnd = null;
+                            try {
+                                tableEnd = Instant.parse(saleEndsAtStr);
+                            } catch (Exception ignored) {
+                            }
+                            if (tableEnd != null && now.isAfter(tableEnd)) {
+                                throw new ApiException(410, "Sales for table " + selection + " have ended");
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     private Integer parseOptionalCapacity(Object value) {
         if (value == null) {
             return null;
@@ -651,6 +1010,26 @@ public class TicketPurchaseService {
             return fallback;
         }
         return Integer.parseInt(digits);
+    }
+
+    private static String parseOptionalString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String str = String.valueOf(value).trim();
+        return str.isBlank() || "null".equalsIgnoreCase(str) ? null : str;
+    }
+
+    private static boolean parsePresaleRequired(Map<?, ?> map) {
+        Object req = map.get("presaleRequired");
+        if (req instanceof Boolean b) {
+            return b;
+        }
+        if (req != null && "true".equalsIgnoreCase(String.valueOf(req).trim())) {
+            return true;
+        }
+        Object code = map.get("presaleCode");
+        return code != null && !String.valueOf(code).trim().isBlank() && !"null".equalsIgnoreCase(String.valueOf(code).trim());
     }
 
     private Map<String, Object> parseMetadata(String metadata) {

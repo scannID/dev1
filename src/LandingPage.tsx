@@ -740,13 +740,13 @@ function EventTicketStub() {
    ───────────────────────────────────────────────────────────── */
 
 const FB = {
-  board: '#1b1815',
-  boardEdge: '#0f0d0b',
-  flap: '#ece5d3',
-  flapDim: '#d9d1bd',
-  ink: '#221e19',
-  amber: '#d9a441',
-  ok: '#7fae6f',
+  board: C.paper,
+  boardEdge: C.spike,
+  flap: C.paperLt,
+  flapDim: '#e8dfcc',
+  ink: C.ink,
+  amber: C.stamp,
+  ok: C.ok,
 }
 
 const flapEvents = [
@@ -787,14 +787,14 @@ function FlapChar({ char, delay = 0, size = 15 }: { char: string; delay?: number
       background: FB.flap, borderRadius: 2,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'hidden',
-      boxShadow: '0 1px 0 rgba(0,0,0,0.4)',
+      boxShadow: `0 1px 0 ${C.spike}44`,
       perspective: 120,
       flexShrink: 0,
     }}>
       {/* center seam */}
-      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'rgba(0,0,0,0.35)', zIndex: 3 }} />
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: `${C.spike}55`, zIndex: 3 }} />
       {/* subtle top/bottom shading like real flap halves */}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.15), transparent 50%, rgba(0,0,0,0.08) 51%, transparent)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(255,255,255,0.18), transparent 50%, ${C.spike}18 51%, transparent)` }} />
       <span style={{
         position: 'relative', zIndex: 2,
         fontFamily: "'IBM Plex Mono', monospace",
@@ -842,7 +842,7 @@ function FlapLine({ text, size = 11 }: { text: string; size?: number }) {
       background: FB.flap, borderRadius: 3, padding: '5px 10px',
       position: 'relative', overflow: 'hidden', display: 'inline-block',
     }}>
-      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: 'rgba(0,0,0,0.3)' }} />
+      <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: `${C.spike}44` }} />
       <span style={{
         fontFamily: "'IBM Plex Mono', monospace",
         fontWeight: 600, fontSize: size, color: FB.ink, letterSpacing: '0.04em',
@@ -907,10 +907,10 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
     <div style={{ fontFamily: "'Outfit', sans-serif" }}>
       <div style={{
         width: 400, margin: '0 auto',
-        background: `linear-gradient(180deg, #26221d, ${FB.board})`,
-        border: `10px solid ${FB.boardEdge}`,
+        background: `linear-gradient(180deg, ${C.paperLt}, ${C.paper})`,
+        border: `3px solid ${FB.boardEdge}55`,
         borderRadius: 10,
-        boxShadow: '0 30px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.03)',
+        boxShadow: '0 30px 60px rgba(38,32,26,0.22), inset 0 0 0 1px rgba(38,32,26,0.06)',
         padding: '20px 18px 22px',
         boxSizing: 'border-box',
       }}>
@@ -919,7 +919,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: FB.amber }}>NOW SELLING</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: FB.ok, boxShadow: `0 0 6px ${FB.ok}` }} />
-            <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.12em', color: '#a89f8c' }}>LIVE</span>
+            <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.12em', color: C.inkSoft }}>LIVE</span>
           </div>
         </div>
 
@@ -938,21 +938,21 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
         <div style={{ display: 'flex', gap: 18, marginBottom: 18 }}>
           {[{ l: ev.tier1, p: ev.price1 }, { l: ev.tier2, p: ev.price2 }].map(({ l, p }) => (
             <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: '#8a8172' }}>{l}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: C.inkSoft }}>{l}</span>
               <FlapLine text={`UGX ${p}`} size={12} />
             </div>
           ))}
         </div>
 
-        <div style={{ borderTop: '1px dashed rgba(236,229,211,0.15)', marginBottom: 16 }} />
+        <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
 
         {/* sold counter — digit flaps */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FlapNumber value={sold} digits={3} size={17} />
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#a89f8c' }}>SOLD</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: C.inkSoft }}>SOLD</span>
           </div>
-          <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', color: '#6d6555' }}>GATE 07</span>
+          <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', color: C.inkSoft }}>GATE 07</span>
         </div>
       </div>
 
@@ -961,7 +961,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
         {flapEvents.map((_, i) => (
           <span key={i} style={{
             width: i === idx ? 18 : 5, height: 5, borderRadius: 3,
-            background: i === idx ? FB.amber : 'rgba(236,229,211,0.2)',
+            background: i === idx ? FB.amber : `${C.ink}2a`,
             transition: 'all .35s ease',
           }} />
         ))}

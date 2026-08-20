@@ -75,6 +75,8 @@ type TicketClass = {
   fee: string
   /** Max tickets for this class; empty = unlimited */
   capacity: string
+  saleEndsAt?: string
+  presaleCode?: string
 }
 
 type TableOption = {
@@ -84,12 +86,17 @@ type TableOption = {
   price: string
   /** How many of this table package can sell; empty = unlimited */
   capacity: string
+  saleEndsAt?: string
 }
 
 export type EventTicketVisual = {
   eventName: string
   date: string
   time?: string
+  saleStartsDate?: string
+  saleStartsTime?: string
+  saleEndsDate?: string
+  saleEndsTime?: string
   location?: string
   host?: string
   hostContact?: string
@@ -103,8 +110,8 @@ export type EventTicketVisual = {
   selectedClass: string
   purchaseUrl?: string
   managerUrl?: string
-  /** Creator-uploaded event sticker / cover (data URL or http URL). */
   eventImageUrl?: string
+  queueEnabled?: boolean
 }
 
 type TicketData = EventTicketVisual
@@ -1638,35 +1645,6 @@ function TicketOutput({
         flexDirection: 'column',
       }}
     >
-      <div className="print-only" style={{ textAlign: 'center', padding: 24 }}>
-        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#666' }}>
-          Kode · Master Pass
-        </p>
-        <h1 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 600, fontFamily: TICKET_FONT, color: '#111' }}>{data.eventName}</h1>
-        <p style={{ margin: '0 0 20px', fontSize: 14, color: '#444' }}>
-          {fmtDateShort(data.date)} · {fmtTime(data.time || '')}
-          {data.location ? ` · ${data.location}` : ''}
-        </p>
-        {qr ? (
-          <div style={{ display: 'inline-grid', gridTemplateColumns: managerQr ? '1fr 1fr' : '1fr', gap: 16 }}>
-            <div>
-              <img className="print-qr-img" src={qr} alt="Customer purchase QR code" width={240} height={240} style={{ width: 240, height: 240, border: '2px solid #111', borderRadius: 8, background: '#fff' }} />
-              <p style={{ margin: '8px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#111' }}>Customer purchase (black)</p>
-            </div>
-            {managerQr ? (
-              <div>
-                <img className="print-qr-img" src={managerQr} alt="Event manager gate QR code" width={240} height={240} style={{ width: 240, height: 240, border: '2px solid #B91C1C', borderRadius: 8, background: '#fff' }} />
-                <p style={{ margin: '8px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#B91C1C' }}>Event manager gate (red)</p>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <p style={{ color: '#c00' }}>QR code unavailable</p>
-        )}
-        <p style={{ margin: '14px 0 0', fontSize: 12, fontWeight: 600, letterSpacing: '0.1em', color: '#111' }}>BLACK: BUY TICKETS · RED: MANAGER GATE</p>
-        <p style={{ margin: '8px 0 0', fontSize: 12, fontFamily: MONO, color: '#555' }}>#{data.ticketId}</p>
-      </div>
-
       <div className="no-print" style={{ maxWidth: 1040, width: '100%', margin: '0 auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {revokeMessage ? (
           <div
@@ -1747,7 +1725,6 @@ function TicketOutput({
                 }}
               >
                 <Check size={13} strokeWidth={2.6} />
-                Master pass
               </span>
             </div>
 
@@ -1847,14 +1824,14 @@ function TicketOutput({
                   <div className="et-shimmer" style={{ width: '100%', aspectRatio: '1', borderRadius: 10 }} />
                 )}
                 <p style={{ margin: '13px 0 0', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: CONFIRM.muted, textAlign: 'center' }}>
-                  Customer purchase (black)
+                  Scan to buy tickets
                 </p>
                 {managerQr ? (
                   <>
                     <div style={{ width: '100%', height: 1, background: CONFIRM.line, margin: '14px 0 12px' }} />
                     <img src={managerQr} alt="Event manager gate QR" style={{ width: '100%', aspectRatio: '1', borderRadius: 10, display: 'block', background: '#fff', border: '1px solid #B91C1C' }} />
                     <p style={{ margin: '11px 0 0', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#B91C1C', textAlign: 'center' }}>
-                      Event manager gate (red)
+                      Gate manager
                     </p>
                   </>
                 ) : null}
@@ -1996,6 +1973,10 @@ type FormState = {
   eventName: string
   date: string
   time: string
+  saleStartsDate?: string
+  saleStartsTime?: string
+  saleEndsDate?: string
+  saleEndsTime?: string
   location: string
   host: string
   hostContact: string
@@ -2008,6 +1989,7 @@ type FormState = {
   ticketClasses: TicketClass[]
   tables: TableOption[]
   eventImageUrl: string
+  queueEnabled?: boolean
 }
 
 function formatPaymentDetails(form: FormState): string {
@@ -2473,6 +2455,10 @@ function TicketForm({
           eventName: form.eventName,
           date: form.date,
           time: form.time,
+          saleStartsDate: form.saleStartsDate,
+          saleStartsTime: form.saleStartsTime,
+          saleEndsDate: form.saleEndsDate,
+          saleEndsTime: form.saleEndsTime,
           location: form.location,
           host: form.host.trim(),
           hostContact: form.hostContact.trim(),
@@ -2802,6 +2788,82 @@ function TicketForm({
                       {touched && errors.hostContact && <FieldError>{errors.hostContact}</FieldError>}
                     </div>
                   </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Sales schedule" subtitle="Optional: set when sales open and close for this event.">
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }}>Sales open (leave blank for immediate)</label>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <input
+                        className="et-focus"
+                        style={{ ...fieldStyle(), flex: 1, minWidth: 140 }}
+                        type="date"
+                        aria-label="Sales open date"
+                        value={form.saleStartsDate || ''}
+                        onChange={(e) => set('saleStartsDate', e.target.value)}
+                      />
+                      <input
+                        className="et-focus"
+                        style={{ ...fieldStyle(), flex: 1, minWidth: 100 }}
+                        type="time"
+                        aria-label="Sales open time"
+                        value={form.saleStartsTime || '09:00'}
+                        onChange={(e) => set('saleStartsTime', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }}>Sales close (leave blank to sell until event)</label>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <input
+                        className="et-focus"
+                        style={{ ...fieldStyle(), flex: 1, minWidth: 140 }}
+                        type="date"
+                        aria-label="Sales close date"
+                        value={form.saleEndsDate || ''}
+                        onChange={(e) => set('saleEndsDate', e.target.value)}
+                      />
+                      <input
+                        className="et-focus"
+                        style={{ ...fieldStyle(), flex: 1, minWidth: 100 }}
+                        type="time"
+                        aria-label="Sales close time"
+                        value={form.saleEndsTime || '23:59'}
+                        onChange={(e) => set('saleEndsTime', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Virtual queue toggle */}
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    cursor: 'pointer',
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    border: `1.5px solid ${form.queueEnabled ? CREATE.teal : CREATE.line}`,
+                    background: form.queueEnabled ? `${CREATE.teal}0d` : 'transparent',
+                    transition: 'border-color 0.15s, background 0.15s',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.queueEnabled)}
+                      onChange={(e) => set('queueEnabled', e.target.checked)}
+                      style={{ marginTop: 2, accentColor: CREATE.teal, flexShrink: 0, width: 16, height: 16 }}
+                      aria-label="Enable virtual waiting room"
+                    />
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: CREATE.ink }}>
+                        Enable virtual waiting room
+                      </p>
+                      <p style={{ margin: '3px 0 0', fontSize: 12, color: CREATE.muted, lineHeight: 1.5 }}>
+                        When demand is high, customers join a queue instead of hitting the purchase endpoint directly. Tickets are issued sequentially — prevents overselling and crashes on popular launches.
+                      </p>
+                    </div>
+                  </label>
                 </div>
               </SectionCard>
 
@@ -3435,13 +3497,34 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
       setRevokeMessage(null)
       setTrackingOnly(false)
       const eventDateIso = new Date(`${data.date}T${data.time || '00:00'}:00.000Z`).toISOString()
+      const saleStartsAtIso = data.saleStartsDate
+        ? new Date(`${data.saleStartsDate}T${data.saleStartsTime || '00:00'}:00.000Z`).toISOString()
+        : undefined
+      const saleEndsAtIso = data.saleEndsDate
+        ? new Date(`${data.saleEndsDate}T${data.saleEndsTime || '23:59'}:00.000Z`).toISOString()
+        : undefined
+
       const normalizedClasses = data.ticketClasses.map((c) => {
         const capacity = Number(c.capacity)
-        return { id: c.id, name: c.name, fee: c.fee, ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}) }
+        return {
+          id: c.id,
+          name: c.name,
+          fee: c.fee,
+          ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+          ...(c.saleEndsAt ? { saleEndsAt: c.saleEndsAt } : {}),
+          ...(c.presaleCode ? { presaleCode: c.presaleCode } : {}),
+        }
       })
       const normalizedTables = data.tables.map((t) => {
         const capacity = Number(t.capacity)
-        return { id: t.id, name: t.name, seats: t.seats, price: t.price, ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}) }
+        return {
+          id: t.id,
+          name: t.name,
+          seats: t.seats,
+          price: t.price,
+          ...(Number.isFinite(capacity) && capacity > 0 ? { capacity } : {}),
+          ...(t.saleEndsAt ? { saleEndsAt: t.saleEndsAt } : {}),
+        }
       })
       const createdTicket = editingEventId
         ? await ticketsApi.updateEvent(editingEventId, {
@@ -3457,16 +3540,22 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
             host: data.host,
             hostContact: data.hostContact,
             eventImageUrl: data.eventImageUrl || '',
+            saleStartsAt: saleStartsAtIso,
+            saleEndsAt: saleEndsAtIso,
+            queueEnabled: Boolean(data.queueEnabled),
             ticketClasses: normalizedClasses.map((c) => ({
               name: c.name,
               fee: Number(c.fee || 0),
               ...(typeof c.capacity === 'number' ? { capacity: c.capacity } : {}),
+              ...(c.saleEndsAt ? { saleEndsAt: c.saleEndsAt } : {}),
+              ...(c.presaleCode ? { presaleCode: c.presaleCode } : {}),
             })),
             tables: normalizedTables.map((t) => ({
               name: t.name,
               seats: Number(t.seats || 0),
               price: Number(t.price || 0),
               ...(typeof t.capacity === 'number' ? { capacity: t.capacity } : {}),
+              ...(t.saleEndsAt ? { saleEndsAt: t.saleEndsAt } : {}),
             })),
           })
         : await publicTicketsApi.createEvent({
@@ -3485,6 +3574,9 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
               time: data.time,
               host: data.host,
               hostContact: data.hostContact,
+              ...(saleStartsAtIso ? { saleStartsAt: saleStartsAtIso } : {}),
+              ...(saleEndsAtIso ? { saleEndsAt: saleEndsAtIso } : {}),
+              ...(data.queueEnabled ? { queueEnabled: true } : {}),
               ticketClasses: normalizedClasses,
               tables: normalizedTables,
               ...(data.eventImageUrl ? { eventImageUrl: data.eventImageUrl } : {}),
@@ -3512,14 +3604,31 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         formSnapshot: {
           date: data.date,
           time: data.time,
+          saleStartsDate: data.saleStartsDate,
+          saleStartsTime: data.saleStartsTime,
+          saleEndsDate: data.saleEndsDate,
+          saleEndsTime: data.saleEndsTime,
           location: data.location,
           host: data.host,
           hostContact: data.hostContact,
           paymentDetails: data.paymentDetails,
           template: data.template,
-          ticketClasses: data.ticketClasses.map((c) => ({ name: c.name, fee: c.fee, capacity: c.capacity })),
-          tables: data.tables.map((t) => ({ name: t.name, seats: t.seats, price: t.price, capacity: t.capacity })),
+          ticketClasses: data.ticketClasses.map((c) => ({
+            name: c.name,
+            fee: c.fee,
+            capacity: c.capacity,
+            saleEndsAt: c.saleEndsAt,
+            presaleCode: c.presaleCode,
+          })),
+          tables: data.tables.map((t) => ({
+            name: t.name,
+            seats: t.seats,
+            price: t.price,
+            capacity: t.capacity,
+            saleEndsAt: t.saleEndsAt,
+          })),
           eventImageUrl: data.eventImageUrl,
+          queueEnabled: data.queueEnabled,
         },
         createdAt: new Date().toISOString(),
       })

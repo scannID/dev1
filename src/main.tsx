@@ -13,6 +13,7 @@ import TicketViewPage from './tickets/TicketViewPage'
 import GateScanPage from './tickets/GateScanPage'
 import EventTicketPage from './EventTicket'
 import NotFoundPage from './NotFoundPage'
+import TicketTransferAcceptPage from './tickets/TicketTransferAcceptPage'
 import keycloak, {
   hasPortalSession,
   initKeycloak,
@@ -73,6 +74,11 @@ function resolveTicketViewRoute(): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+function resolveTicketTransferRoute(): string | null {
+  const match = window.location.pathname.match(/^\/ticket\/transfer\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 function resolveTicketPurchaseRoute(): string | null {
   const match = window.location.pathname.match(/^\/ticket\/([^/]+)\/?$/)
   if (!match) return null
@@ -123,6 +129,7 @@ const kitchenBusinessId = resolveKitchenRoute()
 const payToken = resolvePayRoute()
 const trackNumber = resolveTrackRoute()
 const ticketViewToken = resolveTicketViewRoute()
+const ticketTransferToken = resolveTicketTransferRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
 const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
@@ -218,6 +225,12 @@ if (kitchenBusinessId) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <TicketViewPage accessToken={ticketViewToken} />
+    </StrictMode>
+  )
+} else if (ticketTransferToken) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <TicketTransferAcceptPage transferToken={ticketTransferToken} />
     </StrictMode>
   )
 } else if (gateScanRoute) {

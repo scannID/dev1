@@ -12,6 +12,8 @@ public class PublicTicketDtos {
     /**
      * @param capacity null means unlimited stock
      * @param remaining null when unlimited; otherwise units left after sold + held
+     * @param saleEndsAt ISO-8601 string — when this specific class stops selling (null = no per-class cutoff)
+     * @param presaleRequired true when this class requires a presale code at checkout
      */
     public record TicketClassOption(
         String name,
@@ -20,12 +22,15 @@ public class PublicTicketDtos {
         int sold,
         int held,
         Integer remaining,
-        boolean soldOut
+        boolean soldOut,
+        String saleEndsAt,
+        boolean presaleRequired
     ) {}
 
     /**
      * @param seats party size for the table package (display)
      * @param capacity how many of this package can be sold; null = unlimited
+     * @param saleEndsAt ISO-8601 string — per-table cutoff (null = uses event-level saleEndsAt)
      */
     public record TicketTableOption(
         String name,
@@ -35,7 +40,8 @@ public class PublicTicketDtos {
         int sold,
         int held,
         Integer remaining,
-        boolean soldOut
+        boolean soldOut,
+        String saleEndsAt
     ) {}
 
     public record EventInfoResponse(
@@ -49,8 +55,31 @@ public class PublicTicketDtos {
         String paymentDestination,
         String purchaseUrl,
         String eventImageUrl,
-        String host
-    ) {}
+        String host,
+        String saleStartsAt,
+        String saleEndsAt,
+        boolean saleOpen,
+        boolean queueEnabled
+    ) {
+        public EventInfoResponse(
+            String masterTicketId,
+            String eventName,
+            String eventDate,
+            String currency,
+            String template,
+            List<TicketClassOption> ticketClasses,
+            List<TicketTableOption> tables,
+            String paymentDestination,
+            String purchaseUrl,
+            String eventImageUrl,
+            String host,
+            String saleStartsAt,
+            String saleEndsAt,
+            boolean saleOpen
+        ) {
+            this(masterTicketId, eventName, eventDate, currency, template, ticketClasses, tables, paymentDestination, purchaseUrl, eventImageUrl, host, saleStartsAt, saleEndsAt, saleOpen, false);
+        }
+    }
 
     public record PurchaseRequest(
         String masterQrToken,
@@ -58,7 +87,43 @@ public class PublicTicketDtos {
         String holderName,
         String holderEmail,
         String holderPhone,
-        String provider
+        String paymentPhone,
+        String provider,
+        String presaleCode
+    ) {
+        public PurchaseRequest(
+            String masterQrToken,
+            String ticketClass,
+            String holderName,
+            String holderEmail,
+            String holderPhone,
+            String provider,
+            String presaleCode
+        ) {
+            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, presaleCode);
+        }
+
+        public PurchaseRequest(
+            String masterQrToken,
+            String ticketClass,
+            String holderName,
+            String holderEmail,
+            String holderPhone,
+            String provider
+        ) {
+            this(masterQrToken, ticketClass, holderName, holderEmail, holderPhone, null, provider, null);
+        }
+    }
+
+    public record QueueStatusResponse(
+        String queueToken,
+        String status,
+        Integer position,
+        Long totalInQueue,
+        Integer estimatedWaitSeconds,
+        String attendeeTicketId,
+        String viewUrl,
+        String errorMessage
     ) {}
 
     public record PurchaseResponse(
@@ -68,6 +133,35 @@ public class PublicTicketDtos {
         PaymentIntentStatus paymentStatus,
         String message,
         String viewUrl
+    ) {}
+
+    public record TransferInitiateResponse(
+        String transferToken,
+        String transferUrl,
+        String expiresAt
+    ) {}
+
+    public record TransferInfoResponse(
+        String eventName,
+        String eventDate,
+        String ticketType,
+        String originalHolderName,
+        String expiresAt,
+        boolean valid,
+        String message
+    ) {}
+
+    public record TransferAcceptRequest(
+        String transferToken,
+        String newHolderName,
+        String newHolderPhone,
+        String newHolderEmail
+    ) {}
+
+    public record TransferAcceptResponse(
+        String attendeeTicketId,
+        String viewUrl,
+        String message
     ) {}
 
     public record AttendeeTicketView(

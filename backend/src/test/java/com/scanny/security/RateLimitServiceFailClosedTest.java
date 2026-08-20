@@ -25,11 +25,11 @@ class RateLimitServiceFailClosedTest {
         when(ops.increment(anyString())).thenThrow(new RuntimeException("redis down"));
 
         RateLimitService failClosed = new RateLimitService(
-                provider, true, true, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10);
+                provider, true, true, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10);
         assertFalse(failClosed.tryConsume("register:10", "1.1.1.1"));
 
         RateLimitService failOpen = new RateLimitService(
-                provider, true, false, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10);
+                provider, true, false, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10);
         assertTrue(failOpen.tryConsume("register:10", "1.1.1.1"));
     }
 }

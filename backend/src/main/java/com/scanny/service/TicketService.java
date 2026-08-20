@@ -81,6 +81,12 @@ public class TicketService {
         ticket.setStatus(TicketStatus.Active);
         ticket.setPaymentStatus(PaymentStatus.Unpaid);
 
+        if (eventTemplate && request.metadata() != null) {
+            Map<String, Object> meta = parseMetadata(request.metadata());
+            ticket.setSaleStartsAt(parseInstant(meta.get("saleStartsAt")));
+            ticket.setSaleEndsAt(parseInstant(meta.get("saleEndsAt")));
+        }
+
         ticket = ticketRepository.save(ticket);
         auditService.success(
             "TICKET_CREATED",
@@ -495,6 +501,13 @@ public class TicketService {
         putMeta(meta, "hostContact", request.hostContact());
         putMeta(meta, "eventImageUrl", request.eventImageUrl());
 
+        if (request.saleStartsAt() != null) {
+            master.setSaleStartsAt(request.saleStartsAt());
+        }
+        if (request.saleEndsAt() != null) {
+            master.setSaleEndsAt(request.saleEndsAt());
+        }
+
         if (request.ticketClasses() != null) {
             List<Map<String, Object>> classes = new ArrayList<>();
             for (TicketDtos.EventClassInput item : request.ticketClasses()) {
@@ -511,6 +524,13 @@ public class TicketService {
                 cls.put("fee", fee);
                 if (capacity != null) {
                     cls.put("capacity", capacity);
+                }
+                if (item.saleEndsAt() != null && !item.saleEndsAt().isBlank()) {
+                    cls.put("saleEndsAt", item.saleEndsAt().trim());
+                }
+                if (item.presaleCode() != null && !item.presaleCode().isBlank()) {
+                    cls.put("presaleCode", item.presaleCode().trim());
+                    cls.put("presaleRequired", true);
                 }
                 classes.add(cls);
             }
@@ -536,6 +556,9 @@ public class TicketService {
                 if (capacity != null) {
                     table.put("capacity", capacity);
                 }
+                if (item.saleEndsAt() != null && !item.saleEndsAt().isBlank()) {
+                    table.put("saleEndsAt", item.saleEndsAt().trim());
+                }
                 tables.add(table);
             }
             meta.put("tables", tables);
@@ -546,6 +569,18 @@ public class TicketService {
         Ticket saved = ticketRepository.save(master);
         broadcastStatsUpdate();
         return TicketResponse.from(saved, customerUrl);
+    }
+
+    private static Instant parseInstant(Object val) {
+        if (val == null) return null;
+        if (val instanceof Instant inst) return inst;
+        String str = String.valueOf(val).trim();
+        if (str.isBlank() || "null".equalsIgnoreCase(str)) return null;
+        try {
+            return Instant.parse(str);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static String normalizeRequiredText(String value) {

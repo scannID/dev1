@@ -13,6 +13,10 @@ export type LocalCreatedEvent = {
   formSnapshot?: {
     date?: string
     time?: string
+    saleStartsDate?: string
+    saleStartsTime?: string
+    saleEndsDate?: string
+    saleEndsTime?: string
     location?: string
     host?: string
     hostContact?: string
@@ -22,14 +26,18 @@ export type LocalCreatedEvent = {
       name?: string
       fee?: string
       capacity?: string
+      saleEndsAt?: string
+      presaleCode?: string
     }>
     tables?: Array<{
       name?: string
       seats?: string
       price?: string
       capacity?: string
+      saleEndsAt?: string
     }>
     eventImageUrl?: string
+    queueEnabled?: boolean
   }
   createdAt: string
 }
