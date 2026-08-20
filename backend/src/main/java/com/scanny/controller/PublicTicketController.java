@@ -75,7 +75,6 @@ public class PublicTicketController {
     }
 
     @PostMapping("/waitlist")
-    @PostMapping("/waitlist")
     public ResponseEntity<PublicTicketDtos.WaitlistJoinResponse> joinWaitlist(
             @RequestBody PublicTicketDtos.WaitlistJoinRequest request) {
         return ResponseEntity.ok(ticketPurchaseService.joinWaitlist(request));
