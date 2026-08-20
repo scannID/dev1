@@ -94,6 +94,9 @@ scanny:
     # Soft hold TTL for unpaid class/table inventory before payment completes.
     hold-ttl-minutes: ${TICKET_HOLD_TTL_MINUTES:10}
     hold-expiry-cron: ${TICKET_HOLD_EXPIRY_CRON:0 */1 * * * *}
+    # Auto-queue activates when concurrent Waiting+Processing entries for an event
+    # reach this threshold. Adjust up for high-capacity events, down for small ones.
+    queue-activation-threshold: ${TICKET_QUEUE_ACTIVATION_THRESHOLD:3}
   pexels:
     api-key: ${PEXELS_API_KEY:}
   fees:

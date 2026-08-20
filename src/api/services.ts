@@ -434,8 +434,23 @@ export const publicTicketsApi = {
     return api.get<TicketEventInfo>(`/tickets/public/event/${encodeURIComponent(masterQrToken)}`)
   },
 
-  purchase: async (data: TicketPurchaseRequest): Promise<TicketPurchaseResponse> => {
-    return api.post<TicketPurchaseResponse>('/tickets/public/purchase', data)
+  purchase: async (data: TicketPurchaseRequest): Promise<{ status: 200; data: TicketPurchaseResponse } | { status: 202; data: QueueStatusResponse }> => {
+    const res = await fetch(`/api/tickets/public/purchase`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      const msg = (json as { message?: string; error?: string })?.message
+        || (json as { message?: string; error?: string })?.error
+        || `Purchase failed (${res.status})`
+      throw new Error(msg)
+    }
+    if (res.status === 202) {
+      return { status: 202, data: json as QueueStatusResponse }
+    }
+    return { status: 200, data: json as TicketPurchaseResponse }
   },
 
   joinQueue: async (data: TicketPurchaseRequest): Promise<QueueStatusResponse> => {

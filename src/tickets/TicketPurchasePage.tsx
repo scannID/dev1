@@ -252,15 +252,14 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         quantity: quantity > 1 ? quantity : undefined,
       }
 
-      if (event.queueEnabled) {
-        const qRes = await publicTicketsApi.joinQueue(payload)
-        setQueueEntry(qRes)
+      // purchase() returns 200 (direct) or 202 (auto-queued by backend under high load)
+      const result = await publicTicketsApi.purchase(payload)
+      if (result.status === 202) {
+        // Backend detected high concurrency and placed us in the queue automatically
+        setQueueEntry(result.data)
       } else {
-        const result = await publicTicketsApi.purchase(payload)
-        // For group bookings, redirect to the first ticket's view URL
-        window.location.href = result.viewUrl
-      }
-    } catch (err) {
+        window.location.href = result.data.viewUrl
+      }    } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start purchase')
     } finally {
       setSubmitting(false)

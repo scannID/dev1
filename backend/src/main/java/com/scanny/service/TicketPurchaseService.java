@@ -47,6 +47,9 @@ public class TicketPurchaseService {
     private final SystemBusyModeService systemBusyModeService;
     private final TicketWaitlistService ticketWaitlistService;
 
+    /** Queue activates automatically when concurrent requests for an event exceed this. */
+    private final int queueActivationThreshold;
+
     @Value("${scanny.scan-base-url:https://scanny.app}")
     private String customerUrl;
 
@@ -59,7 +62,8 @@ public class TicketPurchaseService {
             Environment environment,
             @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes,
             SystemBusyModeService systemBusyModeService,
-            TicketWaitlistService ticketWaitlistService) {
+            TicketWaitlistService ticketWaitlistService,
+            @Value("${scanny.tickets.queue-activation-threshold:3}") int queueActivationThreshold) {
         this.ticketRepository = ticketRepository;
         this.ticketQueueRepository = ticketQueueRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
@@ -69,6 +73,7 @@ public class TicketPurchaseService {
         this.holdTtlMinutes = Math.max(1, holdTtlMinutes);
         this.systemBusyModeService = systemBusyModeService;
         this.ticketWaitlistService = ticketWaitlistService;
+        this.queueActivationThreshold = Math.max(1, queueActivationThreshold);
     }
 
     @Transactional
@@ -109,7 +114,7 @@ public class TicketPurchaseService {
         boolean queueEnabled = Boolean.TRUE.equals(meta.get("queueEnabled"))
             || "true".equalsIgnoreCase(String.valueOf(meta.get("queueEnabled")));
 
-        return new PublicTicketDtos.EventInfoResponse(
+    return new PublicTicketDtos.EventInfoResponse(
             master.getId(),
             master.getEventName(),
             master.getEventDate() != null ? master.getEventDate().toString() : null,
@@ -123,8 +128,7 @@ public class TicketPurchaseService {
             stringMeta(meta, "host", ""),
             saleStartsAt != null ? saleStartsAt.toString() : null,
             saleEndsAt != null ? saleEndsAt.toString() : null,
-            saleOpen,
-            queueEnabled
+            saleOpen
         );
     }
 
@@ -144,10 +148,26 @@ public class TicketPurchaseService {
         String phone = requirePhone(request.holderPhone());
         String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
         int quantity = (request.quantity() == null || request.quantity() < 1) ? 1
-                       : Math.min(request.quantity(), 10);  // cap at 10 per transaction
+                       : Math.min(request.quantity(), 10);
 
         org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
                 .info("Ticket purchase start phone={} event={} qty={}", phone, master.getEventName(), quantity);
+
+        // ── Auto-queue under high concurrency ──────────────────────────────────
+        // Count how many requests are currently active (Waiting or Processing)
+        // for this event. If we're over threshold, redirect this request into the
+        // queue automatically — no merchant action required.
+        long activeInQueue = ticketQueueRepository.countByMasterIdAndStatus(master.getId(), "Waiting")
+            + ticketQueueRepository.countByMasterIdAndStatus(master.getId(), "Processing");
+
+        if (activeInQueue >= queueActivationThreshold) {
+            org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                .info("AUTO_QUEUE event={} activeInQueue={} threshold={} phone={}",
+                    master.getEventName(), activeInQueue, queueActivationThreshold, phone);
+            // Delegate to joinQueue — returns a QueueStatusResponse wrapped as a 202
+            // The controller checks for this and returns HTTP 202 when queueToken is set.
+            throw new AutoQueueRedirectException(joinQueueInternal(request, master, name, phone, email, ticketClass, now));
+        }
 
         // Skip duplicate-phone check for group bookings (qty>1 may be buying for friends)
         if (quantity == 1 && ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
@@ -173,7 +193,6 @@ public class TicketPurchaseService {
             && ticketWaitlistService.isValidClaimToken(master.getId(), ticketClass, request.claimToken());
 
         if (!hasValidClaim) {
-            // For group bookings, assert that `quantity` slots are all available
             assertInventoryAvailableForQuantity(master.getId(), ticketClass, capacity, quantity, now);
         }
 
@@ -191,7 +210,6 @@ public class TicketPurchaseService {
             attendee.setTicketType(ticketClass);
             attendee.setEventName(master.getEventName());
             attendee.setEventDate(master.getEventDate());
-            // For group bookings beyond the first ticket, mark as "guest of <name>"
             attendee.setHolderName(quantity > 1 && i > 0 ? name + " (guest " + (i + 1) + ")" : name);
             attendee.setHolderPhone(phone);
             attendee.setHolderEmail(email);
@@ -220,7 +238,6 @@ public class TicketPurchaseService {
             viewUrls.add(buildViewUrl(attendee.getAccessToken()));
         }
 
-        // Consume claim token if used
         if (hasValidClaim) {
             ticketWaitlistService.consumeClaimToken(request.claimToken());
         }
@@ -241,6 +258,56 @@ public class TicketPurchaseService {
             ticketIds,
             viewUrls
         );
+    }
+
+    /**
+     * Internal queue entry creation — shared by joinQueue() and the auto-queue path in startPurchase().
+     */
+    private PublicTicketDtos.QueueStatusResponse joinQueueInternal(
+            PublicTicketDtos.PurchaseRequest request,
+            Ticket master,
+            String name,
+            String phone,
+            String email,
+            String ticketClass,
+            Instant now) {
+        String queueId = "Q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
+        TicketQueueEntry entry = new TicketQueueEntry();
+        entry.setId(queueId);
+        entry.setMasterId(master.getId());
+        entry.setTicketClass(ticketClass);
+        entry.setHolderName(name);
+        entry.setHolderPhone(phone);
+        entry.setHolderEmail(email);
+        entry.setPaymentPhone(request.paymentPhone());
+        entry.setProvider(request.provider());
+        entry.setPresaleCode(request.presaleCode());
+        entry.setStatus("Waiting");
+        entry.setQueuedAt(now);
+        entry.setExpiresAt(now.plus(15, ChronoUnit.MINUTES));
+        ticketQueueRepository.save(entry);
+
+        long waitingAhead = ticketQueueRepository.countWaitingAhead(master.getId(), "Waiting", entry.getQueuedAt(), entry.getId());
+        long totalWaiting = ticketQueueRepository.countByMasterIdAndStatus(master.getId(), "Waiting");
+        int position = (int) waitingAhead + 1;
+        int waitSeconds = Math.max(2, position * 2);
+
+        return new PublicTicketDtos.QueueStatusResponse(
+            queueId, "Waiting", position, totalWaiting, waitSeconds, null, null, null
+        );
+    }
+
+    /**
+     * Thrown internally when startPurchase() detects high concurrency and needs to
+     * redirect the request into the queue. Caught by the controller which returns HTTP 202.
+     */
+    public static class AutoQueueRedirectException extends RuntimeException {
+        private final PublicTicketDtos.QueueStatusResponse queueStatus;
+        public AutoQueueRedirectException(PublicTicketDtos.QueueStatusResponse queueStatus) {
+            super("Auto-queued due to high concurrency");
+            this.queueStatus = queueStatus;
+        }
+        public PublicTicketDtos.QueueStatusResponse getQueueStatus() { return queueStatus; }
     }
 
     /** Waitlist delegation. */
@@ -303,48 +370,12 @@ public class TicketPurchaseService {
         String name = requireText(request.holderName(), "Your name is required");
         String phone = requirePhone(request.holderPhone());
         String ticketClass = requireText(request.ticketClass(), "Select a ticket class or table");
-
-        if (ticketRepository.existsByEventNameAndHolderPhoneAndPaymentStatusAndMasterTicketIdIsNotNull(
-                master.getEventName(), phone, PaymentStatus.Paid)) {
-            if (!h2ProfileActive()) {
-                throw new ApiException(409, "This WhatsApp number already has a paid ticket for this event. Check WhatsApp or use a different number.");
-            }
-        }
+        String email = optionalEmail(request.holderEmail());
 
         Map<String, Object> masterMeta = parseMetadata(master.getMetadata());
         validateClassSaleConstraints(masterMeta, ticketClass, request.presaleCode(), now);
 
-        String queueId = "Q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
-        TicketQueueEntry entry = new TicketQueueEntry();
-        entry.setId(queueId);
-        entry.setMasterId(master.getId());
-        entry.setTicketClass(ticketClass);
-        entry.setHolderName(name);
-        entry.setHolderPhone(phone);
-        entry.setHolderEmail(optionalEmail(request.holderEmail()));
-        entry.setPaymentPhone(request.paymentPhone());
-        entry.setProvider(request.provider());
-        entry.setPresaleCode(request.presaleCode());
-        entry.setStatus("Waiting");
-        entry.setQueuedAt(now);
-        entry.setExpiresAt(now.plus(15, ChronoUnit.MINUTES));
-        ticketQueueRepository.save(entry);
-
-        long waitingAhead = ticketQueueRepository.countWaitingAhead(master.getId(), "Waiting", entry.getQueuedAt(), entry.getId());
-        long totalWaiting = ticketQueueRepository.countByMasterIdAndStatus(master.getId(), "Waiting");
-        int position = (int) waitingAhead + 1;
-        int waitSeconds = Math.max(2, position * 2);
-
-        return new PublicTicketDtos.QueueStatusResponse(
-            queueId,
-            "Waiting",
-            position,
-            totalWaiting,
-            waitSeconds,
-            null,
-            null,
-            null
-        );
+        return joinQueueInternal(request, master, name, phone, email, ticketClass, now);
     }
 
     @Transactional(readOnly = true)

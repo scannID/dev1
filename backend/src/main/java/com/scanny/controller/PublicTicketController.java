@@ -31,11 +31,17 @@ public class PublicTicketController {
     }
 
     @PostMapping("/purchase")
-    public ResponseEntity<PublicTicketDtos.PurchaseResponse> purchase(@Valid @RequestBody PublicTicketDtos.PurchaseRequest request) {
-        PublicTicketDtos.PurchaseResponse response = ticketPurchaseService.startPurchase(request);
-        // Outside the purchase transaction so Meta I/O cannot block/rollback the ticket.
-        ticketPurchaseService.deliverTicketWhatsApp(response.attendeeTicketId(), response.viewUrl());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> purchase(@Valid @RequestBody PublicTicketDtos.PurchaseRequest request) {
+        try {
+            PublicTicketDtos.PurchaseResponse response = ticketPurchaseService.startPurchase(request);
+            // Outside the purchase transaction so Meta I/O cannot block/rollback the ticket.
+            ticketPurchaseService.deliverTicketWhatsApp(response.attendeeTicketId(), response.viewUrl());
+            return ResponseEntity.ok(response);
+        } catch (TicketPurchaseService.AutoQueueRedirectException ex) {
+            // High concurrency detected — customer has been placed in queue automatically.
+            // Return 202 Accepted with the queue status so the frontend can start polling.
+            return ResponseEntity.status(202).body(ex.getQueueStatus());
+        }
     }
 
     @PostMapping("/queue")
@@ -68,6 +74,7 @@ public class PublicTicketController {
         return ResponseEntity.ok(ticketPurchaseService.acceptTransfer(request));
     }
 
+    @PostMapping("/waitlist")
     @PostMapping("/waitlist")
     public ResponseEntity<PublicTicketDtos.WaitlistJoinResponse> joinWaitlist(
             @RequestBody PublicTicketDtos.WaitlistJoinRequest request) {

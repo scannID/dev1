@@ -13,7 +13,7 @@ import TicketViewPage from './tickets/TicketViewPage'
 import GateScanPage from './tickets/GateScanPage'
 import EventTicketPage from './EventTicket'
 import NotFoundPage from './NotFoundPage'
-import TicketTransferAcceptPage from './tickets/TicketTransferAcceptPage'
+import TicketTransferAcceptPage from './tickets/TicketTransferPage'
 import keycloak, {
   hasPortalSession,
   initKeycloak,
