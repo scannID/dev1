@@ -78,13 +78,17 @@ export function CartStep({
                   {lodging ? `${currency(unit)} / night` : `${currency(unit)} each`}
                 </span>
                 <div className="cm-qty compact">
-                  <button type="button" onClick={() => onUpdateQty(item.lineKey, -1)} aria-label={`Decrease ${item.name}`}>
-                    <Minus size={12} />
-                  </button>
-                  <span>{item.quantity}</span>
-                  <button type="button" onClick={() => onUpdateQty(item.lineKey, 1)} aria-label={`Increase ${item.name}`}>
-                    <Plus size={12} />
-                  </button>
+                  {!lodging && (
+                    <button type="button" onClick={() => onUpdateQty(item.lineKey, -1)} aria-label={`Decrease ${item.name}`}>
+                      <Minus size={12} />
+                    </button>
+                  )}
+                  <span>{lodging ? `${item.nights ?? 1} night${(item.nights ?? 1) === 1 ? '' : 's'}` : item.quantity}</span>
+                  {!lodging && (
+                    <button type="button" onClick={() => onUpdateQty(item.lineKey, 1)} aria-label={`Increase ${item.name}`}>
+                      <Plus size={12} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="cm-remove"

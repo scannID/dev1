@@ -187,39 +187,9 @@ export function StayStep({
             {checkInError ? <span className="cm-field-error">{checkInError}</span> : null}
           </label>
 
-          {/* Check-out — stepper (−/+ nights) + optional calendar picker */}
+          {/* Check-out — calendar picker, nights count auto-calculates */}
           <label>
             Check-out
-            <div className="cm-stay-night-row">
-              <button
-                type="button"
-                className="cm-stay-night-btn"
-                aria-label="Remove one night"
-                disabled={nights <= 1}
-                onClick={() => {
-                  if (nights <= 1) return
-                  const next = addDaysIso(checkOut, -1)
-                  setCheckOut(next)
-                  validateDates(checkIn, next)
-                }}
-              >−</button>
-              <div className="cm-stay-night-display">
-                <span className="cm-stay-night-count">{datesValid ? nights : 0}</span>
-                <span className="cm-stay-night-label">night{nights === 1 ? '' : 's'}</span>
-                <span className="cm-stay-night-date">{checkOut || '—'}</span>
-              </div>
-              <button
-                type="button"
-                className="cm-stay-night-btn"
-                aria-label="Add one night"
-                disabled={nights >= 30}
-                onClick={() => {
-                  const next = addDaysIso(checkOut, 1)
-                  setCheckOut(next)
-                  validateDates(checkIn, next)
-                }}
-              >+</button>
-            </div>
             <DatePicker
               value={checkOut}
               min={checkIn ? addDaysIso(checkIn, 1) : addDaysIso(minCheckIn, 1)}
@@ -229,8 +199,7 @@ export function StayStep({
                 setCheckOut(next)
                 validateDates(checkIn, next)
               }}
-              placeholder="Pick specific date"
-              triggerClassName="cm-stay-checkout-picker"
+              placeholder="Check-out date"
             />
             {checkOutError ? <span className="cm-field-error">{checkOutError}</span> : null}
           </label>
