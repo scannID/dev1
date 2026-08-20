@@ -646,7 +646,17 @@ export default function CustomerApp({
 
   const addStayToCart = useCallback((itemId: string, checkInDate: string, checkOutDate: string) => {
     const key = cartLineKey(itemId, null, { checkInDate, checkOutDate })
-    setCart((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }))
+    setCart((prev) => {
+      // Remove any existing booking for this room (different dates = different key)
+      // so the cart never holds the same room twice with different dates.
+      const withoutExisting = Object.fromEntries(
+        Object.entries(prev).filter(([k]) => {
+          const parsed = parseCartLineKey(k)
+          return !(parsed.itemId === itemId && parsed.checkInDate)
+        })
+      )
+      return { ...withoutExisting, [key]: 1 }
+    })
     setStep('cart')
     toast.success('Stay added to cart')
   }, [])
