@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { DateTimePicker } from '@/components/ui/date-picker'
 import {
   Sheet,
   SheetContent,
@@ -516,7 +517,12 @@ export default function TicketingPage() {
                   </label>
                   <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
                     Event date/time
-                    <Input type="datetime-local" value={editForm.eventDate} onChange={(e) => updateEditField('eventDate', e.target.value)} />
+                    <DateTimePicker
+                      value={editForm.eventDate}
+                      onChange={(v) => updateEditField('eventDate', v)}
+                      placeholder="Pick date & time"
+                      aria-label="Event date and time"
+                    />
                   </label>
                   <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
                     Host

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DateTimePicker } from '@/components/ui/date-picker'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -182,11 +183,12 @@ export default function CommunicationsPage() {
               </div>
               <div style={{ display: 'grid', gap: 6 }}>
                 <Label htmlFor="broadcast-expires">Expires (optional)</Label>
-                <Input
+                <DateTimePicker
                   id="broadcast-expires"
-                  type="datetime-local"
                   value={expiresLocal}
-                  onChange={(e) => setExpiresLocal(e.target.value)}
+                  onChange={(v) => setExpiresLocal(v)}
+                  placeholder="No expiry"
+                  aria-label="Broadcast expiry date and time"
                 />
               </div>
             </div>

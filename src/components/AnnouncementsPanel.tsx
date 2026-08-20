@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   Sheet,
   SheetContent,
@@ -372,23 +373,25 @@ function AnnouncementForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1.5">
           <Label htmlFor="ann-starts">Show from</Label>
-          <Input
+          <DatePicker
             id="ann-starts"
-            type="date"
             value={form.startsAt}
-            onChange={(e) => set('startsAt', e.target.value)}
+            onChange={(v) => set('startsAt', v)}
+            placeholder="Any date"
             disabled={saving}
+            aria-label="Show from date"
           />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="ann-ends">Show until</Label>
-          <Input
+          <DatePicker
             id="ann-ends"
-            type="date"
             value={form.endsAt}
             min={form.startsAt || undefined}
-            onChange={(e) => set('endsAt', e.target.value)}
+            onChange={(v) => set('endsAt', v)}
+            placeholder="Any date"
             disabled={saving}
+            aria-label="Show until date"
           />
         </div>
       </div>

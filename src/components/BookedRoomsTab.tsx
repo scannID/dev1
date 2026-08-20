@@ -3,8 +3,8 @@ import { toast } from 'sonner'
 import { BedDouble, CalendarCheck, LogIn, LogOut, Wrench, ArrowRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatePicker } from '@/components/ui/date-picker'
 import {
   Dialog,
   DialogContent,
@@ -86,12 +86,12 @@ function ExtendDialog({ room, onConfirm, onClose }: ExtendDialogProps) {
           ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="new-checkout">New checkout date</Label>
-            <Input
+            <DatePicker
               id="new-checkout"
-              type="date"
               value={newDate}
               min={minDate}
-              onChange={(e) => setNewDate(e.target.value)}
+              onChange={setNewDate}
+              aria-label="New checkout date"
             />
           </div>
         </div>

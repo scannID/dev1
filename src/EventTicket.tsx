@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
+import { DatePicker } from './components/ui/date-picker'
 import {
   ArrowLeft,
   ArrowRight,
@@ -2726,14 +2727,12 @@ function TicketForm({
 
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 140 }}>
-                      <input
-                        className="et-focus"
-                        style={fieldStyle(Boolean(touched && errors.date))}
-                        type="date"
+                      <DatePicker
                         aria-label="Date"
-                        title="Date"
                         value={form.date}
-                        onChange={(e) => set('date', e.target.value)}
+                        onChange={(v) => set('date', v)}
+                        aria-invalid={Boolean(touched && errors.date)}
+                        placeholder="Event date"
                       />
                       {touched && errors.date && <FieldError>{errors.date}</FieldError>}
                     </div>
@@ -2796,14 +2795,14 @@ function TicketForm({
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }}>Sales open (leave blank for immediate)</label>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <input
-                        className="et-focus"
-                        style={{ ...fieldStyle(), flex: 1, minWidth: 140 }}
-                        type="date"
-                        aria-label="Sales open date"
-                        value={form.saleStartsDate || ''}
-                        onChange={(e) => set('saleStartsDate', e.target.value)}
-                      />
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <DatePicker
+                          aria-label="Sales open date"
+                          value={form.saleStartsDate || ''}
+                          onChange={(v) => set('saleStartsDate', v)}
+                          placeholder="Any date"
+                        />
+                      </div>
                       <input
                         className="et-focus"
                         style={{ ...fieldStyle(), flex: 1, minWidth: 100 }}
@@ -2817,14 +2816,14 @@ function TicketForm({
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }}>Sales close (leave blank to sell until event)</label>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <input
-                        className="et-focus"
-                        style={{ ...fieldStyle(), flex: 1, minWidth: 140 }}
-                        type="date"
-                        aria-label="Sales close date"
-                        value={form.saleEndsDate || ''}
-                        onChange={(e) => set('saleEndsDate', e.target.value)}
-                      />
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <DatePicker
+                          aria-label="Sales close date"
+                          value={form.saleEndsDate || ''}
+                          onChange={(v) => set('saleEndsDate', v)}
+                          placeholder="Any date"
+                        />
+                      </div>
                       <input
                         className="et-focus"
                         style={{ ...fieldStyle(), flex: 1, minWidth: 100 }}

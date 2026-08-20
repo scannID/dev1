@@ -5,6 +5,7 @@ import { isLodgingItem, nightsBetween } from '../../lib/catalogCart'
 import { discountPercentOf, effectivePrice } from '../../lib/catalogPricing'
 import { getCategoryImage } from '../../lib/categoryImages'
 import { currency, usdEquiv } from '../utils'
+import { DatePicker } from '../../components/ui/date-picker'
 
 function todayIso() {
   const d = new Date()
@@ -165,39 +166,71 @@ export function StayStep({
         {selected.details ? <p className="cm-stay-details">{selected.details}</p> : null}
 
         <div className="cm-stay-dates">
+          {/* Check-in — calendar picker */}
           <label>
             Check-in
-            <input
-              type="date"
+            <DatePicker
               value={checkIn}
               min={minCheckIn}
-              required
-              aria-required="true"
+              aria-required={true}
               aria-invalid={Boolean(checkInError)}
-              onChange={(e) => {
-                const next = e.target.value
+              onChange={(next) => {
+                if (!next) return
                 setCheckIn(next)
-                const nextOut = checkOut && checkOut > next ? checkOut : addDaysIso(next || minCheckIn, 1)
-                if (nextOut !== checkOut) setCheckOut(nextOut)
-                validateDates(next, nextOut)
+                const currentNights = datesValid ? nights : 1
+                const newOut = addDaysIso(next, currentNights)
+                setCheckOut(newOut)
+                validateDates(next, newOut)
               }}
+              placeholder="Check-in date"
             />
             {checkInError ? <span className="cm-field-error">{checkInError}</span> : null}
           </label>
+
+          {/* Check-out — stepper (−/+ nights) + optional calendar picker */}
           <label>
             Check-out
-            <input
-              type="date"
+            <div className="cm-stay-night-row">
+              <button
+                type="button"
+                className="cm-stay-night-btn"
+                aria-label="Remove one night"
+                disabled={nights <= 1}
+                onClick={() => {
+                  if (nights <= 1) return
+                  const next = addDaysIso(checkOut, -1)
+                  setCheckOut(next)
+                  validateDates(checkIn, next)
+                }}
+              >−</button>
+              <div className="cm-stay-night-display">
+                <span className="cm-stay-night-count">{datesValid ? nights : 0}</span>
+                <span className="cm-stay-night-label">night{nights === 1 ? '' : 's'}</span>
+                <span className="cm-stay-night-date">{checkOut || '—'}</span>
+              </div>
+              <button
+                type="button"
+                className="cm-stay-night-btn"
+                aria-label="Add one night"
+                disabled={nights >= 30}
+                onClick={() => {
+                  const next = addDaysIso(checkOut, 1)
+                  setCheckOut(next)
+                  validateDates(checkIn, next)
+                }}
+              >+</button>
+            </div>
+            <DatePicker
               value={checkOut}
               min={checkIn ? addDaysIso(checkIn, 1) : addDaysIso(minCheckIn, 1)}
-              required
-              aria-required="true"
+              aria-required={true}
               aria-invalid={Boolean(checkOutError)}
-              onChange={(e) => {
-                const next = e.target.value
+              onChange={(next) => {
                 setCheckOut(next)
                 validateDates(checkIn, next)
               }}
+              placeholder="Pick specific date"
+              triggerClassName="cm-stay-checkout-picker"
             />
             {checkOutError ? <span className="cm-field-error">{checkOutError}</span> : null}
           </label>
