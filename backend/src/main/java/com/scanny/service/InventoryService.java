@@ -431,9 +431,10 @@ public class InventoryService {
             Ingredient ingredient = requireIngredient(businessId, lineReq.ingredientId());
             String lineUnit = lineReq.lineUnit() != null ? lineReq.lineUnit().trim() : "";
 
-            // Validate unit compatibility
+            // Validate unit compatibility — check DB first (business-specific), then same-family
             if (!lineUnit.isBlank()) {
-                unitConversionService.validateCompatible(lineUnit, ingredient.getUnit());
+                unitConversionService.validateCompatible(
+                    lineUnit, ingredient.getUnit(), ingredient.getBusiness().getId());
             }
 
             RecipeLine line = new RecipeLine();
@@ -650,8 +651,9 @@ public class InventoryService {
                 String lineUnit = recipeLine.effectiveUnit();
                 String ingredientUnit = ingredient.getUnit();
 
-                // Convert from recipe line unit to ingredient stocked unit
-                BigDecimal consumeQty = unitConversionService.toIngredientUnit(lineQty, lineUnit, ingredientUnit);
+                // Convert from recipe line unit to ingredient stocked unit — DB lookup first
+                BigDecimal consumeQty = unitConversionService.toIngredientUnit(
+                    lineQty, lineUnit, ingredientUnit, business.getId());
 
                 int unitCost = ingredient.getAvgUnitCost();
                 int cost = consumeQty.multiply(BigDecimal.valueOf(unitCost))
