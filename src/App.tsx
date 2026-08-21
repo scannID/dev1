@@ -1542,14 +1542,20 @@ function SidebarProfile({
       setUploadError('Please choose an image file (PNG, JPG, or WebP).')
       return
     }
-    if (file.size > 512 * 1024) {
-      setUploadError('Image must be 512KB or smaller.')
+    // Allow up to 15MB raw — resizeImageFile always outputs a small 256×256 JPEG
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError('Image must be under 15MB.')
       return
     }
     setUploadError(null)
 
     try {
       const dataUrl = await resizeImageFile(file)
+      // Sanity check on the output (should never exceed ~80KB as a 256px JPEG)
+      if (dataUrl.length > 200_000) {
+        setUploadError('Could not compress that image small enough. Try a different file.')
+        return
+      }
       await onLogoUpload(dataUrl)
     } catch {
       setUploadError('Could not process that image. Try another file.')

@@ -373,8 +373,8 @@ public class MerchantService {
             String logoUrl = request.businessLogoUrl().trim();
             if (logoUrl.isEmpty()) {
                 merchant.setBusinessLogoUrl(null);
-            } else if (logoUrl.length() > 500_000) {
-                throw new ApiException(400, "Logo image is too large. Maximum size is 500KB.");
+            } else if (logoUrl.length() > 200_000) {
+                throw new ApiException(400, "Logo image is too large. Please upload a smaller image.");
             } else if (!logoUrl.startsWith("data:image/") && !logoUrl.startsWith("http://") && !logoUrl.startsWith("https://")) {
                 throw new ApiException(400, "Logo must be an uploaded image or a valid image URL.");
             } else {
