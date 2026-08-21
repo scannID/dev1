@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import {
   Scissors,
   Check,
@@ -178,7 +178,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
                 color: C.ink,
               }}
             >
-              KODE
+              KODTE
             </div>
 
             <div
@@ -401,7 +401,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
                       <div style={{
                         width: 8, height: 8, borderRadius: '50%',
                         background: C.stamp,
-                        animation: 'kodePulseDot 1s ease-in-out infinite',
+                        animation: 'kodtePulseDot 1s ease-in-out infinite',
                       }} />
                     )}
                   </div>
@@ -645,7 +645,7 @@ function EventTicketStub() {
               borderRadius: '50%',
               background: C.ok,
               animation:
-                'kodePulseDot 1.4s ease-in-out infinite',
+                'kodtePulseDot 1.4s ease-in-out infinite',
             }}
           />
 
@@ -688,7 +688,7 @@ function EventTicketStub() {
           justifyContent: 'center',
           gap: 8,
           animation:
-            'kodeGatePulse 2.6s ease-in-out infinite',
+            'kodteGatePulse 2.6s ease-in-out infinite',
         }}
       >
         <div
@@ -1243,7 +1243,7 @@ function Manifest() {
           display: 'flex',
           width: 'max-content',
           animation:
-            'kodeManifest 32s linear infinite',
+            'kodteManifest 32s linear infinite',
         }}
       >
         {loop.map((v, i) => (
@@ -1288,17 +1288,17 @@ function Manifest() {
    Main
    ───────────────────────────────────────────────────────────── */
 
-type KodeLandingTicketProps = {
+type KodteLandingTicketProps = {
   onGetStarted?: () => void
   onCreateEventTicket?: () => void
 }
 
-export default function KodeLandingTicket({
+export default function KodteLandingTicket({
   onGetStarted,
   onCreateEventTicket,
-}: KodeLandingTicketProps = {}) {
+}: KodteLandingTicketProps = {}) {
   usePageMeta({
-    title: 'Kode — QR ordering and event ticketing for Uganda',
+    title: 'Kodte — QR ordering and event ticketing for Uganda',
     description:
       'One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda.',
     canonicalPath: '/',
@@ -1334,7 +1334,7 @@ export default function KodeLandingTicket({
           font-family: 'Outfit', sans-serif;
         }
 
-        @keyframes kodeManifest {
+        @keyframes kodteManifest {
           from {
             transform: translateX(0);
           }
@@ -1344,7 +1344,7 @@ export default function KodeLandingTicket({
           }
         }
 
-        @keyframes kodeDeckIn {
+        @keyframes kodteDeckIn {
           from {
             opacity: 0;
             transform: translateY(18px) rotate(-4deg);
@@ -1356,7 +1356,7 @@ export default function KodeLandingTicket({
           }
         }
 
-        @keyframes kodePulseDot {
+        @keyframes kodtePulseDot {
           0%,
           100% {
             opacity: 1;
@@ -1369,7 +1369,7 @@ export default function KodeLandingTicket({
           }
         }
 
-        @keyframes kodeGatePulse {
+        @keyframes kodteGatePulse {
           0%,
           100% {
             box-shadow:
@@ -1382,13 +1382,13 @@ export default function KodeLandingTicket({
           }
         }
 
-        .kode-stamp-btn {
+        .kodte-stamp-btn {
           transition:
             transform 0.15s ease,
             box-shadow 0.15s ease;
         }
 
-        .kode-stamp-btn:hover {
+        .kodte-stamp-btn:hover {
           transform: rotate(-2deg) scale(1.03);
         }
       `}</style>
@@ -1450,7 +1450,7 @@ export default function KodeLandingTicket({
                 }}
               >
                 <img
-                  src="/kode-icon.svg"
+                  src="/kodte-icon.svg"
                   alt=""
                   width={28}
                   height={28}
@@ -1471,7 +1471,7 @@ export default function KodeLandingTicket({
                   color: C.ink,
                 }}
               >
-                Kode
+                Kodte
               </span>
             </a>
 
@@ -1484,7 +1484,7 @@ export default function KodeLandingTicket({
             >
               <button
                 onClick={onCreateEventTicket}
-                className="kode-stamp-btn"
+                className="kodte-stamp-btn"
                 style={{
                   background: 'transparent',
                   border: `1.5px dashed ${C.ink}66`,
@@ -1506,7 +1506,7 @@ export default function KodeLandingTicket({
               </button>
 
               <button
-                className="kode-stamp-btn"
+                className="kodte-stamp-btn"
                 style={{
                   background: 'transparent',
                   border: `2.5px solid ${C.stamp}`,
@@ -1600,7 +1600,7 @@ export default function KodeLandingTicket({
                 }}
               >
                 <button
-                  className="kode-stamp-btn"
+                  className="kodte-stamp-btn"
                   style={{
                     background: C.ink,
                     color: C.paperLt,
@@ -1704,7 +1704,7 @@ export default function KodeLandingTicket({
               marginBottom: 10,
             }}
           >
-            ALSO ON KODE
+            ALSO ON KODTE
           </div>
 
           <h2
@@ -1809,7 +1809,7 @@ export default function KodeLandingTicket({
               </p>
 
               <button
-                className="kode-stamp-btn"
+                className="kodte-stamp-btn"
                 style={{
                   background: C.stamp,
                   color: C.paperLt,
@@ -1868,7 +1868,7 @@ export default function KodeLandingTicket({
                     marginBottom: 10,
                   }}
                 >
-                  KODE
+                  KODTE
                 </div>
 
                 <p
@@ -2003,7 +2003,7 @@ export default function KodeLandingTicket({
               </span>
 
               <span>
-                Kode is a product of QBI Labs SMC ·
+                Kodte is a product of QBI Labs SMC ·
                 Kampala, Uganda
               </span>
             </div>

@@ -4201,11 +4201,30 @@ button:disabled {
 }
 
 .kds-place {
-  color: var(--kds-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--kds-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kds-text) 15%, transparent);
+  color: var(--kds-text);
+  font-size: 10px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-shrink: 1;
+  max-width: 100%;
+}
+
+.kds-place-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  flex-shrink: 0;
 }
 
 .kds-items {

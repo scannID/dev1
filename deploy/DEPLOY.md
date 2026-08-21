@@ -1,4 +1,4 @@
-# Production deploy (Contabo VPS, 3 APIs)
+﻿# Production deploy (Contabo VPS, 3 APIs)
 
 Stack: Caddy + `api-1`/`api-2`/`api-3` + merchant UI + admin UI + Keycloak + Postgres + Redis.
 
@@ -6,10 +6,10 @@ Domains (A records → VPS public IP):
 
 | Host | Service |
 |------|---------|
-| `kode.com` | Merchant UI |
-| `admin.kode.com` | Admin console |
-| `api.kode.com` | Spring API (round-robin) |
-| `auth.kode.com` | Keycloak |
+| `kodte.com` | Merchant UI |
+| `admin.kodte.com` | Admin console |
+| `api.kodte.com` | Spring API (round-robin) |
+| `auth.kodte.com` | Keycloak |
 
 ## 1. Server prep
 
@@ -55,15 +55,15 @@ Wait until `api-1`/`api-2`/`api-3`, `keycloak`, `merchant`, `admin`, and `caddy`
 
 ```bash
 set -a && source .env && set +a
-export KEYCLOAK_URL=https://auth.kode.com
+export KEYCLOAK_URL=https://auth.kodte.com
 export CREATE_SEED_USERS=1   # optional first-time seed merchant/admin users
 bash deploy/setup-realm.sh
 ```
 
 This sets:
 
-- `scanny-client` → redirect/web origin **only** `https://kode.com`
-- `scanny-admin` → redirect/web origin **only** `https://admin.kode.com`
+- `scanny-client` → redirect/web origin **only** `https://kodte.com`
+- `scanny-admin` → redirect/web origin **only** `https://admin.kodte.com`
 - `scanny-backend` confidential client secret from `.env`
 
 Do **not** give one user both `MERCHANT` and `ADMIN` roles.
@@ -76,8 +76,8 @@ bash deploy/smoke.sh
 
 Manual auth checks:
 
-1. Private window → `https://kode.com` → Sign in with a **MERCHANT** user (login form always shown).
-2. Another private window → `https://admin.kode.com` → Sign in with an **ADMIN** user.
+1. Private window → `https://kodte.com` → Sign in with a **MERCHANT** user (login form always shown).
+2. Another private window → `https://admin.kodte.com` → Sign in with an **ADMIN** user.
 3. Merchant account must not enter admin; admin account must not enter merchant.
 4. Logout from one app clears Keycloak SSO for both (same realm). Same-browser dual login is unsupported — use a private window or log out first.
 

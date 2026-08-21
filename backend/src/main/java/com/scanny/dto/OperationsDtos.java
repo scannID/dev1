@@ -76,7 +76,8 @@ public final class OperationsDtos {
             String whatsappBusinessPhone,
             boolean dailyDigestEnabled,
             String dailyDigestChannel,
-            String dailyDigestEmail
+            String dailyDigestEmail,
+            String currency
     ) {
         public static OperationsSettingsResponse from(Business business) {
             return new OperationsSettingsResponse(
@@ -88,7 +89,8 @@ public final class OperationsDtos {
                     business.getWhatsappBusinessPhone(),
                     business.isDailyDigestEnabled(),
                     business.getDailyDigestChannel(),
-                    business.getDailyDigestEmail()
+                    business.getDailyDigestEmail(),
+                    business.getCurrency()
             );
         }
     }
@@ -102,7 +104,8 @@ public final class OperationsDtos {
             @Size(max = 32) String whatsappBusinessPhone,
             Boolean dailyDigestEnabled,
             @Size(max = 16) String dailyDigestChannel,
-            @Size(max = 255) String dailyDigestEmail
+            @Size(max = 255) String dailyDigestEmail,
+            @Size(max = 8) String currency
     ) {}
 
     public record StaffResponse(

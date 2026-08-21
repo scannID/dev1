@@ -1,4 +1,4 @@
-/** Device-local list of events created on this browser (for create-event QR gallery). */
+﻿/** Device-local list of events created on this browser (for create-event QR gallery). */
 
 export type LocalCreatedEvent = {
   eventId: string
@@ -42,7 +42,7 @@ export type LocalCreatedEvent = {
   createdAt: string
 }
 
-const STORAGE_KEY = 'kode-created-events'
+const STORAGE_KEY = 'kodte-created-events'
 const MAX_EVENTS = 40
 
 function readAll(): LocalCreatedEvent[] {

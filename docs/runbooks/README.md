@@ -1,4 +1,4 @@
-# Scanny runbooks
+﻿# Scanny runbooks
 
 Short operational guides. Keep them current when hosting changes.
 
@@ -14,7 +14,7 @@ Short operational guides. Keep them current when hosting changes.
 ### Local (dev)
 ```powershell
 scanny -Stop
-kode -All
+kodte -All
 ```
 Or from repo root:
 ```powershell

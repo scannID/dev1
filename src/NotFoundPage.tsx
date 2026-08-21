@@ -1,4 +1,4 @@
-import { usePageMeta } from './hooks/usePageMeta'
+﻿import { usePageMeta } from './hooks/usePageMeta'
 
 /**
  * On-brand 404 page. Rendered by the Root component in main.tsx when the
@@ -26,7 +26,7 @@ type Props = {
 export default function NotFoundPage({ onGoHome }: Props) {
   usePageMeta({
     title: '404 — Page not found',
-    description: "The page you're looking for doesn't exist. Go back to Kode to manage your QR ordering and event ticketing.",
+    description: "The page you're looking for doesn't exist. Go back to Kodte to manage your QR ordering and event ticketing.",
     robots: 'noindex, nofollow',
   })
 
@@ -206,7 +206,7 @@ export default function NotFoundPage({ onGoHome }: Props) {
                 letterSpacing: '0.14em',
               }}
             >
-              KODE · kode.ug
+              KODTE · kodte.ug
             </span>
 
             <div style={{ display: 'flex', gap: 5 }}>

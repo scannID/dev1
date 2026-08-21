@@ -1,4 +1,4 @@
-/* ========================================
+﻿/* ========================================
    SCANNY CUSTOM KEYCLOAK THEME
    Modern, centered design matching the app
    ======================================== */
@@ -91,7 +91,7 @@ body {
 }
 
 #kc-logo a::after {
-  content: 'Kode';
+  content: 'Kodte';
   color: var(--scanny-text);
   font-weight: 800;
   font-size: 32px;

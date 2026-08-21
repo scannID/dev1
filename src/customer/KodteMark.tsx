@@ -1,8 +1,8 @@
-export function KodeMark({ size = 28 }: { size?: number }) {
+export function KodteMark({ size = 28 }: { size?: number }) {
   return (
     <img
-      src="/kode-icon.svg"
-      alt="Kode"
+      src="/kodte-icon.svg"
+      alt="Kodte"
       width={size}
       height={size}
       style={{

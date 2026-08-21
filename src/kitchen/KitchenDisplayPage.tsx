@@ -194,7 +194,14 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
                 </div>
                 <div className="kds-card-meta">
                   <span className="kds-customer">{order.customerName || 'Guest'}</span>
-                  {place ? <span className="kds-place">{place}</span> : null}
+                  {place ? (
+                    <span className="kds-place">
+                      <span className="kds-place-label">
+                        {order.tableLabel ? 'Table' : 'Loc'}
+                      </span>
+                      {place}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="kds-items">{itemsPreview}{extra}</p>
                 {order.customerNote ? (

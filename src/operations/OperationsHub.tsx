@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { operationsApi, type Branch, type OperationsSettings } from '../api/operations'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { hasPermission } from './roleCatalog'
 import type { StaffRole } from '../api/operations'
 
 export type OperationsTab = 'roles' | 'settings' | 'branches'
-const BUSY_TIMER_STORAGE_PREFIX = 'Kode:busy-until:'
+const BUSY_TIMER_STORAGE_PREFIX = 'Kodte:busy-until:'
 
 type BusyTimerSnapshot = {
   busyUntilMs: number
@@ -360,7 +360,7 @@ export function OperationsHub({
 
               <div className="operations-field">
                 <Label>Branch display name</Label>
-                <Input value={branchName} onChange={(e) => setBranchName(e.target.value)} placeholder="Kode Kololo" />
+                <Input value={branchName} onChange={(e) => setBranchName(e.target.value)} placeholder="Kodte Kololo" />
               </div>
               <div className="operations-field">
                 <Label>Branch label</Label>

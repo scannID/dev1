@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
@@ -771,12 +771,12 @@ function App({
       <aside className="company-sidebar" aria-label="Company workspace navigation">
         <div className="sidebar-brand">
           <img
-            src="/kode-icon.svg"
-            alt="Kode"
+            src="/kodte-icon.svg"
+            alt="Kodte"
             className="sidebar-brand-logo"
           />
           <div className="sidebar-brand-text">
-            <strong>Kode</strong>
+            <strong>Kodte</strong>
             <span>{staffMode ? (staffRole ?? 'Staff') + ' Portal' : 'Merchant Portal'}</span>
           </div>
         </div>
@@ -959,7 +959,7 @@ function App({
         <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Log out of Kode?</AlertDialogTitle>
+              <AlertDialogTitle>Log out of Kodte?</AlertDialogTitle>
               <AlertDialogDescription>
                 You will be logged out and returned to the landing page.
               </AlertDialogDescription>
@@ -1335,7 +1335,7 @@ function App({
           <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
             <SheetHeader className="border-b border-border px-6 py-4">
               <SheetTitle className="">Notifications</SheetTitle>
-              <SheetDescription className="">Kode messages and recent activity for {business.name || 'your business'}</SheetDescription>
+              <SheetDescription className="">Kodte messages and recent activity for {business.name || 'your business'}</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto">
               <NotificationsPanel
@@ -1403,7 +1403,7 @@ function NotificationsPanel({
     <div>
       {broadcasts.length > 0 && (
         <div style={{ borderBottom: '1px solid var(--border)' }}>
-          <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>From Kode</p>
+          <p style={{ margin: 0, padding: '10px 20px 6px', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>From Kodte</p>
           {broadcasts.map((b) => (
             <div
               key={b.id}
@@ -1425,7 +1425,7 @@ function NotificationsPanel({
                 <p style={{ margin: 0, fontSize: 13, fontWeight: b.unread ? 600 : 500, color: 'var(--foreground)' }}>{b.title}</p>
                 <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--muted-foreground)', whiteSpace: 'pre-wrap' }}>{b.body}</p>
                 <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>
-                  {b.publishedAt ? new Date(b.publishedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Kode'}
+                  {b.publishedAt ? new Date(b.publishedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Kodte'}
                   {b.dismissed ? ' · Dismissed' : ''}
                 </p>
               </div>
@@ -1736,7 +1736,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
     }
 
     const shareTitle = `${business.name} QR code`
-    const fileName = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kode'}-qr.png`
+    const fileName = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kodte'}-qr.png`
 
     try {
       const imageResponse = await fetch(qrImage)
@@ -1770,7 +1770,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
   return (
     <div className={compact ? 'qr-panel compact' : 'qr-panel large'} style={{ '--accent': business.accent } as QrStyle}>
       <div className="print-card">
-        <div className="print-brand">Kode</div>
+        <div className="print-brand">Kodte</div>
         <h3>{business.name}</h3>
         <p>Scan to view prices, browse the menu, and place orders.</p>
         {qrImage ? <img src={qrImage} alt={`${business.name} QR code`} /> : <div className="qr-loading" />}
@@ -1800,7 +1800,7 @@ function QrPanel({ business, compact = false }: { business: Business; compact?: 
                   if (!qrImage) return
                   const a = document.createElement('a')
                   a.href = qrImage
-                  a.download = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kode'}-qr.png`
+                  a.download = `${business.name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Kodte'}-qr.png`
                   a.click()
                 }}
               >

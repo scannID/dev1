@@ -1,8 +1,8 @@
-# Security
+﻿# Security
 
 ## Trust model
 
-Kode separates three access levels:
+Kodte separates three access levels:
 
 - Customers use intentionally public menu, order-placement, QR, and selected ticket/device flows.
 - Merchants authenticate with Keycloak and require the `MERCHANT` realm role.
@@ -18,7 +18,7 @@ Authorization must be enforced in the backend, not only by hiding UI controls. R
 
 Never:
 
-- store passwords in Kode tables;
+- store passwords in Kodte tables;
 - put client secrets in `VITE_*` variables;
 - commit `.env` files or production credentials;
 - log access tokens, passwords, PINs, or full payment credentials;
@@ -65,7 +65,7 @@ Client IP for rate limits and audit uses `request.getRemoteAddr()` by default. `
 
 Keycloak redirect URIs and web origins must be exact production values. Rotate all local defaults before deployment and use a secret manager for database, Keycloak, mail, Redis, and integration credentials.
 
-Merchant (`scanny-client` on `kode.com`) and admin (`scanny-admin` on `admin.kode.com`) share one Keycloak realm, so they share one SSO cookie on `auth.kode.com`. Both apps force `prompt=login`, gate on realm role + `azp`, and call Keycloak logout so ending a session on one app clears SSO for the other. Do not assign both `MERCHANT` and `ADMIN` to the same user for day-1. Same-browser dual login is unsupported: log out before switching apps, or use a private window.
+Merchant (`scanny-client` on `kodte.com`) and admin (`scanny-admin` on `admin.kodte.com`) share one Keycloak realm, so they share one SSO cookie on `auth.kodte.com`. Both apps force `prompt=login`, gate on realm role + `azp`, and call Keycloak logout so ending a session on one app clears SSO for the other. Do not assign both `MERCHANT` and `ADMIN` to the same user for day-1. Same-browser dual login is unsupported: log out before switching apps, or use a private window.
 
 ## Data and operations
 

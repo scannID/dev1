@@ -1,7 +1,7 @@
-import { type FormEvent, useEffect, useState } from 'react'
+﻿import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
 import type { TicketEventInfo, QueueStatusResponse, WaitlistJoinResponse } from '../api/types'
-import { KodeMark } from '../customer/KodeMark'
+import { KodteMark } from '../customer/KodteMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
 import { usePageMeta } from '../hooks/usePageMeta'
@@ -296,7 +296,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kode</p>
+          <p className="tk-hero-kicker">Kodte</p>
           <h2>Event unavailable</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error}
@@ -313,9 +313,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       <div className="tk-shell">
         <header className="tk-topbar">
           <div className="tk-brand">
-            <KodeMark size={28} />
+            <KodteMark size={28} />
             <div>
-              <strong>Kode</strong>
+              <strong>Kodte</strong>
               <span>{event.host?.trim() || 'Hosted event'}</span>
             </div>
           </div>
@@ -340,9 +340,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       <div className="tk-shell">
         <header className="tk-topbar">
           <div className="tk-brand">
-            <KodeMark size={28} />
+            <KodteMark size={28} />
             <div>
-              <strong>Kode</strong>
+              <strong>Kodte</strong>
               <span>{event.host?.trim() || 'Hosted event'}</span>
             </div>
           </div>
@@ -369,9 +369,9 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     <div className="tk-shell">
       <header className="tk-topbar">
         <div className="tk-brand">
-          <KodeMark size={28} />
+          <KodteMark size={28} />
           <div>
-            <strong>Kode</strong>
+            <strong>Kodte</strong>
             <span>{event.host?.trim() || 'Hosted event'}</span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+﻿import type { ReactNode } from 'react'
 import type { MarketingSlug } from './routes'
 
 export type MarketingPage = {
@@ -79,7 +79,7 @@ const LEGAL_UPDATED = 'July 22, 2026'
 export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   'how-it-works': {
     eyebrow: 'Product',
-    title: 'How Kode works',
+    title: 'How Kodte works',
     lead: 'Go from empty catalog to live QR ordering in minutes. Three steps — no hardware, no app installs for your guests.',
     showCta: true,
     body: (
@@ -97,7 +97,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           <Bullets
             items={[
               'A modern browser and internet connection',
-              'A Kode merchant account',
+              'A Kodte merchant account',
               'A printer or screen to display your QR (optional but recommended)',
             ]}
           />
@@ -168,7 +168,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
         <SimpleTable
           headers={['Plan', 'Best for', 'Includes']}
           rows={[
-            ['Starter', 'Trying Kode with one location', 'QR ordering, catalog, live dashboard, core payment tracking'],
+            ['Starter', 'Trying Kodte with one location', 'QR ordering, catalog, live dashboard, core payment tracking'],
             ['Growth', 'Busy restaurants, cafés, and hotels', 'Everything in Starter plus priority support and advanced ops views'],
             ['Enterprise', 'Groups and multi-site operators', 'Custom onboarding, dedicated support, and volume arrangements'],
           ]}
@@ -191,8 +191,8 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
 
   about: {
     eyebrow: 'Company',
-    title: 'About Kode',
-    lead: 'Kode helps modern venues turn menus into scannable ordering experiences — so customers move faster and teams stay in control.',
+    title: 'About Kodte',
+    lead: 'Kodte helps modern venues turn menus into scannable ordering experiences — so customers move faster and teams stay in control.',
     showCta: true,
     body: (
       <>
@@ -235,7 +235,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           />
         </Section>
         <Section title="Apply">
-          Send a short note and CV to <strong style={{ color: 'var(--foreground)' }}>careers@kode.com</strong>. Tell us what you want to build and why Kode.
+          Send a short note and CV to <strong style={{ color: 'var(--foreground)' }}>careers@kodte.com</strong>. Tell us what you want to build and why Kodte.
         </Section>
       </>
     ),
@@ -251,9 +251,9 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
         <Section title="Channels">
           <Bullets
             items={[
-              'General: hello@kode.com',
-              'Support: support@kode.com',
-              'Press: press@kode.com',
+              'General: hello@kodte.com',
+              'Support: support@kodte.com',
+              'Press: press@kodte.com',
             ]}
           />
         </Section>
@@ -343,13 +343,13 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
     body: (
       <>
         <Section title="About the company">
-          Kode is a QR ordering platform for merchants. Customers scan, browse a live catalog, and place orders; merchants manage fulfillment from a real-time dashboard.
+          Kodte is a QR ordering platform for merchants. Customers scan, browse a live catalog, and place orders; merchants manage fulfillment from a real-time dashboard.
         </Section>
         <Section title="Boilerplate">
-          Kode turns menus and catalogs into scannable ordering experiences. Built for restaurants, hotels, cafés, and service businesses that need speed without forcing guests to install an app.
+          Kodte turns menus and catalogs into scannable ordering experiences. Built for restaurants, hotels, cafés, and service businesses that need speed without forcing guests to install an app.
         </Section>
         <Section title="Media contact">
-          For interviews, logos, or product briefings: <strong style={{ color: 'var(--foreground)' }}>press@kode.com</strong>
+          For interviews, logos, or product briefings: <strong style={{ color: 'var(--foreground)' }}>press@kodte.com</strong>
         </Section>
       </>
     ),
@@ -358,7 +358,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   help: {
     eyebrow: 'Resources',
     title: 'Help center',
-    lead: 'Answers to the questions merchants ask most when going live with Kode.',
+    lead: 'Answers to the questions merchants ask most when going live with Kodte.',
     showCta: true,
     body: (
       <>
@@ -381,7 +381,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           />
         </Section>
         <Section title="Still stuck?">
-          Email <strong style={{ color: 'var(--foreground)' }}>support@kode.com</strong> with your business name and a short description of the issue.
+          Email <strong style={{ color: 'var(--foreground)' }}>support@kodte.com</strong> with your business name and a short description of the issue.
         </Section>
       </>
     ),
@@ -413,7 +413,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           />
         </Section>
         <Section title="More coming">
-          We publish new guides as merchant patterns emerge. Request a topic via support@kode.com.
+          We publish new guides as merchant patterns emerge. Request a topic via support@kodte.com.
         </Section>
       </>
     ),
@@ -422,7 +422,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   status: {
     eyebrow: 'Resources',
     title: 'System status',
-    lead: 'Current availability of Kode services. We aim for transparent, timely updates.',
+    lead: 'Current availability of Kodte services. We aim for transparent, timely updates.',
     showCta: false,
     body: (
       <>
@@ -465,7 +465,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
     body: (
       <>
         <Section title="Overview">
-          Kode exposes authenticated HTTP APIs for catalog, orders, and business configuration used by the merchant and customer applications.
+          Kodte exposes authenticated HTTP APIs for catalog, orders, and business configuration used by the merchant and customer applications.
         </Section>
         <SimpleTable
           headers={['Area', 'Capability']}
@@ -477,7 +477,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           ]}
         />
         <Section title="Access">
-          API access for production integrations is granted per account. Contact <strong style={{ color: 'var(--foreground)' }}>hello@kode.com</strong> with your use case.
+          API access for production integrations is granted per account. Contact <strong style={{ color: 'var(--foreground)' }}>hello@kodte.com</strong> with your use case.
         </Section>
       </>
     ),
@@ -486,13 +486,13 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   privacy: {
     eyebrow: 'Legal',
     title: 'Privacy Policy',
-    lead: `Last updated ${LEGAL_UPDATED}. This policy explains how Kode collects, uses, and protects information.`,
+    lead: `Last updated ${LEGAL_UPDATED}. This policy explains how Kodte collects, uses, and protects information.`,
     narrow: true,
     showCta: false,
     body: (
       <>
         <Section title="Who we are">
-          Kode provides QR ordering software for merchants and ordering experiences for their customers. For privacy questions, contact privacy@kode.com.
+          Kodte provides QR ordering software for merchants and ordering experiences for their customers. For privacy questions, contact privacy@kodte.com.
         </Section>
         <Section title="Information we collect">
           <Bullets
@@ -514,7 +514,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           We retain information for as long as needed to provide the service and meet legal obligations, then delete or anonymize it where feasible.
         </Section>
         <Section title="Your choices">
-          Merchants may update account information in-product. For access or deletion requests, email privacy@kode.com. We will respond within a reasonable period.
+          Merchants may update account information in-product. For access or deletion requests, email privacy@kodte.com. We will respond within a reasonable period.
         </Section>
       </>
     ),
@@ -523,28 +523,28 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   terms: {
     eyebrow: 'Legal',
     title: 'Terms of Service',
-    lead: `Last updated ${LEGAL_UPDATED}. By using Kode you agree to these terms.`,
+    lead: `Last updated ${LEGAL_UPDATED}. By using Kodte you agree to these terms.`,
     narrow: true,
     showCta: false,
     body: (
       <>
         <Section title="The service">
-          Kode provides software for QR-based ordering, catalog management, and merchant order operations. Features may evolve; we will aim to avoid material disruption where practical.
+          Kodte provides software for QR-based ordering, catalog management, and merchant order operations. Features may evolve; we will aim to avoid material disruption where practical.
         </Section>
         <Section title="Accounts">
           You are responsible for safeguarding login credentials and for activity under your merchant account. Provide accurate business information and keep it current.
         </Section>
         <Section title="Acceptable use">
-          You may not misuse the service, attempt unauthorized access, interfere with other customers, or use Kode for unlawful activity.
+          You may not misuse the service, attempt unauthorized access, interfere with other customers, or use Kodte for unlawful activity.
         </Section>
         <Section title="Your content">
-          You retain rights to catalogs and business content you upload. You grant Kode a limited license to host and process that content solely to operate the product.
+          You retain rights to catalogs and business content you upload. You grant Kodte a limited license to host and process that content solely to operate the product.
         </Section>
         <Section title="Disclaimers">
           The service is provided on an “as is” basis to the extent permitted by law. We do not warrant uninterrupted availability, though we work to maintain high reliability.
         </Section>
         <Section title="Contact">
-          Questions about these terms: legal@kode.com.
+          Questions about these terms: legal@kodte.com.
         </Section>
       </>
     ),
@@ -572,7 +572,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
           Use strong credentials, limit staff access to trusted operators, and report suspected account compromise promptly.
         </Section>
         <Section title="Report a vulnerability">
-          Email security@kode.com with enough detail to reproduce the issue. Please avoid public disclosure until we have had a reasonable chance to respond.
+          Email security@kodte.com with enough detail to reproduce the issue. Please avoid public disclosure until we have had a reasonable chance to respond.
         </Section>
       </>
     ),
@@ -581,7 +581,7 @@ export const marketingPages: Record<MarketingSlug, MarketingPage> = {
   cookies: {
     eyebrow: 'Legal',
     title: 'Cookie Policy',
-    lead: `Last updated ${LEGAL_UPDATED}. This page describes how Kode uses cookies and similar technologies.`,
+    lead: `Last updated ${LEGAL_UPDATED}. This page describes how Kodte uses cookies and similar technologies.`,
     narrow: true,
     showCta: false,
     body: (

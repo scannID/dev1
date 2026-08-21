@@ -1,8 +1,8 @@
-import { type FormEvent, useEffect, useState } from 'react'
+﻿import { type FormEvent, useEffect, useState } from 'react'
 import { quickPaymentsApi } from '../api/services'
 import type { QuickPaymentCode } from '../api/types'
 import { LoadingSpinner, InlineSpinner } from '../components/LoadingSpinner'
-import { KodeMark } from '../customer/KodeMark'
+import { KodteMark } from '../customer/KodteMark'
 import { usePageMeta } from '../hooks/usePageMeta'
 import { MoMoPhoneInput } from '../components/MoMoPhoneInput'
 import '../components/MoMoPhoneInput.css'
@@ -81,7 +81,7 @@ export default function QuickPayCustomer({ qrToken }: Props) {
     return (
       <div className="scanny-page">
         <div className="scanny-loading-page" style={{ display: 'grid', gap: 22, placeItems: 'center' }}>
-          <KodeMark size={52} />
+          <KodteMark size={52} />
           <LoadingSpinner label="Loading payment…" />
         </div>
       </div>

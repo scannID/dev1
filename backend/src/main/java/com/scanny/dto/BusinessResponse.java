@@ -29,7 +29,8 @@ public record BusinessResponse(
         String pauseMessage,
         String branchLabel,
         Boolean primary,
-        String address
+        String address,
+        String currency
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
         return from(business, scanBaseUrl, includeItems, null, null);
@@ -72,7 +73,8 @@ public record BusinessResponse(
                 business.getPauseMessage(),
                 business.getBranchLabel(),
                 business.isPrimary(),
-                business.getAddress()
+                business.getAddress(),
+                business.getCurrency()
         );
     }
 }

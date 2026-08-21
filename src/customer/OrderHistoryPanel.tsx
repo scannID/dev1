@@ -1,9 +1,9 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { toast } from 'sonner'
 import { operationsApi } from '../api/operations'
 import { currency } from './utils'
 
-const SESSION_KEY = 'kode:customer-history-session'
+const SESSION_KEY = 'kodte:customer-history-session'
 
 type HistoryOrder = {
   publicId: string

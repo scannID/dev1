@@ -1,6 +1,6 @@
-# Kode System Guide — How the Whole Platform Works
+﻿# Kodte System Guide — How the Whole Platform Works
 
-**Product name:** Kode (`kode.com`)  
+**Product name:** Kodte (`kodte.com`)  
 **Internal / package names:** often still `scanny` (Java packages, Keycloak clients, env keys)  
 **Audience:** engineers and operators  
 **Scope:** behavior present in the current codebase
@@ -9,7 +9,7 @@
 
 ## 1. Product overview
 
-Kode is a **QR-powered commerce platform** oriented around Uganda UGX and mobile money. Guests scan a merchant QR, order from their phone, and pay. Merchants run catalog, orders, kitchen, and branch ops. Admins run the platform.
+Kodte is a **QR-powered commerce platform** oriented around Uganda UGX and mobile money. Guests scan a merchant QR, order from their phone, and pay. Merchants run catalog, orders, kitchen, and branch ops. Admins run the platform.
 
 | Surface | App | Who | Auth |
 | --- | --- | --- | --- |
@@ -38,15 +38,15 @@ Sibling products in the same SPA: **Quick Pay**, **event ticketing**, fullscreen
 | `docs/` | Architecture, local dev, realtime, security, runbooks |
 | `docker-compose.yml` | Local Postgres 16, Redis 7, Keycloak 26 |
 | `start-dev.ps1` / `stop-dev.ps1` | Windows one-shot stack |
-| `tools/bin/kode.ps1` | `kode -All` / `kode -Stop` CLI wrapper |
+| `tools/bin/kodte.ps1` | `kodte -All` / `kodte -Stop` CLI wrapper |
 
 ---
 
-## 3. Local development (`kode -All`)
+## 3. Local development (`kodte -All`)
 
 ```powershell
-kode -All     # start Keycloak + API (H2) + merchant + admin
-kode -Stop    # stop listeners on 4000, 8080, 5173, 5174
+kodte -All     # start Keycloak + API (H2) + merchant + admin
+kodte -Stop    # stop listeners on 4000, 8080, 5173, 5174
 ```
 
 | Service | Port | Notes |
@@ -62,7 +62,7 @@ Phone QR URL often uses LAN IP, e.g. `http://192.168.x.x:5173/b/{businessId}?qr=
 
 | Mode | Database | Schema | Typical use |
 | --- | --- | --- | --- |
-| `kode -All` / profile `h2` | File H2 `./data/scanny` | Hibernate `ddl-auto: update`, **Flyway off** | Fast local Windows |
+| `kodte -All` / profile `h2` | File H2 `./data/scanny` | Hibernate `ddl-auto: update`, **Flyway off** | Fast local Windows |
 | `docker compose` + `dev` | PostgreSQL | **Flyway** migrations | Closer to production |
 
 Payments under H2: `fallback-to-stub: true`, stub auto-complete ~10s.
@@ -350,4 +350,4 @@ Not separate services — **permission groups / UI surfaces**.
 
 ---
 
-*Internal engineering reference generated from the Kode / scanny codebase.*
+*Internal engineering reference generated from the Kodte / scanny codebase.*

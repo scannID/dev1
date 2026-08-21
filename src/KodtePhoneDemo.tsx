@@ -11,7 +11,7 @@ const products = [
 
 const selectedIndexes = [0, 3]
 
-export function KodePhoneDemo() {
+export function KodtePhoneDemo() {
   const [currentScreen, setCurrentScreen] = useState(0)
   const [scanLinePos, setScanLinePos] = useState(5)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])

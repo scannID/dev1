@@ -1,5 +1,5 @@
-/** Orange music-instrument loader for event / ticket boot screens. */
-import { KodeMark } from '../customer/KodeMark'
+﻿/** Orange music-instrument loader for event / ticket boot screens. */
+import { KodteMark } from '../customer/KodteMark'
 
 export function MusicInstrumentLoader({ size = 58 }: { size?: number }) {
   const markSize = Math.max(36, Math.round(size * 0.9))
@@ -61,7 +61,7 @@ export function MusicInstrumentLoader({ size = 58 }: { size?: number }) {
       `}</style>
       <span className="sr-only">Loading event</span>
 
-      <KodeMark size={markSize} />
+      <KodteMark size={markSize} />
 
       <div className="tk-music-loader" aria-hidden="true">
         <span className="tk-music-icon tk-music-note">

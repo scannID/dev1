@@ -1,5 +1,12 @@
-import { KodeMark } from '../customer/KodeMark'
-import { formatReceiptDate, loadReceipts, type CustomerReceipt } from '../customer/receipts'
+﻿import { useEffect, useState } from 'react'
+import { KodteMark } from '../customer/KodteMark'
+import {
+  formatReceiptDate,
+  loadReceipts,
+  updateReceiptStatus,
+  type CustomerReceipt,
+} from '../customer/receipts'
+import { ordersApi } from '../api/services'
 import { formatRemovedIngredients } from '../lib/catalogCart'
 import '../customer/CustomerApp.css'
 import './ReceiptPage.css'
@@ -19,11 +26,37 @@ function resolveOrderId(): string | null {
 
 export default function ReceiptPage() {
   const orderId = resolveOrderId()
+  const [receipt, setReceipt] = useState<CustomerReceipt | undefined>(() =>
+    orderId ? loadReceipts().find((r) => r.orderId === orderId || r.id === orderId) : undefined,
+  )
 
-  // Try to find in device-local receipts first
-  const receipt: CustomerReceipt | undefined = orderId
-    ? loadReceipts().find((r) => r.orderId === orderId || r.id === orderId)
-    : undefined
+  // On mount: if the receipt isn't already stamped and we have tracking info,
+  // fetch the real order status from the backend. This handles the case where
+  // the customer closed the tab / switched off the phone before the kitchen
+  // marked the order Completed.
+  useEffect(() => {
+    if (!receipt) return
+    if (receipt.orderStatus === 'Completed') return
+    if (!receipt.orderPublicId || !receipt.orderPhone) return
+
+    let cancelled = false
+    ordersApi
+      .trackPublic(receipt.orderPublicId, receipt.orderPhone)
+      .then((tracked) => {
+        if (cancelled) return
+        if (tracked.status === 'Completed') {
+          updateReceiptStatus(receipt.orderId, 'Completed')
+          setReceipt((prev) =>
+            prev ? { ...prev, orderStatus: 'Completed' } : prev,
+          )
+        }
+      })
+      .catch(() => {
+        // silently ignore — receipt still renders, just without the stamp
+      })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt?.orderId])
 
   if (!orderId) {
     return <NotFound message="No receipt ID in this link." />
@@ -33,8 +66,8 @@ export default function ReceiptPage() {
     return (
       <div className="rp-shell">
         <div className="rp-header">
-          <KodeMark size={28} />
-          <span className="rp-brand">Kode</span>
+          <KodteMark size={28} />
+          <span className="rp-brand">Kodte</span>
         </div>
         <div className="rp-not-found">
           <div className="rp-nf-icon">🧾</div>
@@ -44,7 +77,7 @@ export default function ReceiptPage() {
             device that made the payment. Open this link on that device to view it.
           </p>
           <p className="rp-nf-hint">
-            If you're the payer, open your receipt history in the Kode menu and find
+            If you're the payer, open your receipt history in the Kodte menu and find
             this order.
           </p>
         </div>
@@ -59,13 +92,16 @@ export default function ReceiptPage() {
         {receipt.businessLogoUrl ? (
           <img src={receipt.businessLogoUrl} alt="" className="rp-header-logo" />
         ) : (
-          <KodeMark size={28} />
+          <KodteMark size={28} />
         )}
         <span className="rp-brand">{receipt.businessName}</span>
       </div>
 
       {/* Paper */}
       <div className="rp-paper">
+        {receipt.orderStatus === 'Completed' && (
+          <div className="rp-settled-stamp" aria-hidden="true">SETTLED</div>
+        )}
         <div className="rp-paper-top">
           <p className="rp-paper-eyebrow">Payment receipt</p>
           <h1 className="rp-paper-biz">{receipt.businessName}</h1>
@@ -146,7 +182,7 @@ export default function ReceiptPage() {
         <div className="rp-divider rp-divider--dashed" />
 
         <p className="rp-footnote">
-          Powered by <strong>Kode</strong> · This receipt is stored on the payer's device.
+          Powered by <strong>Kodte</strong> · This receipt is stored on the payer's device.
         </p>
       </div>
     </div>
@@ -157,8 +193,8 @@ function NotFound({ message }: { message: string }) {
   return (
     <div className="rp-shell">
       <div className="rp-header">
-        <KodeMark size={28} />
-        <span className="rp-brand">Kode</span>
+        <KodteMark size={28} />
+        <span className="rp-brand">Kodte</span>
       </div>
       <div className="rp-not-found">
         <div className="rp-nf-icon">❌</div>

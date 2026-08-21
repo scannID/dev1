@@ -89,6 +89,9 @@ public class Business {
     @Column(nullable = false)
     private String accent = "#2563eb";
 
+    @Column(nullable = false, length = 8, columnDefinition = "varchar(8) default 'UGX'")
+    private String currency = "UGX";
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -282,6 +285,14 @@ public class Business {
 
     public void setAccent(String accent) {
         this.accent = accent;
+    }
+
+    public String getCurrency() {
+        return currency == null || currency.isBlank() ? "UGX" : currency.toUpperCase();
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = (currency == null || currency.isBlank()) ? "UGX" : currency.trim().toUpperCase();
     }
 
     public Instant getCreatedAt() {

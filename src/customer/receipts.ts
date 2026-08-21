@@ -1,3 +1,4 @@
+import type { OrderStatus } from '../api/types'
 import type { PaymentProvider } from './payments'
 import { DEFAULT_SERVICE_FEE_UGX } from './utils'
 
@@ -27,6 +28,12 @@ export interface CustomerReceipt {
   paymentProvider: PaymentProvider
   paymentReference?: string | null
   paidAt: string
+  /** Set once the kitchen marks the order Completed. Drives the SETTLED stamp. */
+  orderStatus?: OrderStatus
+  /** Public order ID used to re-check status from the backend on receipt open. */
+  orderPublicId?: string | null
+  /** Customer phone used with orderPublicId to query the public tracking API. */
+  orderPhone?: string | null
 }
 
 const STORAGE_KEY = 'scanny-receipts'
@@ -78,6 +85,15 @@ export function deleteReceipt(receiptId: string): CustomerReceipt[] {
   return loadReceipts()
 }
 
+/** Updates the stored orderStatus for a receipt — called when kitchen marks order Completed. */
+export function updateReceiptStatus(orderId: string, status: OrderStatus): void {
+  const all = readAll()
+  const updated = all.map((r) =>
+    r.orderId === orderId ? { ...r, orderStatus: status } : r,
+  )
+  writeAll(updated)
+}
+
 export function buildReceipt(input: {
   orderId: string
   businessId: string
@@ -96,6 +112,8 @@ export function buildReceipt(input: {
   provider: PaymentProvider
   paymentReference?: string | null
   serviceFeeUgx?: number
+  orderPublicId?: string | null
+  orderPhone?: string | null
 }): CustomerReceipt {
   const receiptItems: CustomerReceiptItem[] = input.items.map((item) => ({
     itemId: item.itemId,
@@ -126,6 +144,8 @@ export function buildReceipt(input: {
     paymentProvider: input.provider,
     paymentReference: input.paymentReference,
     paidAt: new Date().toISOString(),
+    orderPublicId: input.orderPublicId ?? null,
+    orderPhone: input.orderPhone ?? null,
   }
 }
 

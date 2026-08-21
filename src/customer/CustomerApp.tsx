@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Clock3, History, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -8,7 +8,7 @@ import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../ap
 import type { BusinessAnnouncement } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
-import { KodeMark } from './KodeMark'
+import { KodteMark } from './KodteMark'
 import { OrderHistoryPanel } from './OrderHistoryPanel'
 import {
   clearActiveOrder,
@@ -46,6 +46,7 @@ import {
   getReceiptCount,
   loadReceipts,
   saveReceipt,
+  updateReceiptStatus,
   type CustomerReceipt,
 } from './receipts'
 import { useOrderTracking } from './useOrderTracking'
@@ -64,7 +65,7 @@ const PROGRESS_STEPS: CheckoutStep[] = ['menu', 'cart', 'details', 'pay']
 
 /** In-memory guard so React StrictMode remounts don't fire two scan POSTs before sessionStorage sticks. */
 const recordedScanKeys = new Set<string>()
-const BUSY_TIMER_STORAGE_PREFIX = 'Kode:busy-until:'
+const BUSY_TIMER_STORAGE_PREFIX = 'Kodte:busy-until:'
 
 type BusyTimerSnapshot = {
   busyUntilMs: number
@@ -265,12 +266,14 @@ export default function CustomerApp({
         total,
         provider,
         serviceFeeUgx,
+        orderPublicId: orderPublicId ?? null,
+        orderPhone: phone.trim() || null,
       })
       const next = saveReceipt(receipt)
       setReceipts(next)
       setReceiptCount(next.length)
     },
-    [business, customerName, phone, provider, serviceFeeUgx],
+    [business, customerName, phone, provider, serviceFeeUgx, orderPublicId],
   )
 
   const applyOperationalStatus = useCallback((
@@ -386,6 +389,14 @@ export default function CustomerApp({
       setStep('done')
     }
   }, [trackedOrder, step, paymentStatus, businessId, placedOrderId, cartItems, persistPaidReceipt, serviceFeeUgx])
+
+  // Stamp the stored receipt as Completed once the kitchen marks it done.
+  useEffect(() => {
+    if (trackedOrder?.status === 'Completed' && placedOrderId) {
+      updateReceiptStatus(placedOrderId, 'Completed')
+      setReceipts(loadReceipts())
+    }
+  }, [trackedOrder?.status, placedOrderId])
 
   useEffect(() => {
     let cancelled = false
@@ -531,7 +542,7 @@ export default function CustomerApp({
   // Record one scan per open. Server also dedupes (~45s). sessionStorage only
   // suppresses rapid reloads in the same tab so counts still move on real revisits.
   useEffect(() => {
-    const key = `Kode:scan:${businessId}:${qrToken || ''}`
+    const key = `Kodte:scan:${businessId}:${qrToken || ''}`
     const DEDUPE_MS = 45_000
     const now = Date.now()
 
@@ -1313,7 +1324,7 @@ export default function CustomerApp({
   if (!business) {
     return (
       <div className="cm-page cm-centered">
-        <KodeMark />
+        <KodteMark />
         <h1>Menu unavailable</h1>
         <p className="cm-muted">{error || 'This QR code is invalid or expired.'}</p>
       </div>
@@ -1357,10 +1368,10 @@ export default function CustomerApp({
           {business.logoUrl ? (
             <img src={business.logoUrl} alt="" className="cm-brand-logo" />
           ) : (
-            <KodeMark size={26} />
+            <KodteMark size={26} />
           )}
           <h1 className="cm-brand-text">
-            <span className="cm-brand-name">Kode</span>
+            <span className="cm-brand-name">Kodte</span>
             <span className="cm-brand-biz">{business.name}</span>
           </h1>
           {showBusyHeaderBadge ? (
@@ -1690,6 +1701,7 @@ export default function CustomerApp({
         currentBusinessId={business.id}
         onReorder={reorderFromReceipt}
         onDelete={removeReceipt}
+        onSettle={() => setReceipts(loadReceipts())}
         onClose={() => setShowReceipts(false)}
       />
 

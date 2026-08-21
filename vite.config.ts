@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
@@ -44,7 +44,7 @@ export default defineConfig({
     // you can upload them to Sentry/Datadog out-of-band without serving them.
     // Change to false to skip generation entirely if you don't use error monitoring.
     sourcemap: 'hidden',
-    // Raise the warning limit slightly — Kode bundles Keycloak + Konva which are large.
+    // Raise the warning limit slightly — Kodte bundles Keycloak + Konva which are large.
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {

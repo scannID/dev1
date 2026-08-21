@@ -1,4 +1,4 @@
-/**
+﻿/**
  * og-server/server.mjs
  *
  * Lightweight Express server that replaces Nginx for the `merchant` Docker
@@ -30,20 +30,20 @@
  *
  * ── HOW TO TEST ─────────────────────────────────────────────────────────────
  *  # Ticket page:
- *  curl -s -A "facebookexternalhit/1.1" https://kode.ug/ticket/YOUR_TOKEN | grep og:
+ *  curl -s -A "facebookexternalhit/1.1" https://kodte.ug/ticket/YOUR_TOKEN | grep og:
  *
  *  # Quick pay page:
- *  curl -s -A "Twitterbot/1.0" https://kode.ug/pay/YOUR_QR_TOKEN | grep og:
+ *  curl -s -A "Twitterbot/1.0" https://kodte.ug/pay/YOUR_QR_TOKEN | grep og:
  *
  *  # Real browser — should get normal SPA (empty root div):
- *  curl -s https://kode.ug/ticket/YOUR_TOKEN | grep 'id="root"'
+ *  curl -s https://kodte.ug/ticket/YOUR_TOKEN | grep 'id="root"'
  *
  * ── ENVIRONMENT VARIABLES ───────────────────────────────────────────────────
  *  PORT               Listening port (default: 3000)
  *  API_BASE_URL       Internal API URL — e.g. http://api-1:4000/api
- *                     NOT the public https://api.kode.com/api — resolved
+ *                     NOT the public https://api.kodte.com/api — resolved
  *                     inside Docker network without TLS.
- *  SITE_BASE_URL      Public site URL for canonical/og:url (default: https://kode.ug)
+ *  SITE_BASE_URL      Public site URL for canonical/og:url (default: https://kodte.ug)
  *  STATIC_DIR         Path to the Vite dist/ output (default: /app/dist)
  *  API_TIMEOUT_MS     Max ms to wait for the API before falling back (default: 4000)
  */
@@ -57,7 +57,7 @@ import { pipeline } from 'node:stream/promises'
 
 const PORT         = parseInt(process.env.PORT         ?? '3000', 10)
 const API_BASE_URL = (process.env.API_BASE_URL         ?? 'http://api-1:4000/api').replace(/\/$/, '')
-const SITE_BASE    = (process.env.SITE_BASE_URL        ?? 'https://kode.ug').replace(/\/$/, '')
+const SITE_BASE    = (process.env.SITE_BASE_URL        ?? 'https://kodte.ug').replace(/\/$/, '')
 const STATIC_DIR   = process.env.STATIC_DIR            ?? '/app/dist'
 const API_TIMEOUT  = parseInt(process.env.API_TIMEOUT_MS ?? '4000', 10)
 const INDEX_HTML   = join(STATIC_DIR, 'index.html')
@@ -88,7 +88,7 @@ async function apiFetch(path) {
     const timer = setTimeout(() => ac.abort(), API_TIMEOUT)
     const res = await fetch(url, {
       signal: ac.signal,
-      headers: { Accept: 'application/json', 'User-Agent': 'kode-og-server/1.0' },
+      headers: { Accept: 'application/json', 'User-Agent': 'kodte-og-server/1.0' },
     })
     clearTimeout(timer)
     if (!res.ok) return null
@@ -135,7 +135,7 @@ function buildOgShell({ title, description, imageUrl, canonicalUrl, extraMeta = 
 
   <!-- Open Graph -->
   <meta property="og:type"        content="website" />
-  <meta property="og:site_name"   content="Kode" />
+  <meta property="og:site_name"   content="Kodte" />
   <meta property="og:url"         content="${safeCanonical}" />
   <meta property="og:title"       content="${safeTitle}" />
   <meta property="og:description" content="${safeDescription}" />

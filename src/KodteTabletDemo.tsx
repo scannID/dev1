@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+﻿import { useEffect, useId, useMemo, useState } from 'react'
 
 type OrderRow = {
   id: string
@@ -128,7 +128,7 @@ function StatusPill({ status }: { status: OrderRow['status'] }) {
   )
 }
 
-export function KodeTabletDemo() {
+export function KodteTabletDemo() {
   const [orders, setOrders] = useState<OrderRow[]>(baseOrders)
   const [openCount, setOpenCount] = useState(3)
   const [showToast, setShowToast] = useState(false)
@@ -274,8 +274,8 @@ export function KodeTabletDemo() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14, padding: '0 4px' }}>
                 <img
-                  src="/kode-icon.svg"
-                  alt="Kode"
+                  src="/kodte-icon.svg"
+                  alt="Kodte"
                   style={{
                     width: 28,
                     height: 28,
@@ -283,7 +283,7 @@ export function KodeTabletDemo() {
                   }}
                 />
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Kode</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Kodte</div>
                   <div style={{ fontSize: 7.5, color: '#7a867f' }}>Merchant</div>
                 </div>
               </div>

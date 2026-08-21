@@ -1,10 +1,10 @@
-/**
- * Generates PNG favicon files from kode-icon.svg using @resvg/resvg-js.
+﻿/**
+ * Generates PNG favicon files from kodte-icon.svg using @resvg/resvg-js.
  * Run once: node scripts/gen-favicons.mjs
  *
  * Outputs to public/:
- *   kode-icon-512.png  — for manifest + generic large icon
- *   kode-icon-192.png  — for Android home screen / PWA
+ *   kodte-icon-512.png  — for manifest + generic large icon
+ *   kodte-icon-192.png  — for Android home screen / PWA
  *   apple-touch-icon.png (180×180) — for iOS add-to-home-screen
  */
 
@@ -15,12 +15,12 @@ import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
-const svgPath = join(root, 'public', 'kode-icon.svg')
+const svgPath = join(root, 'public', 'kodte-icon.svg')
 const svgData = readFileSync(svgPath, 'utf-8')
 
 const sizes = [
-  { name: 'kode-icon-512.png',    size: 512 },
-  { name: 'kode-icon-192.png',    size: 192 },
+  { name: 'kodte-icon-512.png',    size: 512 },
+  { name: 'kodte-icon-192.png',    size: 192 },
   { name: 'apple-touch-icon.png', size: 180 },
 ]
 

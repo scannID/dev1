@@ -1,5 +1,5 @@
-/** Orange fork / knife / spoon loader for the customer menu boot. */
-import { KodeMark } from './KodeMark'
+﻿/** Orange fork / knife / spoon loader for the customer menu boot. */
+import { KodteMark } from './KodteMark'
 
 export function UtensilLoader({ size = 58 }: { size?: number }) {
   const markSize = Math.max(36, Math.round(size * 0.9))
@@ -61,7 +61,7 @@ export function UtensilLoader({ size = 58 }: { size?: number }) {
       `}</style>
       <span className="sr-only">Preparing menu</span>
 
-      <KodeMark size={markSize} />
+      <KodteMark size={markSize} />
 
       <div className="cm-utensil-loader" aria-hidden="true">
         <span className="cm-utensil cm-utensil-fork">

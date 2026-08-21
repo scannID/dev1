@@ -1,11 +1,13 @@
-import { ArrowLeft, Receipt, RotateCcw, Trash2, X } from 'lucide-react'
+﻿import { ArrowLeft, Receipt, RotateCcw, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { KodeMark } from './KodeMark'
+import { KodteMark } from './KodteMark'
 import {
   formatReceiptDate,
   formatReceiptDay,
+  updateReceiptStatus,
   type CustomerReceipt,
 } from './receipts'
+import { ordersApi } from '../api/services'
 import { currency } from './utils'
 import { formatRemovedIngredients } from '../lib/catalogCart'
 import { ReceiptBarcode } from './ReceiptBarcode'
@@ -28,7 +30,7 @@ function ReceiptCard({
               <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-card-logo" />
             ) : (
               <span className="cm-receipt-card-mark">
-                <KodeMark size={22} />
+                <KodteMark size={22} />
               </span>
             )}
             <div>
@@ -69,12 +71,41 @@ function ReceiptDetail({
   canReorder,
   onBack,
   onReorder,
+  onSettle,
 }: {
   receipt: CustomerReceipt
   canReorder: boolean
   onBack: () => void
   onReorder?: (receipt: CustomerReceipt) => void
+  onSettle?: (orderId: string) => void
 }) {
+  // Lazy-fetch the real order status on open — covers cases where the customer
+  // navigated away or closed the tab before the kitchen marked it Completed.
+  useEffect(() => {
+    if (receipt.orderStatus === 'Completed') return
+    if (!receipt.orderPublicId || !receipt.orderPhone) return
+    let cancelled = false
+    ordersApi
+      .trackPublic(receipt.orderPublicId, receipt.orderPhone)
+      .then((tracked) => {
+        if (cancelled) return
+        if (tracked.status === 'Completed') {
+          updateReceiptStatus(receipt.orderId, 'Completed')
+          setLocalSettled(true)
+          onSettle?.(receipt.orderId)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt.orderId])
+
+  // Local settled flag so the stamp appears immediately on this device
+  // even before the parent refreshes its receipts list.
+  const [localSettled, setLocalSettled] = useState(
+    receipt.orderStatus === 'Completed',
+  )
+  const isSettled = localSettled || receipt.orderStatus === 'Completed'
 
   return (
     <div className="cm-receipt-detail">
@@ -83,11 +114,14 @@ function ReceiptDetail({
       </button>
 
       <div className="cm-receipt-paper">
+        {isSettled && (
+          <div className="cm-receipt-settled-stamp" aria-hidden="true">SETTLED</div>
+        )}
         <div className="cm-receipt-paper-head">
           {receipt.businessLogoUrl ? (
             <img src={receipt.businessLogoUrl} alt="" className="cm-receipt-paper-logo" />
           ) : (
-            <KodeMark size={28} />
+            <KodteMark size={28} />
           )}
           <div>
             <p className="cm-receipt-paper-label">Receipt</p>
@@ -185,6 +219,7 @@ export function ReceiptsPanel({
   currentBusinessId,
   onReorder,
   onDelete,
+  onSettle,
   onClose,
 }: {
   open: boolean
@@ -192,6 +227,7 @@ export function ReceiptsPanel({
   currentBusinessId?: string
   onReorder?: (receipt: CustomerReceipt) => void
   onDelete?: (receiptId: string) => void
+  onSettle?: (orderId: string) => void
   onClose: () => void
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -236,6 +272,7 @@ export function ReceiptsPanel({
             canReorder={Boolean(currentBusinessId && selected.businessId === currentBusinessId && onReorder)}
             onBack={() => setSelectedId(null)}
             onReorder={onReorder}
+            onSettle={onSettle}
           />
         ) : receipts.length === 0 ? (
           <div className="cm-receipts-empty">

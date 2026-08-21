@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import { ApiError } from '../api/client'
 import { publicTicketsApi } from '../api/services'
 import type { EventTicketTrackingMetrics, GateRedeemedAttendee, Ticket } from '../api/types'
-import { KodeMark } from '../customer/KodeMark'
+import { KodteMark } from '../customer/KodteMark'
 import './GateScan.css'
 
 type Props = {
@@ -19,8 +19,8 @@ const RESUME_OK_MS = 900
 const RESUME_BAD_MS = 2200
 const SAME_CODE_COOLDOWN_MS = 4000
 const METRICS_POLL_MS = 15000
-const LAST_EVENT_KEY = 'kode-gate-last-event'
-const ACTIVE_SESSION_KEY = 'kode-gate-active-event'
+const LAST_EVENT_KEY = 'kodte-gate-last-event'
+const ACTIVE_SESSION_KEY = 'kodte-gate-active-event'
 /** Ignore frames briefly after camera opens so a leftover QR isn't auto-fired. */
 const CAMERA_WARMUP_MS = 1200
 
@@ -838,19 +838,19 @@ export default function GateScanPage({
         <header className="gate-topbar">
           <div className="gate-brand">
             <div className="gate-brand-logo" aria-hidden>
-              <KodeMark size={22} />
+              <KodteMark size={22} />
             </div>
             <div className="gate-brand-text">
-              <span className="gate-brand-name">Kode</span>
+              <span className="gate-brand-name">Kodte</span>
             </div>
           </div>
         </header>
       ) : (
         <div className="gate-floating-brand" aria-hidden>
           <span className="gate-floating-logo">
-            <KodeMark size={30} />
+            <KodteMark size={30} />
           </span>
-          <span className="gate-floating-name">Kode</span>
+          <span className="gate-floating-name">Kodte</span>
         </div>
       )}
 
@@ -884,7 +884,7 @@ export default function GateScanPage({
               <img className="gate-event-hero-image" src={eventImageUrl} alt="" />
             ) : (
               <div className="gate-event-hero-fallback" aria-hidden>
-                <KodeMark size={28} />
+                <KodteMark size={28} />
               </div>
             )}
             <div className="gate-event-hero-overlay">

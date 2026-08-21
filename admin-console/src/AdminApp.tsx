@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -215,9 +215,9 @@ export default function AdminApp({
       <Toaster />
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-brand">
-          <img src="/kode-icon.svg" alt="Kode" className="admin-brand-logo" />
+          <img src="/kodte-icon.svg" alt="Kodte" className="admin-brand-logo" />
           <div className="admin-brand-text">
-            <strong>Kode</strong>
+            <strong>Kodte</strong>
             <span>Admin Console</span>
           </div>
         </div>
@@ -268,7 +268,7 @@ export default function AdminApp({
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Log out of Kode?</AlertDialogTitle>
+            <AlertDialogTitle>Log out of Kodte?</AlertDialogTitle>
             <AlertDialogDescription>
               You will be signed out of the admin console and returned to the sign-in page.
             </AlertDialogDescription>

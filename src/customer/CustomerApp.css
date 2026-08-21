@@ -1,4 +1,4 @@
-.cm-page {
+﻿.cm-page {
   --cm-orange: #e86a17;
   --cm-orange-deep: #c4530d;
   --cm-teal: #e86a17;
@@ -43,7 +43,7 @@ html.cm-app body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   color-scheme: light;
-  /* Kill global green/purple/dark tokens — white + Kode orange only */
+  /* Kill global green/purple/dark tokens — white + Kodte orange only */
   --background: #ffffff;
   --foreground: #111827;
   --card: #ffffff;
@@ -3073,4 +3073,29 @@ html.cm-app #root {
   color: var(--cm-accent);
   border-color: color-mix(in srgb, var(--cm-accent) 35%, var(--cm-border));
   background: var(--cm-teal-soft);
+}
+
+/* ── SETTLED stamp (receipt panel inside CustomerApp) ── */
+.cm-receipt-paper {
+  position: relative;
+}
+
+.cm-receipt-settled-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg);
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(5, 150, 105, 0.22);
+  border: 3.5px solid rgba(5, 150, 105, 0.22);
+  border-radius: 9px;
+  padding: 5px 16px;
 }

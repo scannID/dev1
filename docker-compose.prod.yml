@@ -1,4 +1,4 @@
-x-api: &api
+﻿x-api: &api
   build:
     context: ./backend
     dockerfile: Dockerfile
@@ -17,15 +17,15 @@ x-api: &api
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     KEYCLOAK_SERVER_URL: http://keycloak:8080
-    KEYCLOAK_ISSUER_URI: https://auth.kode.com/realms/${KEYCLOAK_REALM:-scanny}
+    KEYCLOAK_ISSUER_URI: https://auth.kodte.com/realms/${KEYCLOAK_REALM:-scanny}
     KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-scanny}/protocol/openid-connect/certs
     KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
     KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
     KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
     KEYCLOAK_CLIENT_ID: ${KEYCLOAK_BACKEND_CLIENT_ID:-scanny-backend}
     KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_BACKEND_CLIENT_SECRET:?KEYCLOAK_BACKEND_CLIENT_SECRET is required}
-    SCAN_BASE_URL: https://kode.com
-    SCANNY_CORS_ORIGIN_PATTERNS: https://kode.com,https://admin.kode.com
+    SCAN_BASE_URL: https://kodte.com
+    SCANNY_CORS_ORIGIN_PATTERNS: https://kodte.com,https://admin.kodte.com
     SCANNY_JWT_ACCEPTED_AUDIENCES: ${SCANNY_JWT_ACCEPTED_AUDIENCES:-account}
     SCANNY_JWT_ACCEPTED_AZP: ${SCANNY_JWT_ACCEPTED_AZP:-scanny-client,scanny-admin}
     SCANNY_TRUST_FORWARDED_HEADERS: ${SCANNY_TRUST_FORWARDED_HEADERS:-true}
@@ -106,10 +106,10 @@ services:
       context: .
       dockerfile: og-server/Dockerfile
       args:
-        VITE_API_BASE_URL: https://api.kode.com/api
-        VITE_SCAN_BASE_URL: https://kode.com
-        VITE_WS_BASE_URL: wss://api.kode.com
-        VITE_KEYCLOAK_URL: https://auth.kode.com
+        VITE_API_BASE_URL: https://api.kodte.com/api
+        VITE_SCAN_BASE_URL: https://kodte.com
+        VITE_WS_BASE_URL: wss://api.kodte.com
+        VITE_KEYCLOAK_URL: https://auth.kodte.com
         VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-scanny-client}
     restart: unless-stopped
@@ -117,7 +117,7 @@ services:
       # Internal API URL — accessed inside the Docker network without TLS.
       # The og-server fetches event/payment data from here for crawler requests.
       API_BASE_URL: http://api-1:4000/api
-      SITE_BASE_URL: https://kode.com
+      SITE_BASE_URL: https://kodte.com
       API_TIMEOUT_MS: "4000"
     expose:
       - "3000"
@@ -136,8 +136,8 @@ services:
       context: ./admin-console
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: https://api.kode.com/api
-        VITE_KEYCLOAK_URL: https://auth.kode.com
+        VITE_API_BASE_URL: https://api.kodte.com/api
+        VITE_KEYCLOAK_URL: https://auth.kodte.com
         VITE_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-scanny}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_ADMIN_KEYCLOAK_CLIENT_ID:-scanny-admin}
     restart: unless-stopped
@@ -168,7 +168,7 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME: https://auth.kode.com
+      KC_HOSTNAME: https://auth.kodte.com
       KC_PROXY_HEADERS: xforwarded
       JAVA_OPTS_APPEND: ${KEYCLOAK_JAVA_OPTS_APPEND:--Xms256m -Xmx768m}
     mem_limit: ${KEYCLOAK_MEM_LIMIT:-1280m}

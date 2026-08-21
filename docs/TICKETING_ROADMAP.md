@@ -1,6 +1,6 @@
-# Ticketing System Roadmap
+﻿# Ticketing System Roadmap
 
-> Current state, missing features, and implementation plan for the Kode ticketing system.
+> Current state, missing features, and implementation plan for the Kodte ticketing system.
 
 ---
 

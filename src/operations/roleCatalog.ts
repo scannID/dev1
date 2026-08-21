@@ -1,4 +1,4 @@
-import type { StaffRole } from '../api/operations'
+﻿import type { StaffRole } from '../api/operations'
 
 export type PermissionId =
   | 'catalog:read'
@@ -143,7 +143,7 @@ export function formatStaffRoleLabel(role: StaffRole): string {
   )
 }
 
-const CUSTOM_ROLES_KEY = (businessId: string) => `kode-custom-roles:${businessId}`
+const CUSTOM_ROLES_KEY = (businessId: string) => `kodte-custom-roles:${businessId}`
 
 export function loadCustomRoles(businessId: string): RoleDefinition[] {
   try {

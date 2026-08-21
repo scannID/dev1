@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TicketTransferAcceptPage
  *
  * Route: /ticket/transfer/:transferToken
@@ -14,7 +14,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
 import type { TransferInfoResponse } from '../api/types'
-import { KodeMark } from '../customer/KodeMark'
+import { KodteMark } from '../customer/KodteMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import { MoMoPhoneInput } from '../components/MoMoPhoneInput'
 import '../components/MoMoPhoneInput.css'
@@ -125,7 +125,7 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kode</p>
+          <p className="tk-hero-kicker">Kodte</p>
           <h2>Invalid transfer link</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error ?? 'This transfer link is not valid.'}
@@ -140,7 +140,7 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kode</p>
+          <p className="tk-hero-kicker">Kodte</p>
           <h2>Transfer unavailable</h2>
           <p className="tk-muted-note" style={{ marginTop: 8, lineHeight: 1.6 }}>
             {info.message ?? 'This transfer link has expired or has already been used.'}
@@ -182,9 +182,9 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
     <div className="tk-shell">
       <header className="tk-topbar">
         <div className="tk-brand">
-          <KodeMark size={28} />
+          <KodteMark size={28} />
           <div>
-            <strong>Kode</strong>
+            <strong>Kodte</strong>
             <span>Ticket transfer</span>
           </div>
         </div>
