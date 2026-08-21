@@ -597,7 +597,10 @@ public class InventoryService {
         ingredient.setUpdatedAt(java.time.Instant.now());
         return InventoryDtos.IngredientResponse.from(ingredientRepository.save(ingredient));
     }
-     * Safe to call multiple times — no-ops if already consumed.
+
+    /**
+     * Consume recipe ingredients for a newly paid order and lock COGS on lines.
+     * Safe to call multiple times -- no-ops if already consumed.
      */
     @Transactional
     public void consumeForPaidOrder(Order order) {

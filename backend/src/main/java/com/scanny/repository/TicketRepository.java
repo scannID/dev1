@@ -111,3 +111,4 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
             ORDER BY t.eventName
             """)
     List<Object[]> aggregateAttendeeEventStats(@Param("search") String search);
+}
