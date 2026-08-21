@@ -118,4 +118,24 @@ public class InventoryController {
     ) {
         return Map.of("items", inventoryService.listMovements(businessId, limit));
     }
+
+    @GetMapping("/variance")
+    public Map<String, List<InventoryDtos.VarianceRow>> variance(
+            @PathVariable String businessId,
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        java.time.Instant fromInstant = java.time.Instant.parse(from);
+        java.time.Instant toInstant   = java.time.Instant.parse(to);
+        return Map.of("items", inventoryService.varianceReport(businessId, fromInstant, toInstant));
+    }
+
+    @PatchMapping("/ingredients/{ingredientId}/par-level")
+    public Map<String, InventoryDtos.IngredientResponse> updateParLevel(
+            @PathVariable String businessId,
+            @PathVariable String ingredientId,
+            @RequestBody InventoryDtos.UpdateParLevelRequest request
+    ) {
+        return Map.of("item", inventoryService.updateParLevel(businessId, ingredientId, request));
+    }
 }

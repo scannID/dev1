@@ -11,6 +11,8 @@ public interface RecipeLineRepository extends JpaRepository<RecipeLine, Long> {
 
     List<RecipeLine> findByCatalogItem_IdOrderByIdAsc(String catalogItemId);
 
+    List<RecipeLine> findByCatalogItem_BusinessId(String businessId);
+
     @Query("""
             SELECT r FROM RecipeLine r
             JOIN FETCH r.ingredient

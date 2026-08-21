@@ -46,6 +46,17 @@ public class Ingredient {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "supplier_id")
+    private String supplierId;
+
+    /** Target on-hand level. Reorder suggestion triggers when qty falls below low_stock_threshold. */
+    @Column(name = "par_level", nullable = false, precision = 18, scale = 4)
+    private BigDecimal parLevel = BigDecimal.ZERO;
+
+    /** Suggested order quantity to restore stock from threshold back to par level. */
+    @Column(name = "reorder_qty", nullable = false, precision = 18, scale = 4)
+    private BigDecimal reorderQty = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -57,9 +68,20 @@ public class Ingredient {
                 && qtyOnHand.compareTo(lowStockThreshold) <= 0;
     }
 
+    public boolean needsReorder() {
+        return isLowStock() && reorderQty.compareTo(BigDecimal.ZERO) > 0;
+    }
+
     public int stockValue() {
         return qtyOnHand.multiply(BigDecimal.valueOf(avgUnitCost)).setScale(0, java.math.RoundingMode.HALF_UP).intValue();
     }
+
+    public String getSupplierId() { return supplierId; }
+    public void setSupplierId(String supplierId) { this.supplierId = supplierId; }
+    public BigDecimal getParLevel() { return parLevel; }
+    public void setParLevel(BigDecimal parLevel) { this.parLevel = parLevel == null ? BigDecimal.ZERO : parLevel; }
+    public BigDecimal getReorderQty() { return reorderQty; }
+    public void setReorderQty(BigDecimal reorderQty) { this.reorderQty = reorderQty == null ? BigDecimal.ZERO : reorderQty; }
 
     public String getId() {
         return id;

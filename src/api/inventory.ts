@@ -19,9 +19,13 @@ export interface Ingredient {
   qtyOnHand: number
   avgUnitCost: number
   lowStockThreshold: number
+  parLevel?: number
+  reorderQty?: number
+  supplierId?: string | null
   sku: string
   active: boolean
   lowStock: boolean
+  needsReorder?: boolean
   stockValue: number
   createdAt?: string
   updatedAt?: string | null
@@ -176,4 +180,221 @@ export const inventoryApi = {
         `/businesses/${businessId}/inventory/movements?limit=${limit}`,
       )
       .then((r) => r.items),
+}
+
+// ── Suppliers ─────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  id: string
+  name: string
+  contactName: string
+  phone: string
+  email: string
+  address: string
+  notes: string
+  active: boolean
+  createdAt?: string
+  updatedAt?: string | null
+}
+
+export interface CreateSupplierRequest {
+  name: string
+  contactName?: string
+  phone?: string
+  email?: string
+  address?: string
+  notes?: string
+}
+
+export interface UpdateSupplierRequest {
+  name?: string
+  contactName?: string
+  phone?: string
+  email?: string
+  address?: string
+  notes?: string
+  active?: boolean
+}
+
+// ── Purchase orders ────────────────────────────────────────────────────────
+
+export type PurchaseOrderStatus =
+  | 'DRAFT'
+  | 'SENT'
+  | 'PARTIALLY_RECEIVED'
+  | 'RECEIVED'
+  | 'CANCELLED'
+
+export interface PurchaseOrderLine {
+  id: number
+  ingredientId: string
+  ingredientName: string
+  unit: string
+  qtyOrdered: number
+  qtyReceived: number
+  unitCost: number
+  lineTotal: number
+}
+
+export interface PurchaseOrder {
+  id: string
+  businessId: string
+  supplierId?: string | null
+  supplierName: string
+  status: PurchaseOrderStatus
+  reference: string
+  notes: string
+  totalCost: number
+  createdAt: string
+  updatedAt?: string | null
+  sentAt?: string | null
+  receivedAt?: string | null
+  lines: PurchaseOrderLine[]
+}
+
+export interface CreatePurchaseOrderRequest {
+  supplierId?: string
+  supplierName?: string
+  reference?: string
+  notes?: string
+  lines: Array<{ ingredientId: string; qtyOrdered: number; unitCost: number }>
+}
+
+export interface ReceivePurchaseOrderRequest {
+  lines: Array<{
+    ingredientId: string
+    qtyReceived: number
+    unitCost?: number
+    batchNumber?: string
+    expiryDate?: string | null
+  }>
+}
+
+export interface ReorderSuggestion {
+  ingredientId: string
+  ingredientName: string
+  unit: string
+  qtyOnHand: number
+  lowStockThreshold: number
+  parLevel: number
+  reorderQty: number
+  avgUnitCost: number
+  preferredSupplierId?: string | null
+}
+
+// ── Batches / expiry ──────────────────────────────────────────────────────
+
+export interface IngredientBatch {
+  id: number
+  ingredientId: string
+  ingredientName: string
+  unit: string
+  batchNumber: string
+  qtyOriginal: number
+  qtyRemaining: number
+  unitCost: number
+  expiryDate?: string | null
+  expired: boolean
+  expiringSoon: boolean
+  receivedAt: string
+  poId?: string | null
+}
+
+// ── Variance report ───────────────────────────────────────────────────────
+
+export interface VarianceRow {
+  ingredientId: string
+  ingredientName: string
+  unit: string
+  receivedQty: number
+  theoreticalConsumption: number
+  actualConsumption: number
+  recordedWaste: number
+  varianceQty: number   // positive = used more than expected
+  varianceCost: number  // UGX
+  avgUnitCost: number
+}
+
+// ── Extended ingredient fields ────────────────────────────────────────────
+
+export interface UpdateParLevelRequest {
+  parLevel?: number
+  reorderQty?: number
+  supplierId?: string | null
+}
+
+// ── New API methods ───────────────────────────────────────────────────────
+
+export const suppliersApi = {
+  list: (businessId: string, includeInactive = false) =>
+    api
+      .get<{ items: Supplier[] }>(
+        `/businesses/${businessId}/suppliers?includeInactive=${includeInactive}`,
+      )
+      .then((r) => r.items),
+
+  create: (businessId: string, body: CreateSupplierRequest) =>
+    api
+      .post<{ item: Supplier }>(`/businesses/${businessId}/suppliers`, body)
+      .then((r) => r.item),
+
+  update: (businessId: string, supplierId: string, body: UpdateSupplierRequest) =>
+    api
+      .patch<{ item: Supplier }>(`/businesses/${businessId}/suppliers/${supplierId}`, body)
+      .then((r) => r.item),
+}
+
+export const purchaseOrdersApi = {
+  list: (businessId: string, status?: PurchaseOrderStatus) =>
+    api
+      .get<{ items: PurchaseOrder[] }>(
+        `/businesses/${businessId}/purchase-orders${status ? `?status=${status}` : ''}`,
+      )
+      .then((r) => r.items),
+
+  get: (businessId: string, poId: string) =>
+    api.get<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${poId}`),
+
+  create: (businessId: string, body: CreatePurchaseOrderRequest) =>
+    api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders`, body),
+
+  send: (businessId: string, poId: string) =>
+    api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${poId}/send`, {}),
+
+  receive: (businessId: string, poId: string, body: ReceivePurchaseOrderRequest) =>
+    api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${poId}/receive`, body),
+
+  cancel: (businessId: string, poId: string) =>
+    api.post<PurchaseOrder>(`/businesses/${businessId}/purchase-orders/${poId}/cancel`, {}),
+
+  reorderSuggestions: (businessId: string) =>
+    api
+      .get<{ items: ReorderSuggestion[] }>(
+        `/businesses/${businessId}/purchase-orders/reorder-suggestions`,
+      )
+      .then((r) => r.items),
+
+  batches: (businessId: string, expiringWithinDays?: number) =>
+    api
+      .get<{ items: IngredientBatch[] }>(
+        `/businesses/${businessId}/purchase-orders/batches${expiringWithinDays != null ? `?expiringWithinDays=${expiringWithinDays}` : ''}`,
+      )
+      .then((r) => r.items),
+}
+
+export const inventoryReportsApi = {
+  variance: (businessId: string, from: string, to: string) =>
+    api
+      .get<{ items: VarianceRow[] }>(
+        `/businesses/${businessId}/inventory/variance?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      )
+      .then((r) => r.items),
+
+  updateParLevel: (businessId: string, ingredientId: string, body: UpdateParLevelRequest) =>
+    api
+      .patch<{ item: Ingredient }>(
+        `/businesses/${businessId}/inventory/ingredients/${ingredientId}/par-level`,
+        body,
+      )
+      .then((r) => r.item),
 }

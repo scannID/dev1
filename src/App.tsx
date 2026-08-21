@@ -83,6 +83,9 @@ import {
   InventoryTransferPage,
   InventoryWastePage,
 } from './inventory/InventoryActionPage'
+import { PurchaseOrdersPage } from './inventory/PurchaseOrdersPage'
+import { SuppliersPage } from './inventory/SuppliersPage'
+import { VarianceReportPage } from './inventory/VarianceReportPage'
 import { SplitBillPanel } from './operations/SplitBillPanel'
 import { FloorPlanPage } from './floor-plan/FloorPlanPage'
 import { hasPermission, type PermissionId } from './operations/roleCatalog'
@@ -333,6 +336,9 @@ function App({
       'inventory-transfer',
       'inventory-adjust',
       'inventory-waste',
+      'inventory-purchase-orders',
+      'inventory-suppliers',
+      'inventory-variance',
       'floor-plan',
       'floor-plan-live',
       'floor-plan-edit',
@@ -796,6 +802,9 @@ function App({
                 { id: 'inventory-transfer', label: 'Transfer', icon: ArrowLeftRight },
                 { id: 'inventory-adjust', label: 'Adjust', icon: Scale },
                 { id: 'inventory-waste', label: 'Waste', icon: Trash },
+                { id: 'inventory-purchase-orders', label: 'Purchase Orders', icon: Package },
+                { id: 'inventory-suppliers', label: 'Suppliers', icon: ShoppingCart },
+                { id: 'inventory-variance', label: 'Variance', icon: BarChart3 },
               ],
             },
             { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
@@ -832,7 +841,10 @@ function App({
               (view === 'inventory' ||
                 view === 'inventory-transfer' ||
                 view === 'inventory-adjust' ||
-                view === 'inventory-waste')
+                view === 'inventory-waste' ||
+                view === 'inventory-purchase-orders' ||
+                view === 'inventory-suppliers' ||
+                view === 'inventory-variance')
             const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms' || view === 'catalog-booked')
             const operationsChildActive = id === 'operations' && operationViews.has(view)
             const floorPlanChildActive = id === 'floor-plan' && (view === 'floor-plan-live' || view === 'floor-plan-edit')
@@ -978,6 +990,9 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Merchant · Inventory · Transfer'}
               {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Merchant · Inventory · Adjust'}
               {!editingItem && !showAddItem && view === 'inventory-waste' && 'Merchant · Inventory · Waste'}
+              {!editingItem && !showAddItem && view === 'inventory-purchase-orders' && 'Merchant · Inventory · Purchase Orders'}
+              {!editingItem && !showAddItem && view === 'inventory-suppliers' && 'Merchant · Inventory · Suppliers'}
+              {!editingItem && !showAddItem && view === 'inventory-variance' && 'Merchant · Inventory · Variance'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
               {!editingItem && !showAddItem && operationViews.has(view) && 'Merchant · Permissions'}
@@ -996,6 +1011,9 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-transfer' && 'Transfer'}
               {!editingItem && !showAddItem && view === 'inventory-adjust' && 'Adjust'}
               {!editingItem && !showAddItem && view === 'inventory-waste' && 'Waste'}
+              {!editingItem && !showAddItem && view === 'inventory-purchase-orders' && 'Purchase Orders'}
+              {!editingItem && !showAddItem && view === 'inventory-suppliers' && 'Suppliers'}
+              {!editingItem && !showAddItem && view === 'inventory-variance' && 'Variance report'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
               {!editingItem && !showAddItem && view === 'operations-roles' && 'Staff'}
@@ -1224,6 +1242,28 @@ function App({
             {view === 'inventory-waste' && (
               <div className="page-content">
                 <InventoryWastePage businessId={business.id} />
+              </div>
+            )}
+
+            {view === 'inventory-purchase-orders' && (
+              <div className="page-content">
+                <PurchaseOrdersPage
+                  businessId={business.id}
+                  ingredients={[]}
+                  suppliers={[]}
+                />
+              </div>
+            )}
+
+            {view === 'inventory-suppliers' && (
+              <div className="page-content">
+                <SuppliersPage businessId={business.id} />
+              </div>
+            )}
+
+            {view === 'inventory-variance' && (
+              <div className="page-content">
+                <VarianceReportPage businessId={business.id} />
               </div>
             )}
 

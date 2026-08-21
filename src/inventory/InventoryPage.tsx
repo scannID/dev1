@@ -27,6 +27,7 @@ import {
   type Ingredient,
   type StockMovement,
 } from '../api/inventory'
+import { inventoryReportsApi } from '../api/inventory'
 import { operationsApi, type Branch } from '../api/operations'
 import type { CatalogItem } from '../api/types'
 
@@ -258,6 +259,7 @@ function StockTab({
                     <TableHead>Ingredient</TableHead>
                     <TableHead>On hand</TableHead>
                     <TableHead>Unit cost</TableHead>
+                    <TableHead>Par / Reorder</TableHead>
                     <TableHead>Value</TableHead>
                     <TableHead />
                   </TableRow>
@@ -278,6 +280,21 @@ function StockTab({
                       </TableCell>
                       <TableCell>{fmtQty(item.qtyOnHand, item.unit)}</TableCell>
                       <TableCell>{ugx(item.avgUnitCost)}</TableCell>
+                      <TableCell>
+                        {Number(item.parLevel) > 0 ? (
+                          <div className="text-xs">
+                            <span className="text-muted-foreground">Par: </span>{fmtQty(Number(item.parLevel), item.unit)}
+                            {Number(item.reorderQty) > 0 && (
+                              <span className="text-muted-foreground ml-1">· Reorder: {fmtQty(Number(item.reorderQty), item.unit)}</span>
+                            )}
+                            {(item as any).needsReorder && (
+                              <Badge variant="outline" className="ml-1 text-amber-600 border-amber-300 bg-amber-50">Reorder</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>{ugx(item.stockValue)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <Button type="button" variant="ghost" size="sm" onClick={() => setActionFor({ id: item.id, mode: 'receive' })}>

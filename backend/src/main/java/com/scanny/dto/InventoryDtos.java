@@ -23,12 +23,16 @@ public final class InventoryDtos {
             String name,
             String unit,
             String category,
-            BigDecimal qtyOnHand,
+            java.math.BigDecimal qtyOnHand,
             int avgUnitCost,
-            BigDecimal lowStockThreshold,
+            java.math.BigDecimal lowStockThreshold,
+            java.math.BigDecimal parLevel,
+            java.math.BigDecimal reorderQty,
+            String supplierId,
             String sku,
             boolean active,
             boolean lowStock,
+            boolean needsReorder,
             int stockValue,
             Instant createdAt,
             Instant updatedAt
@@ -42,9 +46,13 @@ public final class InventoryDtos {
                     ingredient.getQtyOnHand(),
                     ingredient.getAvgUnitCost(),
                     ingredient.getLowStockThreshold(),
+                    ingredient.getParLevel(),
+                    ingredient.getReorderQty(),
+                    ingredient.getSupplierId(),
                     ingredient.getSku(),
                     ingredient.isActive(),
                     ingredient.isLowStock(),
+                    ingredient.needsReorder(),
                     ingredient.stockValue(),
                     ingredient.getCreatedAt(),
                     ingredient.getUpdatedAt()
@@ -189,5 +197,24 @@ public final class InventoryDtos {
             int lowStockCount,
             int stockValueTotal,
             List<IngredientResponse> lowStockItems
+    ) {}
+
+    public record UpdateParLevelRequest(
+            java.math.BigDecimal parLevel,
+            java.math.BigDecimal reorderQty,
+            String supplierId
+    ) {}
+
+    public record VarianceRow(
+            String ingredientId,
+            String ingredientName,
+            String unit,
+            java.math.BigDecimal receivedQty,
+            java.math.BigDecimal theoreticalConsumption,
+            java.math.BigDecimal actualConsumption,
+            java.math.BigDecimal recordedWaste,
+            java.math.BigDecimal varianceQty,    // positive = used more than expected
+            int varianceCost,                    // UGX
+            int avgUnitCost
     ) {}
 }
