@@ -138,18 +138,10 @@ export function InventoryPage({
               />
             </div>
           )}
-          {tab === 'stock' ? (
-            <Button type="button" size="sm" className="h-8" onClick={() => setShowAdd((v) => !v)}>
-              {showAdd ? (
-                'Cancel'
-              ) : (
-                <>
-                  <Plus className="size-3.5" />
-                  Add ingredient
-                </>
-              )}
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" size="sm" className="h-8"
+            onClick={() => { setTab('stock'); setShowAdd(true) }}>
+            <Plus className="size-3.5" /> Add ingredient
+          </Button>
         </div>
       </div>
 
