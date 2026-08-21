@@ -138,10 +138,18 @@ export function InventoryPage({
               />
             </div>
           )}
-          <Button type="button" variant="outline" size="sm" className="h-8"
-            onClick={() => { setTab('stock'); setShowAdd(true) }}>
-            <Plus className="size-3.5" /> Add ingredient
-          </Button>
+          {tab === 'stock' ? (
+            <Button type="button" size="sm" className="h-8" onClick={() => setShowAdd((v) => !v)}>
+              {showAdd ? (
+                'Cancel'
+              ) : (
+                <>
+                  <Plus className="size-3.5" />
+                  Add ingredient
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -648,24 +656,54 @@ function RecipesTab({
       </div>
 
       <div className="inventory-panel p-4">
-        {meta ? (
-          <div className="inventory-recipe-meta">
-            <span>
-              Sell <strong>{ugx(meta.sellPrice)}</strong>
-            </span>
-            <span>
-              Est. cost <strong>{ugx(liveCost || meta.estimatedCost)}</strong>
-            </span>
-            <span>
-              Margin{' '}
-              <strong>
-                {meta.sellPrice > 0
-                  ? `${Math.round(((meta.sellPrice - (liveCost || meta.estimatedCost)) * 100) / meta.sellPrice)}%`
-                  : '—'}
-              </strong>
-            </span>
-          </div>
-        ) : null}
+        {meta ? (() => {
+          const cost = liveCost || meta.estimatedCost
+          const profit = meta.sellPrice - cost
+          const margin = meta.sellPrice > 0
+            ? Math.round((profit * 100) / meta.sellPrice)
+            : null
+          const isLoss = margin !== null && margin < 0
+          const isLow  = margin !== null && margin >= 0 && margin < 20
+          return (
+            <div className="inventory-recipe-meta">
+              <span>
+                Sell <strong>{ugx(meta.sellPrice)}</strong>
+              </span>
+              <span>
+                Est. cost <strong style={{ color: isLoss ? '#b91c1c' : undefined }}>{ugx(cost)}</strong>
+              </span>
+              <span>
+                Margin{' '}
+                <strong style={{ color: isLoss ? '#b91c1c' : isLow ? '#b45309' : '#059669' }}>
+                  {margin !== null ? `${margin}%` : '—'}
+                </strong>
+              </span>
+              {isLoss && (
+                <span style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 12px', borderRadius: 8,
+                  background: '#fef2f2', border: '1px solid #fecaca',
+                  color: '#b91c1c', fontSize: 12, fontWeight: 600,
+                }}>
+                  ⚠ You are selling this dish at a loss of {ugx(Math.abs(profit))} per portion.
+                  Raise the menu price or reduce ingredient quantities.
+                </span>
+              )}
+              {isLow && (
+                <span style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 12px', borderRadius: 8,
+                  background: '#fffbeb', border: '1px solid #fed7aa',
+                  color: '#92400e', fontSize: 12, fontWeight: 600,
+                }}>
+                  Low margin — only {margin}% profit on this dish.
+                </span>
+              )}
+            </div>
+          )
+        })() : null}
 
         {loading ? (
           <p className="report-empty">Loading recipe…</p>
