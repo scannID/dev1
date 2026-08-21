@@ -54,6 +54,12 @@ public class StockMovement {
     @Column(name = "related_ingredient_id")
     private String relatedIngredientId;
 
+    @Column(name = "supplier_ref", nullable = false)
+    private String supplierRef = "";
+
+    @Column(name = "po_number", nullable = false)
+    private String poNumber = "";
+
     @Column(nullable = false, columnDefinition = "TEXT DEFAULT ''")
     private String note = "";
 
@@ -135,17 +141,13 @@ public class StockMovement {
         this.relatedBusinessId = relatedBusinessId;
     }
 
-    public String getRelatedIngredientId() {
-        return relatedIngredientId;
-    }
-
-    public void setRelatedIngredientId(String relatedIngredientId) {
-        this.relatedIngredientId = relatedIngredientId;
-    }
-
-    public String getNote() {
-        return note;
-    }
+    public String getRelatedIngredientId() { return relatedIngredientId; }
+    public void setRelatedIngredientId(String relatedIngredientId) { this.relatedIngredientId = relatedIngredientId; }
+    public String getSupplierRef() { return supplierRef; }
+    public void setSupplierRef(String supplierRef) { this.supplierRef = supplierRef == null ? "" : supplierRef; }
+    public String getPoNumber() { return poNumber; }
+    public void setPoNumber(String poNumber) { this.poNumber = poNumber == null ? "" : poNumber; }
+    public String getNote() { return note; }
 
     public void setNote(String note) {
         this.note = note == null ? "" : note;

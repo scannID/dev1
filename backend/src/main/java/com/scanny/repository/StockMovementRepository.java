@@ -15,6 +15,10 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
 
     boolean existsByOrderId(String orderId);
 
+    boolean existsByOrderIdAndMovementType(String orderId, StockMovementType movementType);
+
+    List<StockMovement> findByOrderIdAndMovementType(String orderId, StockMovementType movementType);
+
     List<StockMovement> findByBusiness_IdAndMovementTypeAndCreatedAtBetween(
         String businessId, StockMovementType movementType,
         Instant from, Instant to

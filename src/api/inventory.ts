@@ -81,6 +81,8 @@ export interface StockMovement {
   transferGroupId?: string | null
   relatedBusinessId?: string | null
   relatedIngredientId?: string | null
+  supplierRef?: string
+  poNumber?: string
   note: string
   actor: string
   createdAt: string
@@ -128,7 +130,7 @@ export const inventoryApi = {
       )
       .then((r) => r.item),
 
-  receive: (businessId: string, ingredientId: string, body: { qty: number; unitCost: number; note?: string }) =>
+  receive: (businessId: string, ingredientId: string, body: { qty: number; unitCost: number; supplierRef?: string; poNumber?: string; note?: string }) =>
     api
       .post<{ item: Ingredient }>(
         `/businesses/${businessId}/inventory/ingredients/${ingredientId}/receive`,

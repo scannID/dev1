@@ -83,6 +83,8 @@ public final class InventoryDtos {
     public record ReceiveStockRequest(
             @NotNull @DecimalMin(value = "0.0001") BigDecimal qty,
             @NotNull @Min(0) Integer unitCost,
+            @Size(max = 128) String supplierRef,
+            @Size(max = 128) String poNumber,
             @Size(max = 500) String note
     ) {}
 
@@ -115,7 +117,9 @@ public final class InventoryDtos {
 
     public record RecipeLineRequest(
             @NotBlank String ingredientId,
-            @NotNull @DecimalMin(value = "0.0001") BigDecimal qtyPerSale
+            @NotNull @DecimalMin(value = "0.0001") BigDecimal qtyPerSale,
+            /** Optional unit override — must be in same family as ingredient unit. Empty = use ingredient unit. */
+            @Size(max = 16) String lineUnit
     ) {}
 
     public record SetRecipeRequest(
@@ -127,24 +131,33 @@ public final class InventoryDtos {
             String ingredientId,
             String ingredientName,
             String unit,
+            String lineUnit,
             BigDecimal qtyPerSale,
             int avgUnitCost,
-            int estimatedCost
+            int estimatedCost,
+            int recipeVersion,
+            java.time.Instant effectiveFrom
     ) {
         public static RecipeLineResponse from(RecipeLine line) {
             Ingredient ingredient = line.getIngredient();
             BigDecimal qty = line.getQtyPerSale();
-            int estimated = qty.multiply(BigDecimal.valueOf(ingredient.getAvgUnitCost()))
-                    .setScale(0, java.math.RoundingMode.HALF_UP)
-                    .intValue();
+            String effectiveLineUnit = line.effectiveUnit();
+            // cost in ingredient unit
+            int estimated = qty
+                .multiply(BigDecimal.valueOf(ingredient.getAvgUnitCost()))
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .intValue();
             return new RecipeLineResponse(
                     line.getId(),
                     ingredient.getId(),
                     ingredient.getName(),
                     ingredient.getUnit(),
+                    effectiveLineUnit,
                     qty,
                     ingredient.getAvgUnitCost(),
-                    estimated
+                    estimated,
+                    line.getRecipeVersion(),
+                    line.getEffectiveFrom()
             );
         }
     }
@@ -169,6 +182,8 @@ public final class InventoryDtos {
             String transferGroupId,
             String relatedBusinessId,
             String relatedIngredientId,
+            String supplierRef,
+            String poNumber,
             String note,
             String actor,
             Instant createdAt
@@ -185,6 +200,8 @@ public final class InventoryDtos {
                     movement.getTransferGroupId(),
                     movement.getRelatedBusinessId(),
                     movement.getRelatedIngredientId(),
+                    movement.getSupplierRef(),
+                    movement.getPoNumber(),
                     movement.getNote(),
                     movement.getActor(),
                     movement.getCreatedAt()

@@ -2771,7 +2771,21 @@ function Dashboard({
                 </TableCell>
                 <TableCell className="text-sm font-medium font-mono text-foreground">{currency(merchantPayoutOf(order))}</TableCell>
                 <TableCell className={undefined}><StatusBadge status={order.status} /></TableCell>
-                <TableCell className={undefined}><PaymentBadge status={order.paymentStatus} /></TableCell>
+                <TableCell className={undefined}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <PaymentBadge status={order.paymentStatus} />
+                    {order.inventoryUnderStock && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+                        padding: '2px 6px', borderRadius: 4,
+                        background: 'oklch(0.97 0.04 50)', color: 'oklch(0.45 0.15 50)',
+                        border: '1px solid oklch(0.85 0.08 50)', whiteSpace: 'nowrap',
+                      }} title="One or more ingredients went below zero stock when this order was consumed">
+                        ⚠ Stock–
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
                   <OrderActionMenu
                     onViewDetails={() => setDetailOrderId(order.id)}

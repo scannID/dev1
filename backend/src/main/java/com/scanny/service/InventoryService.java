@@ -44,6 +44,7 @@ public class InventoryService {
     private final BusinessRepository businessRepository;
     private final MerchantAccessService merchantAccessService;
     private final OutboxService outboxService;
+    private final UnitConversionService unitConversionService;
 
     public InventoryService(
             IngredientRepository ingredientRepository,
@@ -52,7 +53,8 @@ public class InventoryService {
             CatalogItemRepository catalogItemRepository,
             BusinessRepository businessRepository,
             MerchantAccessService merchantAccessService,
-            OutboxService outboxService
+            OutboxService outboxService,
+            UnitConversionService unitConversionService
     ) {
         this.ingredientRepository = ingredientRepository;
         this.recipeLineRepository = recipeLineRepository;
@@ -61,6 +63,7 @@ public class InventoryService {
         this.businessRepository = businessRepository;
         this.merchantAccessService = merchantAccessService;
         this.outboxService = outboxService;
+        this.unitConversionService = unitConversionService;
     }
 
     @Transactional(readOnly = true)
@@ -197,7 +200,9 @@ public class InventoryService {
                 unitCost,
                 null,
                 blankToEmpty(request.note()),
-                "merchant"
+                "merchant",
+                blankToEmpty(request.supplierRef()),
+                blankToEmpty(request.poNumber())
         );
         maybeAlertLowStock(ingredient);
         return InventoryDtos.IngredientResponse.from(ingredient);
@@ -393,7 +398,7 @@ public class InventoryService {
         merchantAccessService.requireOwnedBusiness(businessId);
         CatalogItem item = requireFoodItem(businessId, catalogItemId);
         List<InventoryDtos.RecipeLineResponse> lines = recipeLineRepository
-                .findByCatalogItem_IdOrderByIdAsc(catalogItemId)
+                .findActiveByItemId(catalogItemId)
                 .stream()
                 .map(InventoryDtos.RecipeLineResponse::from)
                 .toList();
@@ -408,8 +413,14 @@ public class InventoryService {
     ) {
         merchantAccessService.requireOwnedBusiness(businessId);
         CatalogItem item = requireFoodItem(businessId, catalogItemId);
-        recipeLineRepository.deleteByCatalogItem_Id(catalogItemId);
+
+        Instant now = Instant.now();
+
+        // Version: stamp effectiveTo on all currently active lines (no hard delete)
+        recipeLineRepository.expireActiveLines(catalogItemId, now);
         recipeLineRepository.flush();
+
+        int nextVersion = recipeLineRepository.maxVersionForItem(catalogItemId) + 1;
 
         List<RecipeLine> saved = new ArrayList<>();
         Map<String, Boolean> seen = new HashMap<>();
@@ -418,10 +429,21 @@ public class InventoryService {
                 throw new ApiException(400, "Duplicate ingredient in recipe.");
             }
             Ingredient ingredient = requireIngredient(businessId, lineReq.ingredientId());
+            String lineUnit = lineReq.lineUnit() != null ? lineReq.lineUnit().trim() : "";
+
+            // Validate unit compatibility
+            if (!lineUnit.isBlank()) {
+                unitConversionService.validateCompatible(lineUnit, ingredient.getUnit());
+            }
+
             RecipeLine line = new RecipeLine();
             line.setCatalogItem(item);
             line.setIngredient(ingredient);
             line.setQtyPerSale(normalizeQty(lineReq.qtyPerSale()));
+            line.setLineUnit(lineUnit);
+            line.setEffectiveFrom(now);
+            line.setEffectiveTo(null);
+            line.setRecipeVersion(nextVersion);
             if (line.getQtyPerSale().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ApiException(400, "Recipe quantity must be greater than zero.");
             }
@@ -595,14 +617,22 @@ public class InventoryService {
             return;
         }
 
+        // Resolve recipe version active at order payment time
+        Instant paidAt = order.getUpdatedAt() != null ? order.getUpdatedAt() : Instant.now();
+
         Set<String> itemIds = lines.stream().map(OrderLineItem::getItemId).collect(Collectors.toSet());
-        List<RecipeLine> recipeLines = itemIds.isEmpty()
-                ? List.of()
-                : recipeLineRepository.findByCatalogItemIdInWithIngredient(itemIds);
-        Map<String, List<RecipeLine>> byItem = recipeLines.stream()
-                .collect(Collectors.groupingBy(r -> r.getCatalogItem().getId()));
+        // Load the recipe lines that were active when this order was paid
+        Map<String, List<RecipeLine>> byItem = new HashMap<>();
+        for (String itemId : itemIds) {
+            List<RecipeLine> versionedLines = recipeLineRepository.findActiveAtTime(itemId, paidAt);
+            if (!versionedLines.isEmpty()) {
+                byItem.put(itemId, versionedLines);
+            }
+        }
 
         int orderCogs = 0;
+        boolean anyUnderStock = false;
+
         for (OrderLineItem line : lines) {
             List<RecipeLine> recipe = byItem.getOrDefault(line.getItemId(), List.of());
             if (recipe.isEmpty()) {
@@ -613,7 +643,13 @@ public class InventoryService {
             int lineCogs = 0;
             for (RecipeLine recipeLine : recipe) {
                 Ingredient ingredient = recipeLine.getIngredient();
-                BigDecimal consumeQty = recipeLine.getQtyPerSale().multiply(portions).setScale(4, RoundingMode.HALF_UP);
+                BigDecimal lineQty = recipeLine.getQtyPerSale().multiply(portions).setScale(4, RoundingMode.HALF_UP);
+                String lineUnit = recipeLine.effectiveUnit();
+                String ingredientUnit = ingredient.getUnit();
+
+                // Convert from recipe line unit to ingredient stocked unit
+                BigDecimal consumeQty = unitConversionService.toIngredientUnit(lineQty, lineUnit, ingredientUnit);
+
                 int unitCost = ingredient.getAvgUnitCost();
                 int cost = consumeQty.multiply(BigDecimal.valueOf(unitCost))
                         .setScale(0, RoundingMode.HALF_UP)
@@ -621,7 +657,10 @@ public class InventoryService {
                 lineCogs += cost;
 
                 BigDecimal nextQty = ingredient.getQtyOnHand().subtract(consumeQty);
-                // Allow negative for awareness; do not block paid orders
+                // Allow negative — don't block paid orders; flag for review instead.
+                if (nextQty.compareTo(BigDecimal.ZERO) < 0) {
+                    anyUnderStock = true;
+                }
                 ingredient.setQtyOnHand(nextQty);
                 ingredient.setUpdatedAt(Instant.now());
                 ingredientRepository.save(ingredient);
@@ -644,6 +683,69 @@ public class InventoryService {
 
         order.setCogsTotal(orderCogs);
         order.setInventoryConsumed(true);
+        order.setInventoryUnderStock(anyUnderStock);
+
+        if (anyUnderStock) {
+            outboxService.enqueueRealtime(
+                "orders:" + business.getId(),
+                "INVENTORY_UNDER_STOCK",
+                business.getId(),
+                Map.of("orderId", order.getId(), "businessId", business.getId())
+            );
+        }
+    }
+
+    /**
+     * Reverse inventory consumption for a refunded/voided order.
+     * Credits back exact quantities from original CONSUME movements (not from current recipe state).
+     * Writes CONSUME_REVERSE movements for each original CONSUME row.
+     * Idempotent: no-op if CONSUME_REVERSE movements already exist for this order.
+     */
+    @Transactional
+    public void reverseConsumeForOrder(Order order) {
+        if (order == null) return;
+
+        // Idempotency: already reversed?
+        if (stockMovementRepository.existsByOrderIdAndMovementType(order.getId(), StockMovementType.CONSUME_REVERSE)) {
+            return;
+        }
+
+        List<StockMovement> originalConsumes = stockMovementRepository
+            .findByOrderIdAndMovementType(order.getId(), StockMovementType.CONSUME);
+
+        if (originalConsumes.isEmpty()) return;
+
+        Business business = order.getBusiness();
+        Instant now = Instant.now();
+
+        for (StockMovement original : originalConsumes) {
+            Ingredient ingredient = original.getIngredient();
+            // qtyDelta on CONSUME is negative — credit back by negating (making it positive)
+            BigDecimal creditQty = original.getQtyDelta().negate().abs();
+            int unitCost = original.getUnitCost();
+
+            ingredient.setQtyOnHand(ingredient.getQtyOnHand().add(creditQty));
+            ingredient.setUpdatedAt(now);
+            ingredientRepository.save(ingredient);
+
+            StockMovement reverse = new StockMovement();
+            reverse.setBusiness(business);
+            reverse.setIngredient(ingredient);
+            reverse.setMovementType(StockMovementType.CONSUME_REVERSE);
+            reverse.setQtyDelta(creditQty);
+            reverse.setUnitCost(unitCost);
+            reverse.setOrderId(order.getId());
+            reverse.setNote("Reversal of order " + order.getId());
+            reverse.setActor("system");
+            reverse.setCreatedAt(now);
+            stockMovementRepository.save(reverse);
+        }
+
+        // Reverse COGS on the order
+        order.setCogsTotal(0);
+        order.setInventoryUnderStock(false);
+        // Keep inventoryConsumed = true so we don't re-consume if someone mistakenly re-pays
+        // The CONSUME_REVERSE rows serve as the idempotency guard.
     }
 
     private InventoryDtos.RecipeResponse toRecipeResponse(
@@ -693,7 +795,34 @@ public class InventoryService {
             String note,
             String actor
     ) {
-        recordTransferMovement(business, ingredient, type, qtyDelta, unitCost, null, null, null, note, Instant.now(), orderId, actor);
+        recordMovement(business, ingredient, type, qtyDelta, unitCost, orderId, note, actor, "", "");
+    }
+
+    private void recordMovement(
+            Business business,
+            Ingredient ingredient,
+            StockMovementType type,
+            BigDecimal qtyDelta,
+            int unitCost,
+            String orderId,
+            String note,
+            String actor,
+            String supplierRef,
+            String poNumber
+    ) {
+        StockMovement movement = new StockMovement();
+        movement.setBusiness(business);
+        movement.setIngredient(ingredient);
+        movement.setMovementType(type);
+        movement.setQtyDelta(qtyDelta);
+        movement.setUnitCost(unitCost);
+        movement.setOrderId(orderId);
+        movement.setNote(note == null ? "" : note);
+        movement.setActor(actor == null ? "merchant" : actor);
+        movement.setSupplierRef(supplierRef == null ? "" : supplierRef);
+        movement.setPoNumber(poNumber == null ? "" : poNumber);
+        movement.setCreatedAt(Instant.now());
+        stockMovementRepository.save(movement);
     }
 
     private void recordTransferMovement(

@@ -111,6 +111,10 @@ public class Order {
     @Column(name = "inventory_consumed", nullable = false, columnDefinition = "boolean default false")
     private boolean inventoryConsumed = false;
 
+    /** True when consumeForPaidOrder() deducted at least one ingredient into negative stock. */
+    @Column(name = "inventory_under_stock", nullable = false, columnDefinition = "boolean default false")
+    private boolean inventoryUnderStock = false;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("id ASC")
     private List<OrderLineItem> items = new ArrayList<>();
@@ -331,13 +335,10 @@ public class Order {
         this.cogsTotal = Math.max(0, cogsTotal);
     }
 
-    public boolean isInventoryConsumed() {
-        return inventoryConsumed;
-    }
-
-    public void setInventoryConsumed(boolean inventoryConsumed) {
-        this.inventoryConsumed = inventoryConsumed;
-    }
+    public boolean isInventoryConsumed() { return inventoryConsumed; }
+    public void setInventoryConsumed(boolean inventoryConsumed) { this.inventoryConsumed = inventoryConsumed; }
+    public boolean isInventoryUnderStock() { return inventoryUnderStock; }
+    public void setInventoryUnderStock(boolean inventoryUnderStock) { this.inventoryUnderStock = inventoryUnderStock; }
 
     public List<OrderLineItem> getItems() {
         return items;

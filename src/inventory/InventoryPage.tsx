@@ -415,6 +415,8 @@ function StockActionForm({
 }) {
   const [qty, setQty] = useState('')
   const [unitCost, setUnitCost] = useState(String(ingredient?.avgUnitCost ?? 0))
+  const [supplierRef, setSupplierRef] = useState('')
+  const [poNumber, setPoNumber] = useState('')
   const [note, setNote] = useState('')
   const [toBusinessId, setToBusinessId] = useState(siblingBranches[0]?.id ?? '')
   const [saving, setSaving] = useState(false)
@@ -431,6 +433,8 @@ function StockActionForm({
         await inventoryApi.receive(businessId, ingredient!.id, {
           qty: Math.abs(amount),
           unitCost: Math.max(0, Math.round(Number(unitCost) || 0)),
+          supplierRef: supplierRef.trim() || undefined,
+          poNumber: poNumber.trim() || undefined,
           note: note.trim() || undefined,
         })
       } else if (mode === 'adjust') {
@@ -509,10 +513,20 @@ function StockActionForm({
           <Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required />
         </div>
         {mode === 'receive' ? (
-          <div className="grid gap-1.5">
-            <Label>Unit cost (UGX)</Label>
-            <Input type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
-          </div>
+          <>
+            <div className="grid gap-1.5">
+              <Label>Unit cost (UGX)</Label>
+              <Input type="number" min={0} value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Supplier ref <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input value={supplierRef} onChange={(e) => setSupplierRef(e.target.value)} placeholder="e.g. INV-2024-001" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>PO number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="e.g. PO-ABC123" />
+            </div>
+          </>
         ) : null}
         <div className="grid gap-1.5">
           <Label>Note</Label>

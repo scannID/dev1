@@ -425,8 +425,16 @@ public class OrderService {
     }
 
     private OrderResponse applyOrderStatus(Order order, OrderStatus status) {
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(status);
         order.setUpdatedAt(Instant.now());
+
+        // If cancelling a paid order, reverse inventory consumption
+        if (status == OrderStatus.Cancelled
+                && order.getPaymentStatus() == PaymentStatus.Paid
+                && order.isInventoryConsumed()) {
+            inventoryService.reverseConsumeForOrder(order);
+        }
 
         OrderResponse response = OrderResponse.from(orderRepository.save(order));
         notifyOrderStatusChange(order, status);
@@ -473,6 +481,11 @@ public class OrderService {
                         savedOrder.getBusinessName() + ": payment received for order " + savedOrder.getId() + "."
                 );
             }
+        }
+
+        // Reverse inventory consumption when an order is refunded
+        if (paymentStatus == PaymentStatus.Refunded && oldStatus == PaymentStatus.Paid) {
+            inventoryService.reverseConsumeForOrder(savedOrder);
         }
 
         OrderResponse response = OrderResponse.from(savedOrder);

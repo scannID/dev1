@@ -32,7 +32,8 @@ public record OrderResponse(
         PaymentStatus paymentStatus,
         Instant createdAt,
         Instant updatedAt,
-        Integer cogsTotal
+        Integer cogsTotal,
+        Boolean inventoryUnderStock
 ) {
     public static OrderResponse from(Order order) {
         return new OrderResponse(
@@ -61,7 +62,8 @@ public record OrderResponse(
                 order.getPaymentStatus(),
                 order.getCreatedAt(),
                 order.getUpdatedAt(),
-                order.getCogsTotal()
+                order.getCogsTotal(),
+                order.isInventoryUnderStock() ? Boolean.TRUE : null
         );
     }
 }

@@ -200,6 +200,8 @@ export interface Order {
   updatedAt?: string
   /** Locked recipe COGS (UGX) after payment. */
   cogsTotal?: number
+  /** True when consume deducted at least one ingredient into negative — needs review. */
+  inventoryUnderStock?: boolean
 }
 
 /** Matches backend RequestDtos.CreateOrderRequest */
