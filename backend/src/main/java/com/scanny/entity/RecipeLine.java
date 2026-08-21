@@ -38,7 +38,6 @@ public class RecipeLine {
     @Column(name = "line_unit", nullable = false)
     private String lineUnit = "";
 
-    // ── Recipe versioning ─────────────────────────────────────────────────────
     /** When this version of the recipe was set. */
     @Column(name = "effective_from", nullable = false)
     private Instant effectiveFrom = Instant.now();

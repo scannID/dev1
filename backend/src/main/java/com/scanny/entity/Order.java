@@ -112,7 +112,7 @@ public class Order {
     private boolean inventoryConsumed = false;
 
     /** True when consumeForPaidOrder() deducted at least one ingredient into negative stock. */
-    @Column(name = "inventory_under_stock", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "inventory_under_stock", nullable = false)
     private boolean inventoryUnderStock = false;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

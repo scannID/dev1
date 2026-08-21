@@ -59,7 +59,6 @@ public class StockMovement {
 
     @Column(name = "po_number", nullable = false)
     private String poNumber = "";
-
     @Column(nullable = false, columnDefinition = "TEXT DEFAULT ''")
     private String note = "";
 

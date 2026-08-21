@@ -48,7 +48,7 @@ public interface RecipeLineRepository extends JpaRepository<RecipeLine, Long> {
     List<RecipeLine> findByCatalogItemIdInWithIngredient(@Param("itemIds") Collection<String> itemIds);
 
     /** Stamp effectiveTo on all currently active lines for a catalog item — called before inserting new version. */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE RecipeLine r SET r.effectiveTo = :now WHERE r.catalogItem.id = :itemId AND r.effectiveTo IS NULL")
     void expireActiveLines(@Param("itemId") String itemId, @Param("now") Instant now);
 
