@@ -294,6 +294,19 @@ function StockTab({
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
+                        <Button type="button" variant="ghost" size="sm" className="h-6 px-1 text-xs mt-0.5"
+                          onClick={() => {
+                            const par = prompt(`Par level for ${item.name} (${item.unit}):`, String(Number(item.parLevel) || ''))
+                            if (par === null) return
+                            const reorder = prompt(`Reorder quantity (${item.unit}):`, String(Number(item.reorderQty) || ''))
+                            if (reorder === null) return
+                            inventoryReportsApi.updateParLevel(businessId, item.id, {
+                              parLevel: Number(par) || 0,
+                              reorderQty: Number(reorder) || 0,
+                            }).then(() => onChanged()).catch(() => toast.error('Failed to update par level'))
+                          }}>
+                          {Number(item.parLevel) > 0 ? 'Edit' : 'Set par'}
+                        </Button>
                       </TableCell>
                       <TableCell>{ugx(item.stockValue)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
@@ -555,7 +568,7 @@ function RecipesTab({
   ingredients: Ingredient[]
 }) {
   const [selectedId, setSelectedId] = useState(foodItems[0]?.id ?? '')
-  const [lines, setLines] = useState<Array<{ ingredientId: string; qtyPerSale: string }>>([])
+  const [lines, setLines] = useState<Array<{ ingredientId: string; qtyPerSale: string; lineUnit: string }>>([])
   const [meta, setMeta] = useState<{ sellPrice: number; estimatedCost: number; marginPercent: number | null; name: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -572,6 +585,7 @@ function RecipesTab({
           recipe.lines.map((l) => ({
             ingredientId: l.ingredientId,
             qtyPerSale: String(l.qtyPerSale),
+            lineUnit: l.lineUnit || '',
           })),
         )
         setMeta({
@@ -603,7 +617,7 @@ function RecipesTab({
     if (!selectedId) return
     const payload = lines
       .filter((l) => l.ingredientId && Number(l.qtyPerSale) > 0)
-      .map((l) => ({ ingredientId: l.ingredientId, qtyPerSale: Number(l.qtyPerSale) }))
+      .map((l) => ({ ingredientId: l.ingredientId, qtyPerSale: Number(l.qtyPerSale), lineUnit: l.lineUnit || undefined }))
     setSaving(true)
     try {
       const recipe = await inventoryApi.setRecipe(businessId, selectedId, payload)
@@ -709,60 +723,122 @@ function RecipesTab({
           <p className="report-empty">Loading recipe…</p>
         ) : (
           <div className="inventory-form">
-            {lines.map((line, index) => (
-              <div key={`${line.ingredientId}-${index}`} className="inventory-form-grid">
-                <div className="grid gap-1.5">
-                  <Label>Ingredient</Label>
-                  <Select
-                    value={line.ingredientId}
-                    onValueChange={(value) => {
-                      const next = [...lines]
-                      next[index] = { ...next[index], ingredientId: value }
-                      setLines(next)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick ingredient" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ingredients.map((ing) => (
-                        <SelectItem key={ing.id} value={ing.id}>
-                          {ing.name} ({ing.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Qty per portion</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={line.qtyPerSale}
-                    onChange={(e) => {
-                      const next = [...lines]
-                      next[index] = { ...next[index], qtyPerSale: e.target.value }
-                      setLines(next)
-                    }}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setLines(lines.filter((_, i) => i !== index))}
-                  >
-                    Remove
-                  </Button>
+            {lines.map((line, index) => {
+              const ing = ingredients.find(i => i.id === line.ingredientId)
+              // Compatible units for this ingredient's family
+              const massUnits = ['kg', 'g']
+              const volUnits  = ['L', 'ml']
+              const compatibleUnits = ing
+                ? massUnits.includes(ing.unit) ? massUnits
+                  : volUnits.includes(ing.unit)  ? volUnits
+                  : [ing.unit]
+                : []
+              const effectiveUnit = line.lineUnit || ing?.unit || ''
+              // Yield hint: e.g. 500g = 0.5 kg
+              const showConversion = ing && effectiveUnit && effectiveUnit !== ing.unit
+              const convFactor: Record<string,number> = {'g:kg':0.001,'kg:g':1000,'ml:L':0.001,'L:ml':1000}
+              const factor = convFactor[`${effectiveUnit}:${ing?.unit}`]
+              const convertedQty = factor && Number(line.qtyPerSale) > 0
+                ? (Number(line.qtyPerSale) * factor).toFixed(4).replace(/\.?0+$/, '')
+                : null
+
+              return (
+              <div key={`${line.ingredientId}-${index}`} style={{ display: 'grid', gap: 8, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                <div className="inventory-form-grid">
+                  <div className="grid gap-1.5">
+                    <Label>Ingredient</Label>
+                    <Select
+                      value={line.ingredientId}
+                      onValueChange={(value) => {
+                        const next = [...lines]
+                        next[index] = { ...next[index], ingredientId: value, lineUnit: '' }
+                        setLines(next)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick ingredient" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ingredients.map((ing) => (
+                          <SelectItem key={ing.id} value={ing.id}>
+                            {ing.name} (stocked in {ing.unit})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1.5">
+                    <Label>Qty per portion</Label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={line.qtyPerSale}
+                        onChange={(e) => {
+                          const next = [...lines]
+                          next[index] = { ...next[index], qtyPerSale: e.target.value }
+                          setLines(next)
+                        }}
+                      />
+                      {/* Unit selector — only shown when ingredient has compatible units */}
+                      {compatibleUnits.length > 1 ? (
+                        <Select
+                          value={line.lineUnit || ing?.unit || ''}
+                          onValueChange={(v) => {
+                            const next = [...lines]
+                            next[index] = { ...next[index], lineUnit: v === ing?.unit ? '' : v }
+                            setLines(next)
+                          }}
+                        >
+                          <SelectTrigger style={{ width: 80, flexShrink: 0 }}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {compatibleUnits.map(u => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: 13, color: 'var(--muted-foreground)', flexShrink: 0 }}>
+                          {ing?.unit ?? ''}
+                        </span>
+                      )}
+                    </div>
+                    {/* Yield conversion hint */}
+                    {showConversion && convertedQty && (
+                      <p style={{ margin: 0, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                        = {convertedQty} {ing?.unit} deducted from stock
+                      </p>
+                    )}
+                    {/* Custom conversion hint for cross-family units */}
+                    {ing && effectiveUnit && !compatibleUnits.includes(effectiveUnit) && (
+                      <p style={{ margin: 0, fontSize: 11, color: '#b45309' }}>
+                        ⚠ Unit mismatch — add a custom conversion in Inventory settings
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
             <Button
               type="button"
               variant="outline"
               onClick={() =>
-                setLines([...lines, { ingredientId: ingredients[0]?.id ?? '', qtyPerSale: '1' }])
+                setLines([...lines, { ingredientId: ingredients[0]?.id ?? '', qtyPerSale: '1', lineUnit: '' }])
               }
             >
               Add line

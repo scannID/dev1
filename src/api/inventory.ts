@@ -56,9 +56,12 @@ export interface RecipeLine {
   ingredientId: string
   ingredientName: string
   unit: string
+  lineUnit?: string
   qtyPerSale: number
   avgUnitCost: number
   estimatedCost: number
+  recipeVersion?: number
+  effectiveFrom?: string
 }
 
 export interface Recipe {
@@ -170,7 +173,7 @@ export const inventoryApi = {
   setRecipe: (
     businessId: string,
     catalogItemId: string,
-    lines: Array<{ ingredientId: string; qtyPerSale: number }>,
+    lines: Array<{ ingredientId: string; qtyPerSale: number; lineUnit?: string }>,
   ) =>
     api.put<Recipe>(`/businesses/${businessId}/inventory/catalog/${catalogItemId}/recipe`, {
       lines,
