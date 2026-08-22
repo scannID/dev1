@@ -157,62 +157,7 @@ function QueueWaitingStep({
 }
 
 // ── Helper: extract accessToken from a view URL like /ticket/view/{token} ──
-// ── Per-ticket row: just the link + copy + WhatsApp share ──
-function TicketRow({
-  index,
-  viewUrl,
-  eventName,
-}: {
-  index: number
-  viewUrl: string
-  eventName: string
-}) {
-  const [copied, setCopied] = useState(false)
-
-  // Make the URL absolute so it works when copied/shared
-  const fullUrl = viewUrl.startsWith('http')
-    ? viewUrl
-    : `${window.location.origin}${viewUrl}`
-
-  function copyLink() {
-    navigator.clipboard.writeText(fullUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2500)
-  }
-
-  function shareWhatsApp() {
-    const text = `Here's your ticket for ${eventName}: ${fullUrl}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
-  }
-
-  return (
-    <div className="tk-mt-ticket-row tk-enter">
-      <div className="tk-mt-ticket-row-head">
-        <span className="tk-mt-ticket-num">Ticket {index + 1}</span>
-        <a href={viewUrl} className="tk-mt-view-link">
-          Open →
-        </a>
-      </div>
-      <div className="tk-mt-link-row">
-        <input
-          className="tk-mt-link-input"
-          readOnly
-          value={fullUrl}
-          aria-label={`Link for ticket ${index + 1}`}
-          onFocus={(e) => e.currentTarget.select()}
-        />
-        <button type="button" className="tk-mt-copy-btn" onClick={copyLink}>
-          {copied ? '✓' : 'Copy'}
-        </button>
-      </div>
-      <button type="button" className="tk-mt-wa-btn" onClick={shareWhatsApp}>
-        Send via WhatsApp
-      </button>
-    </div>
-  )
-}
-
-// ── Multi-ticket success screen shown after qty > 1 purchase ──
+// ── Multi-ticket success screen: just show all the codes ──
 function MultiTicketSuccessStep({
   result,
   eventName,
@@ -222,19 +167,22 @@ function MultiTicketSuccessStep({
   eventName: string
   purchaseUrl: string
 }) {
-  const urls = result.viewUrls ?? [result.viewUrl]
+  const codes = result.ticketCodes ?? [result.ticketCode]
 
   return (
     <div className="tk-panel tk-enter tk-mt-success">
       <div className="tk-mt-success-icon" aria-hidden>🎟️</div>
-      <h2 className="tk-mt-success-title">{urls.length} tickets confirmed</h2>
-      <p className="tk-hint">
-        Each person needs their own link — send it to them directly. They'll open it to see their QR code at the gate.
+      <h2 className="tk-mt-success-title">{codes.length} tickets confirmed</h2>
+      <p className="tk-hint" style={{ marginBottom: 8 }}>
+        {eventName} — share each code with the person attending.
       </p>
 
       <div className="tk-mt-ticket-list">
-        {urls.map((url, i) => (
-          <TicketRow key={url} index={i} viewUrl={url} eventName={eventName} />
+        {codes.map((code, i) => (
+          <div key={code} className="tk-mt-ticket-row tk-enter">
+            <span className="tk-mt-ticket-num">Ticket {i + 1}</span>
+            <strong className="tk-mt-code">{code}</strong>
+          </div>
         ))}
       </div>
 

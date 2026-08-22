@@ -525,10 +525,9 @@ export interface TicketPurchaseResponse {
   paymentStatus: PaymentIntentStatus
   message: string
   viewUrl: string
-  /** All ticket IDs when quantity > 1. */
   ticketIds?: string[]
-  /** View URLs for all tickets when quantity > 1. */
   viewUrls?: string[]
+  ticketCodes?: string[]
 }
 
 export interface WaitlistJoinRequest {

@@ -140,7 +140,9 @@ public class PublicTicketDtos {
         /** All ticket IDs when quantity > 1. First entry matches attendeeTicketId. */
         java.util.List<String> ticketIds,
         /** View URLs for all tickets when quantity > 1. */
-        java.util.List<String> viewUrls
+        java.util.List<String> viewUrls,
+        /** Short codes for all tickets when quantity > 1. */
+        java.util.List<String> ticketCodes
     ) {
         /** Convenience constructor for single-ticket purchases (quantity = 1). */
         public PurchaseResponse(
@@ -152,7 +154,8 @@ public class PublicTicketDtos {
             String viewUrl
         ) {
             this(attendeeTicketId, ticketCode, paymentId, paymentStatus, message, viewUrl,
-                java.util.List.of(attendeeTicketId), java.util.List.of(viewUrl));
+                java.util.List.of(attendeeTicketId), java.util.List.of(viewUrl),
+                java.util.List.of(ticketCode));
         }
     }
 

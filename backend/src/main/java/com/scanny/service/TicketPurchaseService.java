@@ -199,6 +199,7 @@ public class TicketPurchaseService {
         // Create all attendee tickets
         List<String> ticketIds = new ArrayList<>();
         List<String> viewUrls = new ArrayList<>();
+        List<String> ticketCodes = new ArrayList<>();
         String paymentId = generateImmediatePaymentId();
 
         for (int i = 0; i < quantity; i++) {
@@ -236,6 +237,7 @@ public class TicketPurchaseService {
 
             ticketIds.add(attendee.getId());
             viewUrls.add(buildViewUrl(attendee.getAccessToken()));
+            ticketCodes.add(shortCodeForTicketId(attendee.getId()));
         }
 
         if (hasValidClaim) {
@@ -256,7 +258,8 @@ public class TicketPurchaseService {
                 : "Ticket created and marked paid",
             firstViewUrl,
             ticketIds,
-            viewUrls
+            viewUrls,
+            ticketCodes
         );
     }
 
