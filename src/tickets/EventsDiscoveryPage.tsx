@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { loadCreatedEvents, type LocalCreatedEvent } from './createdEventsLocal'
 import { usePageMeta } from '../hooks/usePageMeta'
 
@@ -218,7 +218,7 @@ export default function EventsDiscoveryPage() {
   })
 
   const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadCreatedEvents())
-  const [activePill, setActivePill] = useState('events')
+  const [query, setQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0])
 
   useEffect(() => {
@@ -231,10 +231,19 @@ export default function EventsDiscoveryPage() {
     }
   }, [])
 
-  // Carousel = first 3 events; list = first 4; explore = rest (or first 3 if < 7)
-  const carouselEvents = events.slice(0, 3)
-  const listEvents = events.slice(0, 4)
-  const exploreEvents = events.length > 4 ? events.slice(4, 7) : events.slice(0, 3)
+  // Filter by search query
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? events.filter(e =>
+        e.eventName.toLowerCase().includes(q) ||
+        (e.location ?? '').toLowerCase().includes(q) ||
+        (e.host ?? '').toLowerCase().includes(q)
+      )
+    : events
+
+  const carouselEvents = filtered.slice(0, 3)
+  const listEvents = filtered.slice(0, 4)
+  const exploreEvents = filtered.length > 4 ? filtered.slice(4, 7) : filtered.slice(0, 3)
 
   return (
     <div className="kodte-page">
@@ -251,39 +260,22 @@ export default function EventsDiscoveryPage() {
 
         <div className="hero-stage">
           <div className="hero-copy">
-            <div className="eyebrow">Live across Malawi</div>
+         
             <h1>Find what's<br />happening tonight.</h1>
             <p>Tickets, venues and experiences — all on Kodte. Search, book and walk in with a QR code, no printouts, no queues.</p>
           </div>
 
-          <div className="pill-nav">
-            {NAV_PILLS.map((pill) => (
-              <button
-                key={pill.key}
-                type="button"
-                className={`pill${activePill === pill.key ? ' active' : ''}`}
-                onClick={() => setActivePill(pill.key)}
-              >
-                <PillIcon pillKey={pill.key} />
-                {pill.label}
-              </button>
-            ))}
-          </div>
-
           <div className="search-bar">
             <div className="search-field">
-              <div className="label">Search by Location</div>
-              <div className="sub">Lilongwe, Blantyre, Mzuzu…</div>
-            </div>
-            <div className="search-divider" />
-            <div className="search-field">
-              <div className="label">{new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-              <div className="sub">{new Date().toLocaleDateString(undefined, { weekday: 'long' })}</div>
-            </div>
-            <div className="search-divider" />
-            <div className="search-field">
-              <div className="label">Search by Category</div>
-              <div className="sub">Music, sport, culture…</div>
+              <div className="label">Search events</div>
+              <input
+                className="search-input"
+                type="search"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Event name, location, host…"
+                aria-label="Search events"
+              />
             </div>
             <button type="button" className="search-go">🔍 Search</button>
           </div>
@@ -414,51 +406,6 @@ export default function EventsDiscoveryPage() {
 
 /* ----------- Nav pill icons ----------- */
 
-const NAV_PILLS = [
-  { key: 'accommodation', label: 'Accommodation' },
-  { key: 'bus', label: 'Bus' },
-  { key: 'events', label: 'Events' },
-  { key: 'football', label: 'Football Events' },
-  { key: 'membership', label: 'Membership' },
-]
-
-function PillIcon({ pillKey }: { pillKey: string }) {
-  switch (pillKey) {
-    case 'accommodation': return (
-      <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
-      </svg>
-    )
-    case 'bus': return (
-      <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <rect x="3" y="6" width="18" height="12" rx="2" />
-        <circle cx="7.5" cy="18" r="1.5" />
-        <circle cx="16.5" cy="18" r="1.5" />
-        <path d="M3 11h18" />
-      </svg>
-    )
-    case 'events': return (
-      <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M3 10h18M8 3v4M16 3v4" />
-      </svg>
-    )
-    case 'football': return (
-      <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4zM6 6H3a3 3 0 0 0 3 5M18 6h3a3 3 0 0 1-3 5" />
-      </svg>
-    )
-    case 'membership': return (
-      <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-        <circle cx="9" cy="8" r="3.2" />
-        <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
-        <path d="M17 8.5a3 3 0 1 1 0-6M21.5 20a5.5 5.5 0 0 0-6-5.4" />
-      </svg>
-    )
-    default: return null
-  }
-}
-
 /* ----------- Styles (scoped to .kodte-page) ----------- */
 
 const STYLES = `
@@ -530,20 +477,13 @@ const STYLES = `
 .kodte-page .hero-copy h1 { font-size: 56px; margin: 0 0 14px; }
 .kodte-page .hero-copy p { font-size: 16px; color: rgba(255,255,255,0.78); line-height: 1.55; font-family: 'Outfit', sans-serif; }
 
-/* Pill nav */
-.kodte-page .pill-nav { background: rgba(255,255,255,0.96); border-radius: 16px; display: flex; padding: 8px; gap: 4px; max-width: 920px; box-shadow: var(--card-shadow); margin-bottom: 14px; }
-.kodte-page .pill { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 10px; border-radius: 11px; color: var(--ink-soft); font-size: 13.5px; font-weight: 600; transition: background .15s ease, color .15s ease; }
-.kodte-page .pill svg { width: 20px; height: 20px; }
-.kodte-page .pill.active { background: #EAF1FF; color: var(--blue); }
-.kodte-page .pill:hover:not(.active) { background: #F2F3F6; }
-
 /* Search bar */
 .kodte-page .search-bar { background: rgba(255,255,255,0.94); border-radius: 14px; max-width: 920px; padding: 6px; display: flex; align-items: center; box-shadow: var(--card-shadow); }
-.kodte-page .search-field { flex: 1; padding: 12px 18px; font-size: 14px; color: var(--ink); }
-.kodte-page .search-field .label { font-weight: 700; font-size: 14px; }
-.kodte-page .search-field .sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
-.kodte-page .search-divider { width: 1px; height: 34px; background: var(--line); }
-.kodte-page .search-go { background: var(--blue); color: #fff; padding: 14px 26px; border-radius: 10px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; margin: 0 4px; }
+.kodte-page .search-field { flex: 1; padding: 10px 18px; }
+.kodte-page .search-field .label { font-weight: 700; font-size: 13px; color: var(--ink-soft); margin-bottom: 4px; }
+.kodte-page .search-input { width: 100%; border: none; outline: none; background: transparent; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600; color: var(--ink); }
+.kodte-page .search-input::placeholder { color: var(--ink-soft); font-weight: 400; }
+.kodte-page .search-go { background: var(--blue); color: #fff; padding: 14px 26px; border-radius: 10px; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; margin: 0 4px; flex-shrink: 0; }
 .kodte-page .search-go:hover { background: var(--blue-deep); }
 
 /* Promo */
@@ -634,8 +574,5 @@ const STYLES = `
 }
 @media (max-width: 640px) {
   .kodte-page .explore-grid { grid-template-columns: 1fr; }
-  .kodte-page .pill-nav { overflow-x: auto; }
-  .kodte-page .search-bar { flex-wrap: wrap; }
-  .kodte-page .search-divider { display: none; }
 }
 `
