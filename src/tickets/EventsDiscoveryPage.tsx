@@ -290,18 +290,7 @@ export default function EventsDiscoveryPage() {
         </div>
       </div>
 
-      {/* ===== PROMO ===== */}
-      <div className="promo">
-        <div className="promo-inner">
-          <div className="promo-text">
-            <b>Quick and easy!</b>
-            <span>Grab your event and football tickets on Kodte by dialing</span>
-          </div>
-          <div className="promo-code">*495#</div>
-        </div>
-      </div>
 
-      {/* ===== TRENDING ===== */}
       <div className="section">
         <div className="section-head">
           <div>
