@@ -215,7 +215,7 @@ if (kitchenBusinessId) {
       <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
     </StrictMode>
   )
-if (eventsRoute) {
+} else if (eventsRoute) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <EventsDiscoveryPage />
