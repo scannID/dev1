@@ -27,6 +27,7 @@ import { CookieConsent } from './components/CookieConsent'
 import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
 import { clearStaffSession } from './api/client'
 import ReceiptPage from './receipt/ReceiptPage'
+import EventsDiscoveryPage from './tickets/EventsDiscoveryPage'
 
 initThemeFromStorage()
 
@@ -88,6 +89,10 @@ function resolveTicketPurchaseRoute(): string | null {
   return token
 }
 
+function resolveEventsRoute(): boolean {
+  return /^\/events\/?$/.test(window.location.pathname)
+}
+
 function resolveCreateEventRoute(): boolean {
   return /^\/create-event\/?$/.test(window.location.pathname)
 }
@@ -112,7 +117,7 @@ function resolveIsUnknownPath(): boolean {
   // All functional route prefixes handled earlier in main.tsx
   const knownPrefixes = [
     '/kitchen/', '/receipt/', '/b/', '/pay/', '/track/',
-    '/ticket/', '/create-event', '/ticket/gate',
+    '/ticket/', '/create-event', '/ticket/gate', '/events',
   ]
   if (knownPrefixes.some((prefix) => p === prefix.replace(/\/$/, '') || p.startsWith(prefix))) return false
   // Marketing slugs
@@ -131,6 +136,7 @@ const trackNumber = resolveTrackRoute()
 const ticketViewToken = resolveTicketViewRoute()
 const ticketTransferToken = resolveTicketTransferRoute()
 const ticketMasterToken = resolveTicketPurchaseRoute()
+const eventsRoute = resolveEventsRoute()
 const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
 const receiptOrderId = resolveReceiptRoute()
@@ -207,6 +213,12 @@ if (kitchenBusinessId) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <CustomerMenu businessId={customerRoute.businessId} qrToken={customerRoute.qrToken} />
+    </StrictMode>
+  )
+if (eventsRoute) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <EventsDiscoveryPage />
     </StrictMode>
   )
 } else if (createEventRoute) {
@@ -456,7 +468,7 @@ if (kitchenBusinessId) {
         <LandingPage
           onGetStarted={handleGetStarted}
           onCreateEventTicket={() => {
-            window.location.href = '/create-event'
+            window.location.href = '/events'
           }}
         />
       </>

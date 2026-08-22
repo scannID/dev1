@@ -1502,7 +1502,7 @@ export default function KodteLandingTicket({
                 }}
               >
                 <Scissors size={14} />
-                Event Tickeing
+                Events Ticketing
               </button>
 
               <button
