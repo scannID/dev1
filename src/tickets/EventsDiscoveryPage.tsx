@@ -252,7 +252,10 @@ export default function EventsDiscoveryPage() {
       {/* ===== HERO ===== */}
       <div className="hero">
         <div className="nav-row">
-          <div className="logo">kodte<span>.</span></div>
+          <div className="logo">
+            <img src="/kodte-icon.svg" alt="" className="logo-icon" />
+            kodte<span>.</span>
+          </div>
           <div className="nav-actions">
             <a href="/create-event" className="btn btn-outline">Upload Your Event ⇪</a>
           </div>
@@ -453,8 +456,9 @@ const STYLES = `
   pointer-events: none;
 }
 .kodte-page .nav-row { display: flex; align-items: center; justify-content: space-between; max-width: 1240px; margin: 0 auto; padding: 26px 24px 0; position: relative; z-index: 3; }
-.kodte-page .logo { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 1px; }
+.kodte-page .logo { font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; text-transform: lowercase; display: flex; align-items: center; gap: 10px; }
 .kodte-page .logo span { color: var(--amber); }
+.kodte-page .logo-icon { width: 32px; height: 32px; object-fit: contain; display: block; flex-shrink: 0; }
 .kodte-page .nav-actions { display: flex; gap: 12px; align-items: center; }
 
 /* Buttons */
