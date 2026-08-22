@@ -499,7 +499,7 @@ export default function EventsDiscoveryPage() {
             />
 
             <span className="logo-word">
-              kodte<span>.</span>
+              kodte
             </span>
           </div>
 
