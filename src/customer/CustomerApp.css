@@ -2027,11 +2027,9 @@ html.cm-app #root {
 .cm-receipt-card-mark {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   flex-shrink: 0;
-  object-fit: cover;
-  border: 1px solid var(--cm-border);
-  background: var(--cm-card);
+  object-fit: contain;
   display: grid;
   place-items: center;
 }
@@ -2092,9 +2090,8 @@ html.cm-app #root {
 .cm-receipt-paper-logo {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  object-fit: cover;
-  border: 1px solid var(--cm-border);
+  border-radius: 0;
+  object-fit: contain;
 }
 
 .cm-receipt-paper-label {
