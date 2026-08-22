@@ -348,12 +348,15 @@ function EventCarousel({
           corner of the ticket, half on / half off the card, always
           reflecting whichever slide is currently showing. */}
       <div className="ticket-stub">
-        <QRWidget
-          value={currentPurchaseUrl}
-          size={80}
-          colorDark="#26201a"
-          colorLight="#f7f1e3"
-        />
+        <div className="ticket-stub-qr">
+          <QRWidget
+            value={currentPurchaseUrl}
+            size={100}
+            colorDark="#0E1521"
+            colorLight="#ffffff"
+          />
+        </div>
+        <span className="ticket-stub-label">Scan to book</span>
       </div>
 
       <div className="carousel-arrows">
@@ -1485,7 +1488,7 @@ const STYLES = `
 .kodte-page .carousel {
   position: relative;
 
-  min-height: 640px;
+  min-height: 420px;
 }
 
 .kodte-page .carousel-frame {
@@ -1493,7 +1496,7 @@ const STYLES = `
 
   height: 100%;
 
-  min-height: 640px;
+  min-height: 420px;
 
   border-radius: 20px;
 
@@ -1533,11 +1536,11 @@ const STYLES = `
 
   justify-content: flex-end;
 
-  padding: 34px;
+  padding: 28px;
 
   color: #fff;
 
-  min-height: 640px;
+  min-height: 420px;
 }
 
 .kodte-page .slide-bg {
@@ -1610,9 +1613,7 @@ const STYLES = `
 
   z-index: 2;
 
-  /* leave clear space so text/buttons never run under the
-     nested QR panel in the bottom-right corner */
-  padding-right: 150px;
+  padding-right: 140px;
 }
 
 .kodte-page .slide-content .cat {
@@ -1630,9 +1631,9 @@ const STYLES = `
 }
 
 .kodte-page .slide-content h3 {
-  font-size: 46px;
+  font-size: 34px;
 
-  margin: 0 0 12px;
+  margin: 0 0 10px;
 
   max-width: 80%;
 }
@@ -1690,41 +1691,66 @@ const STYLES = `
 .kodte-page .ticket-stub {
   position: absolute;
 
-  right: 24px;
+  right: 20px;
 
-  bottom: 24px;
+  bottom: 20px;
 
   z-index: 5;
 
-  width: 104px;
-
-  height: 104px;
+  width: 120px;
 
   display: flex;
 
+  flex-direction: column;
+
   align-items: center;
 
-  justify-content: center;
+  gap: 6px;
 
-  padding: 12px;
+  padding: 10px 10px 8px;
 
-  background: var(--white);
+  background: #fff;
 
-  border-radius: 16px;
+  border-radius: 14px;
 
   box-shadow:
-    0 10px 24px rgba(0,0,0,0.28);
+    0 8px 24px rgba(0,0,0,0.32),
+    0 2px 6px rgba(0,0,0,0.18);
 }
 
-.kodte-page .ticket-stub canvas,
-.kodte-page .ticket-stub img {
-  width: 100% !important;
+.kodte-page .ticket-stub-qr {
+  width: 100px;
 
-  height: 100% !important;
+  height: 100px;
 
-  border-radius: 4px;
+  border-radius: 6px;
+
+  overflow: hidden;
+
+  background: #fff;
+}
+
+.kodte-page .ticket-stub-qr canvas,
+.kodte-page .ticket-stub-qr img {
+  width: 100px !important;
+
+  height: 100px !important;
 
   display: block;
+}
+
+.kodte-page .ticket-stub-label {
+  font-size: 9px;
+
+  font-weight: 800;
+
+  letter-spacing: 0.14em;
+
+  text-transform: uppercase;
+
+  color: #6b7280;
+
+  white-space: nowrap;
 }
 
 
