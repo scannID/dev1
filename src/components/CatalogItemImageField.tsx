@@ -247,13 +247,6 @@ export function CatalogItemImageField({
               </Button>
             </div>
             {resultsGrid}
-            <p className="text-[11px] text-muted-foreground">
-              Photos from{' '}
-              <a href="https://www.pexels.com" target="_blank" rel="noreferrer" className="underline">
-                Pexels
-              </a>
-              .
-            </p>
           </div>
         ) : null}
       </div>
@@ -298,13 +291,6 @@ export function CatalogItemImageField({
             </Button>
           </div>
           {resultsGrid}
-          <p className="text-[11px] text-muted-foreground">
-            Photos from{' '}
-            <a href="https://www.pexels.com" target="_blank" rel="noreferrer" className="underline">
-              Pexels
-            </a>
-            . Stock photos — not official brand packaging.
-          </p>
         </div>
       ) : null}
       <p className="text-xs text-muted-foreground">Customers see this photo on the menu grid.</p>

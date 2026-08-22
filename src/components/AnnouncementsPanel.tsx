@@ -271,13 +271,6 @@ function AnnouncementImagePicker({
             </p>
           )}
 
-          <p className="text-[11px] text-muted-foreground">
-            Photos from{' '}
-            <a href="https://www.pexels.com" target="_blank" rel="noreferrer" className="underline">
-              Pexels
-            </a>
-            .
-          </p>
         </div>
       ) : null}
     </div>
