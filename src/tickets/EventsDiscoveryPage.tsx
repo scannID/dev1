@@ -435,6 +435,8 @@ export default function EventsDiscoveryPage() {
   const [activeCategory, setActiveCategory] =
     useState(CATEGORIES[0])
 
+  const [showAllExplore, setShowAllExplore] = useState(false)
+
   useEffect(() => {
     const refresh = () =>
       setEvents(loadCreatedEvents())
@@ -473,9 +475,11 @@ export default function EventsDiscoveryPage() {
   const listEvents = filtered.slice(0, 4)
 
   const exploreEvents =
-    filtered.length > 4
-      ? filtered.slice(4, 7)
-      : filtered.slice(0, 3)
+    showAllExplore
+      ? filtered.slice(4)
+      : filtered.length > 4
+        ? filtered.slice(4, 7)
+        : filtered.slice(0, 3)
 
   return (
     <div className="kodte-page">
@@ -731,13 +735,13 @@ export default function EventsDiscoveryPage() {
             </p>
           </div>
 
-          <a
-            href="/events"
+          <button
+            type="button"
             className="btn btn-light"
+            onClick={() => setShowAllExplore(v => !v)}
           >
-            See More Events
-            <span>→</span>
-          </a>
+            {showAllExplore ? 'Show Less ↑' : 'See More Events →'}
+          </button>
         </div>
 
         <div className="filter-row">
@@ -839,20 +843,18 @@ export default function EventsDiscoveryPage() {
                       >
                         Buy Ticket
                       </a>
+                      <div className="grid-qr-inline">
+                        <QRWidget
+                          value={purchaseUrl}
+                          size={56}
+                          colorDark="#0E1521"
+                          colorLight="#ffffff"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Same corner-badge treatment as the list cards —
-                      sits over the seam between photo and body. */}
-                  <div className="grid-qr-badge">
-                    <QRWidget
-                      value={purchaseUrl}
-                      size={72}
-                      className="qr-mini"
-                      colorDark="#26201a"
-                      colorLight="#f7f1e3"
-                    />
-                  </div>
+                  {/* no floating badge */}
                 </div>
               )
             })
@@ -2383,40 +2385,38 @@ const STYLES = `
 
   align-items: center;
 
+  justify-content: space-between;
+
+  gap: 10px;
+
   padding-top: 12px;
 
   border-top: 1px dashed var(--line);
 }
 
-.kodte-page .grid-qr-badge {
-  position: absolute;
+.kodte-page .grid-qr-inline {
+  width: 56px;
 
-  bottom: 14px;
+  height: 56px;
 
-  right: 14px;
+  flex-shrink: 0;
 
-  z-index: 3;
+  border-radius: 8px;
 
-  width: 46px;
+  overflow: hidden;
 
-  height: 46px;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content: center;
-
-  padding: 4px;
-
-  background: var(--white);
+  background: #fff;
 
   border: 1px solid var(--line);
+}
 
-  border-radius: 10px;
+.kodte-page .grid-qr-inline canvas,
+.kodte-page .grid-qr-inline img {
+  width: 56px !important;
 
-  box-shadow:
-    0 4px 12px rgba(38,32,26,0.16);
+  height: 56px !important;
+
+  display: block;
 }
 
 
