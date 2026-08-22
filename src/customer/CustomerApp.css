@@ -224,12 +224,10 @@ html.cm-app #root {
 }
 
 .cm-brand-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 1px solid var(--cm-border);
-  background: var(--cm-card);
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  object-fit: contain;
   flex-shrink: 0;
 }
 

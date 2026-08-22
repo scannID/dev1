@@ -1,4 +1,4 @@
-/* Customer event-ticket surfaces — light / white */
+﻿/* Customer event-ticket surfaces — light / white */
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&display=swap');
 
 html.tk-app,
@@ -1552,4 +1552,131 @@ html.tk-app body {
   font-size: 14px;
   color: var(--tk-muted);
   line-height: 1.6;
+}
+
+/* ── Multi-ticket success screen ── */
+.tk-mt-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 20px 24px;
+}
+
+.tk-mt-success-icon {
+  font-size: 40px;
+  margin-bottom: 4px;
+}
+
+.tk-mt-success-title {
+  margin: 0 0 4px;
+  font-family: var(--tk-font-display);
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tk-mt-ticket-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.tk-mt-ticket-row {
+  padding: 14px 16px;
+  border-radius: var(--tk-radius-md);
+  border: 1px solid var(--tk-border);
+  background: var(--tk-bg-elev);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tk-mt-ticket-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tk-mt-ticket-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tk-text);
+  letter-spacing: -0.01em;
+}
+
+.tk-mt-view-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tk-gold);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.tk-mt-view-link:hover {
+  text-decoration: underline;
+}
+
+/* link row: input + copy button */
+.tk-mt-link-row {
+  display: flex;
+  gap: 6px;
+}
+
+.tk-mt-link-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--tk-radius-md);
+  border: 1px solid var(--tk-border);
+  background: var(--tk-bg);
+  color: var(--tk-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-mt-copy-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: var(--tk-radius-md);
+  border: 1px solid var(--tk-border);
+  background: var(--tk-bg-elev);
+  color: var(--tk-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.tk-mt-copy-btn:hover {
+  background: var(--tk-border);
+}
+
+/* WhatsApp send button */
+.tk-mt-wa-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--tk-radius-md);
+  border: none;
+  background: #25d366;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.tk-mt-wa-btn:hover {
+  opacity: 0.88;
 }

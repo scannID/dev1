@@ -1,6 +1,6 @@
 ﻿import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
-import type { TicketEventInfo, QueueStatusResponse, WaitlistJoinResponse } from '../api/types'
+import type { TicketEventInfo, QueueStatusResponse, WaitlistJoinResponse, TicketPurchaseResponse } from '../api/types'
 import { KodteMark } from '../customer/KodteMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import './TicketCustomer.css'
@@ -156,6 +156,95 @@ function QueueWaitingStep({
   )
 }
 
+// ── Helper: extract accessToken from a view URL like /ticket/view/{token} ──
+// ── Per-ticket row: just the link + copy + WhatsApp share ──
+function TicketRow({
+  index,
+  viewUrl,
+  eventName,
+}: {
+  index: number
+  viewUrl: string
+  eventName: string
+}) {
+  const [copied, setCopied] = useState(false)
+
+  // Make the URL absolute so it works when copied/shared
+  const fullUrl = viewUrl.startsWith('http')
+    ? viewUrl
+    : `${window.location.origin}${viewUrl}`
+
+  function copyLink() {
+    navigator.clipboard.writeText(fullUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+  }
+
+  function shareWhatsApp() {
+    const text = `Here's your ticket for ${eventName}: ${fullUrl}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  return (
+    <div className="tk-mt-ticket-row tk-enter">
+      <div className="tk-mt-ticket-row-head">
+        <span className="tk-mt-ticket-num">Ticket {index + 1}</span>
+        <a href={viewUrl} className="tk-mt-view-link">
+          Open →
+        </a>
+      </div>
+      <div className="tk-mt-link-row">
+        <input
+          className="tk-mt-link-input"
+          readOnly
+          value={fullUrl}
+          aria-label={`Link for ticket ${index + 1}`}
+          onFocus={(e) => e.currentTarget.select()}
+        />
+        <button type="button" className="tk-mt-copy-btn" onClick={copyLink}>
+          {copied ? '✓' : 'Copy'}
+        </button>
+      </div>
+      <button type="button" className="tk-mt-wa-btn" onClick={shareWhatsApp}>
+        Send via WhatsApp
+      </button>
+    </div>
+  )
+}
+
+// ── Multi-ticket success screen shown after qty > 1 purchase ──
+function MultiTicketSuccessStep({
+  result,
+  eventName,
+  purchaseUrl,
+}: {
+  result: TicketPurchaseResponse
+  eventName: string
+  purchaseUrl: string
+}) {
+  const urls = result.viewUrls ?? [result.viewUrl]
+
+  return (
+    <div className="tk-panel tk-enter tk-mt-success">
+      <div className="tk-mt-success-icon" aria-hidden>🎟️</div>
+      <h2 className="tk-mt-success-title">{urls.length} tickets confirmed</h2>
+      <p className="tk-hint">
+        Each person needs their own link — send it to them directly. They'll open it to see their QR code at the gate.
+      </p>
+
+      <div className="tk-mt-ticket-list">
+        {urls.map((url, i) => (
+          <TicketRow key={url} index={i} viewUrl={url} eventName={eventName} />
+        ))}
+      </div>
+
+      <a href={purchaseUrl} className="tk-btn-cancel" style={{ display: 'flex', marginTop: 20 }}>
+        ← Back to event
+      </a>
+    </div>
+  )
+}
+
 export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [event, setEvent] = useState<TicketEventInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -174,6 +263,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const paymentProvider = detectProvider(paymentPhone || holderPhone)
   const [submitting, setSubmitting] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const [purchaseResult, setPurchaseResult] = useState<TicketPurchaseResponse | null>(null)
 
   usePageMeta({
     title: event ? `Buy tickets — ${event.eventName}` : 'Buy event tickets',
@@ -258,7 +348,13 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         // Backend detected high concurrency and placed us in the queue automatically
         setQueueEntry(result.data)
       } else {
-        window.location.href = result.data.viewUrl
+        const data = result.data
+        // Multi-ticket: show inline success screen so buyer can distribute each ticket
+        if ((data.viewUrls?.length ?? 0) > 1) {
+          setPurchaseResult(data)
+        } else {
+          window.location.href = data.viewUrl
+        }
       }    } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start purchase')
     } finally {
@@ -360,6 +456,29 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
               Back to home
             </button>
           </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (purchaseResult && event && (purchaseResult.viewUrls?.length ?? 0) > 1) {
+    return (
+      <div className="tk-shell">
+        <header className="tk-topbar">
+          <div className="tk-brand">
+            <KodteMark size={28} />
+            <div>
+              <strong>Kodte</strong>
+              <span>{event.host?.trim() || event.eventName}</span>
+            </div>
+          </div>
+        </header>
+        <main className="tk-main">
+          <MultiTicketSuccessStep
+            result={purchaseResult}
+            eventName={event.eventName}
+            purchaseUrl={`/ticket/${masterQrToken}`}
+          />
         </main>
       </div>
     )

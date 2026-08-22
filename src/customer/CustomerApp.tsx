@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Clock3, History, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Clock3, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { businessApi, devicesApi, feesApi, fxApi, ordersApi, announcementsApi } from '../api/services'
@@ -1407,14 +1407,6 @@ export default function CustomerApp({
             {announcements.length > 0 ? (
               <span className="cm-badge">{announcements.length}</span>
             ) : null}
-          </button>
-          <button
-            type="button"
-            className="cm-track-btn"
-            onClick={() => setShowHistory(true)}
-            aria-label="Order history"
-          >
-            <History size={15} />
           </button>
           {orderPublicId ? (
             <button
