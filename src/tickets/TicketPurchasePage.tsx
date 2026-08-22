@@ -167,7 +167,11 @@ function MultiTicketSuccessStep({
   eventName: string
   purchaseUrl: string
 }) {
-  const codes = result.ticketCodes ?? [result.ticketCode]
+  const codes = result.ticketCodes?.length
+    ? result.ticketCodes
+    : result.ticketIds?.length
+      ? result.ticketIds
+      : [result.ticketCode]
 
   return (
     <div className="tk-panel tk-enter tk-mt-success">
@@ -298,7 +302,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
       } else {
         const data = result.data
         // Multi-ticket: show inline success screen so buyer can distribute each ticket
-        if ((data.viewUrls?.length ?? 0) > 1) {
+        if (quantity > 1) {
           setPurchaseResult(data)
         } else {
           window.location.href = data.viewUrl
@@ -409,7 +413,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     )
   }
 
-  if (purchaseResult && event && (purchaseResult.viewUrls?.length ?? 0) > 1) {
+  if (purchaseResult && event && quantity > 1) {
     return (
       <div className="tk-shell">
         <header className="tk-topbar">
