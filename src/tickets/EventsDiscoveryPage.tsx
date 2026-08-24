@@ -94,7 +94,7 @@ function QRWidget({
           height: size,
           colorDark,
           colorLight,
-          correctLevel: window.QRCode.CorrectLevel.M,
+          correctLevel: window.QRCode.CorrectLevel.H,
         })
       })
       .catch(() => {})
@@ -435,8 +435,6 @@ export default function EventsDiscoveryPage() {
   const [activeCategory, setActiveCategory] =
     useState(CATEGORIES[0])
 
-  const [showAllExplore, setShowAllExplore] = useState(false)
-
   useEffect(() => {
     const refresh = () =>
       setEvents(loadCreatedEvents())
@@ -474,12 +472,11 @@ export default function EventsDiscoveryPage() {
 
   const listEvents = filtered.slice(0, 4)
 
-  const exploreEvents =
-    showAllExplore
-      ? filtered.slice(4)
-      : filtered.length > 4
-        ? filtered.slice(4, 7)
-        : filtered.slice(0, 3)
+  // Explore shows everything beyond the first 4; if fewer than 5 events exist,
+  // fall back to showing all events so the section is never empty.
+  const exploreEvents = filtered.length > 4
+    ? filtered.slice(4)
+    : filtered
 
   return (
     <div className="kodte-page">
@@ -589,7 +586,7 @@ export default function EventsDiscoveryPage() {
           </div>
 
           <a
-            href="/events"
+            href="#explore"
             className="btn btn-light"
           >
             See More Events
@@ -694,7 +691,7 @@ export default function EventsDiscoveryPage() {
                         <div className="list-qr-wrap">
                           <QRWidget
                             value={purchaseUrl}
-                            size={56}
+                            size={96}
                             colorDark="#0E1521"
                             colorLight="#ffffff"
                           />
@@ -716,7 +713,7 @@ export default function EventsDiscoveryPage() {
           EXPLORE MORE
           ============================================================ */}
 
-      <div className="section explore-section">
+      <div id="explore" className="section explore-section">
         <div className="section-rule" />
 
         <div className="section-head">
@@ -734,14 +731,6 @@ export default function EventsDiscoveryPage() {
               with categories below.
             </p>
           </div>
-
-          <button
-            type="button"
-            className="btn btn-light"
-            onClick={() => setShowAllExplore(v => !v)}
-          >
-            {showAllExplore ? 'Show Less ↑' : 'See More Events →'}
-          </button>
         </div>
 
         <div className="filter-row">
@@ -846,7 +835,7 @@ export default function EventsDiscoveryPage() {
                       <div className="grid-qr-inline">
                         <QRWidget
                           value={purchaseUrl}
-                          size={56}
+                          size={96}
                           colorDark="#0E1521"
                           colorLight="#ffffff"
                         />
@@ -2026,8 +2015,8 @@ const STYLES = `
 }
 
 .kodte-page .list-qr-wrap {
-  width: 56px;
-  height: 56px;
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2037,8 +2026,8 @@ const STYLES = `
 
 .kodte-page .list-qr-wrap canvas,
 .kodte-page .list-qr-wrap img {
-  width: 56px !important;
-  height: 56px !important;
+  width: 96px !important;
+  height: 96px !important;
   display: block;
 }
 
@@ -2395,27 +2384,19 @@ const STYLES = `
 }
 
 .kodte-page .grid-qr-inline {
-  width: 56px;
-
-  height: 56px;
-
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
-
   border-radius: 8px;
-
   overflow: hidden;
-
   background: #fff;
-
   border: 1px solid var(--line);
 }
 
 .kodte-page .grid-qr-inline canvas,
 .kodte-page .grid-qr-inline img {
-  width: 56px !important;
-
-  height: 56px !important;
-
+  width: 96px !important;
+  height: 96px !important;
   display: block;
 }
 
