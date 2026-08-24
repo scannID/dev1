@@ -169,14 +169,20 @@ function parseJsonObject(raw?: string): Record<string, unknown> {
   }
 }
 
-/** Phone can't open localhost — rewrite API scan URLs to the LAN scan base. */
+/** Phone can't open localhost or a different LAN IP — rewrite to the current scan base. */
 function rewriteScanUrl(url: string) {
   if (!url) return url
   try {
     const parsed = new URL(url)
     const configured = String(import.meta.env.VITE_SCAN_BASE_URL || '').replace(/\/$/, '')
     const preferConfigured = configured && !/localhost|127\.0\.0\.1/i.test(configured)
-    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+    const isLocal =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      /^10\.\d+\.\d+\.\d+$/.test(parsed.hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(parsed.hostname) ||
+      /^192\.168\.\d+\.\d+$/.test(parsed.hostname)
+    if (isLocal) {
       const origin = preferConfigured
         ? configured
         : typeof window !== 'undefined'
