@@ -188,10 +188,11 @@ export function useBusinessData() {
     try {
       setError(null)
       const data = await scannyApi.orders.list(businessId)
-      // Only apply if the selected business hasn't changed while the fetch was in flight
-      setSelectedBusinessId((current) => {
-        if (current === businessId) setOrders(data)
-        return current
+      // Merge orders for this business into the global orders state so
+      // switching branches never loses live data for other branches.
+      setOrders((current) => {
+        const otherBranches = current.filter((o) => o.businessId !== businessId)
+        return [...otherBranches, ...data]
       })
     } catch (err) {
       console.error('Failed to load orders:', err)

@@ -5,6 +5,7 @@ import { operationsApi, type KitchenOrder } from '../api/operations'
 import type { OrderStatus } from '../api/types'
 import { Button } from '@/components/ui/button'
 import { applyDarkMode, readDarkMode, persistDarkMode } from '../lib/theme'
+import { createRealtimeClient } from '../lib/realtime'
 
 const STATUS_FLOW: OrderStatus[] = ['Pending', 'Preparing', 'Ready', 'Completed']
 
@@ -83,9 +84,45 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
 
   useEffect(() => {
     void load()
-    const timer = window.setInterval(() => void load(), 4000)
-    return () => window.clearInterval(timer)
-  }, [load])
+
+    // WebSocket for instant push — polling is the fallback when WS is unavailable.
+    let realtimeClient: { close: () => void } | null = null
+
+    async function startRealtime() {
+      try {
+        const keycloak = (await import('../keycloak')).default
+        realtimeClient = createRealtimeClient({
+          channels: [`orders:${businessId}`],
+          getToken: async () => {
+            try {
+              await keycloak.updateToken(30)
+              return keycloak.token
+            } catch {
+              return keycloak.token
+            }
+          },
+          // Slow poll — WS handles the fast path; this catches any gaps.
+          poll: load,
+          pollIntervalMs: 30000,
+          onEvent: (event) => {
+            if (event.type?.startsWith('ORDER') || event.type === 'ORDERS_CLEARED') {
+              void load()
+            }
+          },
+        })
+      } catch {
+        // Keycloak unavailable (standalone tab, no session) — fall back to polling only.
+        const timer = window.setInterval(() => void load(), 4000)
+        return () => window.clearInterval(timer)
+      }
+    }
+
+    void startRealtime()
+
+    return () => {
+      realtimeClient?.close()
+    }
+  }, [load, businessId])
 
   useEffect(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 30000)

@@ -451,7 +451,6 @@ function App({
   // Owner-only: keep branch cards fresh with realtime + polling fallback.
   useEffect(() => {
     if (staffMode) return
-    if (view !== 'account') return
     if (businesses.length <= 1) {
       setBranchOverviewCounts({})
       return
@@ -499,7 +498,7 @@ function App({
       cancelled = true
       client?.close()
     }
-  }, [staffMode, view, businesses, loadBranchOverviewCounts])
+  }, [staffMode, businesses, loadBranchOverviewCounts])
 
   // Realtime orders with polling fallback — subscribe to ALL businesses so
   // switching to a branch never has a gap where events are missed.
@@ -531,11 +530,11 @@ function App({
         pollIntervalMs: 15000,
         onEvent: (event) => {
           if (event.type?.startsWith('ORDER') || event.type === 'ORDERS_CLEARED') {
-            // Refresh orders for whichever business the event belongs to,
-            // but only if it is the one currently selected.
+            // Refresh orders for whichever branch the event belongs to.
+            // loadOrders merges by businessId so other branches are not wiped.
             const eventBusinessId = event.businessId ?? event.channel?.split(':')[1]
-            if (eventBusinessId && eventBusinessId === business.id) {
-              void loadOrders(business.id)
+            if (eventBusinessId) {
+              void loadOrders(eventBusinessId)
             }
           }
         },
