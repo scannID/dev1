@@ -347,17 +347,17 @@ function EventCarousel({
       {/* QR badge — a circular chip overlapping the bottom-right
           corner of the ticket, half on / half off the card, always
           reflecting whichever slide is currently showing. */}
-      <div className="ticket-stub">
-        <div className="ticket-stub-qr">
-          <QRWidget
-            value={currentPurchaseUrl}
-            size={100}
-            colorDark="#0E1521"
-            colorLight="#ffffff"
-          />
+        <div className="ticket-stub">
+          <div className="ticket-stub-qr">
+            <QRWidget
+              value={currentPurchaseUrl}
+              size={110}
+              colorDark="#0E1521"
+              colorLight="#ffffff"
+            />
+          </div>
+          <span className="ticket-stub-label">Scan to book</span>
         </div>
-        <span className="ticket-stub-label">Scan to book</span>
-      </div>
 
       <div className="carousel-arrows">
         <button
@@ -694,7 +694,7 @@ export default function EventsDiscoveryPage() {
                         <div className="list-qr-wrap">
                           <QRWidget
                             value={purchaseUrl}
-                            size={96}
+                            size={120}
                             colorDark="#0E1521"
                             colorLight="#ffffff"
                           />
@@ -1473,6 +1473,8 @@ const STYLES = `
   gap: 24px;
 
   align-items: stretch;
+
+  position: relative;
 }
 
 
@@ -1693,13 +1695,13 @@ const STYLES = `
 .kodte-page .ticket-stub {
   position: absolute;
 
-  right: 20px;
+  right: -10px;
 
-  bottom: 20px;
+  bottom: 28px;
 
   z-index: 5;
 
-  width: 120px;
+  width: 130px;
 
   display: flex;
 
@@ -1721,9 +1723,9 @@ const STYLES = `
 }
 
 .kodte-page .ticket-stub-qr {
-  width: 100px;
+  width: 110px;
 
-  height: 100px;
+  height: 110px;
 
   border-radius: 6px;
 
@@ -1734,9 +1736,9 @@ const STYLES = `
 
 .kodte-page .ticket-stub-qr canvas,
 .kodte-page .ticket-stub-qr img {
-  width: 100px !important;
+  width: 110px !important;
 
-  height: 100px !important;
+  height: 110px !important;
 
   display: block;
 }
@@ -2026,19 +2028,20 @@ const STYLES = `
 }
 
 .kodte-page .list-qr-wrap {
-  width: 96px;
-  height: 96px;
+  width: 128px;
+  height: 128px;
   flex-shrink: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   background: #fff;
+  padding: 4px;
 }
 
 .kodte-page .list-qr-wrap canvas,
 .kodte-page .list-qr-wrap img {
-  width: 96px !important;
-  height: 96px !important;
+  width: 120px !important;
+  height: 120px !important;
   display: block;
 }
 
