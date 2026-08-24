@@ -188,7 +188,11 @@ export function useBusinessData() {
     try {
       setError(null)
       const data = await scannyApi.orders.list(businessId)
-      setOrders(data)
+      // Only apply if the selected business hasn't changed while the fetch was in flight
+      setSelectedBusinessId((current) => {
+        if (current === businessId) setOrders(data)
+        return current
+      })
     } catch (err) {
       console.error('Failed to load orders:', err)
       setError(err instanceof Error ? err.message : 'Failed to load orders')

@@ -501,18 +501,24 @@ function App({
     }
   }, [staffMode, view, businesses, loadBranchOverviewCounts])
 
-  // Realtime orders with polling fallback
+  // Realtime orders with polling fallback — subscribe to ALL businesses so
+  // switching to a branch never has a gap where events are missed.
   useEffect(() => {
     if (!business.id) return
     let client: { close: () => void } | null = null
     let cancelled = false
+
+    const allChannels = [
+      ...businesses.map((b) => `orders:${b.id}`),
+      `catalog:${business.id}`,
+    ]
 
     async function start() {
       const { createRealtimeClient } = await import('./lib/realtime')
       const keycloak = (await import('./keycloak')).default
       if (cancelled) return
       client = createRealtimeClient({
-        channels: [`orders:${business.id}`, `catalog:${business.id}`],
+        channels: allChannels,
         getToken: async () => {
           try {
             await keycloak.updateToken(30)
@@ -525,7 +531,12 @@ function App({
         pollIntervalMs: 15000,
         onEvent: (event) => {
           if (event.type?.startsWith('ORDER') || event.type === 'ORDERS_CLEARED') {
-            void loadOrders(business.id)
+            // Refresh orders for whichever business the event belongs to,
+            // but only if it is the one currently selected.
+            const eventBusinessId = event.businessId ?? event.channel?.split(':')[1]
+            if (eventBusinessId && eventBusinessId === business.id) {
+              void loadOrders(business.id)
+            }
           }
         },
       })
@@ -536,7 +547,7 @@ function App({
       cancelled = true
       client?.close()
     }
-  }, [business.id, loadOrders])
+  }, [business.id, businesses, loadOrders])
 
   const businessOrders = orders.filter((order) => order.businessId === business.id)
   const pendingCount = businessOrders.filter(
