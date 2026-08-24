@@ -435,6 +435,8 @@ export default function EventsDiscoveryPage() {
   const [activeCategory, setActiveCategory] =
     useState(CATEGORIES[0])
 
+  const [showAllExplore, setShowAllExplore] = useState(false)
+
   useEffect(() => {
     const refresh = () =>
       setEvents(loadCreatedEvents())
@@ -472,11 +474,12 @@ export default function EventsDiscoveryPage() {
 
   const listEvents = filtered.slice(0, 4)
 
-  // Explore shows everything beyond the first 4; if fewer than 5 events exist,
-  // fall back to showing all events so the section is never empty.
-  const exploreEvents = filtered.length > 4
-    ? filtered.slice(4)
-    : filtered
+  const exploreEvents =
+    showAllExplore
+      ? filtered.slice(4)
+      : filtered.length > 4
+        ? filtered.slice(4, 7)
+        : filtered.slice(0, 3)
 
   return (
     <div className="kodte-page">
@@ -586,7 +589,7 @@ export default function EventsDiscoveryPage() {
           </div>
 
           <a
-            href="#explore"
+            href="/events"
             className="btn btn-light"
           >
             See More Events
@@ -713,7 +716,7 @@ export default function EventsDiscoveryPage() {
           EXPLORE MORE
           ============================================================ */}
 
-      <div id="explore" className="section explore-section">
+      <div className="section explore-section">
         <div className="section-rule" />
 
         <div className="section-head">
@@ -731,6 +734,14 @@ export default function EventsDiscoveryPage() {
               with categories below.
             </p>
           </div>
+
+          <button
+            type="button"
+            className="btn btn-light"
+            onClick={() => setShowAllExplore(v => !v)}
+          >
+            {showAllExplore ? 'Show Less ↑' : 'See More Events →'}
+          </button>
         </div>
 
         <div className="filter-row">
