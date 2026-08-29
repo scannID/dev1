@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { KodteMark } from '../customer/KodteMark'
 import {
   formatReceiptDate,
@@ -67,7 +67,7 @@ export default function ReceiptPage() {
       <div className="rp-shell">
         <div className="rp-header">
           <KodteMark size={28} />
-          <span className="rp-brand">Kodte</span>
+          <span className="rp-brand">Koddly</span>
         </div>
         <div className="rp-not-found">
           <div className="rp-nf-icon">🧾</div>
@@ -77,7 +77,7 @@ export default function ReceiptPage() {
             device that made the payment. Open this link on that device to view it.
           </p>
           <p className="rp-nf-hint">
-            If you're the payer, open your receipt history in the Kodte menu and find
+            If you're the payer, open your receipt history in the Koddly menu and find
             this order.
           </p>
         </div>
@@ -182,7 +182,7 @@ export default function ReceiptPage() {
         <div className="rp-divider rp-divider--dashed" />
 
         <p className="rp-footnote">
-          Powered by <strong>Kodte</strong> · This receipt is stored on the payer's device.
+          Powered by <strong>Koddly</strong> · This receipt is stored on the payer's device.
         </p>
       </div>
     </div>
@@ -194,7 +194,7 @@ function NotFound({ message }: { message: string }) {
     <div className="rp-shell">
       <div className="rp-header">
         <KodteMark size={28} />
-        <span className="rp-brand">Kodte</span>
+        <span className="rp-brand">Koddly</span>
       </div>
       <div className="rp-not-found">
         <div className="rp-nf-icon">❌</div>

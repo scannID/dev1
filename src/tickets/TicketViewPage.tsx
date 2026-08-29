@@ -1,4 +1,4 @@
-﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
 import { ArrowRight, Check, CheckCheck, Clock, Copy, Send, Share2, X } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
@@ -199,7 +199,7 @@ export default function TicketViewPage({ accessToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kodte</p>
+          <p className="tk-hero-kicker">Koddly</p>
           <h2>Ticket unavailable</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error ?? 'Not found'}
@@ -217,7 +217,7 @@ export default function TicketViewPage({ accessToken }: Props) {
         <div className="tk-brand">
           <KodteMark size={28} />
           <div>
-            <strong>Kodte</strong>
+            <strong>Koddly</strong>
             <span>{visual.host?.trim() || ticket.holderName || 'Hosted event'}</span>
           </div>
         </div>

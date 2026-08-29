@@ -1,6 +1,6 @@
 {
-  "name": "Kode Merchant",
-  "short_name": "Kode",
+  "name": "Koddly Merchant",
+  "short_name": "Koddly",
   "description": "QR-powered ordering for restaurants, bars, and events",
   "start_url": "/",
   "display": "standalone",

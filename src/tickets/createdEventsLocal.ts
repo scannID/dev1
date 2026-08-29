@@ -1,4 +1,4 @@
-﻿/** Device-local list of events created on this browser (for create-event QR gallery). */
+/** Device-local list of events created on this browser (for create-event QR gallery). */
 
 export type LocalCreatedEvent = {
   eventId: string

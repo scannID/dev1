@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import { ApiError } from '../api/client'
 import { publicTicketsApi } from '../api/services'
@@ -841,7 +841,7 @@ export default function GateScanPage({
               <KodteMark size={22} />
             </div>
             <div className="gate-brand-text">
-              <span className="gate-brand-name">Kodte</span>
+              <span className="gate-brand-name">Koddly</span>
             </div>
           </div>
         </header>
@@ -850,7 +850,7 @@ export default function GateScanPage({
           <span className="gate-floating-logo">
             <KodteMark size={30} />
           </span>
-          <span className="gate-floating-name">Kodte</span>
+          <span className="gate-floating-name">Koddly</span>
         </div>
       )}
 

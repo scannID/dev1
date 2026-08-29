@@ -1,4 +1,4 @@
-﻿import { useRef } from 'react'
+import { useRef } from 'react'
 import type { Business } from '../../api/types'
 import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
@@ -175,7 +175,7 @@ export function PayStep({
           <>
             <p className="cm-muted" style={{ margin: 0 }}>
               Enter each person’s <strong>name, MoMo number, and amount</strong>. Everyone gets their own
-              prompt. All shares settle under the same Kodte payment ref
+              prompt. All shares settle under the same Koddly payment ref
               {business.paymentReference ? (
                 <>
                   {' '}
@@ -353,7 +353,7 @@ export function PayStep({
 
       <p className="cm-hint">
         {splitEnabled
-          ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Kodte ref.`
+          ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Koddly ref.`
           : `You’ll get a ${provider} prompt on your phone. Approve it to complete payment — we won’t mark the order paid until confirmation arrives.`}
       </p>
     </div>

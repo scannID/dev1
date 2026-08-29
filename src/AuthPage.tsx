@@ -1,4 +1,4 @@
-﻿import { useState, FormEvent } from 'react'
+import { useState, FormEvent } from 'react'
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -257,7 +257,7 @@ export default function AuthPage({ onBack, onSuccess }: AuthPageProps) {
                 <rect x="14" y="14" width="3" height="3" rx="0.5" fill="white" />
               </svg>
             </div>
-            <span style={{ color: C.text, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>Kodte</span>
+            <span style={{ color: C.text, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>Koddly</span>
           </div>
         </div>
 

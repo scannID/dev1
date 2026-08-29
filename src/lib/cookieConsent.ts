@@ -1,4 +1,4 @@
-﻿export const COOKIE_CONSENT_KEY = 'kodte-cookie-consent'
+export const COOKIE_CONSENT_KEY = 'kodte-cookie-consent'
 const COOKIE_CONSENT_CLIENT_ID_KEY = 'kodte-cookie-consent-client-id'
 
 export type CookieConsentChoice = 'accepted' | 'essential'

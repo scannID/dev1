@@ -1,4 +1,4 @@
-﻿import { Shield } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MeshGradientBackground from '@/components/MeshGradientBackground'
 import CursorField from '@/components/CursorField'
@@ -20,7 +20,7 @@ export default function AdminLogin({
         <div className="admin-login-brand">
           <img src="/kodte-icon.svg" alt="" className="admin-login-logo" />
           <div>
-            <p className="admin-login-name">Kodte</p>
+            <p className="admin-login-name">Koddly</p>
             <p className="admin-login-tag">Admin Console</p>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function AdminLogin({
         </div>
 
         <p className="admin-login-foot">
-          Authorised access only · © {new Date().getFullYear()} Kodte
+          Authorised access only · © {new Date().getFullYear()} Koddly
         </p>
       </div>
     </div>

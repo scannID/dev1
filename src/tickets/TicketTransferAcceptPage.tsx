@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TicketTransferAcceptPage
  *
  * Route: /ticket/transfer/:transferToken
@@ -125,7 +125,7 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kodte</p>
+          <p className="tk-hero-kicker">Koddly</p>
           <h2>Invalid transfer link</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error ?? 'This transfer link is not valid.'}
@@ -140,7 +140,7 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kodte</p>
+          <p className="tk-hero-kicker">Koddly</p>
           <h2>Transfer unavailable</h2>
           <p className="tk-muted-note" style={{ marginTop: 8, lineHeight: 1.6 }}>
             {info.message ?? 'This transfer link has expired or has already been used.'}
@@ -184,7 +184,7 @@ export default function TicketTransferAcceptPage({ transferToken }: Props) {
         <div className="tk-brand">
           <KodteMark size={28} />
           <div>
-            <strong>Kodte</strong>
+            <strong>Koddly</strong>
             <span>Ticket transfer</span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 
 type OrderRow = {
   id: string
@@ -275,7 +275,7 @@ export function KodteTabletDemo() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 14, padding: '0 4px' }}>
                 <img
                   src="/kodte-icon.svg"
-                  alt="Kodte"
+                  alt="Koddly"
                   style={{
                     width: 28,
                     height: 28,
@@ -283,7 +283,7 @@ export function KodteTabletDemo() {
                   }}
                 />
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Kodte</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#15231c', lineHeight: 1.1 }}>Koddly</div>
                   <div style={{ fontSize: 7.5, color: '#7a867f' }}>Merchant</div>
                 </div>
               </div>

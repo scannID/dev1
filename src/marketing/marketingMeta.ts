@@ -1,9 +1,9 @@
-﻿import type { MarketingSlug } from './routes'
+import type { MarketingSlug } from './routes'
 
 /** Per-slug SEO title and description for marketing pages. */
 export const marketingMeta: Record<MarketingSlug, { title: string; description: string }> = {
   'how-it-works': {
-    title: 'How Kodte works',
+    title: 'How Koddly works',
     description:
       'Go from empty catalog to live QR ordering in minutes. Three steps — no hardware, no app installs for your customers.',
   },
@@ -23,29 +23,29 @@ export const marketingMeta: Record<MarketingSlug, { title: string; description: 
       'Start free while you set up. Scale when your venue is ready — simple, transparent pricing with no surprise hardware fees.',
   },
   about: {
-    title: 'About Kodte',
+    title: 'About Koddly',
     description:
-      'Kodte helps modern venues turn menus into scannable ordering experiences — so customers move faster and teams stay in control.',
+      'Koddly helps modern venues turn menus into scannable ordering experiences — so customers move faster and teams stay in control.',
   },
   careers: {
-    title: 'Careers at Kodte',
+    title: 'Careers at Koddly',
     description:
       'We are building ordering infrastructure for real venues. If you care about craft, reliability, and customer experience, we want to hear from you.',
   },
   contact: {
     title: 'Contact',
     description:
-      'Questions about onboarding, partnerships, or support? Reach the Kodte team — we respond during business hours.',
+      'Questions about onboarding, partnerships, or support? Reach the Koddly team — we respond during business hours.',
   },
   press: {
     title: 'Press',
     description:
-      'Brand assets and company facts for journalists, partners, and analysts covering Kodte.',
+      'Brand assets and company facts for journalists, partners, and analysts covering Koddly.',
   },
   help: {
     title: 'Help center',
     description:
-      'Answers to the questions merchants ask most when going live with Kodte QR ordering.',
+      'Answers to the questions merchants ask most when going live with Koddly QR ordering.',
   },
   guides: {
     title: 'Guides',
@@ -54,31 +54,31 @@ export const marketingMeta: Record<MarketingSlug, { title: string; description: 
   },
   status: {
     title: 'System status',
-    description: 'Current availability of Kodte services — live status and incident updates.',
+    description: 'Current availability of Koddly services — live status and incident updates.',
   },
   api: {
     title: 'API',
     description:
-      'Programmatic access to Kodte for partners and advanced operators. REST API documentation for orders, tickets, and payments.',
+      'Programmatic access to Koddly for partners and advanced operators. REST API documentation for orders, tickets, and payments.',
   },
   privacy: {
     title: 'Privacy Policy',
     description:
-      'How Kodte collects, uses, and protects information from merchants, customers, and visitors.',
+      'How Koddly collects, uses, and protects information from merchants, customers, and visitors.',
   },
   terms: {
     title: 'Terms of Service',
     description:
-      'The terms that govern your use of Kodte — QR ordering, event ticketing, and payment features.',
+      'The terms that govern your use of Koddly — QR ordering, event ticketing, and payment features.',
   },
   security: {
     title: 'Security',
     description:
-      'How Kodte protects merchant and customer data — a practical, layered approach to platform security.',
+      'How Koddly protects merchant and customer data — a practical, layered approach to platform security.',
   },
   cookies: {
     title: 'Cookie Policy',
     description:
-      'How Kodte uses cookies and similar technologies on this site and in the merchant app.',
+      'How Koddly uses cookies and similar technologies on this site and in the merchant app.',
   },
 }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { loadCreatedEvents, type LocalCreatedEvent } from './createdEventsLocal'
 import { usePageMeta } from '../hooks/usePageMeta'
@@ -6,7 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta'
 /* =====================================================================
    Events Discovery Page
 
-   — same visual language as the Kodte landing page
+   — same visual language as the Koddly landing page
    — warm paper background: #efe6d2
    — warm surfaces: #f7f1e3
    — warm ink + subtle brown dividers
@@ -420,7 +420,7 @@ const CATEGORIES = [
 
 export default function EventsDiscoveryPage() {
   usePageMeta({
-    title: 'Kodte — Discover Events',
+    title: 'Koddly — Discover Events',
     description:
       'Tickets, venues and experiences — search, book and walk in with a QR code.',
     robots: 'noindex, nofollow',
@@ -499,7 +499,7 @@ export default function EventsDiscoveryPage() {
             />
 
             <span className="logo-word">
-              kodte
+              koddly
             </span>
           </div>
 
@@ -523,12 +523,12 @@ export default function EventsDiscoveryPage() {
             <h1>
               Find what's
               <br />
-              happening tonight.
+              happening often.
             </h1>
 
             <p>
               Tickets, venues and experiences — all on
-              Kodte. Search, book and walk in with a QR
+              Koddly. Search, book and walk in with a QR
               code, no printouts, no queues.
             </p>
           </div>
@@ -730,7 +730,7 @@ export default function EventsDiscoveryPage() {
             </h2>
 
             <p>
-              Explore more events on Kodte by searching
+              Explore more events on Koddly by searching
               with categories below.
             </p>
           </div>
@@ -872,11 +872,11 @@ export default function EventsDiscoveryPage() {
 
         <div className="footer-inner">
           <div className="footer-brand">
-            kodte<span>.</span>
+            koddly<span>.</span>
           </div>
 
           <div>
-            © {new Date().getFullYear()} Kodte.
+            © {new Date().getFullYear()} Koddly.
             All events, all in one place.
           </div>
         </div>
@@ -988,26 +988,18 @@ const STYLES = `
   background:
     linear-gradient(
       180deg,
-      rgba(6,10,20,0.55) 0%,
-      rgba(6,10,20,0.35) 40%,
-      rgba(6,10,20,0.85) 100%
-    ),
-    radial-gradient(
-      circle at 20% 20%,
-      #3a2f6b 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      circle at 80% 10%,
-      #7a2b6b 0%,
-      transparent 40%
+      rgba(6,10,20,0.5) 0%,
+      rgba(6,10,20,0.28) 42%,
+      rgba(6,10,20,0.88) 100%
     ),
     linear-gradient(
-      120deg,
-      #101625 0%,
-      #1a1f33 55%,
-      #241b3a 100%
-    );
+      105deg,
+      rgba(38,32,26,0.72) 0%,
+      rgba(38,32,26,0.35) 48%,
+      rgba(38,32,26,0.12) 100%
+    ),
+    url('/hero-bg.jpg')
+      center / cover no-repeat;
 
   color: #fff;
 

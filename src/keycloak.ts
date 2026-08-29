@@ -1,9 +1,9 @@
-﻿import Keycloak from 'keycloak-js'
+import Keycloak from 'keycloak-js'
 
 const MERCHANT_CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-client'
 
 /**
- * Prod builds set VITE_KEYCLOAK_URL to https://auth.kodte.com — always use that.
+ * Prod builds set VITE_KEYCLOAK_URL to https://auth.koddly.com — always use that.
  * Local/LAN: match the page host on :8080 so phone access via 192.168.x.x still works
  * even when Vite env points at localhost.
  */

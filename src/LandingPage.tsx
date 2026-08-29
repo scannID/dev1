@@ -24,6 +24,11 @@ const C = {
   ok: '#3f5c3c',
 }
 
+const FONT = "'Outfit Variable', 'Outfit', ui-sans-serif, system-ui, sans-serif"
+
+// Landing hero only — events page uses /hero-bg.jpg separately.
+const heroPhoto = '/hero-restaurant.jpg'
+
 /* ─────────────────────────────────────────────────────────────
    Zigzag ticket edge
    ───────────────────────────────────────────────────────────── */
@@ -160,7 +165,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
           style={{
             background: C.paperLt,
             padding: '22px 26px 30px',
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
           }}
         >
           <div
@@ -171,14 +176,14 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
           >
             <div
               style={{
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: FONT,
                 fontSize: 22,
                 fontWeight: 800,
                 letterSpacing: '0.06em',
                 color: C.ink,
               }}
             >
-              KODTE
+              Koddly
             </div>
 
             <div
@@ -306,7 +311,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
             border: `3px solid ${C.stamp}`,
             borderRadius: 8,
             color: C.stamp,
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
             fontWeight: 800,
             fontSize: 15,
             letterSpacing: '0.08em',
@@ -370,7 +375,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
         <div style={{
           fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
           color: C.inkSoft, marginBottom: 18,
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: FONT,
         }}>
           ORDER № 0482 · TRACKING
         </div>
@@ -409,7 +414,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
                   <span style={{
                     fontSize: 11, fontWeight: done || active ? 700 : 400,
                     color: done || active ? C.ink : `${C.ink}55`,
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     letterSpacing: '0.03em',
                     transition: 'color 0.3s ease',
                   }}>
@@ -552,13 +557,13 @@ function EventTicketStub() {
           background: C.paperLt,
           flex: 1,
           padding: '22px 24px',
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: FONT,
           position: 'relative',
         }}
       >
         <div
           style={{
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
             fontWeight: 700,
             fontSize: 12,
             color: C.stamp,
@@ -571,7 +576,7 @@ function EventTicketStub() {
 
         <div
           style={{
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
             fontWeight: 800,
             fontSize: 24,
             letterSpacing: '-0.02em',
@@ -715,7 +720,7 @@ function EventTicketStub() {
 
         <span
           style={{
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
             fontWeight: 600,
             fontSize: 8.5,
             letterSpacing: '0.06em',
@@ -731,12 +736,6 @@ function EventTicketStub() {
 
 /* ─────────────────────────────────────────────────────────────
    Ticket Book replacement — "DEPARTURES BOARD" split-flap widget
-   A split-flap board, like a train/gate arrivals display. Bolder,
-   more mechanical, higher contrast than the paper-ticket look —
-   plays on "gate", "scan at gate", and events feeling like things
-   you're boarding. The title flips letter by letter; the sold
-   counter flips digit by digit. Cycles through a few events, then
-   calls onDone so the parent scene can reset back to the receipt.
    ───────────────────────────────────────────────────────────── */
 
 const FB = {
@@ -797,7 +796,7 @@ function FlapChar({ char, delay = 0, size = 15 }: { char: string; delay?: number
       <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(255,255,255,0.18), transparent 50%, ${C.spike}18 51%, transparent)` }} />
       <span style={{
         position: 'relative', zIndex: 2,
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: FONT,
         fontWeight: 700,
         fontSize: size * 0.62,
         color: FB.ink,
@@ -844,7 +843,7 @@ function FlapLine({ text, size = 11 }: { text: string; size?: number }) {
     }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: '50%', height: 1, background: `${C.spike}44` }} />
       <span style={{
-        fontFamily: "'IBM Plex Mono', monospace",
+        fontFamily: FONT,
         fontWeight: 600, fontSize: size, color: FB.ink, letterSpacing: '0.04em',
         display: 'inline-block',
         transform: flip ? 'rotateX(-85deg)' : 'rotateX(0deg)',
@@ -904,7 +903,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
   const ev = flapEvents[idx]
 
   return (
-    <div style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div style={{ fontFamily: FONT }}>
       <div style={{
         width: 400, margin: '0 auto',
         background: `linear-gradient(180deg, ${C.paperLt}, ${C.paper})`,
@@ -1016,14 +1015,14 @@ function TicketStack() {
             transform: `rotate(${rot[i]}deg)`,
             boxShadow:
               '0 14px 30px rgba(38,32,26,0.18)',
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
           }}
         >
           <PunchHoles />
 
           <div
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontWeight: 800,
               fontSize: 30,
               color: `${C.ink}33`,
@@ -1069,21 +1068,29 @@ const topFeatures = [
     Icon: QrCode,
     title: 'Instant QR generation',
     body: 'One code, live the moment you sign up.',
+    photo: '/features/qr.jpg',
+    objectPosition: 'center 35%',
   },
   {
     Icon: ClipboardList,
     title: 'Live order dashboard',
     body: 'Orders land in real time — pending to ready in a tap.',
+    photo: '/features/dashboard.jpg',
+    objectPosition: 'center top',
   },
   {
     Icon: ShoppingBag,
     title: 'Catalog management',
     body: 'Edit items anytime, customers see it instantly.',
+    photo: '/features/catalog.jpg',
+    objectPosition: 'center 55%',
   },
   {
     Icon: CreditCard,
     title: 'Payment tracking',
     body: 'Mark paid, unpaid, or refunded. Revenue at a glance.',
+    photo: '/features/payments.jpg',
+    objectPosition: 'center 40%',
   },
 ]
 
@@ -1100,7 +1107,7 @@ function FeatureCards() {
       <h2
         style={{
           textAlign: 'center',
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: FONT,
           fontWeight: 800,
           fontSize: 20,
           letterSpacing: '0.08em',
@@ -1122,14 +1129,14 @@ function FeatureCards() {
         }}
       >
         {topFeatures.map(
-          ({ Icon, title, body }, i) => (
+          ({ Icon, title, body, photo, objectPosition }, i) => (
             <div
               key={title}
               style={{
                 position: 'relative',
                 background: C.paperLt,
                 borderRadius: 4,
-                padding: '24px 20px 22px',
+                padding: '0 20px 22px',
                 boxShadow:
                   '0 14px 30px rgba(38,32,26,0.14)',
                 transform: `rotate(${rot[i]}deg)`,
@@ -1137,9 +1144,72 @@ function FeatureCards() {
             >
               <Zigzag />
 
+              {/* Photo print — framed snapshot tucked into the ticket */}
               <div
                 style={{
-                  padding: '18px 0 4px',
+                  position: 'relative',
+                  margin: '0 -20px',
+                  padding: '14px 16px 0',
+                  background: `linear-gradient(180deg, ${C.paper} 0%, ${C.paperLt} 100%)`,
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    left: '50%',
+                    transform: `translateX(-50%) rotate(${rot[i] > 0 ? -5 : 5}deg)`,
+                    width: 48,
+                    height: 16,
+                    background: `${C.stamp}44`,
+                    boxShadow: '0 2px 4px rgba(38,32,26,0.12)',
+                    zIndex: 2,
+                    pointerEvents: 'none',
+                  }}
+                />
+
+                <div
+                  style={{
+                    position: 'relative',
+                    height: 128,
+                    overflow: 'hidden',
+                    borderRadius: 4,
+                    border: `1px solid ${C.spike}40`,
+                    boxShadow:
+                      'inset 0 0 0 1px rgba(255,255,255,0.45), 0 10px 22px rgba(38,32,26,0.16)',
+                    background: C.paper,
+                  }}
+                >
+                  <img
+                    src={photo}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: objectPosition,
+                      display: 'block',
+                      filter: 'sepia(0.14) contrast(1.06) saturate(1.08)',
+                      transform: 'scale(1.02)',
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background:
+                        'linear-gradient(180deg, rgba(239,230,210,0.05) 0%, rgba(239,230,210,0.55) 88%, rgba(247,241,227,0.95) 100%)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '0 0 4px',
                 }}
               >
                 <div
@@ -1147,12 +1217,16 @@ function FeatureCards() {
                     width: 38,
                     height: 38,
                     borderRadius: 8,
-                    background: `${C.stamp}18`,
+                    background: C.paperLt,
                     border: `1.5px solid ${C.stamp}55`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 16,
+                    marginTop: -22,
+                    marginBottom: 14,
+                    boxShadow: '0 4px 10px rgba(38,32,26,0.18)',
+                    position: 'relative',
+                    zIndex: 1,
                   }}
                 >
                   <Icon
@@ -1164,7 +1238,7 @@ function FeatureCards() {
 
                 <h3
                   style={{
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     fontWeight: 800,
                     fontSize: 16,
                     letterSpacing: '0.02em',
@@ -1177,7 +1251,7 @@ function FeatureCards() {
 
                 <p
                   style={{
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     fontSize: 11.5,
                     fontWeight: 400,
                     lineHeight: 1.6,
@@ -1199,7 +1273,7 @@ function FeatureCards() {
         style={{
           textAlign: 'center',
           marginTop: 32,
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: FONT,
           fontSize: 11.5,
           fontWeight: 500,
           color: C.inkSoft,
@@ -1254,7 +1328,7 @@ function Manifest() {
               gap: 10,
               alignItems: 'baseline',
               padding: '14px 30px',
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontSize: 12.5,
               fontWeight: 500,
               color: C.inkSoft,
@@ -1285,6 +1359,153 @@ function Manifest() {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   Photo strip — real photographs, taped in like proofs pinned to
+   a corkboard above the counter. This is the one place real
+   photography enters an otherwise illustrated page, so it's kept
+   small, tactile, and framed like physical prints rather than a
+   generic hero image or stock-photo banner.
+   ───────────────────────────────────────────────────────────── */
+
+const galleryPhotos = [
+  {
+    url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=500&q=80',
+    caption: 'Table for two, order in',
+    rot: -5,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=500&q=80',
+    caption: 'Scan, tap, done',
+    rot: 3,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=500&q=80',
+    caption: 'Kitchen keeps up',
+    rot: -2,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=500&q=80',
+    caption: 'Gate night, tickets scanning',
+    rot: 4,
+  },
+]
+
+function Polaroid({ url, caption, rot }: { url: string; caption: string; rot: number }) {
+  return (
+    <div
+      style={{
+        background: '#fffdf8',
+        padding: '10px 10px 16px',
+        boxShadow: '0 16px 32px rgba(38,32,26,0.22)',
+        transform: `rotate(${rot}deg)`,
+        width: 190,
+        flexShrink: 0,
+        position: 'relative',
+      }}
+    >
+      {/* washi tape */}
+      <div
+        style={{
+          position: 'absolute',
+          top: -10,
+          left: '50%',
+          transform: `translateX(-50%) rotate(${rot > 0 ? -6 : 6}deg)`,
+          width: 56,
+          height: 20,
+          background: `${C.stamp}55`,
+          opacity: 0.8,
+          boxShadow: '0 2px 4px rgba(38,32,26,0.15)',
+        }}
+      />
+
+      <div
+        style={{
+          width: '100%',
+          aspectRatio: '1 / 1',
+          overflow: 'hidden',
+          background: C.paper,
+        }}
+      >
+        <img
+          src={url}
+          alt={caption}
+          loading="lazy"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            filter: 'sepia(0.12) contrast(1.03)',
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily: FONT,
+          fontSize: 11,
+          fontWeight: 600,
+          color: C.inkSoft,
+          letterSpacing: '0.02em',
+          marginTop: 10,
+        }}
+      >
+        {caption}
+      </div>
+    </div>
+  )
+}
+
+function PhotoStrip() {
+  return (
+    <section style={{ padding: '10px 24px 90px' }}>
+      <div
+        style={{
+          fontFamily: FONT,
+          fontSize: 11.5,
+          fontWeight: 600,
+          color: C.stamp,
+          letterSpacing: '0.1em',
+          marginBottom: 10,
+          textAlign: 'center',
+        }}
+      >
+        FROM THE COUNTER
+      </div>
+
+      <h2
+        style={{
+          fontFamily: FONT,
+          fontWeight: 700,
+          fontSize: 'clamp(18px,2.5vw,26px)',
+          letterSpacing: '-0.01em',
+          color: C.inkSoft,
+          margin: '0 0 34px',
+          textAlign: 'center',
+        }}
+      >
+        Real tables, real gates
+      </h2>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: 28,
+          flexWrap: 'wrap',
+          maxWidth: 1000,
+          margin: '0 auto',
+        }}
+      >
+        {galleryPhotos.map((p) => (
+          <Polaroid key={p.caption} {...p} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
    Main
    ───────────────────────────────────────────────────────────── */
 
@@ -1298,7 +1519,7 @@ export default function KodteLandingTicket({
   onCreateEventTicket,
 }: KodteLandingTicketProps = {}) {
   usePageMeta({
-    title: 'Kodte — QR ordering and event ticketing for Uganda',
+    title: 'Koddly — QR ordering and event ticketing for Uganda',
     description:
       'One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda.',
     canonicalPath: '/',
@@ -1312,26 +1533,24 @@ export default function KodteLandingTicket({
         color: C.ink,
         minHeight: '100vh',
         overflowX: 'hidden',
-        fontFamily: "'Outfit', sans-serif",
+        fontFamily: FONT,
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@600;700&display=swap');
-
         * {
           box-sizing: border-box;
         }
 
         body {
           margin: 0;
-          font-family: 'Outfit', sans-serif;
+          font-family: ${FONT};
         }
 
         button,
         input,
         textarea,
         select {
-          font-family: 'Outfit', sans-serif;
+          font-family: ${FONT};
         }
 
         @keyframes kodteManifest {
@@ -1464,14 +1683,14 @@ export default function KodteLandingTicket({
 
               <span
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontSize: 24,
                   fontWeight: 600,
                   letterSpacing: '0.06em',
                   color: C.ink,
                 }}
               >
-                Kodte
+                Koddly
               </span>
             </a>
 
@@ -1491,7 +1710,7 @@ export default function KodteLandingTicket({
                   color: C.ink,
                   borderRadius: 6,
                   padding: '7px 14px',
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontSize: 11.5,
                   fontWeight: 600,
                   letterSpacing: '0.03em',
@@ -1502,7 +1721,7 @@ export default function KodteLandingTicket({
                 }}
               >
                 <Scissors size={14} />
-                Events Ticketing
+                 Ticketing
               </button>
 
               <button
@@ -1513,7 +1732,7 @@ export default function KodteLandingTicket({
                   color: C.stamp,
                   borderRadius: 8,
                   padding: '7px 16px',
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontSize: 14,
                   fontWeight: 800,
                   letterSpacing: '0.06em',
@@ -1531,11 +1750,49 @@ export default function KodteLandingTicket({
         {/* HERO */}
         <section
           style={{
+            position: 'relative',
             padding: 'clamp(50px,8vw,90px) 0 60px',
+            overflow: 'hidden',
           }}
         >
+          {/* Backdrop photo — a real counter, faded under a paper wash
+              so the illustration reads as printed on top of it rather
+              than a photo competing with the ticket graphics. */}
           <div
             style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 0,
+            }}
+          >
+            <img
+              src={heroPhoto}
+              alt=""
+              loading="eager"
+              decoding="async"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 45%',
+                filter: 'sepia(0.18) contrast(0.96) brightness(1.08) saturate(1.05)',
+              }}
+            />
+
+            {/* paper-toned scrim — readable text on the left, photo visible on the right */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `linear-gradient(100deg, ${C.paper} 0%, ${C.paper}e8 26%, ${C.paper}b3 48%, ${C.paper}55 68%, ${C.paper}22 100%)`,
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              position: 'relative',
+              zIndex: 1,
               display: 'grid',
               gridTemplateColumns:
                 window.innerWidth < 860
@@ -1548,7 +1805,7 @@ export default function KodteLandingTicket({
             <div style={{ paddingLeft: 'clamp(24px, 6vw, 100px)', maxWidth: 580 }}>
               <div
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontSize: 11.5,
                   fontWeight: 600,
                   color: C.stamp,
@@ -1561,16 +1818,15 @@ export default function KodteLandingTicket({
 
               <h1
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontWeight: 500,
-                  fontSize: 'clamp(46px,7vw,78px)',
-                  lineHeight: 0.85,
+                  fontSize: 'clamp(40px,6.5vw,72px)',
+                  lineHeight: 1.05,
                   letterSpacing: '-0.04em',
                   margin: '0 0 28px',
                 }}
               >
-                ONE SCAN.
-                <br />
+                ONE SCAN.{' '}
                 <span style={{ color: C.stamp }}>
                   TOTAL CONTROL.
                 </span>
@@ -1578,17 +1834,19 @@ export default function KodteLandingTicket({
 
               <p
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
-                  fontSize: 20,
+                  fontFamily: FONT,
+                  fontSize: 14,
                   fontWeight: 400,
                   lineHeight: 1.7,
                   color: C.inkSoft,
-                  maxWidth: 420,
+                  maxWidth: 480,
                   margin: '0 0 40px',
                   opacity: 0.85,
                 }}
               >
-                Just Scan. Zero Friction
+                Gone are the days of paper menus, long queues, and chasing payments at
+                the till. One QR code lets your guests scan, order, and pay from their
+                phone — while you run everything from one live dashboard.
               </p>
 
               <div
@@ -1606,7 +1864,7 @@ export default function KodteLandingTicket({
                     color: C.paperLt,
                     border: 'none',
                     padding: '13px 26px',
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     fontWeight: 800,
                     fontSize: 16,
                     letterSpacing: '0.05em',
@@ -1623,7 +1881,7 @@ export default function KodteLandingTicket({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     fontSize: 11.5,
                     fontWeight: 500,
                     color: C.inkSoft,
@@ -1660,7 +1918,7 @@ export default function KodteLandingTicket({
         >
           <div
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontSize: 11.5,
               fontWeight: 600,
               color: C.stamp,
@@ -1673,7 +1931,7 @@ export default function KodteLandingTicket({
 
           <h2
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontWeight: 700,
               fontSize: 'clamp(18px,2.5vw,26px)',
               letterSpacing: '-0.01em',
@@ -1687,6 +1945,9 @@ export default function KodteLandingTicket({
           <TicketStack />
         </section>
 
+        {/* PHOTO STRIP — real photography, taped in like counter proofs */}
+        <PhotoStrip />
+
         {/* EVENT TICKETING */}
         <section
           style={{
@@ -1696,7 +1957,7 @@ export default function KodteLandingTicket({
         >
           <div
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontSize: 11.5,
               fontWeight: 600,
               color: C.stamp,
@@ -1704,12 +1965,12 @@ export default function KodteLandingTicket({
               marginBottom: 10,
             }}
           >
-            ALSO ON KODTE
+            ALSO ON KODDLY
           </div>
 
           <h2
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontWeight: 700,
               fontSize: 'clamp(18px,2.5vw,26px)',
               letterSpacing: '-0.01em',
@@ -1722,7 +1983,7 @@ export default function KodteLandingTicket({
 
           <p
             style={{
-              fontFamily: "'Outfit', sans-serif",
+              fontFamily: FONT,
               fontSize: 11.5,
               fontWeight: 400,
               lineHeight: 1.6,
@@ -1783,7 +2044,7 @@ export default function KodteLandingTicket({
 
               <h2
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontWeight: 800,
                   fontSize:
                     'clamp(28px,4vw,42px)',
@@ -1796,7 +2057,7 @@ export default function KodteLandingTicket({
 
               <p
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontSize: 13,
                   fontWeight: 400,
                   lineHeight: 1.7,
@@ -1816,8 +2077,7 @@ export default function KodteLandingTicket({
                   border: 'none',
                   padding: '15px 34px',
                   borderRadius: 3,
-                  fontFamily:
-                    "'Outfit', sans-serif",
+                  fontFamily: FONT,
                   fontWeight: 800,
                   fontSize: 17,
                   letterSpacing: '0.05em',
@@ -1836,7 +2096,7 @@ export default function KodteLandingTicket({
           style={{
             borderTop: `1px dashed ${C.ink}44`,
             padding: '48px 24px 26px',
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: FONT,
           }}
         >
           <div
@@ -1859,8 +2119,7 @@ export default function KodteLandingTicket({
               <div>
                 <div
                   style={{
-                    fontFamily:
-                      "'Outfit', sans-serif",
+                    fontFamily: FONT,
                     fontSize: 22,
                     fontWeight: 800,
                     letterSpacing: '0.06em',
@@ -1868,7 +2127,7 @@ export default function KodteLandingTicket({
                     marginBottom: 10,
                   }}
                 >
-                  KODTE
+                  Koddly
                 </div>
 
                 <p
@@ -2003,7 +2262,7 @@ export default function KodteLandingTicket({
               </span>
 
               <span>
-                Kodte is a product of QBI Labs SMC ·
+                Koddly is a product of QBI Labs SMC ·
                 Kampala, Uganda
               </span>
             </div>

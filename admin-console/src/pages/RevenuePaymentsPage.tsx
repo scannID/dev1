@@ -1,4 +1,4 @@
-﻿import { TrendingUp } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
@@ -45,7 +45,7 @@ export default function RevenuePaymentsPage() {
         {[
           { label: 'Total Revenue (MTD)', value: currency(current?.revenue ?? 0), delta: current?.growth.revenue ?? 0 },
           { label: 'Merchant GMV (MoMo)', value: currency(current?.merchantGmv ?? 0), delta: current?.growth.revenue ?? 0 },
-          { label: 'Kodte fees', value: currency(current?.platformFees ?? 0), delta: current?.growth.revenue ?? 0 },
+          { label: 'Koddly fees', value: currency(current?.platformFees ?? 0), delta: current?.growth.revenue ?? 0 },
           { label: 'PSO fees', value: currency(current?.psoFees ?? 0), delta: current?.growth.revenue ?? 0 },
           { label: 'Transactions (MTD)', value: String(current?.transactions ?? 0), delta: current?.growth.transactions ?? 0 },
           { label: 'Failed Payments', value: String(current?.failedPayments ?? 0), delta: current?.growth.failedPayments ?? 0 },

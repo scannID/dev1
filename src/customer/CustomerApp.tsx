@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Clock3, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -1371,7 +1371,7 @@ export default function CustomerApp({
             <KodteMark size={26} />
           )}
           <h1 className="cm-brand-text">
-            <span className="cm-brand-name">Kodte</span>
+            <span className="cm-brand-name">Koddly</span>
             <span className="cm-brand-biz">{business.name}</span>
           </h1>
           {showBusyHeaderBadge ? (

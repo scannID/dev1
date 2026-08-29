@@ -1,4 +1,4 @@
-﻿import type { StaffRole } from '../api/operations'
+import type { StaffRole } from '../api/operations'
 
 export type PermissionId =
   | 'catalog:read'

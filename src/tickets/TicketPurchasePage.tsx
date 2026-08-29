@@ -1,4 +1,4 @@
-﻿import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { publicTicketsApi } from '../api/services'
 import type { TicketEventInfo, QueueStatusResponse, WaitlistJoinResponse, TicketPurchaseResponse } from '../api/types'
 import { KodteMark } from '../customer/KodteMark'
@@ -344,7 +344,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
     return (
       <div className="tk-shell tk-centered">
         <div className="tk-panel tk-empty tk-enter">
-          <p className="tk-hero-kicker">Kodte</p>
+          <p className="tk-hero-kicker">Koddly</p>
           <h2>Event unavailable</h2>
           <p className="tk-error" role="alert" style={{ textAlign: 'left' }}>
             {error}
@@ -363,7 +363,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <div className="tk-brand">
             <KodteMark size={28} />
             <div>
-              <strong>Kodte</strong>
+              <strong>Koddly</strong>
               <span>{event.host?.trim() || 'Hosted event'}</span>
             </div>
           </div>
@@ -390,7 +390,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <div className="tk-brand">
             <KodteMark size={28} />
             <div>
-              <strong>Kodte</strong>
+              <strong>Koddly</strong>
               <span>{event.host?.trim() || 'Hosted event'}</span>
             </div>
           </div>
@@ -420,7 +420,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
           <div className="tk-brand">
             <KodteMark size={28} />
             <div>
-              <strong>Kodte</strong>
+              <strong>Koddly</strong>
               <span>{event.host?.trim() || event.eventName}</span>
             </div>
           </div>
@@ -442,7 +442,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
         <div className="tk-brand">
           <KodteMark size={28} />
           <div>
-            <strong>Kodte</strong>
+            <strong>Koddly</strong>
             <span>{event.host?.trim() || 'Hosted event'}</span>
           </div>
         </div>

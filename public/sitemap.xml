@@ -3,105 +3,105 @@
 
   <!-- Home / Landing -->
   <url>
-    <loc>https://kode.ug/</loc>
+    <loc>https://koddly.ug/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <!-- Event ticket creation -->
   <url>
-    <loc>https://kode.ug/create-event</loc>
+    <loc>https://koddly.ug/create-event</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Quick payment tracking (public, no tracking number) -->
   <url>
-    <loc>https://kode.ug/track/</loc>
+    <loc>https://koddly.ug/track/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <!-- Marketing pages -->
   <url>
-    <loc>https://kode.ug/how-it-works</loc>
+    <loc>https://koddly.ug/how-it-works</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://kode.ug/pricing</loc>
+    <loc>https://koddly.ug/pricing</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://kode.ug/ordering</loc>
+    <loc>https://koddly.ug/ordering</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kode.ug/dashboard</loc>
+    <loc>https://koddly.ug/dashboard</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kode.ug/about</loc>
+    <loc>https://koddly.ug/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kode.ug/contact</loc>
+    <loc>https://koddly.ug/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://kode.ug/careers</loc>
+    <loc>https://koddly.ug/careers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://kode.ug/press</loc>
+    <loc>https://koddly.ug/press</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://kode.ug/help</loc>
+    <loc>https://koddly.ug/help</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kode.ug/guides</loc>
+    <loc>https://koddly.ug/guides</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://kode.ug/status</loc>
+    <loc>https://koddly.ug/status</loc>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://kode.ug/api</loc>
+    <loc>https://koddly.ug/api</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <!-- Legal -->
   <url>
-    <loc>https://kode.ug/privacy</loc>
+    <loc>https://koddly.ug/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://kode.ug/terms</loc>
+    <loc>https://koddly.ug/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://kode.ug/security</loc>
+    <loc>https://koddly.ug/security</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://kode.ug/cookies</loc>
+    <loc>https://koddly.ug/cookies</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -1,4 +1,4 @@
-﻿import { Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { OrderStatus } from '../../api/types'
 import type { PaymentProvider, PaymentStatus } from '../payments'
 import { OrderStatusTracker } from '../OrderStatusTracker'
@@ -90,7 +90,7 @@ export function WaitingStep({
 
       {paymentReference ? (
         <p className="cm-ref">
-          Kodte payment ref: <strong>{paymentReference}</strong>
+          Koddly payment ref: <strong>{paymentReference}</strong>
           {multi ? ' · all shares settle under this ref' : null}
         </p>
       ) : null}

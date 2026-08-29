@@ -1,16 +1,16 @@
-﻿import { useEffect } from 'react'
+import { useEffect } from 'react'
 
-const BASE_URL = 'https://kodte.ug'
-const SITE_SUFFIX = ' — Kodte'
+const BASE_URL = 'https://koddly.ug'
+const SITE_SUFFIX = ' — Koddly'
 const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`
 
 export interface PageMeta {
-  /** Page <title>. The site suffix " — Kodte" is appended automatically unless suppressSuffix is true. */
+  /** Page <title>. The site suffix " — Koddly" is appended automatically unless suppressSuffix is true. */
   title: string
   description: string
   /** Canonical path, e.g. "/pricing". Defaults to current pathname. */
   canonicalPath?: string
-  /** Suppress appending " — Kodte" to the title (use for the home page which already includes it). */
+  /** Suppress appending " — Koddly" to the title (use for the home page which already includes it). */
   suppressSuffix?: boolean
   /** OG image URL — defaults to the global og-image.png */
   ogImage?: string

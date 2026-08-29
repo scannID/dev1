@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { DatePicker } from './components/ui/date-picker'
@@ -387,7 +387,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
       >
         <div>
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Kodte · Event Ticket
+            Koddly · Event Ticket
           </p>
           <h2 style={{ margin: '6px 0 0', color: '#fff', fontSize: 23, fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' }}>
             {d.eventName || 'Event Name'}
@@ -419,7 +419,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
         <QrSlot qr={qr} accent={accent} labelColor="#9ca3af" />
       </div>
-      <TicketFooter left="kodte.com · Powered by Kodte" leftColor={accent} right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
+      <TicketFooter left="Koddly.com · Powered by Koddly" leftColor={accent} right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
     </TicketShell>
   )
 }
@@ -494,7 +494,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Kodte · Festival Ticket
+            Koddly · Festival Ticket
           </p>
           <h2 style={{ margin: 0, color: '#f0f6fc', fontSize: 25, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1 }}>
             {d.eventName || 'Event Name'}
@@ -534,7 +534,7 @@ function FestivalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string;
             WebkitTextFillColor: 'transparent',
           }}
         >
-          kodte.com
+          Koddly.com
         </span>
         <span style={{ fontSize: 10, color: '#6e7681' }}>Non-transferable</span>
       </div>
@@ -605,7 +605,7 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
         <QrSlot qr={qr} accent="#e5e7eb" labelColor="#9ca3af" />
       </div>
-      <TicketFooter left="kodte.com · Powered by Kodte" leftColor="#6b7280" right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
+      <TicketFooter left="Koddly.com · Powered by Koddly" leftColor="#6b7280" right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
     </TicketShell>
   )
 }
@@ -636,7 +636,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
       >
         <div>
           <p style={{ margin: '0 0 7px', fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: GOLD_VISUAL.gold }}>
-            Kodte · Gold Reserve
+            Koddly · Gold Reserve
           </p>
           <h2 style={{ margin: 0, color: '#f8f1e3', fontSize: 23, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
             {d.eventName || 'Event Name'}
@@ -676,7 +676,7 @@ function GoldTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; sma
           justifyContent: 'space-between',
         }}
       >
-        <span style={{ fontSize: 10, color: GOLD_VISUAL.gold, fontWeight: 700 }}>kodte.com · Gold Reserve</span>
+        <span style={{ fontSize: 10, color: GOLD_VISUAL.gold, fontWeight: 700 }}>Koddly.com · Gold Reserve</span>
         <span style={{ fontSize: 10, color: '#6b5a3e' }}>Non-transferable</span>
       </div>
     </TicketShell>
@@ -1564,7 +1564,7 @@ function TicketOutput({
   metrics: EventTicketTrackingMetrics | null
 }) {
   const purchaseUrl = data.purchaseUrl || ''
-  const hostName = data.host?.trim() || 'Kodte Events'
+  const hostName = data.host?.trim() || 'Koddly Events'
 
   async function buildPrintableQr(): Promise<string> {
     const link = purchaseUrl
@@ -3299,7 +3299,7 @@ function TicketForm({
                       <Ticket size={18} />
                       <div style={{ minWidth: 0 }}>
                         <p style={{ margin: '0 0 3px', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)' }}>
-                          Kodte · Event ticket
+                          Koddly · Event ticket
                         </p>
                         <p
                           style={{
@@ -3355,7 +3355,7 @@ function TicketForm({
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: CREATE.teal }}>kodte.com · Powered by Kodte</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: CREATE.teal }}>Koddly.com · Powered by Koddly</span>
                       <span style={{ fontSize: 9.5, color: CREATE.muted, fontWeight: 500 }}>Non-transferable</span>
                     </div>
                   </div>
