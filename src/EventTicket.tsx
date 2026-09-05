@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { DatePicker } from './components/ui/date-picker'
+import { MoMoPhoneInput, detectProvider } from './components/MoMoPhoneInput'
+import './components/MoMoPhoneInput.css'
 import {
   ArrowLeft,
   ArrowRight,
@@ -258,7 +260,7 @@ function TicketField({
       <p
         style={{
           margin: '0 0 3px',
-          fontSize: 9,
+          fontSize: 11,
           fontWeight: 700,
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -319,7 +321,7 @@ function QrSlot({
           {placeholder}
         </div>
       )}
-      <p style={{ margin: 0, fontSize: 9, color: labelColor ?? 'rgba(255,255,255,0.4)', textAlign: 'center', letterSpacing: '0.04em' }}>
+      <p style={{ margin: 0, fontSize: 11, color: labelColor ?? 'rgba(255,255,255,0.4)', textAlign: 'center', letterSpacing: '0.04em' }}>
         {label}
       </p>
     </div>
@@ -419,7 +421,7 @@ function ClassicTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
         <QrSlot qr={qr} accent={accent} labelColor="#9ca3af" />
       </div>
-      <TicketFooter left="Koddly.com · Powered by Koddly" leftColor={accent} right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
+      <TicketFooter left="Powered by QbiLabs" leftColor={accent} right="Non-refundable" rightColor="#9ca3af" bg="#f9fafb" />
     </TicketShell>
   )
 }
@@ -605,7 +607,7 @@ function MinimalTicket({ d, qr, small }: { d: Partial<TicketData>; qr?: string; 
         </div>
         <QrSlot qr={qr} accent="#e5e7eb" labelColor="#9ca3af" />
       </div>
-      <TicketFooter left="Koddly.com · Powered by Koddly" leftColor="#6b7280" right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
+      <TicketFooter left="Powered by QbiLabs" leftColor="#6b7280" right="Non-transferable" rightColor="#9ca3af" bg="#f9fafb" />
     </TicketShell>
   )
 }
@@ -864,7 +866,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
       </div>
       {classes.map((cls) => (
         <div key={cls.id} className="et-fade-in" style={{ display: 'grid', gap: 9 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
               className="et-focus"
               list={`class-names-${cls.id}`}
@@ -872,7 +874,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
               onChange={(e) => updateClass(cls.id, 'name', e.target.value)}
               placeholder="Class name (e.g. VIP)"
               aria-label="Class name"
-              style={{ ...fieldStyle(), flex: 1 }}
+              style={{ ...fieldStyle(), flex: '1 1 120px', minWidth: 100 }}
             />
             <datalist id={`class-names-${cls.id}`}>
               {PRESET_NAMES.map((n) => (
@@ -887,7 +889,7 @@ function ClassesEditor({ classes, onChange }: { classes: TicketClass[]; onChange
               onChange={(e) => updateClass(cls.id, 'fee', e.target.value)}
               placeholder="Fee UGX"
               aria-label="Class fee"
-              style={{ ...fieldStyle(), flex: 1 }}
+              style={{ ...fieldStyle(), flex: '1 1 100px', minWidth: 80 }}
             />
             <RemoveButton onClick={() => removeClass(cls.id)} label="Remove class" />
           </div>
@@ -930,14 +932,14 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
       ) : (
         tables.map((t) => (
           <div key={t.id} className="et-fade-in" style={{ display: 'grid', gap: 9 }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <input
                 className="et-focus"
                 value={t.name}
                 onChange={(e) => updateTable(t.id, 'name', e.target.value)}
                 placeholder="Table name"
                 aria-label="Table name"
-                style={{ ...fieldStyle(), flex: 1 }}
+                style={{ ...fieldStyle(), flex: '1 1 120px', minWidth: 100 }}
               />
               <input
                 className="et-focus"
@@ -947,7 +949,7 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
                 onChange={(e) => updateTable(t.id, 'seats', e.target.value)}
                 placeholder="Seats"
                 aria-label="Seats"
-                style={{ ...fieldStyle(), width: 96, flex: '0 0 96px' }}
+                style={{ ...fieldStyle(), flex: '0 1 80px', minWidth: 60 }}
               />
               <input
                 className="et-focus"
@@ -957,7 +959,7 @@ function TablesEditor({ tables, onChange }: { tables: TableOption[]; onChange: (
                 onChange={(e) => updateTable(t.id, 'price', e.target.value)}
                 placeholder="Price"
                 aria-label="Table price"
-                style={{ ...fieldStyle(), flex: 1 }}
+                style={{ ...fieldStyle(), flex: '1 1 100px', minWidth: 80 }}
               />
               <RemoveButton onClick={() => removeTable(t.id)} label="Remove table" />
             </div>
@@ -1760,6 +1762,8 @@ function TicketOutput({
                     lineHeight: 1.15,
                     letterSpacing: '-0.02em',
                     color: CONFIRM.ink,
+                    overflowWrap: 'break-word',
+                    wordBreak: 'break-word',
                   }}
                 >
                   {data.eventName}
@@ -1960,6 +1964,23 @@ function TicketOutput({
   )
 }
 
+/* ─── Event categories ───────────────────────────────────────────────── */
+export const EVENT_CATEGORIES = [
+  'Music, Arts & Culture',
+  'Wildlife & Nature',
+  'Conferences',
+  'Launch Parties',
+  'Networking Events',
+  'Retreats',
+  'Product Launches',
+  'Expos & Fairs',
+  'Performances',
+  'Membership Tickets',
+  'Sports',
+] as const
+
+type EventCategory = typeof EVENT_CATEGORIES[number]
+
 /* ─── Form ──────────────────────────────────────────────────────────── */
 type PaymentMethod = 'MOBILE_MONEY' | 'BANK_ACCOUNT'
 
@@ -1987,6 +2008,7 @@ type FormState = {
   location: string
   host: string
   hostContact: string
+  category: EventCategory | ''
   paymentMethod: PaymentMethod | ''
   mobileProvider: 'MTN' | 'Airtel'
   mobileNumber: string
@@ -2054,6 +2076,7 @@ function TicketForm({
     location: '',
     host: '',
     hostContact: '',
+    category: '',
     paymentMethod: '',
     mobileProvider: 'MTN',
     mobileNumber: '',
@@ -2094,6 +2117,7 @@ function TicketForm({
       location: '',
       host: '',
       hostContact: '',
+      category: '',
       paymentMethod: '',
       mobileProvider: 'MTN',
       mobileNumber: '',
@@ -2421,6 +2445,7 @@ function TicketForm({
     if (!form.location.trim()) e.location = 'Location is required'
     if (!form.host.trim()) e.host = 'Host name is required'
     if (!form.hostContact.trim()) e.hostContact = 'Host contact is required'
+    if (!form.category) e.category = 'Select a category'
     if (!form.paymentMethod) e.paymentMethod = 'Choose Mobile Money or Bank'
     if (form.paymentMethod === 'MOBILE_MONEY') {
       if (!form.mobileNumber.trim()) e.mobileNumber = 'Enter the mobile money number'
@@ -2476,7 +2501,8 @@ function TicketForm({
           ticketId: uid(),
           selectedClass: form.ticketClasses[0]?.name || '',
           eventImageUrl: form.eventImageUrl || undefined,
-        },
+          category: form.category || undefined,
+        } as TicketData & { category?: string },
         editingEventId,
       )
     } finally {
@@ -2526,7 +2552,7 @@ function TicketForm({
           .confirm-ticket { grid-template-columns: 1fr !important; }
           .confirm-side { border-left: none !important; border-top: 1px solid ${CONFIRM.line} !important; }
         }
-        @media (max-width: 520px) {
+        @media (max-width: 480px) {
           .confirm-body { grid-template-columns: 1fr !important; }
         }
       `}</style>
@@ -2792,6 +2818,23 @@ function TicketForm({
                       />
                       {touched && errors.hostContact && <FieldError>{errors.hostContact}</FieldError>}
                     </div>
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <select
+                      className="et-focus"
+                      style={fieldStyle(Boolean(touched && errors.category))}
+                      value={form.category}
+                      onChange={(e) => set('category', e.target.value as EventCategory | '')}
+                      aria-label="Event category"
+                    >
+                      <option value="">Select event category *</option>
+                      {EVENT_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    {touched && errors.category && <FieldError>{errors.category}</FieldError>}
                   </div>
                 </div>
               </SectionCard>
@@ -3073,35 +3116,18 @@ function TicketForm({
 
                   {form.paymentMethod === 'MOBILE_MONEY' ? (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <button
-                          type="button"
-                          style={{ ...choiceBtn(form.mobileProvider === 'MTN'), justifyContent: 'center', padding: '12px', minHeight: 60 }}
-                          onClick={() => set('mobileProvider', 'MTN')}
-                          aria-label="MTN MoMo"
-                          aria-pressed={form.mobileProvider === 'MTN'}
-                        >
-                          <img src="/mtn.png" alt="MTN" style={{ maxHeight: 30, maxWidth: 92, objectFit: 'contain', display: 'block' }} />
-                        </button>
-                        <button
-                          type="button"
-                          style={{ ...choiceBtn(form.mobileProvider === 'Airtel'), justifyContent: 'center', padding: '12px', minHeight: 60 }}
-                          onClick={() => set('mobileProvider', 'Airtel')}
-                          aria-label="Airtel Money"
-                          aria-pressed={form.mobileProvider === 'Airtel'}
-                        >
-                          <img src="/airtel.png" alt="Airtel" style={{ maxHeight: 30, maxWidth: 92, objectFit: 'contain', display: 'block' }} />
-                        </button>
-                      </div>
                       <div>
-                        <input
-                          className="et-focus"
-                          style={fieldStyle(Boolean(touched && errors.mobileNumber))}
-                          type="tel"
-                          placeholder="Mobile money number"
-                          aria-label="Mobile money number"
+                        <MoMoPhoneInput
                           value={form.mobileNumber}
-                          onChange={(e) => set('mobileNumber', e.target.value)}
+                          onChange={(v) => {
+                            set('mobileNumber', v)
+                            const p = detectProvider(v)
+                            if (p === 'MTN' || p === 'Airtel') set('mobileProvider', p)
+                          }}
+                          placeholder="07XX XXX XXX"
+                          aria-label="Mobile money number"
+                          aria-invalid={Boolean(touched && errors.mobileNumber)}
+                          inputStyle={fieldStyle(Boolean(touched && errors.mobileNumber))}
                         />
                         {touched && errors.mobileNumber && <FieldError>{errors.mobileNumber}</FieldError>}
                       </div>

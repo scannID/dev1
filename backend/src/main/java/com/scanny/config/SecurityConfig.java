@@ -2,8 +2,10 @@ package com.scanny.config;
 
 import com.scanny.api.ApiErrorWriter;
 import com.scanny.api.ErrorCode;
+import com.scanny.security.AdminPermissionFilter;
 import com.scanny.security.StaffSessionAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -46,10 +48,19 @@ public class SecurityConfig {
 
     private final ApiErrorWriter apiErrorWriter;
     private final StaffSessionAuthFilter staffSessionAuthFilter;
+    private final ApplicationContext applicationContext;
 
-    public SecurityConfig(ApiErrorWriter apiErrorWriter, StaffSessionAuthFilter staffSessionAuthFilter) {
+    public SecurityConfig(ApiErrorWriter apiErrorWriter,
+                          StaffSessionAuthFilter staffSessionAuthFilter,
+                          ApplicationContext applicationContext) {
         this.apiErrorWriter = apiErrorWriter;
         this.staffSessionAuthFilter = staffSessionAuthFilter;
+        this.applicationContext = applicationContext;
+    }
+
+    @Bean
+    public AdminPermissionFilter adminPermissionFilter() {
+        return new AdminPermissionFilter(applicationContext, apiErrorWriter);
     }
 
     @Bean
@@ -154,7 +165,8 @@ public class SecurityConfig {
                 .accessDeniedHandler((request, response, accessDeniedException) ->
                         apiErrorWriter.write(request, response, ErrorCode.FORBIDDEN))
             )
-            .addFilterAfter(staffSessionAuthFilter, BearerTokenAuthenticationFilter.class);
+            .addFilterAfter(staffSessionAuthFilter, BearerTokenAuthenticationFilter.class)
+            .addFilterAfter(adminPermissionFilter(), StaffSessionAuthFilter.class);
 
         return http.build();
     }

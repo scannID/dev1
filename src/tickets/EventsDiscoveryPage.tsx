@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 
 import { loadCreatedEvents, type LocalCreatedEvent } from './createdEventsLocal'
 import { usePageMeta } from '../hooks/usePageMeta'
@@ -263,7 +263,6 @@ function EventCarousel({
   }
 
   const current = events[index]
-  const currentPurchaseUrl = resolvePurchaseUrl(current)
 
   return (
     <div className="carousel">
@@ -286,6 +285,7 @@ function EventCarousel({
 
             const dateLabel = formatDateLabel(ev.eventDate)
             const timeLabel = timeFromSnapshot(ev)
+            const slideUrl = resolvePurchaseUrl(ev)
 
             return (
               <div className="slide" key={ev.eventId}>
@@ -338,26 +338,24 @@ function EventCarousel({
                     </a>
                   </div>
                 </div>
+
+                {/* QR stub — inside the slide so it's always clipped within the card */}
+                <div className="ticket-stub">
+                  <div className="ticket-stub-qr">
+                    <QRWidget
+                      value={slideUrl}
+                      size={110}
+                      colorDark="#0E1521"
+                      colorLight="#ffffff"
+                    />
+                  </div>
+                  <span className="ticket-stub-label">Scan to book</span>
+                </div>
               </div>
             )
           })}
         </div>
       </div>
-
-      {/* QR badge — a circular chip overlapping the bottom-right
-          corner of the ticket, half on / half off the card, always
-          reflecting whichever slide is currently showing. */}
-        <div className="ticket-stub">
-          <div className="ticket-stub-qr">
-            <QRWidget
-              value={currentPurchaseUrl}
-              size={110}
-              colorDark="#0E1521"
-              colorLight="#ffffff"
-            />
-          </div>
-          <span className="ticket-stub-label">Scan to book</span>
-        </div>
 
       <div className="carousel-arrows">
         <button
@@ -410,7 +408,7 @@ const CATEGORIES = [
   'Expos & Fairs',
   'Performances',
   'Membership Tickets',
-  'Netball Games',
+  'Sports',
 ]
 
 
@@ -470,16 +468,26 @@ export default function EventsDiscoveryPage() {
       )
     : events
 
-  const carouselEvents = filtered.slice(0, 3)
+  const carouselEvents = filtered.slice(0, 2)
 
-  const listEvents = filtered.slice(0, 4)
+  const listEvents = filtered.slice(0, 2)
 
-  const exploreEvents =
-    showAllExplore
-      ? filtered.slice(4)
-      : filtered.length > 4
-        ? filtered.slice(4, 7)
-        : filtered.slice(0, 3)
+  // Category-filtered events for the explore grid
+  const categoryFiltered =
+    activeCategory === CATEGORIES[0]
+      ? filtered
+      : filtered.filter((e) => {
+          const cat = (e as LocalCreatedEvent & { category?: string }).category
+          return cat === activeCategory
+        })
+
+  // Explore grid: events beyond the trending section, 8 visible by default
+  const EXPLORE_PAGE = 8
+  const exploreAll = categoryFiltered.slice(2)
+  const exploreEvents = showAllExplore
+    ? exploreAll
+    : exploreAll.slice(0, EXPLORE_PAGE)
+  const hasMoreExplore = exploreAll.length > EXPLORE_PAGE
 
   return (
     <div className="kodte-page">
@@ -587,14 +595,6 @@ export default function EventsDiscoveryPage() {
               country this week.
             </p>
           </div>
-
-          <a
-            href="/events"
-            className="btn btn-light"
-          >
-            See More Events
-            <span>→</span>
-          </a>
         </div>
 
         <div className="trending-grid">
@@ -735,13 +735,15 @@ export default function EventsDiscoveryPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-light"
-            onClick={() => setShowAllExplore(v => !v)}
-          >
-            {showAllExplore ? 'Show Less ↑' : 'See More Events →'}
-          </button>
+          {(hasMoreExplore || showAllExplore) && (
+            <button
+              type="button"
+              className="btn btn-light"
+              onClick={() => setShowAllExplore(v => !v)}
+            >
+              {showAllExplore ? 'Show Less ↑' : 'See More Events →'}
+            </button>
+          )}
         </div>
 
         <div className="filter-row">
@@ -846,7 +848,7 @@ export default function EventsDiscoveryPage() {
                       <div className="grid-qr-inline">
                         <QRWidget
                           value={purchaseUrl}
-                          size={96}
+                          size={140}
                           colorDark="#0E1521"
                           colorLight="#ffffff"
                         />
@@ -1687,9 +1689,9 @@ const STYLES = `
 .kodte-page .ticket-stub {
   position: absolute;
 
-  right: -10px;
+  right: 20px;
 
-  bottom: 28px;
+  bottom: 24px;
 
   z-index: 5;
 
@@ -2017,6 +2019,7 @@ const STYLES = `
   gap: 10px;
   margin-top: auto;
   padding-top: 10px;
+  justify-content: space-between;
 }
 
 .kodte-page .list-qr-wrap {
@@ -2028,6 +2031,7 @@ const STYLES = `
   overflow: hidden;
   background: #fff;
   padding: 4px;
+  margin-left: auto;
 }
 
 .kodte-page .list-qr-wrap canvas,
@@ -2189,7 +2193,7 @@ const STYLES = `
   display: grid;
 
   grid-template-columns:
-    repeat(3, 1fr);
+    repeat(4, 1fr);
 
   gap: 22px;
 }
@@ -2390,8 +2394,8 @@ const STYLES = `
 }
 
 .kodte-page .grid-qr-inline {
-  width: 96px;
-  height: 96px;
+  width: 140px;
+  height: 140px;
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
@@ -2401,8 +2405,8 @@ const STYLES = `
 
 .kodte-page .grid-qr-inline canvas,
 .kodte-page .grid-qr-inline img {
-  width: 96px !important;
-  height: 96px !important;
+  width: 140px !important;
+  height: 140px !important;
   display: block;
 }
 
@@ -2586,19 +2590,11 @@ const STYLES = `
   }
 
   .kodte-page .ticket-stub {
-    right: 16px;
-
-    bottom: 16px;
-
-    width: 78px;
-
-    height: 78px;
-
-    padding: 8px;
+    display: none;
   }
 
   .kodte-page .slide-content {
-    padding-right: 106px;
+    padding-right: 24px;
   }
 
   .kodte-page .slide {

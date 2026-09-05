@@ -29,21 +29,22 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     'Content-Type': 'application/json',
   }
 
-  try {
-    if (adminKeycloak.authenticated) {
+  if (adminKeycloak.authenticated) {
+    try {
       await adminKeycloak.updateToken(30)
-      if (adminKeycloak.token) {
-        headers.Authorization = `Bearer ${adminKeycloak.token}`
-      }
+    } catch {
+      // Silent — the onTokenExpired / interval path will handle proactive
+      // refresh; the 401 retry below handles any remaining edge case.
     }
-  } catch {
-    // Proceed without token for public endpoints
+    if (adminKeycloak.token) {
+      headers.Authorization = `Bearer ${adminKeycloak.token}`
+    }
   }
 
   return headers
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function fetchApi<T>(endpoint: string, options?: RequestInit, _retry = true): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
   const authHeaders = await getAuthHeaders()
 
@@ -57,6 +58,18 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     })
 
     if (!response.ok) {
+      // On 401, force a token refresh and retry once before giving up.
+      if (response.status === 401 && _retry && adminKeycloak.authenticated) {
+        try {
+          await adminKeycloak.updateToken(-1) // -1 = always refresh
+        } catch {
+          // Refresh token expired — redirect to login cleanly.
+          adminKeycloak.login()
+          return new Promise(() => {})
+        }
+        return fetchApi<T>(endpoint, options, false)
+      }
+
       const errorData = (await response.json().catch(() => null)) as {
         message?: string
         error?: string
@@ -77,7 +90,15 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
     if (error instanceof ApiError) {
       throw error
     }
-    throw new ApiError(error instanceof Error ? error.message : 'Network error', 0)
+
+    // Retry once on transient network errors that coincide with token refresh.
+    const message = error instanceof Error ? error.message : 'Network error'
+    if (_retry && (message === 'Failed to fetch' || message === 'NetworkError when attempting to fetch resource.' || message === 'Network request failed')) {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      return fetchApi<T>(endpoint, options, false)
+    }
+
+    throw new ApiError(message, 0)
   }
 }
 

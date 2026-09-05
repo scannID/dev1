@@ -79,7 +79,11 @@ export function useBusinessData() {
           return current.map((b) => (b.id === businessId ? withItems : b))
         })
         const orderList = await scannyApi.orders.list(businessId)
-        setOrders(orderList)
+        // Merge — don't wipe orders for other branches already in state.
+        setOrders((current) => {
+          const otherBranches = current.filter((o) => o.businessId !== businessId)
+          return [...otherBranches, ...orderList]
+        })
       } catch (err) {
         console.error('Failed to switch branch:', err)
         setError(err instanceof Error ? err.message : 'Failed to switch branch')

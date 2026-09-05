@@ -174,7 +174,7 @@ export function PayStep({
         {splitEnabled ? (
           <>
             <p className="cm-muted" style={{ margin: 0 }}>
-              Enter each person’s <strong>name, MoMo number, and amount</strong>. Everyone gets their own
+              Enter each person's <strong>name, MoMo number, and amount</strong>. Everyone gets their own
               prompt. All shares settle under the same Koddly payment ref
               {business.paymentReference ? (
                 <>
@@ -278,34 +278,17 @@ export function PayStep({
         ) : null}
       </section>
 
-      <div className="cm-providers" role="group" aria-label="Payment provider">
-        <button
-          type="button"
-          className={provider === 'MTN' ? 'active' : ''}
-          onClick={() => onProvider('MTN')}
-          disabled={submitting}
-          aria-label="MTN MoMo"
-        >
-          <img src="/mtn.png" alt="MTN" className="cm-provider-logo" />
-        </button>
-        <button
-          type="button"
-          className={provider === 'Airtel' ? 'active' : ''}
-          onClick={() => onProvider('Airtel')}
-          disabled={submitting}
-          aria-label="Airtel Money"
-        >
-          <img src="/airtel.png" alt="Airtel" className="cm-provider-logo cm-provider-logo-airtel" />
-        </button>
-      </div>
-
       {!splitEnabled ? (
         <>
           {deviceKnown && savedPhone ? (
             <div className="cm-saved-box">
               <p className="cm-eyebrow">Saved on this phone</p>
               <strong>{formatUgPhoneHint(savedPhone ?? '')}</strong>
-              <p className="cm-muted">We’ll send the {provider} prompt here. Change the number below if needed.</p>
+              <p className="cm-muted">
+                {provider
+                  ? `We'll send the ${provider} prompt here. Change the number below if needed.`
+                  : "We'll send the MoMo prompt here. Change the number below if needed."}
+              </p>
               <button
                 type="button"
                 className="customer-secondary-btn"
@@ -353,8 +336,12 @@ export function PayStep({
 
       <p className="cm-hint">
         {splitEnabled
-          ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Koddly ref.`
-          : `You’ll get a ${provider} prompt on your phone. Approve it to complete payment — we won’t mark the order paid until confirmation arrives.`}
+          ? provider
+            ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Koddly ref.`
+            : 'Each person gets a MoMo prompt for their share. When every share is approved, the order is paid under one Koddly ref.'
+          : provider
+            ? `You'll get a ${provider} prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives.`
+            : "You'll get a MoMo prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives."}
       </p>
     </div>
   )

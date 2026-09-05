@@ -141,7 +141,8 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
         if ("tickets:stats".equals(channel)) {
             return state.roles.contains("MERCHANT");
         }
-        if (channel.startsWith("orders:") || channel.startsWith("catalog:") || channel.startsWith("metrics:")) {
+        if (channel.startsWith("orders:") || channel.startsWith("catalog:")
+                || channel.startsWith("metrics:") || channel.startsWith("floor:")) {
             if (!state.roles.contains("MERCHANT")) {
                 return false;
             }

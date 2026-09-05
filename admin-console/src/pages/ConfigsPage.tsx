@@ -6,6 +6,16 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useConfigs } from '@/hooks/usePlatform'
 import { configsApi } from '@/api/services'
@@ -48,6 +58,10 @@ export default function ConfigsPage() {
   const [draft, setDraft] = useState<Record<ConfigSection, ConfigMap> | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
+
+  // ── Danger zone confirmation state ──
+  const [pendingAction, setPendingAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
+  const [confirmText, setConfirmText] = useState('')
 
   // ── System busy mode state ──
   const [systemBusy, setSystemBusy] = useState(false)
@@ -134,19 +148,27 @@ export default function ConfigsPage() {
   }
 
   async function handleAction(action: ConfigAction) {
-    const confirmed = window.confirm(`Run "${action}"? This may be destructive.`)
-    if (!confirmed) return
+    const d = DANGER_ACTIONS.find(a => a.action === action)
+    if (d) {
+      setPendingAction(d)
+      setConfirmText('')
+    }
+  }
+
+  async function executePendingAction() {
+    if (!pendingAction) return
     try {
-      const result = await runAction(action)
+      const result = await runAction(pendingAction.action)
       setActionMessage(result.message)
-      toast.success(result.message || `Action "${action}" completed`)
-      if (action === 'reset-platform') {
-        await refresh()
-      }
+      toast.success(result.message || `Action "${pendingAction.action}" completed`)
+      if (pendingAction.action === 'reset-platform') await refresh()
     } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to run ${action}`
+      const message = err instanceof Error ? err.message : `Failed to run ${pendingAction.action}`
       setActionMessage(message)
       toast.error(message)
+    } finally {
+      setPendingAction(null)
+      setConfirmText('')
     }
   }
 
@@ -447,7 +469,7 @@ export default function ConfigsPage() {
       {/* ── Danger Zone ── */}
       <div className="admin-card" style={{ borderColor: 'oklch(from var(--destructive) l c h / 30%)' }}>
         <div className="admin-card-header">
-          <div><h3 style={{ color: 'var(--destructive)' }}>Danger Zone</h3><p>Irreversible platform actions</p></div>
+          <div><h3 style={{ color: 'var(--destructive)' }}>Danger Zone</h3><p>Irreversible platform actions — require typed confirmation</p></div>
         </div>
         <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {DANGER_ACTIONS.map((d) => (
@@ -468,6 +490,45 @@ export default function ConfigsPage() {
           ))}
         </div>
       </div>
+
+      {/* ── Danger Zone confirmation dialog ── */}
+      <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open) => { if (!open) { setPendingAction(null); setConfirmText('') } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: 'var(--destructive)' }}>
+              {pendingAction?.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{pendingAction?.desc}</strong>
+              <br /><br />
+              This action is <strong>irreversible</strong>. To confirm, type{' '}
+              <code style={{ background: 'var(--muted)', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>
+                {pendingAction?.action}
+              </code>{' '}
+              below.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={pendingAction?.action}
+            autoFocus
+            style={{ marginTop: 4 }}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPendingAction(null); setConfirmText('') }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={confirmText !== pendingAction?.action || saving === pendingAction?.action}
+              onClick={() => void executePendingAction()}
+            >
+              {saving === pendingAction?.action ? 'Running…' : 'I understand, run it'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

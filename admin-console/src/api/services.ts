@@ -297,6 +297,36 @@ export const broadcastsApi = {
   },
 }
 
+export const adminUsersApi = {
+  me: async (): Promise<import('./types').AdminMeResponse> => {
+    return api.get('/admin/admins/me')
+  },
+
+  list: async (): Promise<import('./types').AdminUserListResponse> => {
+    return api.get('/admin/admins')
+  },
+
+  invite: async (payload: { email: string; displayName: string; permissions: string[] }) => {
+    return api.post('/admin/admins', payload)
+  },
+
+  updatePermissions: async (adminId: string, permissions: string[]) => {
+    return api.put(`/admin/admins/${adminId}/permissions`, { permissions })
+  },
+
+  revoke: async (adminId: string) => {
+    return api.post(`/admin/admins/${adminId}/revoke`)
+  },
+
+  restore: async (adminId: string) => {
+    return api.post(`/admin/admins/${adminId}/restore`)
+  },
+
+  resendInvite: async (adminId: string) => {
+    return api.post(`/admin/admins/${adminId}/resend-invite`)
+  },
+}
+
 export const adminApi = {
   dashboard: dashboardApi,
   merchants: merchantsApi,
@@ -313,6 +343,7 @@ export const adminApi = {
   configs: configsApi,
   notifications: notificationsApi,
   broadcasts: broadcastsApi,
+  adminUsers: adminUsersApi,
 }
 
 export default adminApi

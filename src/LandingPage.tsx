@@ -18,7 +18,7 @@ const C = {
   paper: '#efe6d2',
   paperLt: '#f7f1e3',
   ink: '#26201a',
-  inkSoft: '#6b5e4e',
+  inkSoft: '#000000',
   stamp: '#b23425',
   spike: '#8a7355',
   ok: '#3f5c3c',
@@ -464,7 +464,7 @@ function OrderScene() {
   }
 
   return (
-    <div style={{ position: 'relative', width: 560, minHeight: 420 }}>
+    <div style={{ position: 'relative', width: '100%', minHeight: 420 }}>
 
       {/* ── Receipt + tracker side by side (phases: receipt, tracker) ── */}
       <div style={{
@@ -487,13 +487,14 @@ function OrderScene() {
       <div style={{
         position: phase !== 'tickets' ? 'absolute' : 'relative',
         inset: 0,
-        width: 420,
+        width: '100%',
         opacity: phase === 'tickets' ? 1 : 0,
         transform: phase === 'tickets' ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(8px)',
         transition: 'opacity 0.55s ease 0.15s, transform 0.55s ease 0.15s',
         pointerEvents: phase === 'tickets' ? 'auto' : 'none',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
       }}>
         <DeparturesBoard onDone={handleTicketsDone} />
       </div>
@@ -905,7 +906,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
   return (
     <div style={{ fontFamily: FONT }}>
       <div style={{
-        width: 400, margin: '0 auto',
+        maxWidth: 400, width: '100%', margin: '0 auto',
         background: `linear-gradient(180deg, ${C.paperLt}, ${C.paper})`,
         border: `3px solid ${FB.boardEdge}55`,
         borderRadius: 10,
@@ -1068,8 +1069,8 @@ const topFeatures = [
     Icon: QrCode,
     title: 'Instant QR generation',
     body: 'One code, live the moment you sign up.',
-    photo: '/features/qr.jpg',
-    objectPosition: 'center 35%',
+    photo: '/pexels-kampus-7289717.jpg',
+    objectPosition: 'center 40%',
   },
   {
     Icon: ClipboardList,
@@ -1121,10 +1122,7 @@ function FeatureCards() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns:
-            window.innerWidth < 760
-              ? 'repeat(2, 1fr)'
-              : 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: 20,
         }}
       >
@@ -1137,14 +1135,13 @@ function FeatureCards() {
                 background: C.paperLt,
                 borderRadius: 4,
                 padding: '0 20px 22px',
-                boxShadow:
-                  '0 14px 30px rgba(38,32,26,0.14)',
+                boxShadow: '0 14px 30px rgba(38,32,26,0.14)',
                 transform: `rotate(${rot[i]}deg)`,
               }}
             >
               <Zigzag />
 
-              {/* Photo print — framed snapshot tucked into the ticket */}
+              {/* Photo print */}
               <div
                 style={{
                   position: 'relative',
@@ -1167,7 +1164,6 @@ function FeatureCards() {
                     pointerEvents: 'none',
                   }}
                 />
-
                 <div
                   style={{
                     position: 'relative',
@@ -1175,8 +1171,7 @@ function FeatureCards() {
                     overflow: 'hidden',
                     borderRadius: 4,
                     border: `1px solid ${C.spike}40`,
-                    boxShadow:
-                      'inset 0 0 0 1px rgba(255,255,255,0.45), 0 10px 22px rgba(38,32,26,0.16)',
+                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), 0 10px 22px rgba(38,32,26,0.16)',
                     background: C.paper,
                   }}
                 >
@@ -1195,23 +1190,17 @@ function FeatureCards() {
                       transform: 'scale(1.02)',
                     }}
                   />
-
                   <div
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      background:
-                        'linear-gradient(180deg, rgba(239,230,210,0.05) 0%, rgba(239,230,210,0.55) 88%, rgba(247,241,227,0.95) 100%)',
+                      background: 'linear-gradient(180deg, rgba(239,230,210,0.05) 0%, rgba(239,230,210,0.55) 88%, rgba(247,241,227,0.95) 100%)',
                     }}
                   />
                 </div>
               </div>
 
-              <div
-                style={{
-                  padding: '0 0 4px',
-                }}
-              >
+              <div style={{ padding: '0 0 4px' }}>
                 <div
                   style={{
                     width: 38,
@@ -1229,21 +1218,18 @@ function FeatureCards() {
                     zIndex: 1,
                   }}
                 >
-                  <Icon
-                    size={17}
-                    color={C.stamp}
-                    strokeWidth={2}
-                  />
+                  <Icon size={17} color={C.stamp} strokeWidth={2} />
                 </div>
 
                 <h3
                   style={{
                     fontFamily: FONT,
                     fontWeight: 800,
-                    fontSize: 16,
+                    fontSize: 'clamp(14px, 2vw, 16px)',
                     letterSpacing: '0.02em',
                     color: C.ink,
                     marginBottom: 8,
+                    lineHeight: 1.3,
                   }}
                 >
                   {title.toUpperCase()}
@@ -1252,9 +1238,9 @@ function FeatureCards() {
                 <p
                   style={{
                     fontFamily: FONT,
-                    fontSize: 11.5,
+                    fontSize: 'clamp(12px, 1.5vw, 13.5px)',
                     fontWeight: 400,
-                    lineHeight: 1.6,
+                    lineHeight: 1.65,
                     color: C.inkSoft,
                     margin: 0,
                   }}
@@ -1533,12 +1519,26 @@ export default function KodteLandingTicket({
         color: C.ink,
         minHeight: '100vh',
         overflowX: 'hidden',
+        overflowY: 'auto',
+        scrollbarWidth: 'none' as const,
         fontFamily: FONT,
       }}
     >
       <style>{`
         * {
           box-sizing: border-box;
+        }
+
+        html, body {
+          margin: 0;
+          overflow-x: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+          display: none;
         }
 
         body {
@@ -1609,6 +1609,135 @@ export default function KodteLandingTicket({
 
         .kodte-stamp-btn:hover {
           transform: rotate(-2deg) scale(1.03);
+        }
+
+        /* ── Ticket section two-col on wide screens ── */
+        .kodte-ticket-section {
+          padding: 20px 24px 90px;
+          text-align: center;
+        }
+        .kodte-ticket-grid {
+          display: block;
+        }
+        @media (min-width: 1100px) {
+          .kodte-ticket-section {
+            padding: 20px 0 90px clamp(24px, 6vw, 100px);
+            text-align: left;
+          }
+          .kodte-ticket-grid {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 0;
+          }
+          .kodte-ticket-text {
+            max-width: 480px;
+          }
+          .kodte-ticket-visual {
+            display: flex;
+            justify-content: flex-start;
+            margin-left: -40px;
+          }
+        }
+        @media (min-width: 1400px) {
+          .kodte-ticket-visual {
+            margin-left: -80px;
+          }
+        }
+        .kodte-hero-grid {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: center;
+          gap: 0;
+        }
+        .kodte-scene-wrap {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          overflow: hidden;
+        }
+        .kodte-scene-inner {
+          width: min(560px, 100%);
+          min-height: 420px;
+          position: relative;
+        }
+
+        @media (min-width: 1100px) {
+          .kodte-scene-wrap {
+            justify-content: flex-start;
+            margin-left: -40px;
+          }
+          .kodte-scene-inner {
+            width: min(700px, 55vw);
+            min-height: 460px;
+          }
+        }
+
+        @media (min-width: 1400px) {
+          .kodte-scene-wrap {
+            margin-left: -80px;
+          }
+          .kodte-scene-inner {
+            width: min(780px, 52vw);
+            min-height: 480px;
+          }
+        }
+        .kodte-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .kodte-footer-grid {
+          display: grid;
+          grid-template-columns: 1.3fr 1fr 1fr 1fr;
+          gap: 32px;
+          padding-bottom: 32px;
+        }
+        .kodte-footer-bottom {
+          display: flex;
+          flex-direction: row;
+          gap: 8px;
+          justify-content: center;
+          text-align: center;
+        }
+
+        @media (max-width: 860px) {
+          .kodte-hero-grid {
+            grid-template-columns: 1fr;
+          }
+          .kodte-scene-wrap {
+            justify-content: center;
+            padding: 40px 16px 0;
+          }
+          .kodte-scene-inner {
+            width: min(520px, calc(100vw - 32px));
+            min-height: 360px;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .kodte-scene-inner {
+            width: 100%;
+            min-height: 300px;
+          }
+          .kodte-nav-btn-secondary {
+            display: none;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .kodte-footer-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .kodte-footer-bottom {
+            flex-direction: column;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .kodte-footer-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
 
@@ -1695,15 +1824,17 @@ export default function KodteLandingTicket({
             </a>
 
             <div
+              className="kodte-nav-actions"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
+                flexWrap: 'wrap',
               }}
             >
               <button
                 onClick={onCreateEventTicket}
-                className="kodte-stamp-btn"
+                className="kodte-stamp-btn kodte-nav-btn-secondary"
                 style={{
                   background: 'transparent',
                   border: `1.5px dashed ${C.ink}66`,
@@ -1790,16 +1921,10 @@ export default function KodteLandingTicket({
           </div>
 
           <div
+            className="kodte-hero-grid"
             style={{
               position: 'relative',
               zIndex: 1,
-              display: 'grid',
-              gridTemplateColumns:
-                window.innerWidth < 860
-                  ? '1fr'
-                  : '1fr auto',
-              alignItems: 'center',
-              gap: 0,
             }}
           >
             <div style={{ paddingLeft: 'clamp(24px, 6vw, 100px)', maxWidth: 580 }}>
@@ -1820,14 +1945,14 @@ export default function KodteLandingTicket({
                 style={{
                   fontFamily: FONT,
                   fontWeight: 500,
-                  fontSize: 'clamp(40px,6.5vw,72px)',
+                  fontSize: 'clamp(28px,4.5vw,52px)',
                   lineHeight: 1.05,
                   letterSpacing: '-0.04em',
                   margin: '0 0 28px',
                 }}
               >
                 ONE SCAN.{' '}
-                <span style={{ color: C.stamp }}>
+                <span style={{ color: C.stamp, whiteSpace: 'nowrap' }}>
                   TOTAL CONTROL.
                 </span>
               </h1>
@@ -1838,10 +1963,10 @@ export default function KodteLandingTicket({
                   fontSize: 14,
                   fontWeight: 400,
                   lineHeight: 1.7,
-                  color: C.inkSoft,
+                  color: '#000000',
                   maxWidth: 480,
                   margin: '0 0 40px',
-                  opacity: 0.85,
+                  opacity: 1,
                 }}
               >
                 Gone are the days of paper menus, long queues, and chasing payments at
@@ -1893,16 +2018,10 @@ export default function KodteLandingTicket({
               </div>
             </div>
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                paddingRight: 0,
-                overflow: 'hidden',
-              }}
-            >
-              <OrderScene />
+            <div className="kodte-scene-wrap">
+              <div className="kodte-scene-inner">
+                <OrderScene />
+              </div>
             </div>
           </div>
         </section>
@@ -1950,11 +2069,10 @@ export default function KodteLandingTicket({
 
         {/* EVENT TICKETING */}
         <section
-          style={{
-            padding: '20px 24px 90px',
-            textAlign: 'center',
-          }}
+          className="kodte-ticket-section"
+          style={{ textAlign: 'center' }}
         >
+          <div className="kodte-ticket-text" style={{ maxWidth: 480, margin: '0 auto' }}>
           <div
             style={{
               fontFamily: FONT,
@@ -1990,13 +2108,15 @@ export default function KodteLandingTicket({
               color: C.inkSoft,
               maxWidth: 360,
               margin: '0 auto 28px',
-              opacity: 0.8,
             }}
           >
             Same platform, same QR — sell tickets, scan at the gate, watch sales live.
           </p>
+          </div>
 
+          <div className="kodte-ticket-visual" style={{ justifyContent: 'center', marginLeft: 0 }}>
           <EventTicketStub />
+          </div>
         </section>
 
         {/* FEATURES */}
@@ -2105,44 +2225,45 @@ export default function KodteLandingTicket({
               margin: '0 auto',
             }}
           >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns:
-                  window.innerWidth < 700
-                    ? '1fr'
-                    : '1.3fr 1fr 1fr 1fr',
-                gap: 32,
-                paddingBottom: 32,
-              }}
-            >
+            <div className="kodte-footer-grid">
               <div>
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 22,
-                    fontWeight: 800,
-                    letterSpacing: '0.06em',
-                    color: C.ink,
-                    marginBottom: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 0,
                   }}
                 >
-                  Koddly
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src="/kodte-icon.svg"
+                      alt=""
+                      width={28}
+                      height={28}
+                      style={{ width: '100%', height: '100%', display: 'block' }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: FONT,
+                      fontSize: 24,
+                      fontWeight: 600,
+                      letterSpacing: '0.06em',
+                      color: '#000000',
+                    }}
+                  >
+                    Koddly
+                  </span>
                 </div>
-
-                <p
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 400,
-                    lineHeight: 1.7,
-                    color: C.inkSoft,
-                    maxWidth: 260,
-                    margin: 0,
-                  }}
-                >
-                  One QR for menus, orders, and event
-                  tickets — built for venues across Uganda.
-                </p>
               </div>
 
               <div>
@@ -2151,7 +2272,7 @@ export default function KodteLandingTicket({
                     fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: '0.1em',
-                    color: C.ink,
+                    color: '#000000',
                     marginBottom: 12,
                   }}
                 >
@@ -2164,17 +2285,28 @@ export default function KodteLandingTicket({
                   'Event Ticketing',
                   'Payments',
                 ].map((l) => (
-                  <div
+                  <button
                     key={l}
+                    type="button"
                     style={{
+                      display: 'block',
                       fontSize: 12,
                       fontWeight: 400,
-                      color: C.inkSoft,
+                      color: '#000000',
                       marginBottom: 8,
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
+                      textAlign: 'left',
+                      textDecoration: 'none',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                   >
                     {l}
-                  </div>
+                  </button>
                 ))}
               </div>
 
@@ -2184,7 +2316,7 @@ export default function KodteLandingTicket({
                     fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: '0.1em',
-                    color: C.ink,
+                    color: '#000000',
                     marginBottom: 12,
                   }}
                 >
@@ -2193,17 +2325,28 @@ export default function KodteLandingTicket({
 
                 {['About', 'Contact', 'Support'].map(
                   (l) => (
-                    <div
+                    <button
                       key={l}
+                      type="button"
                       style={{
+                        display: 'block',
                         fontSize: 12,
                         fontWeight: 400,
-                        color: C.inkSoft,
+                        color: '#000000',
                         marginBottom: 8,
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        fontFamily: FONT,
+                        textAlign: 'left',
+                        textDecoration: 'none',
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                     >
                       {l}
-                    </div>
+                    </button>
                   )
                 )}
               </div>
@@ -2214,7 +2357,7 @@ export default function KodteLandingTicket({
                     fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: '0.1em',
-                    color: C.ink,
+                    color: '#000000',
                     marginBottom: 12,
                   }}
                 >
@@ -2225,45 +2368,46 @@ export default function KodteLandingTicket({
                   'Terms of Service',
                   'Privacy Policy',
                 ].map((l) => (
-                  <div
+                  <button
                     key={l}
+                    type="button"
                     style={{
+                      display: 'block',
                       fontSize: 12,
                       fontWeight: 400,
-                      color: C.inkSoft,
+                      color: '#000000',
                       marginBottom: 8,
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
+                      textAlign: 'left',
+                      textDecoration: 'none',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                   >
                     {l}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
 
             <div
+              className="kodte-footer-bottom"
               style={{
-                borderTop: `1px dashed ${C.ink}44`,
+                borderTop: `1px dashed #00000044`,
                 paddingTop: 20,
-                display: 'flex',
-                flexDirection:
-                  window.innerWidth < 700
-                    ? 'column'
-                    : 'row',
                 gap: 8,
-                justifyContent: 'space-between',
                 fontSize: 11,
                 fontWeight: 400,
-                color: C.inkSoft,
+                color: '#000000',
               }}
             >
               <span>
                 © {new Date().getFullYear()} QBI Labs SMC.
                 All rights reserved.
-              </span>
-
-              <span>
-                Koddly is a product of QBI Labs SMC ·
-                Kampala, Uganda
               </span>
             </div>
           </div>

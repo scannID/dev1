@@ -8,12 +8,40 @@ const adminKeycloak = new Keycloak({
   clientId: ADMIN_CLIENT_ID,
 })
 
+// ─── Silent token refresh ────────────────────────────────────────────────────
+
+let _refreshing = false
+
+function tryRefresh() {
+  if (!adminKeycloak.authenticated) return
+  if (_refreshing) return
+  _refreshing = true
+
+  adminKeycloak.updateToken(70)
+    .then(() => { _refreshing = false })
+    .catch(() => {
+      _refreshing = false
+      adminKeycloak.login({ redirectUri: window.location.href })
+    })
+}
+
+adminKeycloak.onTokenExpired = () => tryRefresh()
+
+adminKeycloak.onAuthRefreshError = () => {
+  _refreshing = false
+  adminKeycloak.login({ redirectUri: window.location.href })
+}
+
+const _interval = window.setInterval(() => tryRefresh(), 60_000)
+window.addEventListener('pagehide', () => window.clearInterval(_interval), { once: true })
+
+// ─── Role / session helpers ───────────────────────────────────────────────────
+
 function hasAdminRole(): boolean {
   const roles = (adminKeycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
   return roles.includes('ADMIN')
 }
 
-/** True only for a scanny-admin session that includes the ADMIN realm role. */
 export function hasAdminSession() {
   return (
     adminKeycloak.authenticated &&
@@ -23,10 +51,7 @@ export function hasAdminSession() {
   )
 }
 
-/** End Keycloak SSO (shared across merchant/admin on the same realm). */
 export function logoutAdmin(redirectUri: string) {
-  // Avoid showing Keycloak's extra confirm page ("Log out / Back to application").
-  // We clear local auth state and return directly to the app shell.
   adminKeycloak.clearToken()
   window.location.replace(redirectUri)
   return Promise.resolve()

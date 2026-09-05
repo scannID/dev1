@@ -13,10 +13,12 @@ import {
   Moon,
   QrCode,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   Sun,
   Ticket,
   Users,
+  UserCog,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -51,15 +53,18 @@ import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import CommunicationsPage from './pages/CommunicationsPage'
+import AdminsPage from './pages/AdminsPage'
 import { InlineSpinner } from './components/LoadingSpinner'
 import { PaginationBar } from './components/PaginationBar'
 import { usePagination } from './hooks/usePagination'
 import { useNotifications, useSystemHealth } from './hooks/usePlatform'
+import { adminUsersApi } from './api/services'
+import type { AdminPermission, AdminMeResponse } from './api/types'
 
 type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
   | 'users' | 'communications' | 'revenue' | 'qr-activity' | 'cookie-consent' | 'reports'
-  | 'system' | 'audit' | 'configs'
+  | 'system' | 'audit' | 'configs' | 'admins'
 
 type NavItem = {
   id: View
@@ -83,6 +88,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   system: { eyebrow: 'Admin · System', title: 'System Health' },
   audit: { eyebrow: 'Admin · System', title: 'Audit Log' },
   configs: { eyebrow: 'Admin · System', title: 'Configs' },
+  admins: { eyebrow: 'Admin · System', title: 'Admin Accounts' },
 }
 
 function relativeTime(iso: string) {
@@ -119,6 +125,10 @@ export default function AdminApp({
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
   })
+  // Caller's own permissions — fetched from /api/admin/admins/me on mount.
+  // null = loading, undefined = not found (treat as super admin for backwards compat).
+  const [me, setMe] = useState<AdminMeResponse | null | undefined>(null)
+
   const { data: health } = useSystemHealth()
   const {
     notifications,
@@ -127,6 +137,13 @@ export default function AdminApp({
     error: notifError,
     markAllRead,
   } = useNotifications()
+
+  // Fetch own permissions on mount so nav items are filtered immediately.
+  useEffect(() => {
+    adminUsersApi.me()
+      .then((data) => setMe(data))
+      .catch(() => setMe(undefined)) // Not in DB yet — treat as super admin
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark-mode', darkMode)
@@ -156,6 +173,15 @@ export default function AdminApp({
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [])
 
+  // True when the caller is a super admin or not yet seeded.
+  const isSuperAdmin = me === undefined || me?.superAdmin === true
+  const myPermissions = new Set<AdminPermission>(me?.permissions ?? [])
+
+  function canSee(perm: AdminPermission): boolean {
+    if (isSuperAdmin) return true
+    return myPermissions.has(perm)
+  }
+
   const openIncidents = health?.overall?.openIncidents ?? 0
 
   const navSections = useMemo(() => {
@@ -169,40 +195,52 @@ export default function AdminApp({
       {
         label: 'Platform',
         items: [
-          { id: 'overview' as const, label: 'Overview', icon: LayoutGrid },
-          { id: 'merchants' as const, label: 'Merchants', icon: Building2 },
-          { id: 'orders' as const, label: 'All Orders', icon: ShoppingCart },
-          { id: 'ticketing' as const, label: 'Ticketing', icon: Ticket },
-          { id: 'users' as const, label: 'Users', icon: Users },
-          { id: 'communications' as const, label: 'Communications', icon: Megaphone },
-        ],
+          canSee('VIEW_OVERVIEW')       && { id: 'overview' as const,       label: 'Overview',        icon: LayoutGrid },
+          canSee('VIEW_MERCHANTS')      && { id: 'merchants' as const,      label: 'Merchants',       icon: Building2 },
+          canSee('VIEW_ORDERS')         && { id: 'orders' as const,         label: 'All Orders',      icon: ShoppingCart },
+          canSee('VIEW_TICKETING')      && { id: 'ticketing' as const,      label: 'Ticketing',       icon: Ticket },
+          canSee('VIEW_USERS')          && { id: 'users' as const,          label: 'Users',           icon: Users },
+          canSee('VIEW_COMMUNICATIONS') && { id: 'communications' as const, label: 'Communications',  icon: Megaphone },
+        ].filter(Boolean) as NavItem[],
       },
       {
         label: 'Finance',
         items: [
-          { id: 'revenue' as const, label: 'Revenue & Payments', icon: CreditCard },
-        ],
+          canSee('VIEW_REVENUE') && { id: 'revenue' as const, label: 'Revenue & Payments', icon: CreditCard },
+        ].filter(Boolean) as NavItem[],
       },
       {
         label: 'Analytics',
         items: [
-          { id: 'qr-activity' as const, label: 'QR Activity', icon: QrCode },
-          { id: 'cookie-consent' as const, label: 'Cookie Consent', icon: Cookie },
-          { id: 'reports' as const, label: 'Reports', icon: BarChart3 },
-        ],
+          canSee('VIEW_QR_ACTIVITY')    && { id: 'qr-activity' as const,    label: 'QR Activity',      icon: QrCode },
+          canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent',   icon: Cookie },
+          canSee('VIEW_REPORTS')        && { id: 'reports' as const,        label: 'Reports',           icon: BarChart3 },
+        ].filter(Boolean) as NavItem[],
       },
       {
         label: 'System',
         items: [
-          systemItem,
-          { id: 'audit' as const, label: 'Audit Log', icon: FileText },
-          { id: 'configs' as const, label: 'Configs', icon: Settings },
-        ],
+          canSee('VIEW_SYSTEM')  && systemItem,
+          canSee('VIEW_AUDIT')   && { id: 'audit' as const,   label: 'Audit Log', icon: FileText },
+          canSee('VIEW_CONFIGS') && { id: 'configs' as const, label: 'Configs',   icon: Settings },
+          isSuperAdmin && { id: 'admins' as const, label: 'Admin Accounts', icon: UserCog },
+        ].filter(Boolean) as NavItem[],
       },
-    ]
-  }, [openIncidents])
+    ].filter((s) => s.items.length > 0)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openIncidents, me])
+
+  // If current view is no longer visible (permissions changed), redirect to first available.
+  useEffect(() => {
+    if (me === null) return // still loading
+    const allItems = navSections.flatMap((s) => s.items)
+    if (allItems.length > 0 && !allItems.find((i) => i.id === view)) {
+      setView(allItems[0].id)
+    }
+  }, [navSections, me, view])
 
   const meta = PAGE_META[view]
+  const profileLabel = isSuperAdmin ? 'Super Admin' : 'Admin'
   const initials = kcUsername
     .split(' ')
     .map((w) => w[0])
@@ -252,7 +290,7 @@ export default function AdminApp({
           <div className="admin-profile-avatar">{initials}</div>
           <div className="admin-profile-info">
             <strong>{kcUsername}</strong>
-            <span>Super Admin</span>
+            <span>{profileLabel}</span>
           </div>
           <button
             type="button"
@@ -333,6 +371,7 @@ export default function AdminApp({
           {view === 'system' && <SystemHealthPage />}
           {view === 'audit' && <AuditLogPage />}
           {view === 'configs' && <ConfigsPage />}
+          {view === 'admins' && <AdminsPage />}
         </div>
 
         <Sheet open={showNotifications} onOpenChange={setShowNotifications}>

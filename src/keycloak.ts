@@ -2,11 +2,6 @@ import Keycloak from 'keycloak-js'
 
 const MERCHANT_CLIENT_ID = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'scanny-client'
 
-/**
- * Prod builds set VITE_KEYCLOAK_URL to https://auth.koddly.com — always use that.
- * Local/LAN: match the page host on :8080 so phone access via 192.168.x.x still works
- * even when Vite env points at localhost.
- */
 function resolveKeycloakUrl(): string {
   const configured = (import.meta.env.VITE_KEYCLOAK_URL as string | undefined)?.replace(/\/$/, '')
   if (typeof window !== 'undefined') {
@@ -28,6 +23,46 @@ const keycloak = new Keycloak({
   clientId: MERCHANT_CLIENT_ID,
 })
 
+// ─── Silent token refresh ────────────────────────────────────────────────────
+//
+// Rule: NEVER call keycloak.init() more than once. It breaks the instance.
+// Only call updateToken() on a live authenticated session.
+// If that fails the refresh token is gone — redirect to login.
+
+let _refreshing = false
+
+function tryRefresh() {
+  if (!keycloak.authenticated) return
+  if (_refreshing) return
+  _refreshing = true
+
+  keycloak.updateToken(70)
+    .then(() => {
+      _refreshing = false
+    })
+    .catch(() => {
+      _refreshing = false
+      // Refresh token expired — send user to login, return to same page after.
+      keycloak.login({ redirectUri: window.location.href })
+    })
+}
+
+// Fired by keycloak-js when the access token's exp is crossed.
+keycloak.onTokenExpired = () => tryRefresh()
+
+// Fired by keycloak-js when a refresh request to Keycloak fails.
+keycloak.onAuthRefreshError = () => {
+  _refreshing = false
+  keycloak.login({ redirectUri: window.location.href })
+}
+
+// Proactive heartbeat every 60 s — refreshes before expiry so API calls
+// never hit the server with a stale token.
+const _interval = window.setInterval(() => tryRefresh(), 60_000)
+window.addEventListener('pagehide', () => window.clearInterval(_interval), { once: true })
+
+// ─── Initialisation ───────────────────────────────────────────────────────────
+
 let initPromise: Promise<boolean> | null = null
 
 export function initKeycloak() {
@@ -41,6 +76,8 @@ export function waitForKeycloak() {
   return initPromise ?? initKeycloak()
 }
 
+// ─── Role helpers ─────────────────────────────────────────────────────────────
+
 function hasMerchantRole(): boolean {
   const roles = (keycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
   return roles.includes('MERCHANT')
@@ -51,7 +88,6 @@ function hasStaffRole(): boolean {
   return roles.includes('STAFF')
 }
 
-/** True only for a scanny-client session that includes the MERCHANT realm role. */
 export function hasMerchantSession() {
   return (
     keycloak.authenticated &&
@@ -61,7 +97,6 @@ export function hasMerchantSession() {
   )
 }
 
-/** Merchant or staff — same Keycloak login, same client. */
 export function hasPortalSession() {
   return (
     keycloak.authenticated &&
@@ -75,10 +110,7 @@ export function isStaffSession() {
   return hasPortalSession() && hasStaffRole() && !hasMerchantRole()
 }
 
-/** End Keycloak SSO (shared across merchant/admin on the same realm). */
 export function logoutMerchant(redirectUri: string) {
-  // Avoid showing Keycloak's extra confirm page ("Log out / Back to application").
-  // We clear local auth state and return straight to the app landing page.
   keycloak.clearToken()
   window.location.replace(redirectUri)
   return Promise.resolve()

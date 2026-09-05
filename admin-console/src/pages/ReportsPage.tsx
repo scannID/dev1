@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { API_BASE_URL } from '../api/client'
 import { adminApi } from '../api/services'
 import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
@@ -24,6 +24,10 @@ export default function ReportsPage() {
   const [revenue, setRevenue] = useState<RevenueOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Keep the latest search value accessible inside the WS effect without
+  // tearing down and rebuilding the socket every time the user types.
+  const ticketSearchRef = useRef(ticketSearch)
+  ticketSearchRef.current = ticketSearch
 
   const wsUrl = useMemo(() => {
     const base = API_BASE_URL.replace(/\/api$/, '')
@@ -95,7 +99,7 @@ export default function ReportsPage() {
     const startPoll = () => {
       if (pollTimer != null) return
       pollTimer = window.setInterval(() => {
-        loadTicketStats(ticketSearch).catch(() => undefined)
+        loadTicketStats(ticketSearchRef.current).catch(() => undefined)
       }, 15000)
     }
 
@@ -135,7 +139,7 @@ export default function ReportsPage() {
       if (pollTimer != null) window.clearInterval(pollTimer)
       ws?.close()
     }
-  }, [wsUrl, ticketSearch])
+  }, [wsUrl])
 
   const filteredTicketStats = useMemo(() => {
     const query = ticketSearch.trim().toLowerCase()

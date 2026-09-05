@@ -15,7 +15,7 @@
  *   - PayStep             (CustomerApp)       — main + split-share phone fields
  */
 
-import type { ChangeEvent } from 'react'
+import type { CSSProperties, ChangeEvent } from 'react'
 
 export type MoMoProvider = 'MTN' | 'Airtel' | null
 
@@ -36,10 +36,8 @@ export function detectProvider(phone: string): MoMoProvider {
   return null
 }
 
-/** Enforce the leading 0 rule — the input must never be empty or start with non-0. */
+/** Simply return the raw value — no forced leading zero. */
 function enforceLeadingZero(raw: string): string {
-  if (!raw) return '0'
-  if (!raw.startsWith('0')) return '0' + raw.replace(/^0*/, '')
   return raw
 }
 
@@ -66,16 +64,15 @@ function AirtelBadge() {
 interface MoMoPhoneInputProps {
   value: string
   onChange: (value: string) => void
-  /** Called whenever the detected provider changes (including null when undetected). */
   onProvider?: (provider: MoMoProvider) => void
   placeholder?: string
   required?: boolean
   disabled?: boolean
   id?: string
-  /** Extra CSS class applied to the wrapper div. */
   className?: string
-  /** CSS class applied to the <input> element. */
   inputClassName?: string
+  style?: CSSProperties
+  inputStyle?: CSSProperties
   'aria-label'?: string
   'aria-describedby'?: string
   'aria-invalid'?: boolean
@@ -92,6 +89,8 @@ export function MoMoPhoneInput({
   id,
   className = '',
   inputClassName = '',
+  style,
+  inputStyle,
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedby,
   'aria-invalid': ariaInvalid,
@@ -106,11 +105,8 @@ export function MoMoPhoneInput({
     onProvider?.(nextProvider)
   }
 
-  // Notify parent of initial provider on first render / value change
-  // (handled via the calling component's useEffect or inline derivation)
-
   return (
-    <div className={`momo-wrap${className ? ' ' + className : ''}`}>
+    <div className={`momo-wrap${className ? ' ' + className : ''}`} style={style}>
       <input
         id={id}
         type="tel"
@@ -122,6 +118,7 @@ export function MoMoPhoneInput({
         required={required}
         disabled={disabled}
         className={`momo-input${inputClassName ? ' ' + inputClassName : ''}`}
+        style={inputStyle}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedby}
         aria-invalid={ariaInvalid}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import QRCode from 'qrcode'
 import { ArrowRight, Check, CheckCheck, Clock, Copy, Send, Share2, X } from 'lucide-react'
 import { publicTicketsApi } from '../api/services'
@@ -266,18 +266,11 @@ export default function TicketViewPage({ accessToken }: Props) {
 
             {ticket.status === 'Active' ? (
               <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  className="tk-transfer-trigger-btn"
-                  onClick={handleOpenTransfer}
-                >
-                  <Send size={14} />
-                  <span>Transfer Ticket</span>
-                </button>
+               
               </div>
             ) : null}
 
-            <p className="tk-foot-note">Show this QR at entry. A copy is also in your email.</p>
+            <p className="tk-foot-note">Show this QR at entry.</p>
           </div>
         ) : (
           <>

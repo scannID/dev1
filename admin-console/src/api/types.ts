@@ -594,3 +594,67 @@ export interface MerchantScansResponse {
   totalScans: number
   pagination: { page: number; limit: number; total: number; pages: number }
 }
+
+// ── Admin users / permissions ─────────────────────────────────────────────────
+
+export type AdminPermission =
+  | 'VIEW_OVERVIEW'
+  | 'VIEW_MERCHANTS'
+  | 'VIEW_ORDERS'
+  | 'VIEW_TICKETING'
+  | 'VIEW_USERS'
+  | 'VIEW_COMMUNICATIONS'
+  | 'VIEW_REVENUE'
+  | 'VIEW_QR_ACTIVITY'
+  | 'VIEW_COOKIE_CONSENT'
+  | 'VIEW_REPORTS'
+  | 'VIEW_SYSTEM'
+  | 'VIEW_AUDIT'
+  | 'VIEW_CONFIGS'
+  | 'MANAGE_ADMINS'
+
+export const ADMIN_PERMISSION_META: Record<AdminPermission, { label: string; group: string }> = {
+  VIEW_OVERVIEW:       { label: 'Overview',           group: 'Platform' },
+  VIEW_MERCHANTS:      { label: 'Merchants',           group: 'Platform' },
+  VIEW_ORDERS:         { label: 'All Orders',          group: 'Platform' },
+  VIEW_TICKETING:      { label: 'Ticketing',           group: 'Platform' },
+  VIEW_USERS:          { label: 'Users',               group: 'Platform' },
+  VIEW_COMMUNICATIONS: { label: 'Communications',      group: 'Platform' },
+  VIEW_REVENUE:        { label: 'Revenue & Payments',  group: 'Finance' },
+  VIEW_QR_ACTIVITY:    { label: 'QR Activity',         group: 'Analytics' },
+  VIEW_COOKIE_CONSENT: { label: 'Cookie Consent',      group: 'Analytics' },
+  VIEW_REPORTS:        { label: 'Reports',             group: 'Analytics' },
+  VIEW_SYSTEM:         { label: 'System Health',       group: 'System' },
+  VIEW_AUDIT:          { label: 'Audit Log',           group: 'System' },
+  VIEW_CONFIGS:        { label: 'Configs',             group: 'System' },
+  MANAGE_ADMINS:       { label: 'Manage Admins',       group: 'System' },
+}
+
+/** Permissions that can be granted to invited sub-admins (MANAGE_ADMINS is super-admin only). */
+export const GRANTABLE_PERMISSIONS = (
+  Object.keys(ADMIN_PERMISSION_META) as AdminPermission[]
+).filter((p) => p !== 'MANAGE_ADMINS')
+
+export interface AdminUserRow {
+  id: string
+  email: string
+  displayName: string
+  superAdmin: boolean
+  active: boolean
+  pending: boolean
+  permissions: AdminPermission[]
+  invitedByEmail: string | null
+  createdAt: string
+}
+
+export interface AdminUserListResponse {
+  admins: AdminUserRow[]
+}
+
+export interface AdminMeResponse {
+  id: string
+  email: string
+  displayName: string
+  superAdmin: boolean
+  permissions: AdminPermission[]
+}

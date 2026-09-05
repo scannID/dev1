@@ -319,6 +319,59 @@ public class KeycloakAdminService {
     }
 
     /**
+     * Create or reuse a Keycloak user for an invited sub-admin.
+     * Assigns the ADMIN realm role and sends a password-setup email.
+     */
+    public UUID createOrInviteAdminUser(String email, String displayName) {
+        try {
+            RealmResource realmResource = keycloak.realm(keycloakConfig.getRealm());
+            UsersResource usersResource = realmResource.users();
+
+            String trimmedEmail = email.trim().toLowerCase();
+            List<UserRepresentation> existing = usersResource.searchByEmail(trimmedEmail, true);
+            String userId;
+            if (!existing.isEmpty()) {
+                userId = existing.get(0).getId();
+                ensureRealmRole(userId, "ADMIN");
+            } else {
+                String firstName = displayName;
+                String lastName = "";
+                String[] parts = displayName.trim().split("\\s+", 2);
+                if (parts.length >= 1 && !parts[0].isBlank()) firstName = parts[0];
+                if (parts.length == 2) lastName = parts[1];
+
+                UserRepresentation user = new UserRepresentation();
+                user.setEmail(trimmedEmail);
+                user.setUsername(trimmedEmail);
+                user.setFirstName(firstName);
+                user.setLastName(lastName);
+                user.setEnabled(true);
+                user.setEmailVerified(false);
+
+                Response response = usersResource.create(user);
+                if (response.getStatus() != 201) {
+                    String error = response.readEntity(String.class);
+                    logger.error("Failed to create Keycloak admin user: {}", error);
+                    throw new ApiException(500, "Failed to create admin user in Keycloak: " + error);
+                }
+                String locationHeader = response.getHeaderString("Location");
+                userId = locationHeader.substring(locationHeader.lastIndexOf('/') + 1);
+                response.close();
+                assignRoleToUser(userId, "ADMIN");
+            }
+
+            sendPasswordSetupEmail(userId);
+            logger.info("Invited Keycloak admin user: {}", trimmedEmail);
+            return UUID.fromString(userId);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error creating Keycloak admin user", e);
+            throw new ApiException(500, "Failed to invite admin: " + e.getMessage());
+        }
+    }
+
+    /**
      * Delete user
      */
     public void deleteUser(String userId) {

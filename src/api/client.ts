@@ -52,7 +52,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     try {
       await keycloak.updateToken(30)
     } catch {
-      // Keep using the current token when refresh is not needed yet.
+      // Token refresh failed — the 60 s interval should have kept it alive,
+      // so this is likely a genuine session expiry. The 401 retry path in
+      // fetchApi will attempt one forced refresh before giving up.
     }
     if (keycloak.token) {
       headers.Authorization = `Bearer ${keycloak.token}`
@@ -68,7 +70,8 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function fetchApi<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  _retry = true,
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
   const authHeaders = await getAuthHeaders()
@@ -83,6 +86,22 @@ async function fetchApi<T>(
     })
 
     if (!response.ok) {
+      // On a 401 try once to refresh the token and repeat the request.
+      // This handles the race where the token expired between the updateToken
+      // call above and the server receiving the request.
+      if (response.status === 401 && _retry && keycloak.authenticated) {
+        try {
+          await keycloak.updateToken(-1) // force an immediate refresh
+        } catch {
+          // Refresh token is expired — redirect to login.
+          keycloak.login()
+          // Return a pending promise so no further error propagates while
+          // the browser navigates away.
+          return new Promise(() => {})
+        }
+        return fetchApi<T>(endpoint, options, false)
+      }
+
       const errorData = await response.json().catch(() => null) as { message?: string; error?: string } | null
       throw new ApiError(
         errorData?.error || errorData?.message || `HTTP ${response.status}: ${response.statusText}`,
@@ -100,10 +119,17 @@ async function fetchApi<T>(
     if (error instanceof ApiError) {
       throw error
     }
-    throw new ApiError(
-      error instanceof Error ? error.message : 'Network error',
-      0
-    )
+
+    // "Failed to fetch" (status 0) can happen when the browser briefly drops
+    // the connection during a background token refresh. Retry once after a
+    // short pause before surfacing the error to the user.
+    const message = error instanceof Error ? error.message : 'Network error'
+    if (_retry && (message === 'Failed to fetch' || message === 'NetworkError when attempting to fetch resource.' || message === 'Network request failed')) {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      return fetchApi<T>(endpoint, options, false)
+    }
+
+    throw new ApiError(message, 0)
   }
 }
 

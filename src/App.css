@@ -5338,3 +5338,287 @@ button:disabled {
   align-items: center;
   gap: 12px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE MERCHANT PORTAL — phone-native feel (≤ 768px)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Hide desktop sidebar, show hamburger in topbar ─────────────*/
+.mobile-nav-toggle {
+  display: none;
+}
+
+.mobile-nav-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobile-nav-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Shell becomes a single column — sidebar slides in as drawer */
+  .company-shell {
+    flex-direction: column;
+  }
+
+  /* Sidebar hidden by default — slides in from left */
+  .company-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 100;
+    width: 280px;
+    max-width: 85vw;
+    height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.25s ease;
+    box-shadow: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .company-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Backdrop behind open drawer */
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    animation: mobile-fade-in 0.2s ease;
+  }
+
+  @keyframes mobile-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Show the close button inside the drawer */
+  .mobile-nav-close {
+    display: flex;
+    margin-bottom: 8px;
+  }
+
+  /* Show hamburger in topbar */
+  .mobile-nav-toggle {
+    display: inline-flex;
+  }
+
+  /* Topbar: more compact, title truncates */
+  .company-topbar {
+    height: 56px;
+    padding: 0 14px;
+    gap: 10px;
+  }
+
+  .company-topbar h2 {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 44vw;
+  }
+
+  .company-topbar > div:first-child p.eyebrow {
+    display: none;
+  }
+
+  /* Page content: tighter padding, extra bottom for safe area */
+  .page-content {
+    padding: 14px 14px calc(16px + env(safe-area-inset-bottom));
+    gap: 12px;
+  }
+
+  /* Workspace fills the screen */
+  .company-workspace {
+    width: 100%;
+  }
+
+  /* Metric grid: 2 columns on phone */
+  .metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px;
+  }
+
+  /* Orders table becomes stacked cards */
+  .orders-table-head {
+    display: none;
+  }
+
+  .order-row {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    background: var(--card);
+  }
+
+  /* Order board: single column */
+  .order-board {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  /* Catalog rows: single column */
+  .catalog-table-head {
+    display: none;
+  }
+
+  .catalog-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Item grid: 2 columns */
+  .item-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* Add item form: single column */
+  .add-item-form {
+    grid-template-columns: 1fr;
+  }
+
+  .add-item-media {
+    position: static;
+    max-height: none;
+  }
+
+  /* QR panel: compact */
+  .qr-panel {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+
+  .qr-code,
+  .qr-panel img,
+  .qr-loading {
+    width: 68px;
+    height: 68px;
+  }
+
+  /* Owner/branch grid: single column */
+  .owner-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  /* Admin metric grid: 2 columns */
+  .admin-metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+
+  /* Tables: horizontal scroll */
+  .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Reports two-col: single column */
+  .admin-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Floor plan: full height */
+  .floor-plan-canvas-wrap {
+    height: 60dvh;
+  }
+
+  /* Kitchen iframe */
+  .page-content iframe {
+    min-height: 55dvh;
+  }
+
+  /* Tabs: scroll horizontally instead of wrapping */
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs button {
+    flex-shrink: 0;
+  }
+
+  /* Topbar action row: only show essential buttons */
+  .company-topbar > div:last-child {
+    gap: 4px;
+  }
+
+  /* Stat / metric cards: smaller text */
+  .metric-card,
+  .admin-metric-card {
+    padding: 12px 12px;
+  }
+
+  .metric-card .metric-value,
+  .admin-metric-card .metric-value {
+    font-size: 1.4rem;
+  }
+
+  /* Dialog / alert dialogs: full-width on mobile */
+  [role="dialog"][data-radix-dialog-content] {
+    width: calc(100vw - 28px) !important;
+    max-width: none !important;
+  }
+
+  /* Sheet: full width on mobile */
+  [data-radix-sheet-content][data-side="right"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Prevent body scroll when nav open */
+  body.mobile-nav-open {
+    overflow: hidden;
+  }
+}
+
+/* Very small phones (< 390px) */
+@media (max-width: 390px) {
+  .company-topbar h2 {
+    font-size: 15px;
+    max-width: 38vw;
+  }
+
+  .page-content {
+    padding: 12px 12px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .item-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

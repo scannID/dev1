@@ -83,15 +83,14 @@ public class RealtimeEventPublisher {
 
     public void publishDirect(String channel, String type, String businessId, Object payload) {
         try {
-            Map<String, Object> envelope = Map.of(
-                    "type", type,
-                    "channel", channel,
-                    "businessId", businessId != null ? businessId : "",
-                    "version", Instant.now().toEpochMilli(),
-                    "occurredAt", Instant.now().toString(),
-                    "eventId", UUID.randomUUID().toString(),
-                    "payload", payload
-            );
+            Map<String, Object> envelope = new java.util.LinkedHashMap<>();
+            envelope.put("type", type);
+            envelope.put("channel", channel);
+            envelope.put("businessId", businessId != null ? businessId : "");
+            envelope.put("version", Instant.now().toEpochMilli());
+            envelope.put("occurredAt", Instant.now().toString());
+            envelope.put("eventId", UUID.randomUUID().toString());
+            envelope.put("payload", payload != null ? payload : java.util.Collections.emptyMap());
             String json = objectMapper.writeValueAsString(envelope);
             if (redisTemplate != null) {
                 try {

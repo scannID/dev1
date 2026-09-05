@@ -157,7 +157,16 @@ export function CatalogItemGalleryField({
         <ImagePlus className="size-4" />
         Upload from device
       </Button>
-     
+      <Button
+        type="button"
+        variant={searchOpen ? 'default' : 'outline'}
+        size="sm"
+        disabled={disabled}
+        onClick={() => setSearchOpen((open) => !open)}
+      >
+        <Search className="size-4" />
+        Search free photos
+      </Button>
       {imageUrls.length > 0 ? (
         <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={removeActive}>
           <Trash2 className="size-4" />

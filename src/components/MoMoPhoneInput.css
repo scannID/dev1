@@ -11,10 +11,9 @@
 }
 
 .momo-input {
-  /* Intentionally unstyled — consuming context applies its own input styles.
-     The wrapper just positions the badge on top. */
   width: 100%;
-  /* Right padding reserves space for the badge so text doesn't run under it */
+  /* Right padding reserves space for the badge so text doesn't run under it.
+     Height/border/padding come from the consuming context via inputStyle prop. */
   padding-right: 72px !important;
 }
 

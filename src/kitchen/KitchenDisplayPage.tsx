@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { operationsApi, type KitchenOrder } from '../api/operations'
 import type { OrderStatus } from '../api/types'
 import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
 import { applyDarkMode, readDarkMode, persistDarkMode } from '../lib/theme'
 import { createRealtimeClient } from '../lib/realtime'
 
@@ -11,12 +18,12 @@ const STATUS_FLOW: OrderStatus[] = ['Pending', 'Preparing', 'Ready', 'Completed'
 
 const STATUS_META: Record<
   string,
-  { label: string; short: string; nextLabel?: string }
+  { label: string; short: string; nextLabel?: string; color: string }
 > = {
-  Pending: { label: 'Pending', short: 'NEW', nextLabel: 'Start' },
-  Preparing: { label: 'Preparing', short: 'PREP', nextLabel: 'Ready' },
-  Ready: { label: 'Ready', short: 'READY', nextLabel: 'Done' },
-  Completed: { label: 'Completed', short: 'DONE' },
+  Pending:   { label: 'Pending',   short: 'NEW',  nextLabel: 'Start',  color: '#ef4444' },
+  Preparing: { label: 'Preparing', short: 'PREP', nextLabel: 'Ready',  color: '#f59e0b' },
+  Ready:     { label: 'Ready',     short: 'READY', nextLabel: 'Done',  color: '#22c55e' },
+  Completed: { label: 'Completed', short: 'DONE',                      color: '#64748b' },
 }
 
 function nextStatus(current: OrderStatus): OrderStatus | null {
@@ -44,11 +51,221 @@ function statusClass(status: OrderStatus) {
   return `kds-card--${status.toLowerCase()}`
 }
 
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat('en-UG', {
+    style: 'currency',
+    currency: 'UGX',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+/* ── Order detail sheet ─────────────────────────────────────────────────── */
+
+function OrderDetailSheet({
+  order,
+  now,
+  onClose,
+  onAdvance,
+  advancing,
+}: {
+  order: KitchenOrder | null
+  now: number
+  onClose: () => void
+  onAdvance: (order: KitchenOrder) => Promise<void>
+  advancing: boolean
+}) {
+  const next = order ? nextStatus(order.status) : null
+  const meta = order ? (STATUS_META[order.status] ?? { label: order.status, short: order.status, color: '#64748b' }) : null
+
+  return (
+    <Sheet open={Boolean(order)} onOpenChange={(open) => { if (!open) onClose() }}>
+      <SheetContent
+        side="right"
+        className="w-full max-w-md flex flex-col gap-0 p-0"
+        style={{ background: 'var(--kds-surface, var(--background))', color: 'var(--kds-text, var(--foreground))' }}
+      >
+        {order && meta ? (
+          <>
+            {/* ── Header ── */}
+            <SheetHeader
+              className="flex-row items-center gap-3 border-b px-5 py-4"
+              style={{ borderColor: 'var(--kds-border, var(--border))' }}
+            >
+              {/* status rail accent */}
+              <div
+                style={{
+                  width: 5,
+                  alignSelf: 'stretch',
+                  borderRadius: 3,
+                  background: meta.color,
+                  flexShrink: 0,
+                }}
+              />
+              <div className="flex-1 min-w-0">
+                <SheetTitle className="text-base font-bold leading-tight">
+                  #{shortId(order.id)}
+                  <span
+                    className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded"
+                    style={{
+                      background: `color-mix(in srgb, ${meta.color} 18%, transparent)`,
+                      color: meta.color,
+                    }}
+                  >
+                    {meta.short}
+                  </span>
+                </SheetTitle>
+                <SheetDescription className="text-xs mt-0.5" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                  {order.customerName || 'Guest'} · {elapsedLabel(order.createdAt, now)} ago
+                </SheetDescription>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="ml-auto shrink-0 rounded p-1 opacity-60 hover:opacity-100 transition-opacity"
+              >
+                <X size={16} />
+              </button>
+            </SheetHeader>
+
+            {/* ── Body ── */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 grid gap-5">
+
+              {/* Location / table */}
+              {(order.tableLabel || order.customerLocation) && (
+                <div className="grid gap-1">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                    {order.tableLabel ? 'Table' : 'Location'}
+                  </p>
+                  <p className="text-sm font-semibold">{order.tableLabel || order.customerLocation}</p>
+                </div>
+              )}
+
+              {/* Items */}
+              <div className="grid gap-1.5">
+                <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                  Items ({order.items.length})
+                </p>
+                <ul className="grid gap-2">
+                  {order.items.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="flex gap-3 items-start rounded-lg px-3 py-2.5 text-sm"
+                      style={{ background: 'var(--kds-surface-low, var(--muted))', opacity: 1 }}
+                    >
+                      <span
+                        className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-xs font-bold"
+                        style={{ background: meta.color + '28', color: meta.color }}
+                      >
+                        {item.quantity}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold leading-snug">{item.name}</p>
+                        {item.note && (
+                          <p className="text-xs mt-0.5 italic" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                            {item.note}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Customer note */}
+              {order.customerNote && (
+                <div className="grid gap-1">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                    Customer note
+                  </p>
+                  <p
+                    className="text-sm rounded-lg px-3 py-2.5 italic"
+                    style={{ background: 'color-mix(in srgb, #f59e0b 12%, transparent)', borderLeft: '3px solid #f59e0b' }}
+                  >
+                    {order.customerNote}
+                  </p>
+                </div>
+              )}
+
+              {/* Kitchen notes */}
+              {order.kitchenNotes && (
+                <div className="grid gap-1">
+                  <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                    Kitchen notes
+                  </p>
+                  <p
+                    className="text-sm rounded-lg px-3 py-2.5"
+                    style={{ background: 'color-mix(in srgb, #3b82f6 10%, transparent)', borderLeft: '3px solid #3b82f6' }}
+                  >
+                    {order.kitchenNotes}
+                  </p>
+                </div>
+              )}
+
+              {/* Total */}
+              {order.total > 0 && (
+                <div className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-semibold"
+                  style={{ background: 'var(--kds-surface-low, var(--muted))' }}
+                >
+                  <span style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>Order total</span>
+                  <span>{formatMoney(order.total)}</span>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid gap-1">
+                <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                  Placed
+                </p>
+                <p className="text-xs" style={{ color: 'var(--kds-text-muted, var(--muted-foreground))' }}>
+                  {new Date(order.createdAt).toLocaleString('en-UG', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {/* ── Footer: advance button ── */}
+            {next ? (
+              <div
+                className="border-t px-5 py-4"
+                style={{ borderColor: 'var(--kds-border, var(--border))' }}
+              >
+                <button
+                  type="button"
+                  className="kds-advance w-full"
+                  style={{ borderRadius: 8, padding: '14px', fontSize: 15, fontWeight: 700 }}
+                  disabled={advancing}
+                  onClick={() => void onAdvance(order)}
+                >
+                  {advancing ? 'Updating…' : (meta.nextLabel ?? `→ ${next}`)}
+                </button>
+              </div>
+            ) : (
+              <div
+                className="border-t px-5 py-4 flex items-center justify-center gap-2 text-sm font-semibold"
+                style={{ borderColor: 'var(--kds-border, var(--border))', color: '#64748b' }}
+              >
+                ✓ Completed
+              </div>
+            )}
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/* ── Main page ──────────────────────────────────────────────────────────── */
+
 export function KitchenDisplayPage({ businessId }: { businessId: string }) {
   const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(() => Date.now())
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
+  const [selectedOrder, setSelectedOrder] = useState<KitchenOrder | null>(null)
+  const [advancing, setAdvancing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const seenPending = useRef<Set<string>>(new Set())
 
@@ -75,6 +292,11 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
     try {
       const data = await operationsApi.kitchenOrders(businessId)
       setOrders(data)
+      // Keep the selected order's data fresh when it's still open
+      setSelectedOrder((prev) => {
+        if (!prev) return null
+        return data.find((o) => o.id === prev.id) ?? null
+      })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load kitchen orders')
     } finally {
@@ -85,12 +307,14 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
   useEffect(() => {
     void load()
 
-    // WebSocket for instant push — polling is the fallback when WS is unavailable.
     let realtimeClient: { close: () => void } | null = null
+    let fallbackTimer: number | null = null
+    let unmounted = false
 
     async function startRealtime() {
       try {
         const keycloak = (await import('../keycloak')).default
+        if (unmounted) return
         realtimeClient = createRealtimeClient({
           channels: [`orders:${businessId}`],
           getToken: async () => {
@@ -101,7 +325,6 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
               return keycloak.token
             }
           },
-          // Slow poll — WS handles the fast path; this catches any gaps.
           poll: load,
           pollIntervalMs: 30000,
           onEvent: (event) => {
@@ -111,16 +334,18 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
           },
         })
       } catch {
-        // Keycloak unavailable (standalone tab, no session) — fall back to polling only.
-        const timer = window.setInterval(() => void load(), 4000)
-        return () => window.clearInterval(timer)
+        if (!unmounted) {
+          fallbackTimer = window.setInterval(() => void load(), 4000)
+        }
       }
     }
 
     void startRealtime()
 
     return () => {
+      unmounted = true
       realtimeClient?.close()
+      if (fallbackTimer != null) window.clearInterval(fallbackTimer)
     }
   }, [load, businessId])
 
@@ -159,12 +384,17 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
   async function advance(order: KitchenOrder) {
     const next = nextStatus(order.status)
     if (!next) return
+    setAdvancing(true)
     try {
       await operationsApi.updateKitchenStatus(businessId, order.id, next)
       toast.success(`${shortId(order.id)} → ${next}`)
-      void load()
+      await load()
+      // Close sheet after final status
+      if (next === 'Completed') setSelectedOrder(null)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update order')
+    } finally {
+      setAdvancing(false)
     }
   }
 
@@ -206,7 +436,7 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
       <div className="kds-board">
         {orders.map((order) => {
           const next = nextStatus(order.status)
-          const meta = STATUS_META[order.status] ?? { label: order.status, short: order.status.slice(0, 4).toUpperCase() }
+          const meta = STATUS_META[order.status] ?? { label: order.status, short: order.status.slice(0, 4).toUpperCase(), color: '#64748b' }
           const place = order.tableLabel || order.customerLocation || ''
           const itemsPreview = order.items
             .slice(0, 3)
@@ -219,6 +449,8 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
               key={order.id}
               className={`kds-card ${statusClass(order.status)}`}
               title={`${order.customerName}${place ? ` · ${place}` : ''}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setSelectedOrder(order)}
             >
               <div className="kds-card-rail" aria-hidden />
               <div className="kds-card-body">
@@ -249,7 +481,11 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
                 <button
                   type="button"
                   className="kds-advance"
-                  onClick={() => void advance(order)}
+                  onClick={(e) => {
+                    // Advance without opening the sheet when tapping the button directly
+                    e.stopPropagation()
+                    void advance(order)
+                  }}
                 >
                   {meta.nextLabel ?? `→ ${next}`}
                 </button>
@@ -264,7 +500,14 @@ export function KitchenDisplayPage({ businessId }: { businessId: string }) {
       {!loading && orders.length === 0 ? (
         <p className="kds-empty">No active kitchen orders right now.</p>
       ) : null}
+
+      <OrderDetailSheet
+        order={selectedOrder}
+        now={now}
+        onClose={() => setSelectedOrder(null)}
+        onAdvance={advance}
+        advancing={advancing}
+      />
     </main>
   )
 }
-

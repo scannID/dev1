@@ -182,7 +182,7 @@ export default function ReceiptPage() {
         <div className="rp-divider rp-divider--dashed" />
 
         <p className="rp-footnote">
-          Powered by <strong>Koddly</strong> · This receipt is stored on the payer's device.
+         Koddly Powered by <strong>QbiLabs</strong> · This receipt is stored on the payer's device.
         </p>
       </div>
     </div>

@@ -1011,7 +1011,7 @@ export default function CustomerApp({
     }
 
     if (!provider) {
-      setError('Choose MTN or Airtel to continue')
+      setError('Enter your mobile money number so we can detect your network')
       return
     }
     if (!feeConsent) {

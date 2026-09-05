@@ -3094,3 +3094,315 @@ html.cm-app #root {
   border-radius: 9px;
   padding: 5px 16px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS — small phone fixes (≤ 390px)
+   Everything below 640px is already single-column; these rules
+   tighten spacing, sizes, and layouts for very small screens.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Topbar ───────────────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-topbar {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .cm-brand-name {
+    font-size: 13px;
+  }
+
+  .cm-brand-biz {
+    max-width: min(32vw, 120px);
+    font-size: 10px;
+  }
+
+  /* Busy/paused chip — drop text on tiny screens, keep dot only */
+  .cm-status-chip {
+    padding: 4px 7px;
+    font-size: 9px;
+    gap: 4px;
+  }
+
+  .cm-cart-btn,
+  .cm-track-btn,
+  .cm-receipt-btn,
+  .cm-ghost-btn,
+  .cm-cancel-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .cm-topbar-actions {
+    gap: 3px;
+  }
+}
+
+/* ── Progress dots ────────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-progress {
+    padding: 12px 14px 4px;
+  }
+
+  .cm-progress-label {
+    font-size: 10px;
+  }
+}
+
+/* ── Menu toolbar (title + search side by side) ───────────────── */
+/* On very small phones the search shrinks too much — stack them */
+@media (max-width: 420px) {
+  .cm-menu-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px 0;
+  }
+
+  .cm-menu-toolbar-title {
+    flex: 1 1 100%;
+  }
+
+  .cm-search {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ── Category pills ───────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-cats {
+    padding: 10px 12px 4px;
+    gap: 6px;
+  }
+
+  .cm-cats button {
+    padding: 7px 11px;
+    font-size: 12px;
+  }
+
+  .cm-cat-icon {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+/* ── Offers / popular rail ────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-offer-card,
+  .cm-popular-card {
+    /* Slightly narrower so first card + hint of next are both visible */
+    flex: 0 0 min(72vw, 220px);
+    height: 134px;
+  }
+
+  .cm-offer-card-scrub h3 {
+    font-size: 14px;
+  }
+
+  .cm-offer-now {
+    font-size: 15px;
+  }
+}
+
+/* ── Menu grid ────────────────────────────────────────────────── */
+@media (max-width: 340px) {
+  /* On the very smallest phones (320px Galaxy fold outer, etc.)
+     a single-column list reads better than two tiny cards */
+  .cm-menu-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px 12px 12px;
+  }
+
+  .cm-menu-card {
+    flex-direction: row;
+    height: auto;
+    border-radius: 14px;
+  }
+
+  .cm-menu-card-hit {
+    flex-direction: row;
+    flex: 1 1 auto;
+  }
+
+  .cm-menu-card-media {
+    flex: 0 0 80px;
+    width: 80px;
+    height: 80px;
+    border-radius: 0;
+    align-self: stretch;
+  }
+
+  .cm-menu-card-img {
+    aspect-ratio: auto;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .cm-menu-card-copy {
+    padding: 10px 10px 0;
+    grid-template-rows: auto auto 1fr;
+  }
+
+  .cm-menu-card-copy h3 {
+    font-size: 13px;
+    -webkit-line-clamp: 1;
+    height: 1.25em;
+    max-height: 1.25em;
+  }
+
+  .cm-menu-card-copy p {
+    -webkit-line-clamp: 1;
+    height: 1.35em;
+    max-height: 1.35em;
+  }
+
+  .cm-menu-card-footer {
+    min-height: 40px;
+    height: 40px;
+    padding: 6px 10px 10px;
+  }
+}
+
+@media (min-width: 341px) and (max-width: 390px) {
+  .cm-menu-grid {
+    gap: 10px;
+    padding: 10px 12px 12px;
+  }
+
+  .cm-menu-card-copy h3 {
+    font-size: 13px;
+  }
+
+  .cm-menu-card-copy p {
+    font-size: 11px;
+  }
+
+  .cm-menu-card-copy > strong,
+  .cm-menu-card-copy .cm-price-sale {
+    font-size: 12px;
+  }
+
+  .cm-menu-card-footer {
+    min-height: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Bottom bar ───────────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-bottom-bar {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .cm-bottom-bar strong {
+    font-size: 14px;
+  }
+
+  .cm-primary {
+    font-size: 13px;
+    padding: 11px 14px;
+  }
+}
+
+/* ── Panel (cart / pay / details) ────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-panel {
+    margin: 10px 12px 20px;
+    padding: 16px 14px 18px;
+  }
+
+  .cm-panel h2 {
+    font-size: 1.2rem;
+  }
+}
+
+/* ── Item detail sheet ────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-track-sheet {
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .cm-item-sheet-media img {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* ── Cart step summary lines ──────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-summary-line {
+    font-size: 13px;
+  }
+
+  .cm-item-thumb {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ── Split draft rows (pay step) ──────────────────────────────── */
+@media (max-width: 420px) {
+  .split-draft-row-multi {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .split-amount-cell {
+    width: 100%;
+  }
+}
+
+/* ── Waiting / done steps ─────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-done-total {
+    font-size: 1.3rem;
+  }
+
+  .cm-waiting-meta > div {
+    font-size: 12px;
+  }
+}
+
+/* ── Spotlight tabs ───────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-spotlight-tabs {
+    margin: 0 12px 10px;
+  }
+
+  .cm-spotlight-tabs button {
+    font-size: 12px;
+    padding: 8px 8px;
+  }
+}
+
+/* ── Browse tabs (Hotel) ──────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-browse-tabs {
+    padding: 10px 12px 0;
+    gap: 6px;
+  }
+
+  .cm-browse-tabs button {
+    font-size: 13px;
+    padding: 9px 10px;
+  }
+}
+
+/* ── Ops / busy banner ────────────────────────────────────────── */
+@media (max-width: 390px) {
+  .cm-ops-banner {
+    margin: 0 12px 8px;
+    font-size: 12px;
+    padding: 9px 10px;
+  }
+}
+
+/* ── Step progress line fix on narrow screens ─────────────────── */
+@media (max-width: 320px) {
+  .cm-progress-label {
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+}

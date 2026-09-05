@@ -126,7 +126,12 @@ export function createRealtimeClient(options: RealtimeOptions) {
           }
           return
         }
-        if (data.type === 'SUBSCRIBED' || data.type === 'ERROR') return
+        if (data.type === 'SUBSCRIBED') return
+        if (data.type === 'ERROR') {
+          // Forbidden / bad channel — fall back to REST polling.
+          startPolling()
+          return
+        }
         if (data.eventId) {
           if (seen.has(data.eventId)) return
           seen.add(data.eventId)

@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -304,6 +304,7 @@ function App({
   const [floorPlanNavOpen, setFloorPlanNavOpen] = useState(false)
   const [catalogNavOpen, setCatalogNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [showMobileNav, setShowMobileNav] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
@@ -425,6 +426,11 @@ function App({
   useEffect(() => {
     applyDarkMode(darkMode)
   }, [darkMode])
+
+  useEffect(() => {
+    document.body.classList.toggle('mobile-nav-open', showMobileNav)
+    return () => document.body.classList.remove('mobile-nav-open')
+  }, [showMobileNav])
 
   const loadBranchOverviewCounts = useCallback(async () => {
     const pairs = await Promise.all(
@@ -778,7 +784,16 @@ function App({
   return (
     <main className="company-shell">
       <Toaster />
-      <aside className="company-sidebar" aria-label="Company workspace navigation">
+      <aside className={`company-sidebar${showMobileNav ? ' mobile-open' : ''}`} aria-label="Company workspace navigation">
+        {/* Mobile close button */}
+        <button
+          type="button"
+          className="mobile-nav-close"
+          aria-label="Close navigation"
+          onClick={() => setShowMobileNav(false)}
+        >
+          <X size={20} />
+        </button>
         <div className="sidebar-brand">
           <img
             src="/kodte-icon.svg"
@@ -918,6 +933,7 @@ function App({
                             if (id === 'catalog') setCatalogNavOpen(true)
                             if (id === 'operations') setOperationsNavOpen(true)
                             setView(childId)
+                            setShowMobileNav(false)
                           }}
                         >
                           <ChildIcon size={16} />
@@ -939,6 +955,7 @@ function App({
                   setShowAddItem(false)
                   setEditingItem(null)
                   setView(id)
+                  setShowMobileNav(false)
                 }}
               >
                 <Icon size={20} />
@@ -1037,6 +1054,16 @@ function App({
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Mobile hamburger — only visible on small screens */}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="mobile-nav-toggle"
+              aria-label="Open navigation"
+              onClick={() => setShowMobileNav(true)}
+            >
+              <Menu className="size-3.5" />
+            </Button>
             {!showAddItem && !editingItem && view === 'account' && (
               <Button className="" size="sm" onClick={() => { setAddItemSection('food'); setEditingItem(null); setShowAddItem(true) }}>
                 <Plus className="size-3.5" />
@@ -1366,6 +1393,14 @@ function App({
           onOpenChange={setShowAnnouncements}
         />
       </section>
+      {/* Mobile nav backdrop */}
+      {showMobileNav && (
+        <div
+          className="mobile-nav-backdrop"
+          aria-hidden="true"
+          onClick={() => setShowMobileNav(false)}
+        />
+      )}
     </main>
   )
 }
