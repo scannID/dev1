@@ -64,6 +64,11 @@ import type {
   CreateAnnouncementRequest,
   UpdateAnnouncementRequest,
   PaymentProvidersResponse,
+  NearbyEventsResponse,
+  NearbyPromotedEvent,
+  PromoteEventRequest,
+  PromotionInitiateResponse,
+  PromotionStatusResponse,
 } from './types'
 
 export type CatalogListParams = {
@@ -594,6 +599,63 @@ export const announcementsApi = {
   },
 }
 
+export const promotionsApi = {
+  /**
+   * Organiser: initiate a 40,000 UGX MoMo payment to promote an event.
+   * Returns promotionId + paymentId for polling.
+   */
+  initiate: async (data: PromoteEventRequest): Promise<PromotionInitiateResponse> => {
+    return api.post<PromotionInitiateResponse>('/promotions/initiate', data)
+  },
+
+  /**
+   * Poll promotion + payment status.
+   * Poll every 3 s until promoStatus === 'ACTIVE' or paymentStatus === 'FAILED'.
+   */
+  status: async (promotionId: string): Promise<PromotionStatusResponse> => {
+    return api.get<PromotionStatusResponse>(
+      `/promotions/${encodeURIComponent(promotionId)}/status`,
+    )
+  },
+
+  /**
+   * Customer feed: active promoted events near lat/lng.
+   * lat/lng are optional — omit for city-wide fallback.
+   */
+  nearby: async (lat?: number | null, lng?: number | null): Promise<NearbyEventsResponse> => {
+    const params = new URLSearchParams()
+    if (lat != null) params.set('lat', String(lat))
+    if (lng != null) params.set('lng', String(lng))
+    const qs = params.toString()
+    return api.get<NearbyEventsResponse>(`/promotions/nearby${qs ? `?${qs}` : ''}`)
+  },
+
+  /** Fire-and-forget impression counter. Never throws. */
+  impression: async (promotionId: string): Promise<void> => {
+    try {
+      await api.post(`/promotions/${encodeURIComponent(promotionId)}/impression`)
+    } catch {
+      // best-effort
+    }
+  },
+
+  /** Fire-and-forget click counter. Never throws. */
+  click: async (promotionId: string): Promise<void> => {
+    try {
+      await api.post(`/promotions/${encodeURIComponent(promotionId)}/click`)
+    } catch {
+      // best-effort
+    }
+  },
+
+  /** Organiser: list all promotions for a specific event. */
+  listForEvent: async (masterTicketId: string): Promise<PromotionStatusResponse[]> => {
+    return api.get<PromotionStatusResponse[]>(
+      `/promotions/event/${encodeURIComponent(masterTicketId)}`,
+    )
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -608,6 +670,7 @@ export const scannyApi = {
   fx: fxApi,
   publicTickets: publicTicketsApi,
   announcements: announcementsApi,
+  promotions: promotionsApi,
 }
 
 export default scannyApi

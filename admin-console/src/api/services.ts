@@ -43,6 +43,7 @@ import type {
   MerchantOrdersResponse,
   MerchantPaymentsResponse,
   MerchantScansResponse,
+  AdminPromotionRow,
 } from './types'
 
 export const dashboardApi = {
@@ -327,6 +328,25 @@ export const adminUsersApi = {
   },
 }
 
+export const promotionsApi = {
+  /**
+   * List all promotions for a specific event (keyed by master ticket id).
+   * Hits the public endpoint — no auth needed for now.
+   */
+  listForEvent: async (masterTicketId: string): Promise<AdminPromotionRow[]> => {
+    return api.get<AdminPromotionRow[]>(
+      `/promotions/event/${encodeURIComponent(masterTicketId)}`
+    )
+  },
+
+  /** Get status of a single promotion (can also trigger payment re-check). */
+  status: async (promotionId: string): Promise<AdminPromotionRow> => {
+    return api.get<AdminPromotionRow>(
+      `/promotions/${encodeURIComponent(promotionId)}/status`
+    )
+  },
+}
+
 export const adminApi = {
   dashboard: dashboardApi,
   merchants: merchantsApi,
@@ -344,6 +364,7 @@ export const adminApi = {
   notifications: notificationsApi,
   broadcasts: broadcastsApi,
   adminUsers: adminUsersApi,
+  promotions: promotionsApi,
 }
 
 export default adminApi

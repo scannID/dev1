@@ -658,3 +658,27 @@ export interface AdminMeResponse {
   superAdmin: boolean
   permissions: AdminPermission[]
 }
+
+// ── Event Promotions (admin view) ─────────────────────────────────────────────
+
+export interface AdminPromotionRow {
+  promotionId: string
+  masterTicketId: string
+  eventName: string
+  eventDate: string | null
+  organiserPhone: string
+  organiserName: string
+  category: string
+  venueAddress: string
+  /** 'PENDING_PAYMENT' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED' */
+  promoStatus: string
+  /** 'UNPAID' | 'PAID' | 'FAILED' */
+  paymentStatus: string
+  promotionFee: number
+  currency: string
+  promotedFrom: string | null
+  promotedUntil: string | null
+  impressions: number
+  clicks: number
+  createdAt: string
+}

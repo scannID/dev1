@@ -59,6 +59,11 @@ export default function ConfigsPage() {
   const [saved, setSaved] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
+  // ── Danger zone password gate ──
+  const [passwordGateAction, setPasswordGateAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState(false)
+
   // ── Danger zone confirmation state ──
   const [pendingAction, setPendingAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
   const [confirmText, setConfirmText] = useState('')
@@ -147,8 +152,25 @@ export default function ConfigsPage() {
     }
   }
 
-  async function handleAction(action: ConfigAction) {
+  function handleAction(action: ConfigAction) {
     const d = DANGER_ACTIONS.find(a => a.action === action)
+    if (d) {
+      setPasswordGateAction(d)
+      setPasswordInput('')
+      setPasswordError(false)
+    }
+  }
+
+  function submitPasswordGate() {
+    if (passwordInput !== 'koddly123') {
+      setPasswordError(true)
+      setPasswordInput('')
+      return
+    }
+    const d = passwordGateAction
+    setPasswordGateAction(null)
+    setPasswordInput('')
+    setPasswordError(false)
     if (d) {
       setPendingAction(d)
       setConfirmText('')
@@ -490,6 +512,49 @@ export default function ConfigsPage() {
           ))}
         </div>
       </div>
+
+      {/* ── Danger Zone password gate ── */}
+      <AlertDialog open={Boolean(passwordGateAction)} onOpenChange={(open) => { if (!open) { setPasswordGateAction(null); setPasswordInput(''); setPasswordError(false) } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: 'var(--destructive)' }}>
+              Danger Zone — Authentication Required
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter the admin password to proceed with{' '}
+              <strong>{passwordGateAction?.title}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitPasswordGate() }}
+              placeholder="Enter password"
+              autoFocus
+              style={{ borderColor: passwordError ? 'var(--destructive)' : undefined }}
+            />
+            {passwordError && (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>
+                Incorrect password.
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPasswordGateAction(null); setPasswordInput(''); setPasswordError(false) }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!passwordInput}
+              onClick={submitPasswordGate}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Danger Zone confirmation dialog ── */}
       <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open) => { if (!open) { setPendingAction(null); setConfirmText('') } }}>

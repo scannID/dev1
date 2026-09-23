@@ -516,8 +516,8 @@ export default function EventsDiscoveryPage() {
               href="/create-event"
               className="btn btn-outline"
             >
-              Upload Your Event
-              <span className="upload-icon">⇪</span>
+              Create Event
+              <span className="upload-icon"></span>
             </a>
           </div>
         </div>
@@ -535,9 +535,7 @@ export default function EventsDiscoveryPage() {
             </h1>
 
             <p>
-              Tickets, venues and experiences — all on
-              Koddly. Search, book and walk in with a QR
-              code, no printouts, no queues.
+              Tickets, venues and experiences 
             </p>
           </div>
 

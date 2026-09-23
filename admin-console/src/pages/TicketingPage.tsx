@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { DateTimePicker } from '@/components/ui/date-picker'
@@ -15,7 +15,7 @@ import { PaginationBar } from '../components/PaginationBar'
 import { usePagination } from '../hooks/usePagination'
 import { loadEventTickets, useTicketing } from '../hooks/useTicketing'
 import { adminApi } from '../api/services'
-import type { AdminTicket, CreatedEventSummary, UpdateCreatedEventRequest } from '../api/types'
+import type { AdminTicket, CreatedEventSummary, UpdateCreatedEventRequest, AdminPromotionRow } from '../api/types'
 
 function currency(amount: number, currencyCode = 'UGX') {
   return new Intl.NumberFormat('en-UG', {
@@ -704,6 +704,10 @@ export default function TicketingPage() {
                     </>
                   )}
                 </div>
+
+                {selected && (
+                  <EventPromotionsPanel masterTicketId={selected.eventId} />
+                )}
               </>
               )
             )}
@@ -719,6 +723,116 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ color: 'var(--muted-foreground)' }}>{label}</span>
       <span style={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
+    </div>
+  )
+}
+
+/* ── EventPromotionsPanel ────────────────────────────────────────────── */
+
+const PROMO_STATUS_COLOR: Record<string, string> = {
+  ACTIVE:          'text-green-700 bg-green-100',
+  PENDING_PAYMENT: 'text-yellow-700 bg-yellow-100',
+  EXPIRED:         'text-gray-500  bg-gray-100',
+  CANCELLED:       'text-red-600   bg-red-100',
+}
+const PAY_STATUS_COLOR: Record<string, string> = {
+  PAID:   'text-green-700 bg-green-100',
+  UNPAID: 'text-yellow-700 bg-yellow-100',
+  FAILED: 'text-red-600   bg-red-100',
+}
+
+function fmt(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function EventPromotionsPanel({ masterTicketId }: { masterTicketId: string }) {
+  const [promos, setPromos] = useState<AdminPromotionRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+
+  function load() {
+    setLoading(true)
+    setError(null)
+    adminApi.promotions.listForEvent(masterTicketId)
+      .then(setPromos)
+      .catch(() => setError('Could not load promotions'))
+      .finally(() => setLoading(false))
+  }
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <button
+        type="button"
+        onClick={() => { setOpen((v) => !v); if (!open) load() }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 13, fontWeight: 700, color: 'var(--foreground)',
+          padding: '4px 0', fontFamily: 'inherit',
+        }}
+      >
+        <TrendingUp size={14} />
+        Promotions {promos.length > 0 && `(${promos.length})`}
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)', marginLeft: 2 }}>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {loading && (
+            <p style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</p>
+          )}
+          {error && (
+            <p style={{ fontSize: 12, color: 'var(--destructive)' }}>{error}</p>
+          )}
+          {!loading && !error && promos.length === 0 && (
+            <p style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
+              No promotions for this event yet.
+            </p>
+          )}
+          {promos.map((p) => (
+            <div
+              key={p.promotionId}
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                marginBottom: 8,
+                fontSize: 12,
+                display: 'grid',
+                gap: 4,
+              }}
+            >
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${PROMO_STATUS_COLOR[p.promoStatus] ?? ''}`}
+                >
+                  {p.promoStatus.replace('_', ' ')}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${PAY_STATUS_COLOR[p.paymentStatus] ?? ''}`}
+                >
+                  {p.paymentStatus}
+                </span>
+              </div>
+              <div><strong>Phone:</strong> {p.organiserPhone || '—'}</div>
+              <div><strong>Category:</strong> {p.category || '—'}</div>
+              <div><strong>Venue:</strong> {p.venueAddress || '—'}</div>
+              <div><strong>Active:</strong> {fmt(p.promotedFrom)} → {fmt(p.promotedUntil)}</div>
+              <div><strong>Fee:</strong> {p.promotionFee.toLocaleString()} {p.currency}</div>
+              <div><strong>Impressions:</strong> {p.impressions} · <strong>Clicks:</strong> {p.clicks}</div>
+              <div style={{ color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
+                {p.promotionId}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

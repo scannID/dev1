@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Clock3, Megaphone, Package, Receipt, ShoppingCart, X } from 'lucide-react'
+import { ArrowLeft, Clock3, Megaphone, Package, Receipt, ShoppingCart, Ticket, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { businessApi, devicesApi, feesApi, fxApi, ordersApi, announcementsApi } from '../api/services'
@@ -32,6 +32,7 @@ import { StayBookedStep } from './steps/StayBookedStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
 import { AnnouncementsCustomerPanel } from './AnnouncementsCustomerPanel'
+import { EventsNearbyPanel, NearbyEventsBanner } from './EventsNearbyPanel'
 import {
   cartLineKey,
   isLodgingItem,
@@ -189,6 +190,7 @@ export default function CustomerApp({
   const [showHistory, setShowHistory] = useState(false)
   const [announcements, setAnnouncements] = useState<BusinessAnnouncement[]>([])
   const [showAnnouncements, setShowAnnouncements] = useState(false)
+  const [showEvents, setShowEvents] = useState(false)
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
   const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
   const [ordersPaused, setOrdersPaused] = useState(false)
@@ -1399,6 +1401,15 @@ export default function CustomerApp({
           ) : null}
           <button
             type="button"
+            className={`cm-events-btn${showEvents ? ' active' : ''}`}
+            onClick={() => setShowEvents(true)}
+            aria-label="What's happening near you"
+            title="What's Happening 🎟️"
+          >
+            <Ticket size={15} />
+          </button>
+          <button
+            type="button"
             className={`cm-track-btn${showAnnouncements ? ' active' : ''}${announcements.length > 0 ? ' cm-ann-btn--has' : ''}`}
             onClick={() => setShowAnnouncements(true)}
             aria-label={`${announcements.length} announcement${announcements.length === 1 ? '' : 's'}`}
@@ -1632,6 +1643,8 @@ export default function CustomerApp({
         />
       )}
 
+      {step === 'done' && <NearbyEventsBanner />}
+
       {showBottomMenu && !ordersPaused && (
         <BottomBar count={cartCount} total={payableTotal} label="View cart" onAction={() => setStep('cart')} />
       )}
@@ -1707,6 +1720,11 @@ export default function CustomerApp({
           onClose={() => setShowAnnouncements(false)}
         />
       ) : null}
+
+      <EventsNearbyPanel
+        open={showEvents}
+        onClose={() => setShowEvents(false)}
+      />
       </div>
       {busyOverlayActive ? (
         <div className="cm-busy-overlay" role="alert" aria-live="assertive" aria-busy="true">

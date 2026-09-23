@@ -20,6 +20,7 @@ import com.scanny.repository.QuickPaymentTransactionRepository;
 import com.scanny.service.FeeService;
 import com.scanny.service.OrderService;
 import com.scanny.service.OutboxService;
+import com.scanny.service.PromotionService;
 import com.scanny.service.TableService;
 import com.scanny.service.TicketPurchaseService;
 import com.scanny.entity.Order;
@@ -31,6 +32,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +52,10 @@ public class PaymentIntentService {
     private final FeeService feeService;
     private final PaymentProperties paymentProperties;
     private final TableService tableService;
+
+    /** Lazy to avoid circular dependency: PromotionService → PaymentGatewayService → here */
+    @Autowired @Lazy
+    private PromotionService promotionService;
 
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
@@ -265,6 +272,7 @@ public class PaymentIntentService {
                 intent.getReferenceId(),
                 intent.getId()
             );
+            case EVENT_PROMOTION -> promotionService.handlePaymentPaid(intent.getId());
             default -> logger.warn("No side-effect handler for payment context {}", intent.getContext());
         }
     }

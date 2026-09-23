@@ -769,7 +769,7 @@ export interface QuickPayInitiateResponse {
   transactionRef: string | null
 }
 
-export type PaymentContext = 'ORDER' | 'ORDER_SPLIT' | 'QUICK_PAY' | 'TICKET'
+export type PaymentContext = 'ORDER' | 'ORDER_SPLIT' | 'QUICK_PAY' | 'TICKET' | 'EVENT_PROMOTION'
 
 export type PaymentIntentStatus = 'Pending' | 'Processing' | 'Paid' | 'Failed' | 'Cancelled'
 
@@ -872,4 +872,66 @@ export interface UpdateAnnouncementRequest {
 
 export interface AnnouncementsListResponse {
   announcements: BusinessAnnouncement[]
+}
+
+// ── Event Promotions ─────────────────────────────────────────────────────────
+
+export interface PromoteEventRequest {
+  /** Master ticket id (ERI-XXXXXX) */
+  masterTicketId: string
+  /** MoMo number to charge 40,000 UGX */
+  paymentPhone: string
+  /** 'MTN' | 'Airtel' */
+  provider: string
+  organiserName?: string
+  venueLat?: number | null
+  venueLng?: number | null
+  venueAddress?: string
+  category?: string
+}
+
+export interface PromotionInitiateResponse {
+  promotionId: string
+  paymentId: string
+  /** 'UNPAID' | 'PAID' | 'FAILED' */
+  paymentStatus: string
+  /** 'PENDING_PAYMENT' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED' */
+  promoStatus: string
+  message: string
+  promotionFee: number
+  currency: string
+}
+
+export interface PromotionStatusResponse {
+  promotionId: string
+  paymentId: string
+  paymentStatus: string
+  promoStatus: string
+  promotedFrom: string | null
+  promotedUntil: string | null
+  eventName: string
+  promotionFee: number
+  currency: string
+  impressions: number
+}
+
+export interface NearbyPromotedEvent {
+  promotionId: string
+  masterTicketId: string
+  eventName: string
+  eventDate: string | null
+  eventImageUrl: string
+  purchaseUrl: string
+  host: string
+  category: string
+  venueAddress: string
+  /** -1 when no coords were supplied */
+  distanceKm: number
+  ticketClassNames: string[]
+  lowestPrice: number
+}
+
+export interface NearbyEventsResponse {
+  events: NearbyPromotedEvent[]
+  total: number
 }

@@ -24,11 +24,14 @@ import {
   X,
 } from 'lucide-react'
 import { usePageMeta } from './hooks/usePageMeta'
-import { ticketsApi, publicTicketsApi, imagesApi } from './api/services'
+import { ticketsApi, publicTicketsApi, imagesApi, promotionsApi } from './api/services'
 import type {
   EventTicketRecentAttendee,
   EventTicketTrackingMetrics,
   ImageSearchResult,
+  PromoteEventRequest,
+  PromotionInitiateResponse,
+  PromotionStatusResponse,
 } from './api/types'
 import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
 import { buildEventManagerGateUrl, buildTicketGateUrl } from './lib/scanBase'
@@ -1546,6 +1549,277 @@ function PanelItem({
   )
 }
 
+/* ─── Promote event section ──────────────────────────────────────────── */
+
+const PROMO_FEE = 40_000
+
+type PromoteStep =
+  | 'idle'
+  | 'form'      // collecting phone + category + venue coords
+  | 'paying'    // waiting for MoMo confirmation
+  | 'active'    // promotion confirmed
+  | 'error'
+
+function PromoteEventSection({
+  masterTicketId,
+  eventName,
+  eventCategory,
+  eventLocation,
+}: {
+  masterTicketId: string
+  eventName: string
+  eventCategory?: string
+  eventLocation?: string
+}) {
+  const [step, setStep] = useState<PromoteStep>('idle')
+  const [phone, setPhone] = useState('')
+  const [provider, setProvider] = useState<'MTN' | 'Airtel'>('MTN')
+  const [category, setCategory] = useState(eventCategory || '')
+  const [venueAddress, setVenueAddress] = useState(eventLocation || '')
+  const [busy, setBusy] = useState(false)
+  const [promoId, setPromoId] = useState<string | null>(null)
+  const [paymentId, setPaymentId] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [status, setStatus] = useState<PromotionStatusResponse | null>(null)
+  const pollRef = useRef<number | null>(null)
+
+  function stopPolling() {
+    if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
+  }
+
+  useEffect(() => () => stopPolling(), [])
+
+  async function handleInitiate() {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 9) { setErrorMsg('Enter a valid MoMo number'); return }
+    if (!category) { setErrorMsg('Select a category'); return }
+    setBusy(true); setErrorMsg(null)
+    try {
+      const req: PromoteEventRequest = {
+        masterTicketId,
+        paymentPhone: phone.trim(),
+        provider,
+        venueAddress: venueAddress.trim(),
+        category,
+      }
+      const res: PromotionInitiateResponse = await promotionsApi.initiate(req)
+      setPromoId(res.promotionId)
+      setPaymentId(res.paymentId)
+      if (res.promoStatus === 'ACTIVE') {
+        setStep('active')
+      } else {
+        setStep('paying')
+        // Start polling every 3 s
+        pollRef.current = window.setInterval(async () => {
+          try {
+            const s = await promotionsApi.status(res.promotionId)
+            setStatus(s)
+            if (s.promoStatus === 'ACTIVE') {
+              stopPolling()
+              setStep('active')
+            } else if (s.paymentStatus === 'FAILED') {
+              stopPolling()
+              setStep('error')
+              setErrorMsg('Payment failed. Please try again.')
+            }
+          } catch { /* network retry */ }
+        }, 3000)
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not initiate promotion')
+      setStep('error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const promoCardStyle: CSSProperties = {
+    marginTop: 16,
+    border: `1px solid ${CREATE.line}`,
+    borderRadius: 14,
+    background: CREATE.card,
+    overflow: 'hidden',
+  }
+  const promoHeaderStyle: CSSProperties = {
+    padding: '12px 16px',
+    background: 'color-mix(in srgb, var(--primary) 6%, transparent)',
+    borderBottom: `1px solid ${CREATE.line}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  }
+  const promoBodyStyle: CSSProperties = { padding: '16px' }
+  const labelStyle: CSSProperties = { display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }
+
+  if (step === 'idle') {
+    return (
+      <button
+        type="button"
+        className="et-press"
+        onClick={() => setStep('form')}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', padding: '13px 16px', borderRadius: 12, fontSize: 14,
+          fontWeight: 600, border: `1px solid color-mix(in srgb, var(--primary) 30%, transparent)`,
+          cursor: 'pointer', fontFamily: 'inherit',
+          background: 'color-mix(in srgb, var(--primary) 8%, transparent)',
+          color: CREATE.teal, marginTop: 10,
+        }}
+      >
+        <TrendingUp size={16} strokeWidth={2.4} />
+        Promote this event — 40,000 UGX
+      </button>
+    )
+  }
+
+  if (step === 'active') {
+    return (
+      <div style={promoCardStyle} className="et-fade-in">
+        <div style={promoHeaderStyle}>
+          <Check size={16} style={{ color: CREATE.teal }} />
+          <span style={{ fontWeight: 700, fontSize: 14, color: CREATE.teal }}>
+            Event is now promoted!
+          </span>
+        </div>
+        <div style={promoBodyStyle}>
+          <p style={{ margin: 0, fontSize: 13, color: CREATE.muted }}>
+            Your event is live in the Scanny customer feed. Customers dining at nearby restaurants will see it.
+          </p>
+          {status && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: CREATE.muted }}>
+              Active until: <strong>{status.promotedUntil ? new Date(status.promotedUntil).toLocaleDateString() : '—'}</strong>
+              {' · '}Impressions: <strong>{status.impressions}</strong>
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'paying') {
+    return (
+      <div style={promoCardStyle} className="et-fade-in">
+        <div style={promoHeaderStyle}>
+          <Loader2 size={16} className="spin" style={{ color: CREATE.teal }} />
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Waiting for payment…</span>
+        </div>
+        <div style={promoBodyStyle}>
+          <p style={{ margin: 0, fontSize: 13, color: CREATE.muted }}>
+            Check your phone for the MoMo prompt. Your event will go live automatically once payment is confirmed.
+          </p>
+          {paymentId && (
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: CREATE.muted, fontFamily: 'monospace' }}>
+              Payment ID: {paymentId}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // step === 'form' | 'error'
+  return (
+    <div style={promoCardStyle} className="et-fade-in">
+      <div style={promoHeaderStyle}>
+        <TrendingUp size={16} style={{ color: CREATE.teal }} />
+        <div>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Promote this event</span>
+          <span style={{ fontSize: 12, color: CREATE.muted, marginLeft: 8 }}>
+            {PROMO_FEE.toLocaleString()} UGX · reaches restaurants within 5 km
+          </span>
+        </div>
+        <button type="button" onClick={() => setStep('idle')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: CREATE.muted, display: 'flex' }}>
+          <X size={15} />
+        </button>
+      </div>
+
+      <div style={{ ...promoBodyStyle, display: 'grid', gap: 12 }}>
+        {errorMsg && (
+          <p style={{ margin: 0, fontSize: 12, color: CREATE.red, fontWeight: 500 }}>{errorMsg}</p>
+        )}
+
+        {/* Category (pre-filled from event) */}
+        <div>
+          <label style={labelStyle}>Event category *</label>
+          <select
+            className="et-focus"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={fieldStyle(!category && Boolean(errorMsg))}
+            aria-label="Event category"
+          >
+            <option value="">Select category…</option>
+            {EVENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        {/* Venue address */}
+        <div>
+          <label style={labelStyle}>Venue address (for proximity matching)</label>
+          <input
+            className="et-focus"
+            type="text"
+            value={venueAddress}
+            onChange={(e) => setVenueAddress(e.target.value)}
+            placeholder="e.g. Kololo, Kampala"
+            style={fieldStyle()}
+            aria-label="Venue address"
+          />
+        </div>
+
+        {/* MoMo payment details */}
+        <div>
+          <label style={labelStyle}>MoMo number to charge *</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              className="et-focus"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as 'MTN' | 'Airtel')}
+              style={{ ...fieldStyle(), width: 90, flexShrink: 0 }}
+              aria-label="Provider"
+            >
+              <option value="MTN">MTN</option>
+              <option value="Airtel">Airtel</option>
+            </select>
+            <input
+              className="et-focus"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="07X XXX XXXX"
+              style={fieldStyle()}
+              aria-label="Mobile money number"
+            />
+          </div>
+        </div>
+
+        <p style={{ margin: 0, fontSize: 11, color: CREATE.muted }}>
+          A MoMo prompt for <strong>40,000 UGX</strong> will be sent to the number above.
+          Your event appears in the Scanny customer feed at restaurants within 5 km of your venue until the event date.
+        </p>
+
+        <button
+          type="button"
+          className="et-press"
+          disabled={busy}
+          onClick={() => void handleInitiate()}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            width: '100%', padding: '13px 16px', borderRadius: 12, fontSize: 14,
+            fontWeight: 700, border: 'none', cursor: busy ? 'wait' : 'pointer',
+            fontFamily: 'inherit', background: CREATE.tealDeep, color: '#fff',
+            opacity: busy ? 0.75 : 1,
+          }}
+        >
+          {busy ? <Loader2 size={16} className="spin" /> : <TrendingUp size={16} />}
+          {busy ? 'Processing…' : `Pay ${PROMO_FEE.toLocaleString()} UGX & Promote`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Ticket output ──────────────────────────────────────────────────── */
 function TicketOutput({
   data,
   qr,
@@ -1931,6 +2205,12 @@ function TicketOutput({
                 <Plus size={17} strokeWidth={2.4} />
                 Create another event
               </button>
+              <PromoteEventSection
+                masterTicketId={data.ticketId}
+                eventName={data.eventName}
+                eventCategory={(data as TicketData & { category?: string }).category}
+                eventLocation={data.location}
+              />
               <button
                 type="button"
                 className="et-press"
@@ -2019,6 +2299,11 @@ type FormState = {
   tables: TableOption[]
   eventImageUrl: string
   queueEnabled?: boolean
+  /** 'standard' = free creation only; 'promoted' = pay 40k to push into restaurant feeds */
+  eventMode: 'standard' | 'promoted'
+  /** MoMo number to charge the 40k promotion fee (promoted mode only) */
+  promoPhone: string
+  promoProvider: 'MTN' | 'Airtel'
 }
 
 function formatPaymentDetails(form: FormState): string {
@@ -2065,7 +2350,7 @@ function TicketForm({
   onBack,
   onTrackLookup,
 }: {
-  onGenerate: (d: TicketData, editingEventId?: string | null) => Promise<void>
+  onGenerate: (d: TicketData, editingEventId?: string | null) => Promise<string>
   onBack: () => void
   onTrackLookup: (ticketId: string) => Promise<void>
 }) {
@@ -2086,6 +2371,9 @@ function TicketForm({
     ticketClasses: DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
     tables: [],
     eventImageUrl: '',
+    eventMode: 'standard',
+    promoPhone: '',
+    promoProvider: 'MTN',
   })
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [touched, setTouched] = useState(false)
@@ -2104,6 +2392,9 @@ function TicketForm({
   const [showTools, setShowTools] = useState(false)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [loadingEdit, setLoadingEdit] = useState(false)
+  // Promotion state — used when eventMode === 'promoted'
+  const [promoResult, setPromoResult] = useState<import('./api/types').PromotionInitiateResponse | null>(null)
+  const [promoError, setPromoError] = useState<string | null>(null)
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -2127,6 +2418,9 @@ function TicketForm({
       ticketClasses: DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
       tables: [],
       eventImageUrl: '',
+      eventMode: 'standard',
+      promoPhone: '',
+      promoProvider: 'MTN',
     })
     setErrors({})
     setTouched(false)
@@ -2223,6 +2517,10 @@ function TicketForm({
             snapshotClasses.length > 0 ? snapshotClasses : DEFAULT_CLASSES.map((c) => ({ ...c, id: shortId() })),
           tables: snapshotTables,
           eventImageUrl: sourceSnapshot.eventImageUrl || '',
+          category: '',
+          eventMode: 'standard',
+          promoPhone: '',
+          promoProvider: 'MTN',
         })
         setOfferTab(snapshotTables.length > 0 ? 'tables' : 'classes')
         setStep(1)
@@ -2341,6 +2639,10 @@ function TicketForm({
         ticketClasses: nextClasses,
         tables: nextTables,
         eventImageUrl: readMetaString('eventImageUrl', 'imageUrl') || sourceSnapshot?.eventImageUrl || '',
+        category: '',
+        eventMode: 'standard',
+        promoPhone: '',
+        promoProvider: 'MTN',
       })
       setOfferTab(nextTables.length > 0 ? 'tables' : 'classes')
       setStep(1)
@@ -2457,6 +2759,10 @@ function TicketForm({
     if (form.ticketClasses.length === 0) e.ticketClasses = 'Add at least one ticket class'
     if (form.ticketClasses.some((c) => !c.name.trim())) e.ticketClasses = 'All classes need a name'
     if (form.ticketClasses.some((c) => !c.fee || isNaN(Number(c.fee)))) e.ticketClasses = 'All classes need a valid fee'
+    if (form.eventMode === 'promoted') {
+      const digits = form.promoPhone.replace(/\D/g, '')
+      if (digits.length < 9) e.promoPhone = 'Enter the MoMo number to charge 40,000 UGX'
+    }
     return e
   }
 
@@ -2482,7 +2788,11 @@ function TicketForm({
     }
     try {
       setSubmitting(true)
-      await onGenerate(
+      setPromoResult(null)
+      setPromoError(null)
+
+      // Create the event — now returns the master ticket id
+      const masterTicketId = await onGenerate(
         {
           eventName: form.eventName,
           date: form.date,
@@ -2505,6 +2815,28 @@ function TicketForm({
         } as TicketData & { category?: string },
         editingEventId,
       )
+
+      // Promoted mode: auto-initiate the 40,000 UGX MoMo charge
+      if (form.eventMode === 'promoted' && masterTicketId) {
+        try {
+          const promoRes = await promotionsApi.initiate({
+            masterTicketId,
+            paymentPhone: form.promoPhone.trim(),
+            provider: form.promoProvider,
+            organiserName: form.host.trim(),
+            venueAddress: form.location.trim(),
+            category: form.category || 'Other',
+          })
+          setPromoResult(promoRes)
+        } catch (promoErr) {
+          // Event was created fine — only promo payment failed
+          setPromoError(
+            promoErr instanceof Error
+              ? promoErr.message
+              : 'Event created, but promotion payment could not be initiated. Try promoting from the output screen.',
+          )
+        }
+      }
     } finally {
       setSubmitting(false)
     }
@@ -2726,6 +3058,108 @@ function TicketForm({
 
         {step === 1 ? (
           <div className="et-fade-in">
+
+            {/* ── Event mode picker ─────────────────────────────────── */}
+            {!editingEventId && (
+              <div style={{ marginBottom: 28 }}>
+                <h2 style={{ margin: '0 0 6px', fontFamily: TICKET_FONT, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>
+                  What are you creating?
+                </h2>
+                <p style={{ margin: '0 0 16px', color: CREATE.muted, fontSize: 14, lineHeight: 1.5 }}>
+                  Standard events are free. Promoted events are pushed to customers dining nearby — for 40,000 UGX.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+                  {/* Standard option */}
+                  <button
+                    type="button"
+                    onClick={() => set('eventMode', 'standard')}
+                    className="et-press"
+                    style={{
+                      padding: '16px 14px',
+                      borderRadius: 14,
+                      border: `2px solid ${form.eventMode === 'standard' ? CREATE.teal : CREATE.line}`,
+                      background: form.eventMode === 'standard'
+                        ? 'color-mix(in srgb, var(--primary) 6%, transparent)'
+                        : CREATE.card,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 22 }}>🎫</span>
+                      {form.eventMode === 'standard' && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, background: CREATE.teal,
+                          color: '#fff', padding: '2px 8px', borderRadius: 20,
+                        }}>Selected</span>
+                      )}
+                    </div>
+                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: CREATE.ink }}>Standard</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, lineHeight: 1.4 }}>
+                      Free to create. Share the QR to sell tickets directly.
+                    </p>
+                    <span style={{
+                      display: 'inline-block', fontSize: 11, fontWeight: 700,
+                      color: form.eventMode === 'standard' ? CREATE.teal : CREATE.muted,
+                      padding: '3px 10px', borderRadius: 20,
+                      background: form.eventMode === 'standard'
+                        ? 'color-mix(in srgb, var(--primary) 12%, transparent)'
+                        : CREATE.fieldBg,
+                    }}>
+                      Free
+                    </span>
+                  </button>
+
+                  {/* Promoted option */}
+                  <button
+                    type="button"
+                    onClick={() => set('eventMode', 'promoted')}
+                    className="et-press"
+                    style={{
+                      padding: '16px 14px',
+                      borderRadius: 14,
+                      border: `2px solid ${form.eventMode === 'promoted' ? '#c97d2e' : CREATE.line}`,
+                      background: form.eventMode === 'promoted'
+                        ? 'color-mix(in srgb, #c97d2e 8%, transparent)'
+                        : CREATE.card,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 22 }}>📣</span>
+                      {form.eventMode === 'promoted' && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, background: '#c97d2e',
+                          color: '#fff', padding: '2px 8px', borderRadius: 20,
+                        }}>Selected</span>
+                      )}
+                    </div>
+                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: CREATE.ink }}>Promoted</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, lineHeight: 1.4 }}>
+                      Pushed to customers dining at nearby restaurants.
+                    </p>
+                    <span style={{
+                      display: 'inline-block', fontSize: 11, fontWeight: 700,
+                      color: form.eventMode === 'promoted' ? '#c97d2e' : CREATE.muted,
+                      padding: '3px 10px', borderRadius: 20,
+                      background: form.eventMode === 'promoted'
+                        ? 'color-mix(in srgb, #c97d2e 14%, transparent)'
+                        : CREATE.fieldBg,
+                    }}>
+                      40,000 UGX
+                    </span>
+                  </button>
+
+                </div>
+              </div>
+            )}
+            {/* ── End mode picker ──────────────────────────────────── */}
             <h1
               style={{
                 margin: '0 0 6px',
@@ -3236,6 +3670,61 @@ function TicketForm({
                 </div>
               </SectionCard>
 
+              {/* Promo payment fields — only when Promoted mode is chosen */}
+              {form.eventMode === 'promoted' && (
+                <SectionCard
+                  title="Promotion payment"
+                  subtitle="We charge 40,000 UGX via MoMo to push your event to nearby restaurants."
+                >
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 12.5, color: CREATE.muted, lineHeight: 1.5 }}>
+                      Enter the mobile money number to debit. A MoMo prompt will appear on that phone once you tap <strong>Generate &amp; Promote</strong>.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {/* Provider selector */}
+                      <select
+                        className="et-focus"
+                        value={form.promoProvider}
+                        onChange={(e) => set('promoProvider', e.target.value as 'MTN' | 'Airtel')}
+                        aria-label="MoMo provider"
+                        style={{ ...fieldStyle(), width: 100, flexShrink: 0 }}
+                      >
+                        <option value="MTN">MTN</option>
+                        <option value="Airtel">Airtel</option>
+                      </select>
+
+                      {/* Phone number */}
+                      <div style={{ flex: 1 }}>
+                        <input
+                          className="et-focus"
+                          type="tel"
+                          placeholder="07X XXX XXXX"
+                          aria-label="Mobile money number for promotion fee"
+                          value={form.promoPhone}
+                          onChange={(e) => set('promoPhone', e.target.value)}
+                          style={fieldStyle(Boolean(touched && errors.promoPhone))}
+                        />
+                        {touched && errors.promoPhone && <FieldError>{errors.promoPhone}</FieldError>}
+                      </div>
+                    </div>
+
+                    {/* What you get summary */}
+                    <div style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: 'color-mix(in srgb, #c97d2e 8%, transparent)',
+                      border: '1px solid color-mix(in srgb, #c97d2e 22%, transparent)',
+                      fontSize: 12,
+                      color: CREATE.ink,
+                      lineHeight: 1.5,
+                    }}>
+                      <strong>What's included:</strong> Your event appears in the <em>What's Happening</em> feed shown to customers at restaurants within 5 km of your venue — active from payment until your event date (max 30 days).
+                    </div>
+                  </div>
+                </SectionCard>
+              )}
+
               <button
                 type="button"
                 onClick={goToGenerate}
@@ -3245,7 +3734,7 @@ function TicketForm({
                   height: 56,
                   borderRadius: 14,
                   border: 'none',
-                  background: CREATE.tealDeep,
+                  background: form.eventMode === 'promoted' ? '#b86e1f' : CREATE.tealDeep,
                   color: '#fff',
                   fontSize: 15,
                   fontWeight: 600,
@@ -3257,7 +3746,10 @@ function TicketForm({
                   gap: 8,
                 }}
               >
-                Continue <ArrowRight size={17} />
+                {form.eventMode === 'promoted'
+                  ? <><TrendingUp size={17} /> Continue to Preview &amp; Promote</>
+                  : <>Continue <ArrowRight size={17} /></>
+                }
               </button>
             </div>
           </div>
@@ -3423,7 +3915,7 @@ function TicketForm({
                       marginBottom: 12,
                       borderRadius: 14,
                       border: 'none',
-                      background: CREATE.tealDeep,
+                      background: form.eventMode === 'promoted' ? '#b86e1f' : CREATE.tealDeep,
                       color: '#fff',
                       fontSize: 17,
                       fontWeight: 700,
@@ -3436,9 +3928,43 @@ function TicketForm({
                       gap: 10,
                     }}
                   >
-                    {submitting ? <Loader2 size={18} className="spin" /> : <QrCode size={18} />}
-                    {submitting ? (editingEventId ? 'Saving…' : 'Generating…') : editingEventId ? 'Save event changes' : 'Generate ticket code'}
+                    {submitting
+                      ? <Loader2 size={18} className="spin" />
+                      : form.eventMode === 'promoted' ? <TrendingUp size={18} /> : <QrCode size={18} />
+                    }
+                    {submitting
+                      ? (editingEventId ? 'Saving…' : form.eventMode === 'promoted' ? 'Creating & paying…' : 'Generating…')
+                      : editingEventId
+                        ? 'Save event changes'
+                        : form.eventMode === 'promoted'
+                          ? 'Generate + Pay 40,000 UGX to Promote'
+                          : 'Generate ticket code'
+                    }
                   </button>
+
+                  {/* Promo mode: show charge notice below the button */}
+                  {form.eventMode === 'promoted' && !submitting && !promoResult && (
+                    <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, textAlign: 'center', lineHeight: 1.4 }}>
+                      A MoMo prompt for <strong>40,000 UGX</strong> will be sent to {form.promoPhone || 'your number'} when you tap the button above.
+                    </p>
+                  )}
+
+                  {/* Promo result feedback — shown while still on step 2 (before parent redirects to output) */}
+                  {promoError && (
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: CREATE.red, fontWeight: 500 }}>
+                      ⚠ {promoError}
+                    </p>
+                  )}
+                  {promoResult && promoResult.promoStatus !== 'ACTIVE' && (
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#c97d2e', fontWeight: 600 }}>
+                      📲 MoMo prompt sent! Confirm on your phone to activate the promotion.
+                    </p>
+                  )}
+                  {promoResult && promoResult.promoStatus === 'ACTIVE' && (
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: CREATE.teal, fontWeight: 600 }}>
+                      ✓ Promotion is live! Customers dining nearby will see your event.
+                    </p>
+                  )}
                 </>
               )
             })()}
@@ -3495,7 +4021,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
     return () => window.clearInterval(timer)
   }, [trackedTicketId])
 
-  async function handleGenerate(data: TicketData, editingEventId?: string | null) {
+  async function handleGenerate(data: TicketData, editingEventId?: string | null): Promise<string> {
     try {
       setRevokeMessage(null)
       setTrackingOnly(false)
@@ -3642,6 +4168,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
         setMetrics(null)
       }
       toast.success(editingEventId ? 'Event updated successfully' : 'Event ticket QR created successfully')
+      return createdTicket.id
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create ticket'
       toast.error(message)

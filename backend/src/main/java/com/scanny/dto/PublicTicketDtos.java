@@ -271,4 +271,85 @@ public class PublicTicketDtos {
         String status,
         java.time.Instant redeemedAt
     ) {}
+
+    // ── Event Promotion DTOs ──────────────────────────────────────────────────
+
+    /**
+     * Request body for POST /api/tickets/public/promotions/initiate
+     */
+    public record PromoteEventRequest(
+        /** Master ticket id (ERI-XXXXXX) of the event to promote. */
+        String masterTicketId,
+        /** MoMo number to charge 40,000 UGX from. */
+        String paymentPhone,
+        /** MoMo provider: MTN or Airtel. */
+        String provider,
+        /** Organiser name (displayed on confirmation). */
+        String organiserName,
+        /** Latitude of the event venue for proximity matching. */
+        Double venueLat,
+        /** Longitude of the event venue for proximity matching. */
+        Double venueLng,
+        /** Human-readable venue address. */
+        String venueAddress,
+        /** Event category for feed filtering. */
+        String category
+    ) {}
+
+    /**
+     * Response from initiating a promotion payment.
+     * Frontend polls /promotions/{promotionId}/status until paymentStatus == PAID.
+     */
+    public record PromotionInitiateResponse(
+        String promotionId,
+        String paymentId,
+        String paymentStatus,   // UNPAID | PAID | FAILED
+        String promoStatus,     // PENDING_PAYMENT | ACTIVE | EXPIRED | CANCELLED
+        String message,
+        int promotionFee,
+        String currency
+    ) {}
+
+    /**
+     * Polling response for GET /api/tickets/public/promotions/{id}/status
+     */
+    public record PromotionStatusResponse(
+        String promotionId,
+        String paymentId,
+        String paymentStatus,   // UNPAID | PAID | FAILED
+        String promoStatus,     // PENDING_PAYMENT | ACTIVE | EXPIRED | CANCELLED
+        String promotedFrom,    // ISO-8601 or null
+        String promotedUntil,   // ISO-8601 or null
+        String eventName,
+        int promotionFee,
+        String currency,
+        long impressions
+    ) {}
+
+    /**
+     * A single promoted event card returned by the nearby-events feed.
+     * Shown in the customer "What's Happening" panel.
+     */
+    public record NearbyEventItem(
+        String promotionId,
+        String masterTicketId,
+        String eventName,
+        String eventDate,       // ISO-8601 or null
+        String eventImageUrl,
+        String purchaseUrl,
+        String host,
+        String category,
+        String venueAddress,
+        double distanceKm,       // -1 when coords were not supplied
+        java.util.List<String> ticketClassNames,
+        int lowestPrice         // UGX, 0 = free
+    ) {}
+
+    /**
+     * Response wrapper for GET /api/tickets/public/promotions/nearby
+     */
+    public record NearbyEventsResponse(
+        java.util.List<NearbyEventItem> events,
+        int total
+    ) {}
 }
