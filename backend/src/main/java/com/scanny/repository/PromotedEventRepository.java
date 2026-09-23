@@ -14,33 +14,28 @@ public interface PromotedEventRepository extends JpaRepository<PromotedEvent, St
 
     /**
      * Find active promoted events whose venue is within {@code radiusKm} of
-     * the supplied restaurant coordinates using the Haversine approximation.
-     * <p>
-     * The formula works in degrees; 111.045 km ≈ 1 degree of latitude.
-     * Restaurants don't store lat/lng yet, so callers pass the best available
-     * approximation (e.g. extracted from the venue_address geocode on the
-     * client side, or a rough central coordinate for the city).
-     * </p>
-     *
-     * @param lat       latitude of the querying restaurant
-     * @param lng       longitude of the querying restaurant
-     * @param nowParam  "now" to filter promotedUntil and eventDate
+     * the supplied restaurant coordinates, OR has radiusKm = 0 (Boost tier — no cap).
      */
     @Query("""
             SELECT p FROM PromotedEvent p
             WHERE p.status = 'ACTIVE'
               AND p.promotedUntil > :now
               AND (p.eventDate IS NULL OR p.eventDate > :now)
-              AND p.venueLat IS NOT NULL
-              AND p.venueLng IS NOT NULL
               AND (
-                  111.045 * DEGREES(ACOS(LEAST(1.0, COS(RADIANS(:lat))
-                    * COS(RADIANS(p.venueLat))
-                    * COS(RADIANS(p.venueLng) - RADIANS(:lng))
-                    + SIN(RADIANS(:lat))
-                    * SIN(RADIANS(p.venueLat))
-                  )))
-              ) <= p.radiusKm
+                  p.radiusKm = 0
+                  OR (
+                      p.venueLat IS NOT NULL
+                      AND p.venueLng IS NOT NULL
+                      AND (
+                          111.045 * DEGREES(ACOS(LEAST(1.0, COS(RADIANS(:lat))
+                            * COS(RADIANS(p.venueLat))
+                            * COS(RADIANS(p.venueLng) - RADIANS(:lng))
+                            + SIN(RADIANS(:lat))
+                            * SIN(RADIANS(p.venueLat))
+                          )))
+                      ) <= p.radiusKm
+                  )
+              )
             ORDER BY p.eventDate ASC NULLS LAST
             """)
     List<PromotedEvent> findActiveNearby(

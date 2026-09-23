@@ -24,7 +24,7 @@ import java.util.Set;
 public class AdminConfigService {
 
     public static final Set<String> SECTIONS = Set.of(
-        "platform", "auth", "payments", "orders", "qr", "notifications", "features"
+        "platform", "auth", "payments", "orders", "qr", "notifications", "features", "ticketing"
     );
 
     // injected below — field declared ahead of DEFAULTS to keep constructor tidy
@@ -76,6 +76,20 @@ public class AdminConfigService {
             "multiBusinessMerchants", false,
             "customerOrderHistory", true,
             "maintenanceMode", false
+        ),
+        "ticketing", Map.of(
+            // Promotion tier fees in UGX — configurable by admin
+            "promoTierLocalFee",  40000,   // 5 km radius
+            "promoTierCityFee",   80000,   // 20 km radius
+            "promoTierBoostFee",  150000,  // all restaurants (no radius limit)
+            // Tier radius caps in km (0 = unlimited / boost)
+            "promoTierLocalRadius",  5,
+            "promoTierCityRadius",   20,
+            "promoTierBoostRadius",  0,
+            // Max active promotions per organiser phone (anti-abuse)
+            "promoMaxActivePerPhone", 10,
+            // Max days a promotion stays active after payment
+            "promoMaxDays", 30
         )
     );
 

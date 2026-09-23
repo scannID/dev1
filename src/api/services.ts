@@ -69,6 +69,8 @@ import type {
   PromoteEventRequest,
   PromotionInitiateResponse,
   PromotionStatusResponse,
+  PromotionTier,
+  PromotionTiersResponse,
 } from './types'
 
 export type CatalogListParams = {
@@ -600,6 +602,11 @@ export const announcementsApi = {
 }
 
 export const promotionsApi = {
+  /** Fetch the 3 promotion tiers with live fees from admin config. */
+  tiers: async (): Promise<PromotionTier[]> => {
+    const res = await api.get<PromotionTiersResponse>('/promotions/tiers')
+    return res.tiers
+  },
   /**
    * Organiser: initiate a 40,000 UGX MoMo payment to promote an event.
    * Returns promotionId + paymentId for polling.

@@ -13,7 +13,6 @@ import com.scanny.payment.service.PaymentGatewayService;
 import com.scanny.repository.PromotedEventRepository;
 import com.scanny.repository.TicketRepository;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,16 +39,10 @@ public class PromotionService {
 
     private static final Logger log = LoggerFactory.getLogger(PromotionService.class);
 
-    /** Fixed promotion fee in UGX. */
-    private static final int PROMOTION_FEE = 40_000;
-    /** Maximum active promotions per organiser phone (anti-abuse). */
-    private static final int MAX_ACTIVE_PER_PHONE = 10;
-    /** Max days a promotion stays active even if event date is further away. */
-    private static final int MAX_PROMOTION_DAYS = 30;
-
     private final PromotedEventRepository promoRepo;
     private final TicketRepository ticketRepository;
     private final PaymentGatewayService paymentGatewayService;
+    private final PromotionTierService promotionTierService;
     private final ObjectMapper objectMapper;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
@@ -59,10 +52,12 @@ public class PromotionService {
             PromotedEventRepository promoRepo,
             TicketRepository ticketRepository,
             PaymentGatewayService paymentGatewayService,
+            PromotionTierService promotionTierService,
             ObjectMapper objectMapper) {
         this.promoRepo = promoRepo;
         this.ticketRepository = ticketRepository;
         this.paymentGatewayService = paymentGatewayService;
+        this.promotionTierService = promotionTierService;
         this.objectMapper = objectMapper;
     }
 
@@ -78,6 +73,13 @@ public class PromotionService {
         String organiserName  = req.organiserName() != null ? req.organiserName().trim() : "";
         String category       = req.category() != null ? req.category().trim() : "Other";
         String venueAddress   = req.venueAddress() != null ? req.venueAddress().trim() : "";
+        String tier           = PromotionTierService.normalizeTier(req.tier());
+
+        // Resolve fee and radius from config (admin-configurable)
+        int promotionFee = promotionTierService.getFeeForTier(tier);
+        int radiusKm     = promotionTierService.getRadiusForTier(tier);
+        int maxActive    = promotionTierService.getMaxActivePerPhone();
+        int maxDays      = promotionTierService.getMaxDays();
 
         // Load master ticket to pull event metadata
         Ticket master = ticketRepository.findById(masterTicketId)
@@ -87,9 +89,9 @@ public class PromotionService {
             throw new ApiException(400, "Provide the master event id, not an attendee ticket id");
         }
 
-        // Rate-limit: no more than MAX_ACTIVE_PER_PHONE active promos per phone
+        // Rate-limit: no more than maxActive active promos per phone
         long activeCount = promoRepo.countByOrganiserPhoneAndStatus(paymentPhone, "ACTIVE");
-        if (activeCount >= MAX_ACTIVE_PER_PHONE) {
+        if (activeCount >= maxActive) {
             throw new ApiException(429, "Too many active promotions for this number. Cancel one before adding another.");
         }
 
@@ -112,10 +114,12 @@ public class PromotionService {
         promo.setVenueLat(req.venueLat());
         promo.setVenueLng(req.venueLng());
         promo.setVenueAddress(venueAddress);
+        promo.setRadiusKm(radiusKm);
+        promo.setTier(tier);
         promo.setOrganiserPhone(paymentPhone);
         promo.setOrganiserName(organiserName);
         promo.setPaymentPhone(paymentPhone);
-        promo.setPromotionFee(PROMOTION_FEE);
+        promo.setPromotionFee(promotionFee);
         promo.setStatus("PENDING_PAYMENT");
         promo.setPaymentStatus("UNPAID");
         promo.setCreatedAt(Instant.now());
@@ -125,14 +129,14 @@ public class PromotionService {
         PaymentDtos.InitiateResponse payment = paymentGatewayService.initiate(
                 new PaymentDtos.InitiateRequest(
                         PaymentContext.EVENT_PROMOTION,
-                        promoId,           // referenceId
+                        promoId,
                         provider,
-                        PROMOTION_FEE,
+                        promotionFee,
                         "UGX",
                         paymentPhone,
                         organiserName.isBlank() ? "Event Organiser" : organiserName,
                         null,
-                        "Event promotion: " + master.getEventName()
+                        "Event promotion (" + tier + "): " + master.getEventName()
                 ));
 
         promo.setPaymentId(payment.paymentId());
@@ -156,7 +160,7 @@ public class PromotionService {
                 payment.status() == PaymentIntentStatus.Paid
                         ? "Promotion is now active!"
                         : "Check your phone for the MoMo prompt. Promotion activates on payment.",
-                PROMOTION_FEE,
+                promotionFee,
                 "UGX"
         );
     }
@@ -272,8 +276,9 @@ public class PromotionService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void activatePromotion(PromotedEvent promo) {
-        Instant now = Instant.now();
-        Instant cap  = now.plus(MAX_PROMOTION_DAYS, ChronoUnit.DAYS);
+        Instant now  = Instant.now();
+        int maxDays  = promotionTierService.getMaxDays();
+        Instant cap  = now.plus(maxDays, java.time.temporal.ChronoUnit.DAYS);
         Instant until = promo.getEventDate() != null && promo.getEventDate().isBefore(cap)
                 ? promo.getEventDate()
                 : cap;
@@ -340,7 +345,8 @@ public class PromotionService {
                 p.getVenueAddress(),
                 Math.round(dist * 10.0) / 10.0,
                 classNames,
-                lowestPrice
+                lowestPrice,
+                p.getTier() != null ? p.getTier() : PromotionTierService.TIER_LOCAL
         );
     }
 

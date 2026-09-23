@@ -1574,6 +1574,8 @@ function PromoteEventSection({
   const [step, setStep] = useState<PromoteStep>('idle')
   const [phone, setPhone] = useState('')
   const [provider, setProvider] = useState<'MTN' | 'Airtel'>('MTN')
+  const [tier, setTier] = useState<'LOCAL' | 'CITY' | 'BOOST'>('LOCAL')
+  const [tiers, setTiers] = useState<import('./api/types').PromotionTier[]>([])
   const [category, setCategory] = useState(eventCategory || '')
   const [venueAddress, setVenueAddress] = useState(eventLocation || '')
   const [busy, setBusy] = useState(false)
@@ -1582,6 +1584,10 @@ function PromoteEventSection({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [status, setStatus] = useState<PromotionStatusResponse | null>(null)
   const pollRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    promotionsApi.tiers().then(setTiers).catch(() => {/* silent */})
+  }, [])
 
   function stopPolling() {
     if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
@@ -1601,6 +1607,7 @@ function PromoteEventSection({
         provider,
         venueAddress: venueAddress.trim(),
         category,
+        tier,
       }
       const res: PromotionInitiateResponse = await promotionsApi.initiate(req)
       setPromoId(res.promotionId)
@@ -1658,15 +1665,14 @@ function PromoteEventSection({
         className="et-press"
         onClick={() => setStep('form')}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          width: '100%', padding: '13px 16px', borderRadius: 12, fontSize: 14,
-          fontWeight: 600, border: `1px solid color-mix(in srgb, var(--primary) 30%, transparent)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '100%', padding: '13px 16px', borderRadius: 12, fontSize: 13,
+          fontWeight: 600, border: `1px solid ${CREATE.line}`,
           cursor: 'pointer', fontFamily: 'inherit',
-          background: 'color-mix(in srgb, var(--primary) 8%, transparent)',
-          color: CREATE.teal, marginTop: 10,
+          background: CREATE.card,
+          color: CREATE.ink, marginTop: 10,
         }}
       >
-        <TrendingUp size={16} strokeWidth={2.4} />
         Promote this event — 40,000 UGX
       </button>
     )
@@ -1676,19 +1682,15 @@ function PromoteEventSection({
     return (
       <div style={promoCardStyle} className="et-fade-in">
         <div style={promoHeaderStyle}>
-          <Check size={16} style={{ color: CREATE.teal }} />
-          <span style={{ fontWeight: 700, fontSize: 14, color: CREATE.teal }}>
-            Event is now promoted!
-          </span>
+          <span style={{ fontWeight: 700, fontSize: 14, color: CREATE.teal }}>Promotion active</span>
         </div>
         <div style={promoBodyStyle}>
           <p style={{ margin: 0, fontSize: 13, color: CREATE.muted }}>
-            Your event is live in the Scanny customer feed. Customers dining at nearby restaurants will see it.
+            Customers dining at nearby restaurants will see your event.
           </p>
           {status && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: CREATE.muted }}>
-              Active until: <strong>{status.promotedUntil ? new Date(status.promotedUntil).toLocaleDateString() : '—'}</strong>
-              {' · '}Impressions: <strong>{status.impressions}</strong>
+              Active until {status.promotedUntil ? new Date(status.promotedUntil).toLocaleDateString() : '—'} · {status.impressions} impressions
             </p>
           )}
         </div>
@@ -1700,16 +1702,16 @@ function PromoteEventSection({
     return (
       <div style={promoCardStyle} className="et-fade-in">
         <div style={promoHeaderStyle}>
-          <Loader2 size={16} className="spin" style={{ color: CREATE.teal }} />
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Waiting for payment…</span>
+          <Loader2 size={14} className="spin" style={{ color: CREATE.muted }} />
+          <span style={{ fontWeight: 600, fontSize: 13 }}>Waiting for MoMo confirmation…</span>
         </div>
         <div style={promoBodyStyle}>
           <p style={{ margin: 0, fontSize: 13, color: CREATE.muted }}>
-            Check your phone for the MoMo prompt. Your event will go live automatically once payment is confirmed.
+            Check your phone and approve the prompt. The promotion activates automatically.
           </p>
           {paymentId && (
             <p style={{ margin: '6px 0 0', fontSize: 11, color: CREATE.muted, fontFamily: 'monospace' }}>
-              Payment ID: {paymentId}
+              {paymentId}
             </p>
           )}
         </div>
@@ -1718,17 +1720,13 @@ function PromoteEventSection({
   }
 
   // step === 'form' | 'error'
+  const selectedFee = tiers.find(t => t.id === tier)?.fee ?? PROMO_FEE
+
   return (
     <div style={promoCardStyle} className="et-fade-in">
-      <div style={promoHeaderStyle}>
-        <TrendingUp size={16} style={{ color: CREATE.teal }} />
-        <div>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Promote this event</span>
-          <span style={{ fontSize: 12, color: CREATE.muted, marginLeft: 8 }}>
-            {PROMO_FEE.toLocaleString()} UGX · reaches restaurants within 5 km
-          </span>
-        </div>
-        <button type="button" onClick={() => setStep('idle')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: CREATE.muted, display: 'flex' }}>
+      <div style={{ ...promoHeaderStyle, justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>Promote this event</span>
+        <button type="button" onClick={() => setStep('idle')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: CREATE.muted, display: 'flex' }}>
           <X size={15} />
         </button>
       </div>
@@ -1738,7 +1736,33 @@ function PromoteEventSection({
           <p style={{ margin: 0, fontSize: 12, color: CREATE.red, fontWeight: 500 }}>{errorMsg}</p>
         )}
 
-        {/* Category (pre-filled from event) */}
+        {/* Tier dropdown */}
+        {tiers.length > 0 && (
+          <div>
+            <label style={labelStyle}>Promotion type</label>
+            <select
+              className="et-focus"
+              value={tier}
+              onChange={(e) => setTier(e.target.value as 'LOCAL' | 'CITY' | 'BOOST')}
+              aria-label="Promotion tier"
+              style={fieldStyle()}
+            >
+              {tiers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label} — {t.fee.toLocaleString()} UGX
+                </option>
+              ))}
+            </select>
+            {(() => {
+              const sel = tiers.find(t => t.id === tier)
+              return sel
+                ? <p style={{ margin: '5px 0 0', fontSize: 11, color: CREATE.muted }}>{sel.description}</p>
+                : null
+            })()}
+          </div>
+        )}
+
+        {/* Category */}
         <div>
           <label style={labelStyle}>Event category *</label>
           <select
@@ -1755,7 +1779,7 @@ function PromoteEventSection({
 
         {/* Venue address */}
         <div>
-          <label style={labelStyle}>Venue address (for proximity matching)</label>
+          <label style={labelStyle}>Venue address</label>
           <input
             className="et-focus"
             type="text"
@@ -1767,36 +1791,16 @@ function PromoteEventSection({
           />
         </div>
 
-        {/* MoMo payment details */}
+        {/* MoMo payment */}
         <div>
           <label style={labelStyle}>MoMo number to charge *</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select
-              className="et-focus"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as 'MTN' | 'Airtel')}
-              style={{ ...fieldStyle(), width: 90, flexShrink: 0 }}
-              aria-label="Provider"
-            >
-              <option value="MTN">MTN</option>
-              <option value="Airtel">Airtel</option>
-            </select>
-            <input
-              className="et-focus"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="07X XXX XXXX"
-              style={fieldStyle()}
-              aria-label="Mobile money number"
-            />
-          </div>
+          <MoMoPhoneInput
+            value={phone}
+            onChange={setPhone}
+            onProvider={(p) => { if (p) setProvider(p) }}
+            aria-label="Mobile money number"
+          />
         </div>
-
-        <p style={{ margin: 0, fontSize: 11, color: CREATE.muted }}>
-          A MoMo prompt for <strong>40,000 UGX</strong> will be sent to the number above.
-          Your event appears in the Scanny customer feed at restaurants within 5 km of your venue until the event date.
-        </p>
 
         <button
           type="button"
@@ -1811,8 +1815,8 @@ function PromoteEventSection({
             opacity: busy ? 0.75 : 1,
           }}
         >
-          {busy ? <Loader2 size={16} className="spin" /> : <TrendingUp size={16} />}
-          {busy ? 'Processing…' : `Pay ${PROMO_FEE.toLocaleString()} UGX & Promote`}
+          {busy ? <Loader2 size={16} className="spin" /> : null}
+          {busy ? 'Processing…' : `Pay ${selectedFee.toLocaleString()} UGX & promote`}
         </button>
       </div>
     </div>
@@ -2299,11 +2303,13 @@ type FormState = {
   tables: TableOption[]
   eventImageUrl: string
   queueEnabled?: boolean
-  /** 'standard' = free creation only; 'promoted' = pay 40k to push into restaurant feeds */
+  /** 'standard' = free creation only; 'promoted' = pay to push into restaurant feeds */
   eventMode: 'standard' | 'promoted'
-  /** MoMo number to charge the 40k promotion fee (promoted mode only) */
+  /** MoMo number to charge the promotion fee (promoted mode only) */
   promoPhone: string
   promoProvider: 'MTN' | 'Airtel'
+  /** Which promotion tier: LOCAL (5 km) | CITY (20 km) | BOOST (all restaurants) */
+  promoTier: 'LOCAL' | 'CITY' | 'BOOST'
 }
 
 function formatPaymentDetails(form: FormState): string {
@@ -2374,6 +2380,7 @@ function TicketForm({
     eventMode: 'standard',
     promoPhone: '',
     promoProvider: 'MTN',
+    promoTier: 'LOCAL',
   })
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({})
   const [touched, setTouched] = useState(false)
@@ -2395,6 +2402,11 @@ function TicketForm({
   // Promotion state — used when eventMode === 'promoted'
   const [promoResult, setPromoResult] = useState<import('./api/types').PromotionInitiateResponse | null>(null)
   const [promoError, setPromoError] = useState<string | null>(null)
+  // Live tier definitions fetched from admin config
+  const [promoTiers, setPromoTiers] = useState<import('./api/types').PromotionTier[]>([])
+  useEffect(() => {
+    promotionsApi.tiers().then(setPromoTiers).catch(() => {/* use fallback */})
+  }, [])
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -2421,6 +2433,7 @@ function TicketForm({
       eventMode: 'standard',
       promoPhone: '',
       promoProvider: 'MTN',
+      promoTier: 'LOCAL',
     })
     setErrors({})
     setTouched(false)
@@ -2521,6 +2534,7 @@ function TicketForm({
           eventMode: 'standard',
           promoPhone: '',
           promoProvider: 'MTN',
+          promoTier: 'LOCAL',
         })
         setOfferTab(snapshotTables.length > 0 ? 'tables' : 'classes')
         setStep(1)
@@ -2643,6 +2657,7 @@ function TicketForm({
         eventMode: 'standard',
         promoPhone: '',
         promoProvider: 'MTN',
+        promoTier: 'LOCAL',
       })
       setOfferTab(nextTables.length > 0 ? 'tables' : 'classes')
       setStep(1)
@@ -2761,7 +2776,7 @@ function TicketForm({
     if (form.ticketClasses.some((c) => !c.fee || isNaN(Number(c.fee)))) e.ticketClasses = 'All classes need a valid fee'
     if (form.eventMode === 'promoted') {
       const digits = form.promoPhone.replace(/\D/g, '')
-      if (digits.length < 9) e.promoPhone = 'Enter the MoMo number to charge 40,000 UGX'
+      if (digits.length < 9) e.promoPhone = 'Enter the MoMo number to charge the promotion fee'
     }
     return e
   }
@@ -2826,6 +2841,7 @@ function TicketForm({
             organiserName: form.host.trim(),
             venueAddress: form.location.trim(),
             category: form.category || 'Other',
+            tier: form.promoTier,
           })
           setPromoResult(promoRes)
         } catch (promoErr) {
@@ -3061,102 +3077,51 @@ function TicketForm({
 
             {/* ── Event mode picker ─────────────────────────────────── */}
             {!editingEventId && (
-              <div style={{ marginBottom: 28 }}>
-                <h2 style={{ margin: '0 0 6px', fontFamily: TICKET_FONT, fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>
-                  What are you creating?
-                </h2>
-                <p style={{ margin: '0 0 16px', color: CREATE.muted, fontSize: 14, lineHeight: 1.5 }}>
-                  Standard events are free. Promoted events are pushed to customers dining nearby — for 40,000 UGX.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-
-                  {/* Standard option */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', gap: 0, border: `1px solid ${CREATE.line}`, borderRadius: 10, overflow: 'hidden', background: CREATE.card }}>
                   <button
                     type="button"
                     onClick={() => set('eventMode', 'standard')}
-                    className="et-press"
                     style={{
-                      padding: '16px 14px',
-                      borderRadius: 14,
-                      border: `2px solid ${form.eventMode === 'standard' ? CREATE.teal : CREATE.line}`,
-                      background: form.eventMode === 'standard'
-                        ? 'color-mix(in srgb, var(--primary) 6%, transparent)'
-                        : CREATE.card,
+                      flex: 1,
+                      height: 42,
+                      border: 'none',
+                      borderRight: `1px solid ${CREATE.line}`,
+                      background: form.eventMode === 'standard' ? CREATE.tealDeep : 'transparent',
+                      color: form.eventMode === 'standard' ? '#fff' : CREATE.muted,
+                      fontWeight: 600,
+                      fontSize: 13,
                       cursor: 'pointer',
                       fontFamily: 'inherit',
-                      textAlign: 'left',
-                      transition: 'all 160ms ease',
+                      transition: 'background 140ms ease, color 140ms ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 22 }}>🎫</span>
-                      {form.eventMode === 'standard' && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, background: CREATE.teal,
-                          color: '#fff', padding: '2px 8px', borderRadius: 20,
-                        }}>Selected</span>
-                      )}
-                    </div>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: CREATE.ink }}>Standard</p>
-                    <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, lineHeight: 1.4 }}>
-                      Free to create. Share the QR to sell tickets directly.
-                    </p>
-                    <span style={{
-                      display: 'inline-block', fontSize: 11, fontWeight: 700,
-                      color: form.eventMode === 'standard' ? CREATE.teal : CREATE.muted,
-                      padding: '3px 10px', borderRadius: 20,
-                      background: form.eventMode === 'standard'
-                        ? 'color-mix(in srgb, var(--primary) 12%, transparent)'
-                        : CREATE.fieldBg,
-                    }}>
-                      Free
-                    </span>
+                    Standard — free
                   </button>
-
-                  {/* Promoted option */}
                   <button
                     type="button"
                     onClick={() => set('eventMode', 'promoted')}
-                    className="et-press"
                     style={{
-                      padding: '16px 14px',
-                      borderRadius: 14,
-                      border: `2px solid ${form.eventMode === 'promoted' ? '#c97d2e' : CREATE.line}`,
-                      background: form.eventMode === 'promoted'
-                        ? 'color-mix(in srgb, #c97d2e 8%, transparent)'
-                        : CREATE.card,
+                      flex: 1,
+                      height: 42,
+                      border: 'none',
+                      background: form.eventMode === 'promoted' ? '#b86e1f' : 'transparent',
+                      color: form.eventMode === 'promoted' ? '#fff' : CREATE.muted,
+                      fontWeight: 600,
+                      fontSize: 13,
                       cursor: 'pointer',
                       fontFamily: 'inherit',
-                      textAlign: 'left',
-                      transition: 'all 160ms ease',
+                      transition: 'background 140ms ease, color 140ms ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 22 }}>📣</span>
-                      {form.eventMode === 'promoted' && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, background: '#c97d2e',
-                          color: '#fff', padding: '2px 8px', borderRadius: 20,
-                        }}>Selected</span>
-                      )}
-                    </div>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: CREATE.ink }}>Promoted</p>
-                    <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, lineHeight: 1.4 }}>
-                      Pushed to customers dining at nearby restaurants.
-                    </p>
-                    <span style={{
-                      display: 'inline-block', fontSize: 11, fontWeight: 700,
-                      color: form.eventMode === 'promoted' ? '#c97d2e' : CREATE.muted,
-                      padding: '3px 10px', borderRadius: 20,
-                      background: form.eventMode === 'promoted'
-                        ? 'color-mix(in srgb, #c97d2e 14%, transparent)'
-                        : CREATE.fieldBg,
-                    }}>
-                      40,000 UGX
-                    </span>
+                    Promoted
                   </button>
-
                 </div>
+                {form.eventMode === 'promoted' && (
+                  <p style={{ margin: '7px 0 0', fontSize: 12, color: CREATE.muted }}>
+                    Your event shows in the "What's Happening" feed at nearby restaurants. Charged via MoMo on publish.
+                  </p>
+                )}
               </div>
             )}
             {/* ── End mode picker ──────────────────────────────────── */}
@@ -3672,54 +3637,51 @@ function TicketForm({
 
               {/* Promo payment fields — only when Promoted mode is chosen */}
               {form.eventMode === 'promoted' && (
-                <SectionCard
-                  title="Promotion payment"
-                  subtitle="We charge 40,000 UGX via MoMo to push your event to nearby restaurants."
-                >
+                <SectionCard title="Promotion payment" subtitle="Charged via MoMo when you publish.">
                   <div style={{ display: 'grid', gap: 12 }}>
-                    <p style={{ margin: 0, fontSize: 12.5, color: CREATE.muted, lineHeight: 1.5 }}>
-                      Enter the mobile money number to debit. A MoMo prompt will appear on that phone once you tap <strong>Generate &amp; Promote</strong>.
-                    </p>
 
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      {/* Provider selector */}
+                    {/* Tier dropdown — live fees from admin config */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: CREATE.muted, marginBottom: 4 }}>Promotion type</label>
                       <select
                         className="et-focus"
-                        value={form.promoProvider}
-                        onChange={(e) => set('promoProvider', e.target.value as 'MTN' | 'Airtel')}
-                        aria-label="MoMo provider"
-                        style={{ ...fieldStyle(), width: 100, flexShrink: 0 }}
+                        value={form.promoTier}
+                        onChange={(e) => set('promoTier', e.target.value as 'LOCAL' | 'CITY' | 'BOOST')}
+                        aria-label="Promotion tier"
+                        style={fieldStyle()}
                       >
-                        <option value="MTN">MTN</option>
-                        <option value="Airtel">Airtel</option>
+                        {promoTiers.length > 0
+                          ? promoTiers.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.label} — {t.fee.toLocaleString()} UGX
+                              </option>
+                            ))
+                          : <>
+                              <option value="LOCAL">5 km — 40,000 UGX</option>
+                              <option value="CITY">20 km — 80,000 UGX</option>
+                              <option value="BOOST">Boost (all restaurants) — 150,000 UGX</option>
+                            </>
+                        }
                       </select>
-
-                      {/* Phone number */}
-                      <div style={{ flex: 1 }}>
-                        <input
-                          className="et-focus"
-                          type="tel"
-                          placeholder="07X XXX XXXX"
-                          aria-label="Mobile money number for promotion fee"
-                          value={form.promoPhone}
-                          onChange={(e) => set('promoPhone', e.target.value)}
-                          style={fieldStyle(Boolean(touched && errors.promoPhone))}
-                        />
-                        {touched && errors.promoPhone && <FieldError>{errors.promoPhone}</FieldError>}
-                      </div>
+                      {/* Description of selected tier */}
+                      {promoTiers.length > 0 && (() => {
+                        const sel = promoTiers.find(t => t.id === form.promoTier)
+                        return sel
+                          ? <p style={{ margin: '5px 0 0', fontSize: 11, color: CREATE.muted }}>{sel.description}</p>
+                          : null
+                      })()}
                     </div>
 
-                    {/* What you get summary */}
-                    <div style={{
-                      padding: '10px 12px',
-                      borderRadius: 10,
-                      background: 'color-mix(in srgb, #c97d2e 8%, transparent)',
-                      border: '1px solid color-mix(in srgb, #c97d2e 22%, transparent)',
-                      fontSize: 12,
-                      color: CREATE.ink,
-                      lineHeight: 1.5,
-                    }}>
-                      <strong>What's included:</strong> Your event appears in the <em>What's Happening</em> feed shown to customers at restaurants within 5 km of your venue — active from payment until your event date (max 30 days).
+                    <div>
+                      <MoMoPhoneInput
+                        value={form.promoPhone}
+                        onChange={(v) => set('promoPhone', v)}
+                        onProvider={(p) => { if (p) set('promoProvider', p) }}
+                        aria-label="Mobile money number for promotion fee"
+                        aria-invalid={Boolean(touched && errors.promoPhone)}
+                        inputStyle={fieldStyle(Boolean(touched && errors.promoPhone))}
+                      />
+                      {touched && errors.promoPhone && <FieldError>{errors.promoPhone}</FieldError>}
                     </div>
                   </div>
                 </SectionCard>
@@ -3746,10 +3708,7 @@ function TicketForm({
                   gap: 8,
                 }}
               >
-                {form.eventMode === 'promoted'
-                  ? <><TrendingUp size={17} /> Continue to Preview &amp; Promote</>
-                  : <>Continue <ArrowRight size={17} /></>
-                }
+                Continue <ArrowRight size={17} />
               </button>
             </div>
           </div>
@@ -3930,14 +3889,14 @@ function TicketForm({
                   >
                     {submitting
                       ? <Loader2 size={18} className="spin" />
-                      : form.eventMode === 'promoted' ? <TrendingUp size={18} /> : <QrCode size={18} />
+                      : <QrCode size={18} />
                     }
                     {submitting
                       ? (editingEventId ? 'Saving…' : form.eventMode === 'promoted' ? 'Creating & paying…' : 'Generating…')
                       : editingEventId
                         ? 'Save event changes'
                         : form.eventMode === 'promoted'
-                          ? 'Generate + Pay 40,000 UGX to Promote'
+                          ? `Generate + pay ${(promoTiers.find(t => t.id === form.promoTier)?.fee ?? 40000).toLocaleString()} UGX`
                           : 'Generate ticket code'
                     }
                   </button>
@@ -3945,24 +3904,24 @@ function TicketForm({
                   {/* Promo mode: show charge notice below the button */}
                   {form.eventMode === 'promoted' && !submitting && !promoResult && (
                     <p style={{ margin: '0 0 8px', fontSize: 12, color: CREATE.muted, textAlign: 'center', lineHeight: 1.4 }}>
-                      A MoMo prompt for <strong>40,000 UGX</strong> will be sent to {form.promoPhone || 'your number'} when you tap the button above.
+                      A MoMo prompt will be sent to {form.promoPhone || 'your number'} when you tap the button above.
                     </p>
                   )}
 
                   {/* Promo result feedback — shown while still on step 2 (before parent redirects to output) */}
                   {promoError && (
                     <p style={{ margin: '0 0 8px', fontSize: 12.5, color: CREATE.red, fontWeight: 500 }}>
-                      ⚠ {promoError}
+                      {promoError}
                     </p>
                   )}
                   {promoResult && promoResult.promoStatus !== 'ACTIVE' && (
-                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#c97d2e', fontWeight: 600 }}>
-                      📲 MoMo prompt sent! Confirm on your phone to activate the promotion.
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#c97d2e', fontWeight: 500 }}>
+                      MoMo prompt sent — confirm on your phone to activate the promotion.
                     </p>
                   )}
                   {promoResult && promoResult.promoStatus === 'ACTIVE' && (
-                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: CREATE.teal, fontWeight: 600 }}>
-                      ✓ Promotion is live! Customers dining nearby will see your event.
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: CREATE.teal, fontWeight: 500 }}>
+                      Promotion active. Customers dining nearby will see your event.
                     </p>
                   )}
                 </>

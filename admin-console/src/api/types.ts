@@ -365,6 +365,7 @@ export type ConfigSection =
   | 'qr'
   | 'notifications'
   | 'features'
+  | 'ticketing'
 
 export type ConfigMap = Record<string, string | number | boolean>
 
@@ -376,6 +377,7 @@ export interface PlatformConfigs {
   qr: ConfigMap
   notifications: ConfigMap
   features: ConfigMap
+  ticketing: ConfigMap
 }
 
 export interface AllConfigsResponse {

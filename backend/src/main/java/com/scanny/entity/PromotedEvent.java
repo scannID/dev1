@@ -59,6 +59,12 @@ public class PromotedEvent {
     private int radiusKm = 5;
 
     /**
+     * Tier identifier: LOCAL (5 km) | CITY (20 km) | BOOST (all restaurants)
+     */
+    @Column(nullable = false)
+    private String tier = "LOCAL";
+
+    /**
      * PENDING_PAYMENT | ACTIVE | EXPIRED | CANCELLED
      */
     @Column(nullable = false)
@@ -142,7 +148,10 @@ public class PromotedEvent {
     public void setVenueAddress(String venueAddress) { this.venueAddress = venueAddress != null ? venueAddress : ""; }
 
     public int getRadiusKm() { return radiusKm; }
-    public void setRadiusKm(int radiusKm) { this.radiusKm = Math.max(1, radiusKm); }
+    public void setRadiusKm(int radiusKm) { this.radiusKm = Math.max(0, radiusKm); }
+
+    public String getTier() { return tier; }
+    public void setTier(String tier) { this.tier = tier != null ? tier.toUpperCase() : "LOCAL"; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

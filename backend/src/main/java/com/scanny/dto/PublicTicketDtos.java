@@ -280,7 +280,7 @@ public class PublicTicketDtos {
     public record PromoteEventRequest(
         /** Master ticket id (ERI-XXXXXX) of the event to promote. */
         String masterTicketId,
-        /** MoMo number to charge 40,000 UGX from. */
+        /** MoMo number to charge. */
         String paymentPhone,
         /** MoMo provider: MTN or Airtel. */
         String provider,
@@ -293,7 +293,9 @@ public class PublicTicketDtos {
         /** Human-readable venue address. */
         String venueAddress,
         /** Event category for feed filtering. */
-        String category
+        String category,
+        /** Promotion tier: LOCAL (5 km) | CITY (20 km) | BOOST (all restaurants). Default: LOCAL */
+        String tier
     ) {}
 
     /**
@@ -327,22 +329,37 @@ public class PublicTicketDtos {
     ) {}
 
     /**
-     * A single promoted event card returned by the nearby-events feed.
-     * Shown in the customer "What's Happening" panel.
+     * A single promotion tier returned by GET /api/promotions/tiers
      */
+    public record PromotionTier(
+        String id,          // LOCAL | CITY | BOOST
+        String label,       // "5 km" | "20 km" | "Boost"
+        String description,
+        int radiusKm,       // 0 = no cap (Boost)
+        int fee,
+        String currency
+    ) {}
+
+    /**
+     * Response for GET /api/promotions/tiers
+     */
+    public record PromotionTiersResponse(
+        java.util.List<PromotionTier> tiers
+    ) {}
     public record NearbyEventItem(
         String promotionId,
         String masterTicketId,
         String eventName,
-        String eventDate,       // ISO-8601 or null
+        String eventDate,
         String eventImageUrl,
         String purchaseUrl,
         String host,
         String category,
         String venueAddress,
-        double distanceKm,       // -1 when coords were not supplied
+        double distanceKm,
         java.util.List<String> ticketClassNames,
-        int lowestPrice         // UGX, 0 = free
+        int lowestPrice,
+        String tier
     ) {}
 
     /**

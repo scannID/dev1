@@ -876,10 +876,23 @@ export interface AnnouncementsListResponse {
 
 // ── Event Promotions ─────────────────────────────────────────────────────────
 
+export interface PromotionTier {
+  id: 'LOCAL' | 'CITY' | 'BOOST'
+  label: string      // "5 km" | "20 km" | "Boost"
+  description: string
+  radiusKm: number   // 0 = no cap
+  fee: number
+  currency: string
+}
+
+export interface PromotionTiersResponse {
+  tiers: PromotionTier[]
+}
+
 export interface PromoteEventRequest {
   /** Master ticket id (ERI-XXXXXX) */
   masterTicketId: string
-  /** MoMo number to charge 40,000 UGX */
+  /** MoMo number to charge */
   paymentPhone: string
   /** 'MTN' | 'Airtel' */
   provider: string
@@ -888,6 +901,8 @@ export interface PromoteEventRequest {
   venueLng?: number | null
   venueAddress?: string
   category?: string
+  /** 'LOCAL' | 'CITY' | 'BOOST' */
+  tier?: string
 }
 
 export interface PromotionInitiateResponse {
@@ -925,10 +940,10 @@ export interface NearbyPromotedEvent {
   host: string
   category: string
   venueAddress: string
-  /** -1 when no coords were supplied */
   distanceKm: number
   ticketClassNames: string[]
   lowestPrice: number
+  tier: string
 }
 
 export interface NearbyEventsResponse {

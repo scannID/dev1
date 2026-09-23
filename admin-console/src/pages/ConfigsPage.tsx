@@ -107,6 +107,7 @@ export default function ConfigsPage() {
         qr: { ...configs.qr },
         notifications: { ...configs.notifications },
         features: { ...configs.features },
+        ticketing: { ...(configs.ticketing ?? {}) },
       })
     }
   }, [configs])
@@ -408,6 +409,81 @@ export default function ConfigsPage() {
               {saving === 'notifications' ? 'Saving…' : 'Save'}
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* ── Ticketing / Promotion Tiers ── */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div>
+            <h3>Ticketing</h3>
+            <p>Event promotion tier fees — shown to organisers on the create-event page</p>
+          </div>
+          {saved === 'ticketing' && <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">Saved</Badge>}
+        </div>
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Tier fees */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <Label>Local fee — 5 km (UGX)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={asNumber(draft.ticketing?.promoTierLocalFee, 40000)}
+                onChange={(e) => setField('ticketing', 'promoTierLocalFee', Number(e.target.value))}
+              />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <Label>City fee — 20 km (UGX)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={asNumber(draft.ticketing?.promoTierCityFee, 80000)}
+                onChange={(e) => setField('ticketing', 'promoTierCityFee', Number(e.target.value))}
+              />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <Label>Boost fee — all restaurants (UGX)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={asNumber(draft.ticketing?.promoTierBoostFee, 150000)}
+                onChange={(e) => setField('ticketing', 'promoTierBoostFee', Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Other limits */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <Label>Max active promos per organiser</Label>
+              <Input
+                type="number"
+                min={1}
+                value={asNumber(draft.ticketing?.promoMaxActivePerPhone, 10)}
+                onChange={(e) => setField('ticketing', 'promoMaxActivePerPhone', Number(e.target.value))}
+              />
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <Label>Max promotion duration (days)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={asNumber(draft.ticketing?.promoMaxDays, 30)}
+                onChange={(e) => setField('ticketing', 'promoMaxDays', Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            className="w-fit"
+            disabled={saving === 'ticketing'}
+            onClick={() => save('ticketing')}
+          >
+            {saving === 'ticketing' ? 'Saving…' : 'Save'}
+          </Button>
         </div>
       </div>
 

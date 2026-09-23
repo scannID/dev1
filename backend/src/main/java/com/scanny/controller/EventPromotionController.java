@@ -2,6 +2,7 @@ package com.scanny.controller;
 
 import com.scanny.dto.PublicTicketDtos;
 import com.scanny.service.PromotionService;
+import com.scanny.service.PromotionTierService;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +33,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventPromotionController {
 
     private final PromotionService promotionService;
+    private final PromotionTierService promotionTierService;
 
-    public EventPromotionController(PromotionService promotionService) {
+    public EventPromotionController(PromotionService promotionService, PromotionTierService promotionTierService) {
         this.promotionService = promotionService;
+        this.promotionTierService = promotionTierService;
+    }
+
+    /**
+     * Returns the 3 available promotion tiers with their live fees (from admin config).
+     * Called by the create-event page on load so the UI shows current prices.
+     */
+    @GetMapping("/tiers")
+    public ResponseEntity<PublicTicketDtos.PromotionTiersResponse> tiers() {
+        var tiers = promotionTierService.getTiers().stream()
+            .map(t -> new PublicTicketDtos.PromotionTier(
+                t.id(), t.label(), t.description(), t.radiusKm(), t.fee(), t.currency()
+            ))
+            .toList();
+        return ResponseEntity.ok(new PublicTicketDtos.PromotionTiersResponse(tiers));
     }
 
     /**
