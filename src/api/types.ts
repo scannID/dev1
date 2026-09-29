@@ -55,6 +55,10 @@ export interface Business {
   branchLabel?: string
   primary?: boolean
   address?: string
+  /** Restaurant latitude — used for event-promo radius matching. */
+  latitude?: number | null
+  /** Restaurant longitude — used for event-promo radius matching. */
+  longitude?: number | null
 }
 
 export interface CreateBusinessRequest {

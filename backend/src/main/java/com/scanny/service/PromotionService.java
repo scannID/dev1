@@ -43,6 +43,8 @@ public class PromotionService {
     private final TicketRepository ticketRepository;
     private final PaymentGatewayService paymentGatewayService;
     private final PromotionTierService promotionTierService;
+    private final GeocodingService geocodingService;
+    private final BusinessGeoService businessGeoService;
     private final ObjectMapper objectMapper;
 
     @Value("${scanny.scan-base-url:https://scanny.app}")
@@ -53,11 +55,15 @@ public class PromotionService {
             TicketRepository ticketRepository,
             PaymentGatewayService paymentGatewayService,
             PromotionTierService promotionTierService,
+            GeocodingService geocodingService,
+            BusinessGeoService businessGeoService,
             ObjectMapper objectMapper) {
         this.promoRepo = promoRepo;
         this.ticketRepository = ticketRepository;
         this.paymentGatewayService = paymentGatewayService;
         this.promotionTierService = promotionTierService;
+        this.geocodingService = geocodingService;
+        this.businessGeoService = businessGeoService;
         this.objectMapper = objectMapper;
     }
 
@@ -100,6 +106,26 @@ public class PromotionService {
         String host          = stringMeta(meta, "host", "");
         String purchaseUrl   = scanBaseUrl + "/ticket/" + master.getQrToken();
 
+        // Auto-geocode venue when organiser only provided an address (or event name).
+        // LOCAL/CITY radius matching requires coords; BOOST (radiusKm=0) works without them.
+        Double venueLat = req.venueLat();
+        Double venueLng = req.venueLng();
+        if (venueLat == null || venueLng == null) {
+            String geoHint = !venueAddress.isBlank()
+                    ? venueAddress
+                    : (master.getEventName() != null ? master.getEventName() + ", Kampala" : "");
+            if (!geoHint.isBlank()) {
+                var point = geocodingService.geocode(geoHint);
+                if (point.isPresent()) {
+                    venueLat = point.get().lat();
+                    venueLng = point.get().lng();
+                    if (venueAddress.isBlank()) {
+                        venueAddress = geoHint;
+                    }
+                }
+            }
+        }
+
         // Create the PromotedEvent record (PENDING_PAYMENT)
         String promoId = "PRO-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         PromotedEvent promo = new PromotedEvent();
@@ -111,8 +137,8 @@ public class PromotionService {
         promo.setPurchaseUrl(purchaseUrl);
         promo.setHost(host);
         promo.setCategory(category);
-        promo.setVenueLat(req.venueLat());
-        promo.setVenueLng(req.venueLng());
+        promo.setVenueLat(venueLat);
+        promo.setVenueLng(venueLng);
         promo.setVenueAddress(venueAddress);
         promo.setRadiusKm(radiusKm);
         promo.setTier(tier);
@@ -216,19 +242,24 @@ public class PromotionService {
 
     // ── Nearby feed ───────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
-    public PublicTicketDtos.NearbyEventsResponse findNearby(Double lat, Double lng) {
+    @Transactional
+    public PublicTicketDtos.NearbyEventsResponse findNearby(Double lat, Double lng, String businessId) {
+        // Resolve restaurant coords: explicit lat/lng, else business row (auto-geocoded).
+        var resolved = businessGeoService.resolveForNearby(businessId, lat, lng);
+        Double effectiveLat = resolved.map(BusinessGeoService.RestaurantCoords::lat).orElse(lat);
+        Double effectiveLng = resolved.map(BusinessGeoService.RestaurantCoords::lng).orElse(lng);
+
         Instant now = Instant.now();
         List<PromotedEvent> promos;
 
-        if (lat != null && lng != null) {
-            promos = promoRepo.findActiveNearby(lat, lng, now);
+        if (effectiveLat != null && effectiveLng != null) {
+            promos = promoRepo.findActiveNearby(effectiveLat, effectiveLng, now);
         } else {
             promos = promoRepo.findAllActive(now);
         }
 
         List<PublicTicketDtos.NearbyEventItem> items = promos.stream()
-                .map(p -> toNearbyItem(p, lat, lng))
+                .map(p -> toNearbyItem(p, effectiveLat, effectiveLng))
                 .toList();
 
         return new PublicTicketDtos.NearbyEventsResponse(items, items.size());

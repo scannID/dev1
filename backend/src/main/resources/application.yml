@@ -55,6 +55,9 @@ management:
 
 scanny:
   scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
+  geocoding:
+    nominatim-url: ${SCANNY_GEOCODING_URL:https://nominatim.openstreetmap.org/search}
+    user-agent: ${SCANNY_GEOCODING_UA:KoddlyPromotions/1.0 (support@koddly.app)}
   redis:
     enabled: ${REDIS_ENABLED:false}
   cors:

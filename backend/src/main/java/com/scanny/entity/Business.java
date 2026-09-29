@@ -34,6 +34,16 @@ public class Business {
     @Column(nullable = false)
     private String address = "";
 
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
+    /** Last geocode query used — avoids repeat lookups for the same address. */
+    @Column(name = "geo_query", nullable = false)
+    private String geoQuery = "";
+
     @Column(name = "accepting_orders", nullable = false)
     private boolean acceptingOrders = true;
 
@@ -141,6 +151,30 @@ public class Business {
 
     public void setAddress(String address) {
         this.address = address != null ? address : "";
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
+    public String getGeoQuery() {
+        return geoQuery;
+    }
+
+    public void setGeoQuery(String geoQuery) {
+        this.geoQuery = geoQuery != null ? geoQuery : "";
     }
 
     public boolean isAcceptingOrders() {

@@ -38,6 +38,7 @@ import { buildEventManagerGateUrl, buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
 import {
   loadCreatedEvents,
+  loadAllCreatedEvents,
   removeCreatedEvent,
   saveCreatedEvent,
   type LocalCreatedEvent,
@@ -991,11 +992,11 @@ function CreatedEventsQrSection({
   onTrack: (event: LocalCreatedEvent) => void
   onEdit: (event: LocalCreatedEvent) => void
 }) {
-  const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadCreatedEvents())
+  const [events, setEvents] = useState<LocalCreatedEvent[]>(() => loadAllCreatedEvents())
   const [managerQrMap, setManagerQrMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const refresh = () => setEvents(loadCreatedEvents())
+    const refresh = () => setEvents(loadAllCreatedEvents())
     refresh()
     window.addEventListener('focus', refresh)
     window.addEventListener('kodte-created-events', refresh)
@@ -4117,6 +4118,7 @@ export default function EventTicketPage({ onBack }: { onBack: () => void }) {
           })),
           eventImageUrl: data.eventImageUrl,
           queueEnabled: data.queueEnabled,
+          category: (data as TicketData & { category?: string }).category,
         },
         createdAt: new Date().toISOString(),
       })

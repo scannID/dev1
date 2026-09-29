@@ -626,13 +626,18 @@ export const promotionsApi = {
   },
 
   /**
-   * Customer feed: active promoted events near lat/lng.
-   * lat/lng are optional — omit for city-wide fallback.
+   * Customer feed: active promoted events near lat/lng (or a restaurant businessId).
+   * Prefer businessId so the backend can auto-resolve / geocode the restaurant.
    */
-  nearby: async (lat?: number | null, lng?: number | null): Promise<NearbyEventsResponse> => {
+  nearby: async (
+    lat?: number | null,
+    lng?: number | null,
+    businessId?: string | null,
+  ): Promise<NearbyEventsResponse> => {
     const params = new URLSearchParams()
     if (lat != null) params.set('lat', String(lat))
     if (lng != null) params.set('lng', String(lng))
+    if (businessId) params.set('businessId', businessId)
     const qs = params.toString()
     return api.get<NearbyEventsResponse>(`/promotions/nearby${qs ? `?${qs}` : ''}`)
   },

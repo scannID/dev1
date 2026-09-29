@@ -7,6 +7,8 @@ import { TicketRenderer, type EventTicketVisual } from '../EventTicket'
 import { KodteMark } from '../customer/KodteMark'
 import { MusicInstrumentLoader } from './MusicInstrumentLoader'
 import { buildTicketGateUrl } from '../lib/scanBase'
+import { saveRecentTicket } from './EventsDiscoveryPage'
+import { usePageMeta } from '../hooks/usePageMeta'
 import './TicketCustomer.css'
 
 type Props = { accessToken: string }
@@ -88,6 +90,14 @@ export default function TicketViewPage({ accessToken }: Props) {
   const [transferLoading, setTransferLoading] = useState(false)
   const [transferUrl, setTransferUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  usePageMeta({
+    title: ticket ? `${ticket.eventName} — Your Ticket` : 'Your ticket',
+    description: ticket
+      ? `${ticket.ticketType} ticket for ${ticket.eventName}. Held by ${ticket.holderName}.`
+      : 'View your event ticket.',
+    robots: 'noindex, nofollow',
+  })
   const [transferError, setTransferError] = useState<string | null>(null)
 
   const handleOpenTransfer = async () => {
@@ -138,6 +148,18 @@ export default function TicketViewPage({ accessToken }: Props) {
         if (remaining > 0) await new Promise((r) => setTimeout(r, remaining))
         if (cancelled) return
         setTicket(data)
+        // Save to recently-viewed list so EventsDiscoveryPage can show it
+        try {
+          saveRecentTicket({
+            accessToken,
+            eventName: data.eventName,
+            ticketType: data.ticketType,
+            eventDate: data.eventDate,
+            holderName: data.holderName,
+            viewUrl: data.viewUrl || window.location.href,
+            savedAt: new Date().toISOString(),
+          })
+        } catch { /* never block the UI */ }
         if (data.paymentStatus === 'Paid') {
           const gateLink = buildTicketGateUrl(
             data.qrPayload || data.gateUrl || data.viewUrl || data.qrToken || data.id,

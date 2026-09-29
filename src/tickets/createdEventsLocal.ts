@@ -38,12 +38,27 @@ export type LocalCreatedEvent = {
     }>
     eventImageUrl?: string
     queueEnabled?: boolean
+    category?: string
   }
   createdAt: string
 }
 
 const STORAGE_KEY = 'kodte-created-events'
 const MAX_EVENTS = 40
+
+/** Grace period after event date before it disappears (6 hours). */
+const PAST_GRACE_MS = 6 * 60 * 60 * 1000
+
+function isExpired(event: LocalCreatedEvent): boolean {
+  if (!event.eventDate) return false
+  try {
+    const eventMs = new Date(event.eventDate).getTime()
+    if (Number.isNaN(eventMs)) return false
+    return Date.now() > eventMs + PAST_GRACE_MS
+  } catch {
+    return false
+  }
+}
 
 function readAll(): LocalCreatedEvent[] {
   try {
@@ -64,7 +79,17 @@ function writeAll(events: LocalCreatedEvent[]) {
   }
 }
 
+/** For the public discovery page — excludes past events. */
 export function loadCreatedEvents(): LocalCreatedEvent[] {
+  return readAll()
+    .filter((e) => !isExpired(e))
+    .sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+}
+
+/** For the organiser gallery — includes past events so they can re-edit / revoke. */
+export function loadAllCreatedEvents(): LocalCreatedEvent[] {
   return readAll().sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )

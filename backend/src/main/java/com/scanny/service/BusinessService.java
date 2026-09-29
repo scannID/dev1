@@ -51,6 +51,7 @@ public class BusinessService {
     private final OrderRepository orderRepository;
     private final StarterCatalogService starterCatalogService;
     private final MerchantAccessService merchantAccessService;
+    private final BusinessGeoService businessGeoService;
     private final String scanBaseUrl;
 
     public BusinessService(
@@ -61,6 +62,7 @@ public class BusinessService {
             OrderRepository orderRepository,
             StarterCatalogService starterCatalogService,
             MerchantAccessService merchantAccessService,
+            BusinessGeoService businessGeoService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
     ) {
         this.businessRepository = businessRepository;
@@ -70,6 +72,7 @@ public class BusinessService {
         this.orderRepository = orderRepository;
         this.starterCatalogService = starterCatalogService;
         this.merchantAccessService = merchantAccessService;
+        this.businessGeoService = businessGeoService;
         this.scanBaseUrl = scanBaseUrl;
     }
 
@@ -317,14 +320,24 @@ public class BusinessService {
             business.setPaymentReference(CodeUtils.makeCode("PAY", merchant.getBusinessName()));
             business.setCreatedAt(Instant.now());
             business.setCustomCategories(new ArrayList<>(CatalogCategories.defaultNames(type)));
+            if (merchant.getBusinessAddress() != null && !merchant.getBusinessAddress().isBlank()) {
+                business.setAddress(merchant.getBusinessAddress().trim());
+            }
 
             starterCatalogService.buildStarterItems(type, id).forEach(business::addItem);
             business = businessRepository.save(business);
+            businessGeoService.ensureCoordinates(business);
         } else {
             boolean dirty = false;
             if (merchant.getQrCodeToken() != null
                     && !merchant.getQrCodeToken().equals(business.getQrToken())) {
                 business.setQrToken(merchant.getQrCodeToken());
+                dirty = true;
+            }
+            if ((business.getAddress() == null || business.getAddress().isBlank())
+                    && merchant.getBusinessAddress() != null
+                    && !merchant.getBusinessAddress().isBlank()) {
+                business.setAddress(merchant.getBusinessAddress().trim());
                 dirty = true;
             }
 
@@ -355,6 +368,9 @@ public class BusinessService {
 
             if (dirty) {
                 business = businessRepository.save(business);
+            }
+            if (business.getLatitude() == null || business.getLongitude() == null) {
+                business = businessGeoService.ensureCoordinates(business);
             }
         }
 

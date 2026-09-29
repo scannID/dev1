@@ -1,24 +1,33 @@
 ﻿import { useEffect, useRef, useState } from 'react'
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
+  Plus,
+} from 'lucide-react'
 
 import { loadCreatedEvents, type LocalCreatedEvent } from './createdEventsLocal'
+import { EVENT_CATEGORIES } from '../EventTicket'
 import { usePageMeta } from '../hooks/usePageMeta'
 
 /* =====================================================================
    Events Discovery Page
 
-   — same visual language as the Koddly landing page
-   — warm paper background: #efe6d2
-   — warm surfaces: #f7f1e3
-   — warm ink + subtle brown dividers
-   — real events from localStorage
-   — real QR codes pointing to each event's purchaseUrl
-   — Outfit + Bebas Neue
+   � same visual language as the Koddly landing page
+   � warm paper background: #efe6d2
+   � warm surfaces: #f7f1e3
+   � warm ink + subtle brown dividers
+   � real events from localStorage
+   � real QR codes pointing to each event's purchaseUrl
+   � Outfit + Bebas Neue
 
    CHANGE LOG (this pass):
-   — QR codes are no longer laid out inline inside the ticket's text
+   � QR codes are no longer laid out inline inside the ticket's text
      content. Each ticket now has a die-cut notch at its bottom-right
      corner (like a real ticket stub), with the QR sitting in that
-     notch — visually "outside" the card's content flow, tucked into
+     notch � visually "outside" the card's content flow, tucked into
      its own corner instead of competing with the copy/buttons.
    ===================================================================== */
 
@@ -269,7 +278,7 @@ function EventCarousel({
       {/* carousel-frame is the clipped, rounded photo/track layer.
           It has a diagonal notch cut out of its bottom-right corner
           (clip-path), so the ticket-stub sitting behind it shows
-          through that corner only — nothing else about the layout
+          through that corner only � nothing else about the layout
           needs to know about the QR. */}
       <div className="carousel-frame">
         <div
@@ -309,14 +318,14 @@ function EventCarousel({
                   <div className="slide-meta">
                     {dateLabel && (
                       <span>
-                        <span className="meta-icon">◷</span>
+                        <Calendar className="meta-icon" size={14} aria-hidden="true" />
                         {dateLabel}
                       </span>
                     )}
 
                     {timeLabel && (
                       <span>
-                        <span className="meta-icon">◴</span>
+                        <Clock className="meta-icon" size={14} aria-hidden="true" />
                         {timeLabel}
                       </span>
                     )}
@@ -324,7 +333,7 @@ function EventCarousel({
 
                   {ev.location && (
                     <div className="slide-loc">
-                      <span>⌖</span>
+                      <MapPin size={14} aria-hidden="true" />
                       {ev.location}
                     </div>
                   )}
@@ -339,7 +348,7 @@ function EventCarousel({
                   </div>
                 </div>
 
-                {/* QR stub — inside the slide so it's always clipped within the card */}
+                {/* QR stub � inside the slide so it's always clipped within the card */}
                 <div className="ticket-stub">
                   <div className="ticket-stub-qr">
                     <QRWidget
@@ -364,7 +373,7 @@ function EventCarousel({
           aria-label="Previous"
           onClick={() => goTo(index - 1)}
         >
-          ‹
+          <ChevronLeft size={20} aria-hidden="true" />
         </button>
 
         <button
@@ -373,7 +382,7 @@ function EventCarousel({
           aria-label="Next"
           onClick={() => goTo(index + 1)}
         >
-          ›
+          <ChevronRight size={20} aria-hidden="true" />
         </button>
       </div>
 
@@ -394,22 +403,50 @@ function EventCarousel({
 
 
 /* ---------------------------------------------------------------------
-   CATEGORIES
+   RECENT TICKETS � tickets the customer recently bought / viewed
+   Stored by TicketViewPage under 'kodte-recent-tickets' key.
    --------------------------------------------------------------------- */
 
-const CATEGORIES = [
-  'Music, Arts & Culture',
-  'Wildlife & Nature',
-  'Conferences',
-  'Launch Parties',
-  'Networking Events',
-  'Retreats',
-  'Product Launches',
-  'Expos & Fairs',
-  'Performances',
-  'Membership Tickets',
-  'Sports',
-]
+const RECENT_KEY = 'kodte-recent-tickets'
+const MAX_RECENT = 12
+
+type RecentTicket = {
+  accessToken: string
+  eventName: string
+  ticketType: string
+  eventDate: string | null
+  holderName: string
+  viewUrl: string
+  savedAt: string
+}
+
+export function saveRecentTicket(ticket: RecentTicket) {
+  try {
+    const all: RecentTicket[] = loadRecentTickets()
+    const deduped = all.filter((t) => t.accessToken !== ticket.accessToken)
+    const next = [{ ...ticket, savedAt: new Date().toISOString() }, ...deduped].slice(0, MAX_RECENT)
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+  } catch { /* ignore quota */ }
+}
+
+function loadRecentTickets(): RecentTicket[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as RecentTicket[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+   CATEGORIES � sourced from EventTicket so they always stay in sync
+   --------------------------------------------------------------------- */
+
+const ALL_TAB = 'All'
+const CATEGORIES = [ALL_TAB, ...EVENT_CATEGORIES]
 
 
 /* ---------------------------------------------------------------------
@@ -418,9 +455,8 @@ const CATEGORIES = [
 
 export default function EventsDiscoveryPage() {
   usePageMeta({
-    title: 'Koddly — Discover Events',
-    description:
-      'Tickets, venues and experiences — search, book and walk in with a QR code.',
+    title: 'Discover Events',
+    description: 'Tickets, venues and experiences — search, book and walk in with a QR code.',
     robots: 'noindex, nofollow',
   })
 
@@ -429,65 +465,53 @@ export default function EventsDiscoveryPage() {
   )
 
   const [query, setQuery] = useState('')
-
-  const [activeCategory, setActiveCategory] =
-    useState(CATEGORIES[0])
-
+  const [activeCategory, setActiveCategory] = useState<string>(ALL_TAB)
   const [showAllExplore, setShowAllExplore] = useState(false)
 
   useEffect(() => {
-    const refresh = () =>
-      setEvents(loadCreatedEvents())
-
+    const refresh = () => setEvents(loadCreatedEvents())
     window.addEventListener('focus', refresh)
-    window.addEventListener(
-      'kodte-created-events',
-      refresh,
-    )
-
+    window.addEventListener('kodte-created-events', refresh)
     return () => {
       window.removeEventListener('focus', refresh)
-
-      window.removeEventListener(
-        'kodte-created-events',
-        refresh,
-      )
+      window.removeEventListener('kodte-created-events', refresh)
     }
   }, [])
 
+  // Reset to page 1 when category changes
+  useEffect(() => { setShowAllExplore(false) }, [activeCategory])
+
   const q = query.trim().toLowerCase()
 
-  const filtered = q
+  const searched = q
     ? events.filter(
         (e) =>
           e.eventName.toLowerCase().includes(q) ||
-          (e.location ?? '')
-            .toLowerCase()
-            .includes(q) ||
+          (e.location ?? '').toLowerCase().includes(q) ||
           (e.host ?? '').toLowerCase().includes(q),
       )
     : events
 
-  const carouselEvents = filtered.slice(0, 2)
-
-  const listEvents = filtered.slice(0, 2)
-
-  // Category-filtered events for the explore grid
+  // Category filter � read from formSnapshot.category
   const categoryFiltered =
-    activeCategory === CATEGORIES[0]
-      ? filtered
-      : filtered.filter((e) => {
-          const cat = (e as LocalCreatedEvent & { category?: string }).category
-          return cat === activeCategory
-        })
+    activeCategory === ALL_TAB
+      ? searched
+      : searched.filter(
+          (e) => e.formSnapshot?.category === activeCategory,
+        )
 
-  // Explore grid: events beyond the trending section, 8 visible by default
+  // Carousel + list-col show top 2 of category-filtered
+  const carouselEvents = categoryFiltered.slice(0, 2)
+  const listEvents = categoryFiltered.slice(0, 2)
+
+  // Explore grid shows everything beyond the top 2
   const EXPLORE_PAGE = 8
   const exploreAll = categoryFiltered.slice(2)
-  const exploreEvents = showAllExplore
-    ? exploreAll
-    : exploreAll.slice(0, EXPLORE_PAGE)
+  const exploreEvents = showAllExplore ? exploreAll : exploreAll.slice(0, EXPLORE_PAGE)
   const hasMoreExplore = exploreAll.length > EXPLORE_PAGE
+
+  // Recently viewed tickets from localStorage (saved by TicketViewPage)
+  const recentTickets = loadRecentTickets()
 
   return (
     <div className="kodte-page">
@@ -517,7 +541,7 @@ export default function EventsDiscoveryPage() {
               className="btn btn-outline"
             >
               Create Event
-              <span className="upload-icon"></span>
+              <Plus className="upload-icon" size={16} aria-hidden="true" />
             </a>
           </div>
         </div>
@@ -539,32 +563,25 @@ export default function EventsDiscoveryPage() {
             </p>
           </div>
 
-          <div className="search-bar">
+          <label className="search-bar" htmlFor="events-search-input">
             <div className="search-field">
               <div className="label">
                 Search events
               </div>
 
               <input
+                id="events-search-input"
                 className="search-input"
                 type="search"
                 value={query}
                 onChange={(e) =>
                   setQuery(e.target.value)
                 }
-                placeholder="Event name, location, host…"
+                placeholder="Event name, location"
                 aria-label="Search events"
               />
             </div>
-
-            <button
-              type="button"
-              className="search-go"
-            >
-              <span>⌕</span>
-              Search
-            </button>
-          </div>
+          </label>
         </div>
       </div>
 
@@ -816,7 +833,7 @@ export default function EventsDiscoveryPage() {
                   <div className="grid-body">
                     {ev.location && (
                       <div className="grid-loc">
-                        <span>⌖</span>
+                        <MapPin size={13} aria-hidden="true" />
                         {ev.location}
                       </div>
                     )}
@@ -825,7 +842,7 @@ export default function EventsDiscoveryPage() {
 
                     {timeLabel && (
                       <div className="grid-time">
-                        <span>◴</span>
+                        <Clock size={13} aria-hidden="true" />
                         {timeLabel}
                       </div>
                     )}
@@ -861,6 +878,48 @@ export default function EventsDiscoveryPage() {
           )}
         </div>
       </div>
+
+
+      {/* ============================================================
+          RECENTLY VIEWED TICKETS
+          ============================================================ */}
+
+      {recentTickets.length > 0 && (
+        <div className="section recent-section">
+          <div className="section-rule" />
+          <div className="section-head">
+            <div>
+              <div className="section-kicker">Your tickets</div>
+              <h2>Recently Viewed</h2>
+              <p>Tickets you've opened on this device.</p>
+            </div>
+          </div>
+
+          <div className="recent-scroll">
+            {recentTickets.map((t) => {
+              const dateLabel = formatDateLabel(t.eventDate)
+              return (
+                <a
+                  key={t.accessToken}
+                  href={t.viewUrl}
+                  className="recent-card"
+                  aria-label={`View ticket: ${t.eventName}`}
+                >
+                  <div className="recent-card-type">{t.ticketType}</div>
+                  <div className="recent-card-name">{t.eventName}</div>
+                  {t.holderName && (
+                    <div className="recent-card-holder">{t.holderName}</div>
+                  )}
+                  {dateLabel && (
+                    <div className="recent-card-date">{dateLabel}</div>
+                  )}
+                  <div className="recent-card-cta">View ticket →</div>
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
 
       {/* ============================================================
@@ -1144,9 +1203,7 @@ const STYLES = `
 }
 
 .kodte-page .upload-icon {
-  font-size: 16px;
-
-  line-height: 1;
+  flex-shrink: 0;
 }
 
 .kodte-page .btn-solid {
@@ -1668,10 +1725,16 @@ const STYLES = `
   margin-bottom: 20px;
 
   font-weight: 600;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
 }
 
-.kodte-page .slide-loc span {
-  margin-right: 5px;
+.kodte-page .slide-loc svg {
+  flex-shrink: 0;
 }
 
 .kodte-page .slide-actions {
@@ -2643,5 +2706,74 @@ const STYLES = `
 
     align-items: flex-start;
   }
+}
+
+
+/* -----------------------------------------------------------------
+   RECENT TICKETS
+   ----------------------------------------------------------------- */
+
+.kodte-page .recent-section {
+  padding: 60px 0 40px;
+}
+
+.kodte-page .recent-scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 24px 16px;
+  max-width: 1240px;
+  margin: 0 auto;
+  scrollbar-width: none;
+}
+.kodte-page .recent-scroll::-webkit-scrollbar { display: none; }
+
+.kodte-page .recent-card {
+  flex-shrink: 0;
+  width: 200px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+  color: var(--ink);
+  box-shadow: var(--soft-shadow);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.kodte-page .recent-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow);
+}
+.kodte-page .recent-card-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 2px;
+}
+.kodte-page .recent-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.kodte-page .recent-card-holder {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.kodte-page .recent-card-date {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.kodte-page .recent-card-cta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue);
+  margin-top: auto;
+  padding-top: 10px;
 }
 `

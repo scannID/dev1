@@ -30,6 +30,8 @@ public record BusinessResponse(
         String branchLabel,
         Boolean primary,
         String address,
+        Double latitude,
+        Double longitude,
         String currency
 ) {
     public static BusinessResponse from(Business business, String scanBaseUrl, boolean includeItems) {
@@ -74,6 +76,8 @@ public record BusinessResponse(
                 business.getBranchLabel(),
                 business.isPrimary(),
                 business.getAddress(),
+                business.getLatitude(),
+                business.getLongitude(),
                 business.getCurrency()
         );
     }

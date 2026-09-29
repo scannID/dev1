@@ -8,6 +8,7 @@ import {
 } from '../customer/receipts'
 import { ordersApi } from '../api/services'
 import { formatRemovedIngredients } from '../lib/catalogCart'
+import { usePageMeta } from '../hooks/usePageMeta'
 import '../customer/CustomerApp.css'
 import './ReceiptPage.css'
 
@@ -29,6 +30,14 @@ export default function ReceiptPage() {
   const [receipt, setReceipt] = useState<CustomerReceipt | undefined>(() =>
     orderId ? loadReceipts().find((r) => r.orderId === orderId || r.id === orderId) : undefined,
   )
+
+  usePageMeta({
+    title: receipt ? `Receipt — ${receipt.businessName}` : 'Payment receipt',
+    description: receipt
+      ? `Your payment receipt for order ${receipt.orderId} at ${receipt.businessName}.`
+      : 'View your payment receipt.',
+    robots: 'noindex, nofollow',
+  })
 
   // On mount: if the receipt isn't already stamped and we have tracking info,
   // fetch the real order status from the backend. This handles the case where

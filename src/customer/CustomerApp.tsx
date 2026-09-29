@@ -9,6 +9,7 @@ import type { BusinessAnnouncement } from '../api/types'
 import { BottomBar } from './BottomBar'
 import { payments, type PaymentProvider, type PaymentStatus } from './payments'
 import { KodteMark } from './KodteMark'
+import { usePageMeta } from '../hooks/usePageMeta'
 import { OrderHistoryPanel } from './OrderHistoryPanel'
 import {
   clearActiveOrder,
@@ -204,6 +205,15 @@ export default function CustomerApp({
     loading: trackingLoading,
     error: trackingError,
   } = useOrderTracking(orderPublicId, phone, trackOrder)
+
+  // Browser tab title — updates once the menu loads
+  usePageMeta({
+    title: business ? `${business.name} — Order & Pay` : 'Scan & order',
+    description: business
+      ? `Browse the menu at ${business.name}, place your order and pay by mobile money — no app needed.`
+      : 'Scan the QR code, browse the menu, and pay from your phone.',
+    robots: 'noindex, nofollow',
+  })
 
   const cartItems: CartLine[] = useMemo(() => {
     return Object.entries(cart)
@@ -1643,7 +1653,13 @@ export default function CustomerApp({
         />
       )}
 
-      {step === 'done' && <NearbyEventsBanner />}
+      {step === 'done' && (
+        <NearbyEventsBanner
+          businessId={business?.id}
+          venueLat={business?.latitude}
+          venueLng={business?.longitude}
+        />
+      )}
 
       {showBottomMenu && !ordersPaused && (
         <BottomBar count={cartCount} total={payableTotal} label="View cart" onAction={() => setStep('cart')} />
@@ -1723,6 +1739,9 @@ export default function CustomerApp({
 
       <EventsNearbyPanel
         open={showEvents}
+        businessId={business?.id}
+        venueLat={business?.latitude}
+        venueLng={business?.longitude}
         onClose={() => setShowEvents(false)}
       />
       </div>

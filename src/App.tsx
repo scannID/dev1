@@ -303,6 +303,7 @@ function App({
   const [operationsNavOpen, setOperationsNavOpen] = useState(false)
   const [floorPlanNavOpen, setFloorPlanNavOpen] = useState(false)
   const [catalogNavOpen, setCatalogNavOpen] = useState(false)
+  const [ordersNavOpen, setOrdersNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
@@ -363,7 +364,13 @@ function App({
       { id: 'catalog', perm: 'catalog:read' },
     ]
     const next = fallbacks.find((f) => hasPermission(staffRole as StaffRole, f.perm))
-    setView(next?.id ?? 'dashboard')
+    const nextView = next?.id ?? 'dashboard'
+    setView(nextView)
+    if (nextView === 'dashboard' || nextView === 'kitchen' || nextView === 'catalog-booked') {
+      setOrdersNavOpen(true)
+    } else if (nextView === 'catalog' || nextView === 'catalog-food' || nextView === 'catalog-rooms') {
+      setCatalogNavOpen(true)
+    }
   }, [view, staffMode, staffRole])
 
   const business = selectedBusiness ?? emptyBusiness
@@ -810,11 +817,10 @@ function App({
           {([
             { id: 'account', label: 'Overview', icon: Home, merchantOnly: true },
             { id: 'catalog', label: 'Catalog', icon: Package, perm: 'catalog:read' as PermissionId,
-              // Hotel merchants get Food + Rooms + Booked rooms sub-items; others use the flat link
+              // Hotel merchants get Food + Rooms sub-items; Booked rooms lives under Orders
               children: business.type === 'Hotel' ? [
                 { id: 'catalog-food', label: 'Food', icon: UtensilsCrossed },
                 { id: 'catalog-rooms', label: 'Rooms', icon: BedDouble },
-                { id: 'catalog-booked', label: 'Booked rooms', icon: CalendarCheck },
               ] : undefined,
             },
             {
@@ -832,8 +838,19 @@ function App({
                 { id: 'inventory-variance', label: 'Variance', icon: BarChart3 },
               ],
             },
-            { id: 'dashboard', label: 'Orders', icon: ShoppingCart, count: pendingCount, perm: 'orders:read' as PermissionId },
-            { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
+            {
+              id: 'orders',
+              label: 'Orders',
+              icon: ShoppingCart,
+              count: pendingCount,
+              children: [
+                { id: 'dashboard', label: 'All orders', icon: ShoppingCart, perm: 'orders:read' as PermissionId },
+                { id: 'kitchen', label: 'Kitchen', icon: UtensilsCrossed, count: kitchenCount, perm: 'kitchen:view' as PermissionId },
+                ...(business.type === 'Hotel'
+                  ? [{ id: 'catalog-booked', label: 'Booked rooms', icon: CalendarCheck, perm: 'catalog:read' as PermissionId }]
+                  : []),
+              ],
+            },
             {
               id: 'operations',
               label: 'Permissions',
@@ -854,10 +871,14 @@ function App({
             count?: number
             perm?: PermissionId
             merchantOnly?: boolean
-            children?: Array<{ id: string; label: string; icon: typeof Home }>
+            children?: Array<{ id: string; label: string; icon: typeof Home; count?: number; perm?: PermissionId }>
           }>)
-          .filter(({ perm, merchantOnly }) => {
+          .filter(({ perm, merchantOnly, children }) => {
             if (staffMode && merchantOnly) return false
+            if (staffMode && children?.length) {
+              // Show group if staff can access at least one child
+              return children.some((child) => !child.perm || hasPermission(staffRole as StaffRole, child.perm))
+            }
             return !staffMode || !perm || hasPermission(staffRole as StaffRole, perm)
           })
           .map(({ id, label, icon: Icon, count, children }) => {
@@ -870,25 +891,37 @@ function App({
                 view === 'inventory-purchase-orders' ||
                 view === 'inventory-suppliers' ||
                 view === 'inventory-variance')
-            const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms' || view === 'catalog-booked')
+            const catalogChildActive = id === 'catalog' && (view === 'catalog-food' || view === 'catalog-rooms')
+            const ordersChildActive =
+              id === 'orders' && (view === 'dashboard' || view === 'kitchen' || view === 'catalog-booked')
             const operationsChildActive = id === 'operations' && operationViews.has(view)
             const floorPlanChildActive = id === 'floor-plan' && (view === 'floor-plan-live' || view === 'floor-plan-edit')
-            const isActive = !showAddItem && !editingItem && (view === id || inventoryChildActive || catalogChildActive || operationsChildActive || floorPlanChildActive)
+            const childActive =
+              inventoryChildActive || catalogChildActive || ordersChildActive || operationsChildActive || floorPlanChildActive
+            const isActive = !showAddItem && !editingItem && (view === id || childActive)
+            // Open state is controlled only by the toggle flag so retapping the
+            // parent can collapse even while a child view is still active.
             const groupOpen =
               id === 'inventory'
-                ? (inventoryNavOpen || inventoryChildActive)
+                ? inventoryNavOpen
                 : id === 'catalog'
-                  ? (catalogNavOpen || catalogChildActive)
-                  : id === 'operations'
-                    ? (operationsNavOpen || operationsChildActive)
-                    : id === 'floor-plan'
-                      ? (floorPlanNavOpen || floorPlanChildActive)
-                      : false
+                  ? catalogNavOpen
+                  : id === 'orders'
+                    ? ordersNavOpen
+                    : id === 'operations'
+                      ? operationsNavOpen
+                      : id === 'floor-plan'
+                        ? floorPlanNavOpen
+                        : false
 
             if (children?.length) {
-              const defaultChildView = children[0]?.id
+              const visibleChildren = children.filter(
+                (child) => !staffMode || !child.perm || hasPermission(staffRole as StaffRole, child.perm),
+              )
+              if (visibleChildren.length === 0) return null
+              const defaultChildView = visibleChildren[0]?.id
               return (
-                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${(inventoryChildActive || catalogChildActive || operationsChildActive || floorPlanChildActive) ? ' active-group' : ''}`}>
+                <div key={id} className={`side-nav-group${groupOpen ? ' open' : ''}${childActive ? ' active-group' : ''}`}>
                   <button
                     type="button"
                     className={isActive ? 'active' : ''}
@@ -897,22 +930,45 @@ function App({
                       setShowAddItem(false)
                       setEditingItem(null)
                       if (id === 'inventory') {
-                        setInventoryNavOpen((open) => !open)
-                        if (!inventoryChildActive) setView('inventory')
+                        setInventoryNavOpen((open) => {
+                          const next = !open
+                          if (next && !inventoryChildActive) setView('inventory')
+                          return next
+                        })
                       } else if (id === 'catalog') {
-                        setCatalogNavOpen((open) => !open)
-                        if (!catalogChildActive) setView('catalog-food')
+                        setCatalogNavOpen((open) => {
+                          const next = !open
+                          if (next && !catalogChildActive) setView('catalog-food')
+                          return next
+                        })
+                      } else if (id === 'orders') {
+                        setOrdersNavOpen((open) => {
+                          const next = !open
+                          if (next && !ordersChildActive && defaultChildView) setView(defaultChildView)
+                          return next
+                        })
                       } else if (id === 'operations') {
-                        setOperationsNavOpen((open) => !open)
-                        if (!operationsChildActive && defaultChildView) setView(defaultChildView)
+                        setOperationsNavOpen((open) => {
+                          const next = !open
+                          if (next && !operationsChildActive && defaultChildView) setView(defaultChildView)
+                          return next
+                        })
                       } else if (id === 'floor-plan') {
-                        setFloorPlanNavOpen((open) => !open)
-                        if (!floorPlanChildActive) setView('floor-plan-live')
+                        setFloorPlanNavOpen((open) => {
+                          const next = !open
+                          if (next && !floorPlanChildActive) setView('floor-plan-live')
+                          return next
+                        })
                       }
                     }}
                   >
                     <Icon size={20} />
                     <span style={{ flex: 1 }}>{label}</span>
+                    {typeof count === 'number' ? (
+                      <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
+                        {count}
+                      </Badge>
+                    ) : null}
                     <ChevronDown
                       size={16}
                       className={`side-nav-chevron${groupOpen ? ' open' : ''}`}
@@ -921,7 +977,7 @@ function App({
                   </button>
                   {groupOpen ? (
                     <div className="side-nav-sub" role="group" aria-label={`${label} sections`}>
-                      {children.map(({ id: childId, label: childLabel, icon: ChildIcon }) => (
+                      {visibleChildren.map(({ id: childId, label: childLabel, icon: ChildIcon, count: childCount }) => (
                         <button
                           type="button"
                           key={childId}
@@ -931,13 +987,20 @@ function App({
                             setEditingItem(null)
                             if (id === 'inventory') setInventoryNavOpen(true)
                             if (id === 'catalog') setCatalogNavOpen(true)
+                            if (id === 'orders') setOrdersNavOpen(true)
                             if (id === 'operations') setOperationsNavOpen(true)
+                            if (id === 'floor-plan') setFloorPlanNavOpen(true)
                             setView(childId)
                             setShowMobileNav(false)
                           }}
                         >
                           <ChildIcon size={16} />
                           <span style={{ flex: 1 }}>{childLabel}</span>
+                          {typeof childCount === 'number' ? (
+                            <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
+                              {childCount}
+                            </Badge>
+                          ) : null}
                         </button>
                       ))}
                     </div>

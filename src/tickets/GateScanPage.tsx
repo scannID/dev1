@@ -4,6 +4,7 @@ import { ApiError } from '../api/client'
 import { publicTicketsApi } from '../api/services'
 import type { EventTicketTrackingMetrics, GateRedeemedAttendee, Ticket } from '../api/types'
 import { KodteMark } from '../customer/KodteMark'
+import { usePageMeta } from '../hooks/usePageMeta'
 import './GateScan.css'
 
 type Props = {
@@ -243,6 +244,12 @@ export default function GateScanPage({
   const [eventLoginBusy, setEventLoginBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<EventTicketTrackingMetrics | null>(null)
+
+  usePageMeta({
+    title: metrics ? `Gate — ${metrics.eventName}` : 'Gate scanner',
+    description: 'Scan and validate event tickets at the gate.',
+    robots: 'noindex, nofollow',
+  })
 
   const [cameraActive, setCameraActive] = useState(false)
   const [, setCameraError] = useState<string | null>(null)

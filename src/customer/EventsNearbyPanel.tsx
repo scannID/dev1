@@ -97,11 +97,13 @@ function EventCard({
 
 export function EventsNearbyPanel({
   open,
+  businessId,
   venueLat,
   venueLng,
   onClose,
 }: {
   open: boolean
+  businessId?: string | null
   venueLat?: number | null
   venueLng?: number | null
   onClose: () => void
@@ -117,18 +119,40 @@ export function EventsNearbyPanel({
     setLoading(true)
     setError(null)
 
-    promotionsApi
-      .nearby(venueLat, venueLng)
-      .then((res) => {
+    void (async () => {
+      let lat = venueLat ?? null
+      let lng = venueLng ?? null
+
+      // If restaurant coords aren't on the business yet, try the diner's GPS once.
+      if ((lat == null || lng == null) && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 4000,
+              maximumAge: 120_000,
+            })
+          })
+          lat = pos.coords.latitude
+          lng = pos.coords.longitude
+        } catch {
+          // Permission denied / timeout — backend will still try businessId geocode.
+        }
+      }
+
+      try {
+        const res = await promotionsApi.nearby(lat, lng, businessId)
         setEvents(res.events)
-        // Record impressions for all returned events (best-effort, fire-and-forget)
         res.events.forEach((ev) => {
           promotionsApi.impression(ev.promotionId)
         })
-      })
-      .catch(() => setError('Could not load events right now.'))
-      .finally(() => setLoading(false))
-  }, [open, venueLat, venueLng])
+      } catch {
+        setError('Could not load events right now.')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [open, venueLat, venueLng, businessId])
 
   function handleBuy(event: NearbyPromotedEvent) {
     promotionsApi.click(event.promotionId)
@@ -200,9 +224,11 @@ export function EventsNearbyPanel({
 // ── Compact post-order card (shown on DoneStep) ───────────────────────────────
 
 export function NearbyEventsBanner({
+  businessId,
   venueLat,
   venueLng,
 }: {
+  businessId?: string | null
   venueLat?: number | null
   venueLng?: number | null
 }) {
@@ -214,14 +240,14 @@ export function NearbyEventsBanner({
     if (fetchedRef.current) return
     fetchedRef.current = true
     promotionsApi
-      .nearby(venueLat, venueLng)
+      .nearby(venueLat, venueLng, businessId)
       .then((res) => {
         const top = res.events.slice(0, 3)
         setEvents(top)
         top.forEach((ev) => promotionsApi.impression(ev.promotionId))
       })
       .catch(() => {/* silent */})
-  }, [venueLat, venueLng])
+  }, [venueLat, venueLng, businessId])
 
   if (dismissed || events.length === 0) return null
 

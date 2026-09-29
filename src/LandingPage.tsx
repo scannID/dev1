@@ -1505,7 +1505,7 @@ export default function KodteLandingTicket({
   onCreateEventTicket,
 }: KodteLandingTicketProps = {}) {
   usePageMeta({
-    title: 'Koddly — QR ordering and event ticketing for Uganda',
+    title: 'Koddly — Scan, order and pay',
     description:
       'One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda.',
     canonicalPath: '/',
@@ -2406,7 +2406,7 @@ export default function KodteLandingTicket({
               }}
             >
               <span>
-                © {new Date().getFullYear()} QBI Labs SMC.
+                © {new Date().getFullYear()} Qbilabs SMC.
                 All rights reserved.
               </span>
             </div>

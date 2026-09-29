@@ -77,7 +77,8 @@ public class EventPromotionController {
 
     /**
      * Customer feed: returns promoted events near the given coordinates.
-     * lat/lng are optional — if omitted, returns all active city-wide promos.
+     * Prefer businessId so the backend can auto-resolve / geocode the restaurant.
+     * lat/lng are optional overrides; if everything is omitted, returns all active promos.
      *
      * Used by the "What's Happening" panel in CustomerApp and by the
      * post-order card on the DoneStep.
@@ -85,8 +86,9 @@ public class EventPromotionController {
     @GetMapping("/nearby")
     public ResponseEntity<PublicTicketDtos.NearbyEventsResponse> nearby(
             @RequestParam(required = false) Double lat,
-            @RequestParam(required = false) Double lng) {
-        return ResponseEntity.ok(promotionService.findNearby(lat, lng));
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) String businessId) {
+        return ResponseEntity.ok(promotionService.findNearby(lat, lng, businessId));
     }
 
     /**

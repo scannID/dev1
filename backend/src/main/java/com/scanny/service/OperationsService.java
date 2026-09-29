@@ -44,6 +44,7 @@ public class OperationsService {
     private final StarterCatalogService starterCatalogService;
     private final BusinessService businessService;
     private final SystemBusyModeService systemBusyModeService;
+    private final BusinessGeoService businessGeoService;
     private final String scanBaseUrl;
 
     public OperationsService(
@@ -56,6 +57,7 @@ public class OperationsService {
             StarterCatalogService starterCatalogService,
             BusinessService businessService,
             SystemBusyModeService systemBusyModeService,
+            BusinessGeoService businessGeoService,
             @Value("${scanny.scan-base-url}") String scanBaseUrl
     ) {
         this.businessRepository = businessRepository;
@@ -67,6 +69,7 @@ public class OperationsService {
         this.starterCatalogService = starterCatalogService;
         this.businessService = businessService;
         this.systemBusyModeService = systemBusyModeService;
+        this.businessGeoService = businessGeoService;
         this.scanBaseUrl = scanBaseUrl;
     }
 
@@ -105,7 +108,11 @@ public class OperationsService {
         branch.setAddress(request.address() != null ? request.address().trim() : "");
         branch.setDailyDigestEmail(merchant.getEmail());
 
-        return OperationsDtos.BranchResponse.from(businessRepository.save(branch));
+        Business saved = businessRepository.save(branch);
+        if (saved.getAddress() != null && !saved.getAddress().isBlank()) {
+            businessGeoService.ensureCoordinates(saved);
+        }
+        return OperationsDtos.BranchResponse.from(saved);
     }
 
     /**
