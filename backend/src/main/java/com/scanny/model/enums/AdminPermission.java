@@ -20,6 +20,7 @@ public enum AdminPermission {
 
     // ── Finance ───────────────────────────────────────────────────────────────
     VIEW_REVENUE("Revenue and payments"),
+    VIEW_CASH_COLLECTIONS("Cash collections per merchant"),
 
     // ── Analytics ─────────────────────────────────────────────────────────────
     VIEW_QR_ACTIVITY("QR scan activity"),

@@ -26,7 +26,9 @@ public final class RequestDtos {
             @Valid @NotNull CustomerRequest customer,
             @NotEmpty List<@Valid OrderItemRequest> items,
             String tableId,
-            String tableQrToken
+            String tableQrToken,
+            /** "MOMO" (default) or "CASH" */
+            String paymentMethod
     ) {
     }
 

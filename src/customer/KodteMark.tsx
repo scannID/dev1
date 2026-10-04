@@ -1,7 +1,7 @@
 export function KodteMark({ size = 28 }: { size?: number }) {
   return (
     <img
-      src="/kodte-icon.svg"
+      src="/koddlylogo3.png"
       alt="Koddly"
       width={size}
       height={size}

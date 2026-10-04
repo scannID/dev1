@@ -200,6 +200,8 @@ export interface Order {
   merchantMomoDestination?: string
   paymentStatus: PaymentStatus
   status: OrderStatus
+  /** "MOMO" (mobile money) or "CASH" */
+  paymentMethod?: string
   createdAt: string
   updatedAt?: string
   /** Locked recipe COGS (UGX) after payment. */
@@ -226,6 +228,8 @@ export interface CreateOrderRequest {
   }>
   tableId?: string
   tableQrToken?: string
+  /** "MOMO" (default) or "CASH" */
+  paymentMethod?: 'MOMO' | 'CASH'
 }
 
 export interface UpdateOrderStatusRequest {

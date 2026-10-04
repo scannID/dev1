@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   BarChart3,
+  Banknote,
   Bell,
   Building2,
   Cookie,
@@ -46,6 +47,7 @@ import OrdersPage from './pages/OrdersPage'
 import TicketingPage from './pages/TicketingPage'
 import UsersPage from './pages/UsersPage'
 import RevenuePaymentsPage from './pages/RevenuePaymentsPage'
+import CashCollectionsPage from './pages/CashCollectionsPage'
 import QRActivityPage from './pages/QRActivityPage'
 import CookieConsentPage from './pages/CookieConsentPage'
 import ReportsPage from './pages/ReportsPage'
@@ -63,7 +65,8 @@ import type { AdminPermission, AdminMeResponse } from './api/types'
 
 type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
-  | 'users' | 'communications' | 'revenue' | 'qr-activity' | 'cookie-consent' | 'reports'
+  | 'users' | 'communications' | 'revenue' | 'cash-collections'
+  | 'qr-activity' | 'cookie-consent' | 'reports'
   | 'system' | 'audit' | 'configs' | 'admins'
 
 type NavItem = {
@@ -82,6 +85,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   users: { eyebrow: 'Admin · Platform', title: 'Users' },
   communications: { eyebrow: 'Admin · Platform', title: 'Communications' },
   revenue: { eyebrow: 'Admin · Finance', title: 'Revenue & Payments' },
+  'cash-collections': { eyebrow: 'Admin · Finance', title: 'Cash Collections' },
   'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
   'cookie-consent': { eyebrow: 'Admin · Analytics', title: 'Cookie Consent' },
   reports: { eyebrow: 'Admin · Analytics', title: 'Reports' },
@@ -206,7 +210,8 @@ export default function AdminApp({
       {
         label: 'Finance',
         items: [
-          canSee('VIEW_REVENUE') && { id: 'revenue' as const, label: 'Revenue & Payments', icon: CreditCard },
+          canSee('VIEW_REVENUE')           && { id: 'revenue' as const,           label: 'Revenue & Payments', icon: CreditCard },
+          canSee('VIEW_CASH_COLLECTIONS')  && { id: 'cash-collections' as const,  label: 'Cash Collections',   icon: Banknote },
         ].filter(Boolean) as NavItem[],
       },
       {
@@ -253,7 +258,7 @@ export default function AdminApp({
       <Toaster />
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-brand">
-          <img src="/kodte-icon.svg" alt="Koddly" className="admin-brand-logo" />
+          <img src="/koddlylogo3.png" alt="Koddly" className="admin-brand-logo" />
           <div className="admin-brand-text">
             <strong>Koddly</strong>
             <span>Admin Console</span>
@@ -365,6 +370,7 @@ export default function AdminApp({
           {view === 'users' && <UsersPage />}
           {view === 'communications' && <CommunicationsPage />}
           {view === 'revenue' && <RevenuePaymentsPage />}
+          {view === 'cash-collections' && <CashCollectionsPage />}
           {view === 'qr-activity' && <QRActivityPage />}
           {view === 'cookie-consent' && <CookieConsentPage />}
           {view === 'reports' && <ReportsPage />}

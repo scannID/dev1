@@ -803,7 +803,7 @@ function App({
         </button>
         <div className="sidebar-brand">
           <img
-            src="/kodte-icon.svg"
+            src="/koddlylogo3.png"
             alt="Koddly"
             className="sidebar-brand-logo"
           />

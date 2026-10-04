@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { Smartphone, Banknote } from 'lucide-react'
 import type { Business } from '../../api/types'
 import { formatRemovedIngredients, isLodgingItem } from '../../lib/catalogCart'
 import { effectivePrice } from '../../lib/catalogPricing'
@@ -32,6 +33,8 @@ export function PayStep({
   splitEnabled,
   splitShares,
   feeConsent,
+  paymentMethod,
+  onPaymentMethod,
   onSplitEnabled,
   onSplitShares,
   onFeeConsent,
@@ -55,6 +58,8 @@ export function PayStep({
   splitEnabled: boolean
   splitShares: SplitShareDraft[]
   feeConsent: boolean
+  paymentMethod: 'MOMO' | 'CASH'
+  onPaymentMethod: (method: 'MOMO' | 'CASH') => void
   onSplitEnabled: (enabled: boolean) => void
   onSplitShares: (shares: SplitShareDraft[]) => void
   onFeeConsent: (value: boolean) => void
@@ -108,11 +113,31 @@ export function PayStep({
 
   return (
     <div className="cm-step cm-step-enter cm-panel">
-      <h2>Pay with mobile money</h2>
+      <h2>Pay for your order</h2>
       <p className="cm-muted">
-        Pay {currency(payableTotal)} to <strong>{business.name}</strong>
+        Total {currency(payableTotal)} at <strong>{business.name}</strong>
       </p>
       {business.paymentReference ? <p className="cm-ref">Ref: {business.paymentReference}</p> : null}
+
+      {/* ── Payment method toggle ── */}
+      <div className="cm-pay-method-toggle" role="group" aria-label="Payment method">
+        <button
+          type="button"
+          className={`cm-pay-method-btn${paymentMethod === 'MOMO' ? ' active' : ''}`}
+          disabled={submitting}
+          onClick={() => onPaymentMethod('MOMO')}
+        >
+          <Smartphone size={15} style={{ flexShrink: 0 }} /> Mobile Money
+        </button>
+        <button
+          type="button"
+          className={`cm-pay-method-btn${paymentMethod === 'CASH' ? ' active' : ''}`}
+          disabled={submitting}
+          onClick={() => onPaymentMethod('CASH')}
+        >
+          <Banknote size={15} style={{ flexShrink: 0 }} /> Cash
+        </button>
+      </div>
 
       <div className="cm-order-strip">
         {cartItems.map((item) => {
@@ -160,189 +185,204 @@ export function PayStep({
         <span>I confirm the total includes the service fee shown above.</span>
       </label>
 
-      <section className="split-pay-panel">
-        <label className="cm-check">
-          <input
-            type="checkbox"
-            checked={splitEnabled}
-            disabled={submitting}
-            onChange={(e) => toggleSplit(e.target.checked)}
-          />
-          <span>Split this bill (multi-payer)</span>
-        </label>
-
-        {splitEnabled ? (
-          <>
-            <p className="cm-muted" style={{ margin: 0 }}>
-              Enter each person's <strong>name, MoMo number, and amount</strong>. Everyone gets their own
-              prompt. All shares settle under the same Koddly payment ref
-              {business.paymentReference ? (
-                <>
-                  {' '}
-                  (<strong>{business.paymentReference}</strong>)
-                </>
-              ) : null}
-              .
-            </p>
-            <label className="cm-field">
-              Number of people
-              <select
-                value={splitShares.length || 2}
-                disabled={submitting}
-                onChange={(e) => setPeopleCount(Number(e.target.value))}
-              >
-                {[2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <option key={n} value={n}>
-                    {n} people
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="customer-secondary-btn" disabled={submitting} onClick={splitEqually}>
-              Split equally
-            </button>
-            <ul>
-              {splitShares.map((share, index) => {
-                const shareAmount = Math.round(Number(share.amount)) || 0
-                return (
-                  <li key={index} className="split-draft-row split-draft-row-multi">
-                    <input
-                      type="text"
-                      aria-label={`Person ${index + 1} name`}
-                      placeholder={`Guest ${index + 1}`}
-                      value={share.name}
-                      disabled={submitting}
-                      onChange={(e) => updateShare(index, { name: e.target.value })}
-                    />
-                    <MoMoPhoneInput
-                      value={share.phone}
-                      onChange={(v) => updateShare(index, { phone: v })}
-                      placeholder="07XX XXX XXX"
-                      disabled={submitting}
-                      aria-label={`Person ${index + 1} phone`}
-                    />
-                    <div className="split-amount-cell">
-                      <input
-                        type="number"
-                        min="1"
-                        aria-label={`Person ${index + 1} amount`}
-                        placeholder="Amount"
-                        value={share.amount}
-                        disabled={submitting}
-                        onChange={(e) => updateShare(index, { amount: e.target.value })}
-                      />
-                      {shareAmount > 0 && (
-                        <span className="split-amount-hint">{currency(shareAmount)}</span>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-            <div className={`split-remaining ${remaining === 0 ? 'ok' : remaining < 0 ? 'over' : ''}`}>
-              <span>Allocated {currency(allocated)} of {currency(splitTotal)}</span>
-              <strong>
-                {remaining === 0
-                  ? 'All allocated — ready to pay'
-                  : remaining > 0
-                    ? `${currency(remaining)} unallocated`
-                    : `Over by ${currency(Math.abs(remaining))}`}
-              </strong>
-              {remaining !== 0 && splitShares.length > 0 && (
-                <button
-                  type="button"
-                  className="customer-secondary-btn"
-                  style={{ marginTop: 4, fontSize: 12, padding: '4px 10px' }}
-                  disabled={submitting}
-                  onClick={() => {
-                    // Assign the full remainder to the last share
-                    const lastIdx = splitShares.length - 1
-                    const othersSum = splitShares
-                      .slice(0, lastIdx)
-                      .reduce((s, sh) => s + (Math.round(Number(sh.amount)) || 0), 0)
-                    const lastAmount = Math.max(1, splitTotal - othersSum)
-                    onSplitShares(
-                      splitShares.map((sh, i) =>
-                        i === lastIdx ? { ...sh, amount: String(lastAmount) } : sh,
-                      ),
-                    )
-                  }}
-                >
-                  {remaining > 0
-                    ? `Assign ${currency(remaining)} to ${splitShares[splitShares.length - 1]?.name || `Guest ${splitShares.length}`}`
-                    : 'Fix allocation'}
-                </button>
-              )}
-            </div>
-          </>
-        ) : null}
-      </section>
-
-      {!splitEnabled ? (
+      {/* ── Cash notice OR MoMo inputs ── */}
+      {paymentMethod === 'CASH' ? (
+        <div className="cm-cash-notice">
+          <p className="cm-cash-notice-title"><Banknote size={16} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />Pay with cash at the counter</p>
+          <p className="cm-muted">
+            Your order goes straight to the kitchen. Hand{' '}
+            <strong>{currency(payableTotal)}</strong> to staff when it's ready.
+            They'll mark it paid on their end.
+          </p>
+        </div>
+      ) : (
         <>
-          {deviceKnown && savedPhone ? (
-            <div className="cm-saved-box">
-              <p className="cm-eyebrow">Saved on this phone</p>
-              <strong>{formatUgPhoneHint(savedPhone ?? '')}</strong>
-              <p className="cm-muted">
-                {provider
-                  ? `We'll send the ${provider} prompt here. Change the number below if needed.`
-                  : "We'll send the MoMo prompt here. Change the number below if needed."}
-              </p>
-              <button
-                type="button"
-                className="customer-secondary-btn"
-                disabled={submitting}
-                onClick={beginChangeSavedNumber}
-              >
-                Change number
-              </button>
-            </div>
-          ) : null}
-
-          <label className="cm-field">
-            Mobile money number
-            <MoMoPhoneInput
-              value={phone}
-              onChange={(v) => {
-                onPhone(v)
-                const p = detectProvider(v)
-                if (p === 'MTN' || p === 'Airtel') onProvider(p)
-              }}
-              placeholder="07XX XXX XXX"
-              required
-              disabled={submitting}
-              inputClassName=""
-              aria-invalid={Boolean(phoneError)}
-            />
-            {phoneError ? <span className="cm-field-error">{phoneError}</span> : null}
-          </label>
-
-          {!deviceKnown ? (
+          <section className="split-pay-panel">
             <label className="cm-check">
               <input
                 type="checkbox"
-                checked={saveNumber}
-                onChange={(e) => onSaveNumber(e.target.checked)}
+                checked={splitEnabled}
                 disabled={submitting}
+                onChange={(e) => toggleSplit(e.target.checked)}
               />
-              <span>Save this number on this phone for faster checkout next time</span>
+              <span>Split this bill (multi-payer)</span>
             </label>
-          ) : null}
-        </>
-      ) : phoneError ? (
-        <p className="cm-field-error">{phoneError}</p>
-      ) : null}
 
-      <p className="cm-hint">
-        {splitEnabled
-          ? provider
-            ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Koddly ref.`
-            : 'Each person gets a MoMo prompt for their share. When every share is approved, the order is paid under one Koddly ref.'
-          : provider
-            ? `You'll get a ${provider} prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives.`
-            : "You'll get a MoMo prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives."}
-      </p>
+            {splitEnabled ? (
+              <>
+                <p className="cm-muted" style={{ margin: 0 }}>
+                  Enter each person's <strong>name, MoMo number, and amount</strong>. Everyone gets their own
+                  prompt. All shares settle under the same Koddly payment ref
+                  {business.paymentReference ? (
+                    <>
+                      {' '}
+                      (<strong>{business.paymentReference}</strong>)
+                    </>
+                  ) : null}
+                  .
+                </p>
+                <label className="cm-field">
+                  Number of people
+                  <select
+                    value={splitShares.length || 2}
+                    disabled={submitting}
+                    onChange={(e) => setPeopleCount(Number(e.target.value))}
+                  >
+                    {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>
+                        {n} people
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="customer-secondary-btn" disabled={submitting} onClick={splitEqually}>
+                  Split equally
+                </button>
+                <ul>
+                  {splitShares.map((share, index) => {
+                    const shareAmount = Math.round(Number(share.amount)) || 0
+                    return (
+                      <li key={index} className="split-draft-row split-draft-row-multi">
+                        <input
+                          type="text"
+                          aria-label={`Person ${index + 1} name`}
+                          placeholder={`Guest ${index + 1}`}
+                          value={share.name}
+                          disabled={submitting}
+                          onChange={(e) => updateShare(index, { name: e.target.value })}
+                        />
+                        <MoMoPhoneInput
+                          value={share.phone}
+                          onChange={(v) => updateShare(index, { phone: v })}
+                          placeholder="07XX XXX XXX"
+                          disabled={submitting}
+                          aria-label={`Person ${index + 1} phone`}
+                        />
+                        <div className="split-amount-cell">
+                          <input
+                            type="number"
+                            min="1"
+                            aria-label={`Person ${index + 1} amount`}
+                            placeholder="Amount"
+                            value={share.amount}
+                            disabled={submitting}
+                            onChange={(e) => updateShare(index, { amount: e.target.value })}
+                          />
+                          {shareAmount > 0 && (
+                            <span className="split-amount-hint">{currency(shareAmount)}</span>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+                <div className={`split-remaining ${remaining === 0 ? 'ok' : remaining < 0 ? 'over' : ''}`}>
+                  <span>Allocated {currency(allocated)} of {currency(splitTotal)}</span>
+                  <strong>
+                    {remaining === 0
+                      ? 'All allocated — ready to pay'
+                      : remaining > 0
+                        ? `${currency(remaining)} unallocated`
+                        : `Over by ${currency(Math.abs(remaining))}`}
+                  </strong>
+                  {remaining !== 0 && splitShares.length > 0 && (
+                    <button
+                      type="button"
+                      className="customer-secondary-btn"
+                      style={{ marginTop: 4, fontSize: 12, padding: '4px 10px' }}
+                      disabled={submitting}
+                      onClick={() => {
+                        const lastIdx = splitShares.length - 1
+                        const othersSum = splitShares
+                          .slice(0, lastIdx)
+                          .reduce((s, sh) => s + (Math.round(Number(sh.amount)) || 0), 0)
+                        const lastAmount = Math.max(1, splitTotal - othersSum)
+                        onSplitShares(
+                          splitShares.map((sh, i) =>
+                            i === lastIdx ? { ...sh, amount: String(lastAmount) } : sh,
+                          ),
+                        )
+                      }}
+                    >
+                      {remaining > 0
+                        ? `Assign ${currency(remaining)} to ${splitShares[splitShares.length - 1]?.name || `Guest ${splitShares.length}`}`
+                        : 'Fix allocation'}
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </section>
+
+          {!splitEnabled ? (
+            <>
+              {deviceKnown && savedPhone ? (
+                <div className="cm-saved-box">
+                  <p className="cm-eyebrow">Saved on this phone</p>
+                  <strong>{formatUgPhoneHint(savedPhone ?? '')}</strong>
+                  <p className="cm-muted">
+                    {provider
+                      ? `We'll send the ${provider} prompt here. Change the number below if needed.`
+                      : "We'll send the MoMo prompt here. Change the number below if needed."}
+                  </p>
+                  <button
+                    type="button"
+                    className="customer-secondary-btn"
+                    disabled={submitting}
+                    onClick={beginChangeSavedNumber}
+                  >
+                    Change number
+                  </button>
+                </div>
+              ) : null}
+
+              <label className="cm-field">
+                Mobile money number
+                <MoMoPhoneInput
+                  value={phone}
+                  onChange={(v) => {
+                    onPhone(v)
+                    const p = detectProvider(v)
+                    if (p === 'MTN' || p === 'Airtel') onProvider(p)
+                  }}
+                  placeholder="07XX XXX XXX"
+                  required
+                  disabled={submitting}
+                  inputClassName=""
+                  aria-invalid={Boolean(phoneError)}
+                />
+                {phoneError ? <span className="cm-field-error">{phoneError}</span> : null}
+              </label>
+
+              {!deviceKnown ? (
+                <label className="cm-check">
+                  <input
+                    type="checkbox"
+                    checked={saveNumber}
+                    onChange={(e) => onSaveNumber(e.target.checked)}
+                    disabled={submitting}
+                  />
+                  <span>Save this number on this phone for faster checkout next time</span>
+                </label>
+              ) : phoneError ? (
+                <p className="cm-field-error">{phoneError}</p>
+              ) : null}
+
+              <p className="cm-hint">
+                {provider
+                  ? `You'll get a ${provider} prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives.`
+                  : "You'll get a MoMo prompt on your phone. Approve it to complete payment — we won't mark the order paid until confirmation arrives."}
+              </p>
+            </>
+          ) : (
+            <p className="cm-hint">
+              {provider
+                ? `Each person gets a ${provider} prompt for their share. When every share is approved, the order is paid under one Koddly ref.`
+                : 'Each person gets a MoMo prompt for their share. When every share is approved, the order is paid under one Koddly ref.'}
+            </p>
+          )}
+        </>
+      )}
     </div>
   )
 }

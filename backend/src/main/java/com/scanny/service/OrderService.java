@@ -318,6 +318,12 @@ public class OrderService {
         order.setStatus(OrderStatus.Pending);
         order.setPaymentStatus(PaymentStatus.Unpaid);
         order.setCreatedAt(Instant.now());
+        // Normalise payment method — default to MOMO when absent
+        String pm = request.paymentMethod() != null
+                ? request.paymentMethod().trim().toUpperCase()
+                : "MOMO";
+        if (!pm.equals("CASH") && !pm.equals("MOMO")) pm = "MOMO";
+        order.setPaymentMethod(pm);
         lines.forEach(order::addItem);
 
         if (request.tableId() != null || request.tableQrToken() != null) {
@@ -355,6 +361,23 @@ public class OrderService {
         }
         if (saved.getTableSessionId() != null) {
             tableService.linkOrderToSession(saved.getTableSessionId(), saved.getId());
+        }
+
+        // Cash orders are paid on the spot — mark Paid immediately so they count
+        // in revenue tracking and trigger inventory consumption + receipt generation.
+        if ("CASH".equals(saved.getPaymentMethod())) {
+            saved.setPaymentStatus(PaymentStatus.Paid);
+            saved = orderRepository.save(saved);
+            inventoryService.consumeForPaidOrder(saved);
+            outboxService.enqueueReceipt(saved.getId());
+            if (business.isWhatsappNotificationsEnabled()
+                    && saved.getCustomerPhone() != null
+                    && !saved.getCustomerPhone().isBlank()) {
+                outboxService.enqueueWhatsapp(
+                        saved.getCustomerPhone(),
+                        business.getName() + ": payment received (cash) for order " + saved.getId() + "."
+                );
+            }
         }
 
         OrderResponse response = OrderResponse.from(saved);

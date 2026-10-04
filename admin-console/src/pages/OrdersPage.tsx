@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Smartphone, Banknote } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { InlineSpinner } from '../components/LoadingSpinner'
@@ -52,6 +52,9 @@ export default function OrdersPage() {
     customer: o.customerName,
     items: o.items,
     total: currency(o.total),
+    method: o.paymentMethod === 'CASH'
+      ? { icon: Banknote, label: 'Cash' }
+      : { icon: Smartphone, label: 'MoMo' },
     payment: String(o.paymentStatus),
     status: String(o.status),
     time: new Date(o.createdAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
@@ -96,7 +99,7 @@ export default function OrdersPage() {
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Order', 'Merchant', 'Customer', 'Items', 'Total', 'Payment', 'Status', 'Time'].map((h) => (
+                {['Order', 'Merchant', 'Customer', 'Items', 'Total', 'Method', 'Payment', 'Status', 'Time'].map((h) => (
                   <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 10, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>{h}</th>
                 ))}
               </tr>
@@ -104,7 +107,7 @@ export default function OrdersPage() {
             <tbody>
               {displayOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
+                  <td colSpan={9} style={{ padding: '16px', color: 'var(--muted-foreground)' }}>
                     {loading ? <InlineSpinner label="Loading…" /> : 'No orders found.'}
                   </td>
                 </tr>
@@ -119,6 +122,11 @@ export default function OrdersPage() {
                     <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{o.customer}</td>
                     <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{o.items}</td>
                     <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{o.total}</td>
+                    <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)', fontSize: 12 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <o.method.icon size={13} />{o.method.label}
+                      </span>
+                    </td>
                     <td style={{ padding: '10px 16px' }}><Badge variant="secondary" className={S_PAY[o.payment] ?? ''}>{o.payment}</Badge></td>
                     <td style={{ padding: '10px 16px' }}><Badge variant="secondary" className={S_STATUS[o.status] ?? ''}>{o.status}</Badge></td>
                     <td style={{ padding: '10px 16px', color: 'var(--muted-foreground)' }}>{o.time}</td>

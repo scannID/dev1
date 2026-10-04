@@ -45,6 +45,11 @@ public class AdminPlatformController {
         return adminPlatformService.listRevenueTransactions();
     }
 
+    @GetMapping("/revenue/cash-collections")
+    public AdminPlatformDtos.CashCollectionsResponse getCashCollections() {
+        return adminPlatformService.getCashCollections();
+    }
+
     @GetMapping("/reports/overview")
     public AdminPlatformDtos.ReportsOverview getReportsOverview() {
         return adminPlatformService.getReportsOverview();

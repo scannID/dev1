@@ -18,7 +18,7 @@ export default function AdminLogin({
       <CursorField />
       <div className="admin-login-card">
         <div className="admin-login-brand">
-          <img src="/kodte-icon.svg" alt="" className="admin-login-logo" />
+          <img src="/koddlylogo3.png" alt="" className="admin-login-logo" />
           <div>
             <p className="admin-login-name">Koddly</p>
             <p className="admin-login-tag">Admin Console</p>

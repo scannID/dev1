@@ -44,6 +44,7 @@ import type {
   MerchantPaymentsResponse,
   MerchantScansResponse,
   AdminPromotionRow,
+  CashCollectionsResponse,
 } from './types'
 
 export const dashboardApi = {
@@ -218,6 +219,9 @@ export const revenueApi = {
   listTransactions: async (): Promise<RevenueTransaction[]> => {
     const response = await api.get<{ transactions: RevenueTransaction[] }>('/admin/revenue/transactions')
     return response.transactions
+  },
+  getCashCollections: async (): Promise<CashCollectionsResponse> => {
+    return api.get<CashCollectionsResponse>('/admin/revenue/cash-collections')
   },
 }
 

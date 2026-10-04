@@ -1495,6 +1495,34 @@ function PhotoStrip() {
    Main
    ───────────────────────────────────────────────────────────── */
 
+/* ─────────────────────────────────────────────────────────────
+   Shared "Get Started" button — matches the header stamp style
+   ───────────────────────────────────────────────────────────── */
+
+function GetStartedButton({ onClick }: { onClick?: () => void }) {
+  return (
+    <button
+      className="kodte-stamp-btn"
+      style={{
+        background: 'transparent',
+        border: `2.5px solid ${C.stamp}`,
+        color: C.stamp,
+        borderRadius: 8,
+        padding: '7px 16px',
+        fontFamily: FONT,
+        fontSize: 14,
+        fontWeight: 800,
+        letterSpacing: '0.06em',
+        cursor: 'pointer',
+        transform: 'rotate(-2deg)',
+      }}
+      onClick={onClick}
+    >
+      Get Started
+    </button>
+  )
+}
+
 type KodteLandingTicketProps = {
   onGetStarted?: () => void
   onCreateEventTicket?: () => void
@@ -1798,7 +1826,7 @@ export default function KodteLandingTicket({
                 }}
               >
                 <img
-                  src="/kodte-icon.svg"
+                  src="/koddlylogo3.png"
                   alt=""
                   width={28}
                   height={28}
@@ -1855,25 +1883,7 @@ export default function KodteLandingTicket({
                  Ticketing
               </button>
 
-              <button
-                className="kodte-stamp-btn"
-                style={{
-                  background: 'transparent',
-                  border: `2.5px solid ${C.stamp}`,
-                  color: C.stamp,
-                  borderRadius: 8,
-                  padding: '7px 16px',
-                  fontFamily: FONT,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  cursor: 'pointer',
-                  transform: 'rotate(-2deg)',
-                }}
-                onClick={onGetStarted}
-              >
-                Get Started
-              </button>
+              <GetStartedButton onClick={onGetStarted} />
             </div>
           </div>
         </header>
@@ -1982,24 +1992,7 @@ export default function KodteLandingTicket({
                   alignItems: 'center',
                 }}
               >
-                <button
-                  className="kodte-stamp-btn"
-                  style={{
-                    background: C.ink,
-                    color: C.paperLt,
-                    border: 'none',
-                    padding: '13px 26px',
-                    fontFamily: FONT,
-                    fontWeight: 800,
-                    fontSize: 16,
-                    letterSpacing: '0.05em',
-                    cursor: 'pointer',
-                    borderRadius: 3,
-                  }}
-                  onClick={onGetStarted}
-                >
-                  Get Started
-                </button>
+                <GetStartedButton onClick={onGetStarted} />
 
                 <span
                   style={{
@@ -2189,24 +2182,7 @@ export default function KodteLandingTicket({
                 first scan. No card, no install.
               </p>
 
-              <button
-                className="kodte-stamp-btn"
-                style={{
-                  background: C.stamp,
-                  color: C.paperLt,
-                  border: 'none',
-                  padding: '15px 34px',
-                  borderRadius: 3,
-                  fontFamily: FONT,
-                  fontWeight: 800,
-                  fontSize: 17,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                }}
-                onClick={onGetStarted}
-              >
-                Get Started
-              </button>
+              <GetStartedButton onClick={onGetStarted} />
             </div>
           </div>
         </section>
@@ -2245,7 +2221,7 @@ export default function KodteLandingTicket({
                     }}
                   >
                     <img
-                      src="/kodte-icon.svg"
+                      src="/koddlylogo3.png"
                       alt=""
                       width={28}
                       height={28}

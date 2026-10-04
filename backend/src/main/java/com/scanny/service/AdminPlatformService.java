@@ -459,4 +459,29 @@ public class AdminPlatformService {
         }
         return value;
     }
+
+    /**
+     * Returns per-merchant cash order totals: how much cash each merchant collected
+     * and how much of that Koddly is owed (platform fee from cash orders).
+     */
+    @Transactional(readOnly = true)
+    public AdminPlatformDtos.CashCollectionsResponse getCashCollections() {
+        List<Object[]> rows = orderRepository.aggregateCashOrdersByMerchant();
+
+        List<AdminPlatformDtos.CashCollectionRow> result = rows.stream()
+            .map(r -> new AdminPlatformDtos.CashCollectionRow(
+                (String) r[0],                          // merchantId
+                (String) r[1],                          // businessName
+                ((Number) r[2]).longValue(),             // orderCount
+                ((Number) r[3]).longValue(),             // totalCash
+                ((Number) r[4]).longValue(),             // koddlyCut (platformFee sum)
+                "UGX"
+            ))
+            .toList();
+
+        long grandTotalCash = result.stream().mapToLong(AdminPlatformDtos.CashCollectionRow::totalCash).sum();
+        long grandKoddlyCut = result.stream().mapToLong(AdminPlatformDtos.CashCollectionRow::koddlyCut).sum();
+
+        return new AdminPlatformDtos.CashCollectionsResponse(result, grandTotalCash, grandKoddlyCut, "UGX");
+    }
 }

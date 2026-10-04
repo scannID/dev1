@@ -391,14 +391,17 @@ public class AdminAnalyticsService {
             byMethod.merge("Device Pay", deviceAmount, Long::sum);
         }
 
-        long orderAmount = orders.stream()
+        // Break paid orders out by paymentMethod so Cash appears as its own slice
+        // in the admin Payment Methods chart, separate from Mobile Money.
+        orders.stream()
             .filter(o -> inRange(o.getCreatedAt(), start, end))
             .filter(this::isPaidOrder)
-            .mapToLong(Order::getTotal)
-            .sum();
-        if (orderAmount > 0) {
-            byMethod.merge("Orders", orderAmount, Long::sum);
-        }
+            .forEach(o -> {
+                String method = "CASH".equalsIgnoreCase(o.getPaymentMethod())
+                        ? "Cash"
+                        : "Mobile Money";
+                byMethod.merge(method, (long) o.getTotal(), Long::sum);
+            });
 
         long total = byMethod.values().stream().mapToLong(Long::longValue).sum();
         if (total <= 0) {

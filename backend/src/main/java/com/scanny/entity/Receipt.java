@@ -132,6 +132,14 @@ public class Receipt {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        // On H2 there is no database trigger to generate receipt_number.
+        // Generate one here if it hasn't been set; the PostgreSQL trigger will
+        // override this for the real DB (it fires BEFORE INSERT and sets its own value).
+        if (receiptNumber == null || receiptNumber.isBlank()) {
+            receiptNumber = "RCT-"
+                + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd").format(createdAt)
+                + "-" + String.format("%04d", (int)(Math.random() * 9000) + 1000);
+        }
     }
 
     @PreUpdate

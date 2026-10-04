@@ -141,4 +141,26 @@ public class AdminPlatformDtos {
         List<NotificationItem> notifications,
         int unread
     ) {}
+
+    /**
+     * One row per merchant that has received cash orders.
+     * totalCash   = sum of order totals (what the merchant collected from customers).
+     * koddlyCut   = sum of platform_fee (what Koddly is owed from those cash orders).
+     * merchantOwes = totalCash minus what the merchant legitimately keeps (i.e. = koddlyCut).
+     */
+    public record CashCollectionRow(
+        String merchantId,
+        String merchantName,
+        long orderCount,
+        long totalCash,
+        long koddlyCut,
+        String currency
+    ) {}
+
+    public record CashCollectionsResponse(
+        List<CashCollectionRow> rows,
+        long grandTotalCash,
+        long grandKoddlyCut,
+        String currency
+    ) {}
 }

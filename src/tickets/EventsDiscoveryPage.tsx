@@ -525,7 +525,7 @@ export default function EventsDiscoveryPage() {
         <div className="nav-row">
           <div className="logo">
             <img
-              src="/kodte-icon.svg"
+              src="/koddlylogo3.png"
               alt=""
               className="logo-icon"
             />

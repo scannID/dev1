@@ -104,6 +104,14 @@ public class Order {
     @Column(name = "kitchen_notes", nullable = false)
     private String kitchenNotes = "";
 
+    /**
+     * How the customer intends to pay: "MOMO" (mobile money, default) or "CASH".
+     * Cash orders are marked Paid immediately on creation so they flow into revenue
+     * and inventory tracking like any other paid order.
+     */
+    @Column(name = "payment_method", nullable = false, columnDefinition = "varchar(16) default 'MOMO'")
+    private String paymentMethod = "MOMO";
+
     /** Locked recipe COGS (UGX) at payment time. */
     @Column(name = "cogs_total", nullable = false, columnDefinition = "integer default 0")
     private int cogsTotal = 0;
@@ -325,6 +333,14 @@ public class Order {
 
     public void setKitchenNotes(String kitchenNotes) {
         this.kitchenNotes = kitchenNotes != null ? kitchenNotes : "";
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod != null ? paymentMethod : "MOMO";
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod != null ? paymentMethod.toUpperCase() : "MOMO";
     }
 
     public int getCogsTotal() {

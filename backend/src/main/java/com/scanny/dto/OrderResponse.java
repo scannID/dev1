@@ -30,6 +30,8 @@ public record OrderResponse(
         String merchantMomoDestination,
         OrderStatus status,
         PaymentStatus paymentStatus,
+        /** "MOMO" or "CASH" */
+        String paymentMethod,
         Instant createdAt,
         Instant updatedAt,
         Integer cogsTotal,
@@ -60,6 +62,7 @@ public record OrderResponse(
                 order.getMerchantMomoDestination(),
                 order.getStatus(),
                 order.getPaymentStatus(),
+                order.getPaymentMethod(),
                 order.getCreatedAt(),
                 order.getUpdatedAt(),
                 order.getCogsTotal(),

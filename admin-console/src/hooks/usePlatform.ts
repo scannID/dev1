@@ -8,6 +8,7 @@ import type {
   ConfigMap,
   ConfigSection,
   PlatformConfigs,
+  CashCollectionsResponse,
 } from '../api/types'
 
 export function useCatalog() {
@@ -398,3 +399,30 @@ export function useBroadcasts() {
   }
 }
 
+
+export function useCashCollections() {
+  const [data, setData] = useState<CashCollectionsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refresh = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      setError(null)
+      setData(await adminApi.revenue.getCashCollections())
+    } catch (err) {
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to load cash collections')
+        setData(null)
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh(false)
+  }, [refresh])
+
+  return { data, loading, error, refresh: () => refresh(false) }
+}

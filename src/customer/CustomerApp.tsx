@@ -45,7 +45,6 @@ import { effectivePrice } from '../lib/catalogPricing'
 import {
   buildReceipt,
   deleteReceipt,
-  getReceiptCount,
   loadReceipts,
   saveReceipt,
   updateReceiptStatus,
@@ -160,6 +159,7 @@ export default function CustomerApp({
   const [locationError, setLocationError] = useState<string | null>(null)
 
   const [provider, setProvider] = useState<PaymentProvider>(draft?.provider ?? 'MTN')
+  const [paymentMethod, setPaymentMethod] = useState<'MOMO' | 'CASH'>('MOMO')
   const [splitEnabled, setSplitEnabled] = useState(false)
   const [splitShares, setSplitShares] = useState<SplitShareDraft[]>([])
   const [splitSummary, setSplitSummary] = useState<SplitShareLive[] | null>(null)
@@ -193,7 +193,7 @@ export default function CustomerApp({
   const [showAnnouncements, setShowAnnouncements] = useState(false)
   const [showEvents, setShowEvents] = useState(false)
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
-  const [receiptCount, setReceiptCount] = useState(() => getReceiptCount())
+  const receiptCount = receipts.length
   const [ordersPaused, setOrdersPaused] = useState(false)
   const [accountSuspended, setAccountSuspended] = useState(false)
   const [busyBanner, setBusyBanner] = useState<string | null>(null)
@@ -283,7 +283,6 @@ export default function CustomerApp({
       })
       const next = saveReceipt(receipt)
       setReceipts(next)
-      setReceiptCount(next.length)
     },
     [business, customerName, phone, provider, serviceFeeUgx, orderPublicId],
   )
@@ -705,7 +704,6 @@ export default function CustomerApp({
   const removeReceipt = useCallback((receiptId: string) => {
     const next = deleteReceipt(receiptId)
     setReceipts(next)
-    setReceiptCount(next.length)
     toast.success('Receipt deleted')
   }, [])
 
@@ -1014,23 +1012,22 @@ export default function CustomerApp({
       }
       // Order contact = first payer
       setPhone(splitAllocation[0].phone)
-    } else {
+    } else if (paymentMethod === 'MOMO') {
       const phoneIssue = validatePhone(phone)
       if (phoneIssue) {
         setPhoneError(phoneIssue)
         return
       }
+      if (!provider) {
+        setError('Enter your mobile money number so we can detect your network')
+        return
+      }
     }
 
-    if (!provider) {
-      setError('Enter your mobile money number so we can detect your network')
-      return
-    }
     if (!feeConsent) {
       setError('Confirm the total and service fee before paying')
       return
     }
-
     setPhoneError(null)
     setSubmitting(true)
     setError(null)
@@ -1073,6 +1070,7 @@ export default function CustomerApp({
         })),
         tableId,
         tableQrToken,
+        paymentMethod,
       })
 
       setPlacedOrderId(order.id)
@@ -1114,6 +1112,18 @@ export default function CustomerApp({
         } catch {
           // Order + payment still proceed
         }
+      }
+
+      // Cash orders are marked Paid by the backend immediately — skip MoMo entirely.
+      if (paymentMethod === 'CASH') {
+        setPaidTotal(order.total || payableTotal)
+        setPaymentStatus('PAID')
+        persistPaidReceipt(order.id, order.total || payableTotal, cartItems)
+        clearCheckoutDraft(businessId)
+        setCart({})
+        toast.success('Order placed — pay cash to staff when ready')
+        setStep('done')
+        return
       }
 
       if (splitAllocation && order.publicId) {
@@ -1561,6 +1571,8 @@ export default function CustomerApp({
           splitEnabled={splitEnabled}
           splitShares={splitShares}
           feeConsent={feeConsent}
+          paymentMethod={paymentMethod}
+          onPaymentMethod={setPaymentMethod}
           onSplitEnabled={setSplitEnabled}
           onSplitShares={setSplitShares}
           onFeeConsent={setFeeConsent}
@@ -1685,7 +1697,11 @@ export default function CustomerApp({
               ? splitEnabled
                 ? 'Prompting payers…'
                 : 'Sending…'
-              : !splitReady
+              : paymentMethod === 'CASH'
+                ? !feeConsent
+                  ? 'Confirm total first'
+                  : `Place order · ${currency(payTotal)}`
+                : !splitReady
                 ? !splitPhonesOk
                   ? 'Add each MoMo number'
                   : splitAllocated < payableTotal
@@ -1701,7 +1717,7 @@ export default function CustomerApp({
           loading={submitting}
           disabled={
             submitting
-            || !splitReady
+            || (paymentMethod === 'MOMO' && !splitReady)
             || !feeConsent
             || (!placedOrderId && (cartCount === 0 || ordersPaused))
           }

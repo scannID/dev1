@@ -44,6 +44,12 @@ public class H2CatalogDiscountSchemaRunner implements ApplicationRunner {
         ensureColumn("payment_intents", "merchant_payout", "INT NOT NULL DEFAULT 0");
         ensureColumn("payment_intents", "merchant_momo_destination", "VARCHAR(64) NOT NULL DEFAULT ''");
         ensureColumn("payment_intents", "scanny_fee_destination", "VARCHAR(64) NOT NULL DEFAULT ''");
+
+        // New columns added to existing entities — must be pre-created with defaults so
+        // Hibernate's UPDATE DDL (which can't add NOT NULL columns to populated tables) is a no-op.
+        ensureColumn("businesses", "geo_query", "VARCHAR(255) NOT NULL DEFAULT ''");
+        ensureColumn("admin_users", "pending", "BOOLEAN NOT NULL DEFAULT TRUE");
+
         log.info("Ensured catalog discount + fee-split columns exist (H2)");
     }
 

@@ -253,4 +253,22 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             @Param("cancelled") OrderStatus cancelled,
             @Param("refunded") PaymentStatus refunded
     );
+
+    /**
+     * Per-merchant aggregate of cash (paymentMethod = 'CASH') paid orders.
+     * Returns rows of [merchantId, businessName, orderCount, sumTotal, sumPlatformFee].
+     */
+    @Query("""
+            SELECT o.merchantId,
+                   MAX(o.businessName),
+                   COUNT(o),
+                   COALESCE(SUM(o.total), 0),
+                   COALESCE(SUM(o.platformFee), 0)
+            FROM Order o
+            WHERE o.paymentMethod = 'CASH'
+              AND o.paymentStatus = com.scanny.model.enums.PaymentStatus.Paid
+            GROUP BY o.merchantId
+            ORDER BY SUM(o.total) DESC
+            """)
+    List<Object[]> aggregateCashOrdersByMerchant();
 }

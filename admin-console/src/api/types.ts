@@ -89,6 +89,8 @@ export interface AdminOrder {
   total: number
   currency: string
   paymentStatus: PaymentStatus | string
+  /** "MOMO" or "CASH" */
+  paymentMethod?: string
   status: OrderStatus | string
   createdAt: string
   completedAt?: string | null
@@ -162,6 +164,22 @@ export interface RevenueOverview {
   }
   monthly: Array<{ month: string; revenue: number; transactions: number }>
   paymentMethods: Array<{ method: string; percentage: number; amount: number }>
+}
+
+export interface CashCollectionRow {
+  merchantId: string
+  merchantName: string
+  orderCount: number
+  totalCash: number
+  koddlyCut: number
+  currency: string
+}
+
+export interface CashCollectionsResponse {
+  rows: CashCollectionRow[]
+  grandTotalCash: number
+  grandKoddlyCut: number
+  currency: string
 }
 
 export interface ServiceHealth {
