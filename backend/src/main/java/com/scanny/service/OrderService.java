@@ -61,6 +61,7 @@ public class OrderService {
     private final TableService tableService;
     private final InventoryService inventoryService;
     private final SystemBusyModeService systemBusyModeService;
+    private final LedgerWriterService ledgerWriterService;
 
     public OrderService(
             BusinessService businessService,
@@ -73,7 +74,8 @@ public class OrderService {
             MerchantRepository merchantRepository,
             TableService tableService,
             InventoryService inventoryService,
-            SystemBusyModeService systemBusyModeService
+            SystemBusyModeService systemBusyModeService,
+            LedgerWriterService ledgerWriterService
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -86,6 +88,7 @@ public class OrderService {
         this.tableService = tableService;
         this.inventoryService = inventoryService;
         this.systemBusyModeService = systemBusyModeService;
+        this.ledgerWriterService = ledgerWriterService;
     }
 
     @Transactional(readOnly = true)
@@ -370,6 +373,13 @@ public class OrderService {
             saved = orderRepository.save(saved);
             inventoryService.consumeForPaidOrder(saved);
             outboxService.enqueueReceipt(saved.getId());
+            // Freeze ledger row for the cash payment
+            try {
+                ledgerWriterService.recordPayment(saved);
+            } catch (Exception ex) {
+                logger.error("LedgerWriterService failed for cash order {} — accounting row was NOT written: {}",
+                        saved.getId(), ex.getMessage(), ex);
+            }
             if (business.isWhatsappNotificationsEnabled()
                     && saved.getCustomerPhone() != null
                     && !saved.getCustomerPhone().isBlank()) {
@@ -491,6 +501,19 @@ public class OrderService {
         order.setUpdatedAt(Instant.now());
 
         Order savedOrder = orderRepository.save(order);
+
+        // ── Immutable ledger writes (REQUIRES_NEW — own transaction) ──────────
+        // Wrapped in try/catch so a ledger failure never rolls back the payment.
+        try {
+            if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
+                ledgerWriterService.recordPayment(savedOrder);
+            } else if (paymentStatus == PaymentStatus.Refunded && oldStatus == PaymentStatus.Paid) {
+                ledgerWriterService.recordRefund(savedOrder);
+            }
+        } catch (Exception ex) {
+            logger.error("LedgerWriterService failed for order {} — accounting row was NOT written: {}",
+                    savedOrder.getId(), ex.getMessage(), ex);
+        }
 
         if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
             inventoryService.consumeForPaidOrder(savedOrder);
@@ -687,6 +710,10 @@ public class OrderService {
 
         receiptService.generateReceipt(receiptRequest);
         logger.info("Auto-generated receipt for order {}", order.getId());
+
+        // Queue EFRIS fiscal submission asynchronously via the outbox so the
+        // payment confirmation response is not held up by a URA API call.
+        outboxService.enqueueEfrisSubmit(order.getId());
     }
 
     private static java.time.LocalDate parseRequiredDate(String raw, String label) {

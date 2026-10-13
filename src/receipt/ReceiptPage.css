@@ -252,3 +252,81 @@
   border-radius: 10px;
   padding: 6px 18px;
 }
+
+/* ── EFRIS fiscal badge ── */
+.rp-efris {
+  margin: 0 20px 14px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 10px;
+}
+
+.rp-efris-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.rp-efris-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.rp-efris-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.rp-efris-meta {
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rp-efris-meta > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.rp-efris-meta dt {
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.rp-efris-meta dd {
+  margin: 0;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.rp-efris-fdn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
+.rp-efris-verify {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #15803d;
+  text-decoration: none;
+}
+
+.rp-efris-verify:hover,
+.rp-efris-verify:focus-visible {
+  text-decoration: underline;
+  outline-offset: 2px;
+}

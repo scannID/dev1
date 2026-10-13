@@ -190,6 +190,32 @@ export default function ReceiptPage() {
 
         <div className="rp-divider rp-divider--dashed" />
 
+        {/* EFRIS fiscal badge — shown once the URA submission has completed */}
+        {receipt.efrisFdn && (
+          <div className="rp-efris">
+            <div className="rp-efris-header">
+              <span className="rp-efris-icon" aria-hidden="true">🏛️</span>
+              <span className="rp-efris-label">URA Fiscal Receipt</span>
+            </div>
+            <dl className="rp-efris-meta">
+              <div>
+                <dt>FDN</dt>
+                <dd className="rp-efris-fdn">{receipt.efrisFdn}</dd>
+              </div>
+            </dl>
+            {receipt.efrisQrUrl && (
+              <a
+                className="rp-efris-verify"
+                href={receipt.efrisQrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Verify with URA ↗
+              </a>
+            )}
+          </div>
+        )}
+
         <p className="rp-footnote">
          Koddly Powered by <strong>QbiLabs</strong> · This receipt is stored on the payer's device.
         </p>

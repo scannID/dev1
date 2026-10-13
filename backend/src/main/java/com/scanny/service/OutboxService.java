@@ -19,6 +19,8 @@ public class OutboxService {
     public static final String TYPE_RECEIPT = "RECEIPT";
     public static final String TYPE_AUDIT = "AUDIT";
     public static final String TYPE_WHATSAPP = "WHATSAPP";
+    /** EFRIS fiscal submission — payload: {@code {"orderId": "<id>"}}. */
+    public static final String TYPE_EFRIS = "EFRIS_SUBMIT";
 
     private static final Logger log = LoggerFactory.getLogger(OutboxService.class);
 
@@ -66,6 +68,16 @@ public class OutboxService {
                 "to", toPhone != null ? toPhone : "",
                 "message", message != null ? message : ""
         ));
+    }
+
+    /**
+     * Enqueues an EFRIS fiscal submission for the given order.
+     * The dispatcher will call {@link com.scanny.efris.EfrisSubmissionService#submitForOrder(String)}.
+     * Retries on failure are handled by leaving the outbox event unprocessed.
+     */
+    @Transactional
+    public void enqueueEfrisSubmit(String orderId) {
+        enqueue(TYPE_EFRIS, "", "", Map.of("orderId", orderId != null ? orderId : ""));
     }
 
     @Transactional

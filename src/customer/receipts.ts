@@ -34,6 +34,16 @@ export interface CustomerReceipt {
   orderPublicId?: string | null
   /** Customer phone used with orderPublicId to query the public tracking API. */
   orderPhone?: string | null
+  /**
+   * URA Fiscal Document Number — populated once the EFRIS submission succeeds
+   * (or a fake STUB- value in dev mode). Null until the outbox job completes.
+   */
+  efrisFdn?: string | null
+  /**
+   * URA-hosted verification URL for the fiscal receipt QR code.
+   * Opens the official URA verification portal when scanned.
+   */
+  efrisQrUrl?: string | null
 }
 
 const STORAGE_KEY = 'scanny-receipts'

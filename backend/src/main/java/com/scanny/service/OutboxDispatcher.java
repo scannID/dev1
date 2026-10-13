@@ -2,6 +2,7 @@ package com.scanny.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scanny.efris.EfrisSubmissionService;
 import com.scanny.entity.OutboxEvent;
 import com.scanny.entity.PaymentIntent;
 import com.scanny.payment.service.PaymentIntentService;
@@ -12,10 +13,12 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
@@ -30,6 +33,12 @@ public class OutboxDispatcher {
     private final OrderService orderService;
     private final AuditService auditService;
     private final WhatsAppNotificationService whatsAppNotificationService;
+    private final EfrisSubmissionService efrisSubmissionService;
+
+    // Self-reference via Spring proxy so @Transactional(REQUIRES_NEW) on
+    // stampProcessed() fires correctly when called from within this bean.
+    @Autowired @Lazy
+    private OutboxDispatcher self;
 
     public OutboxDispatcher(
             OutboxEventRepository outboxEventRepository,
@@ -38,7 +47,8 @@ public class OutboxDispatcher {
             @Lazy PaymentIntentService paymentIntentService,
             @Lazy OrderService orderService,
             AuditService auditService,
-            WhatsAppNotificationService whatsAppNotificationService
+            WhatsAppNotificationService whatsAppNotificationService,
+            @Lazy EfrisSubmissionService efrisSubmissionService
     ) {
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
@@ -47,21 +57,35 @@ public class OutboxDispatcher {
         this.orderService = orderService;
         this.auditService = auditService;
         this.whatsAppNotificationService = whatsAppNotificationService;
+        this.efrisSubmissionService = efrisSubmissionService;
     }
 
     @Scheduled(fixedDelayString = "${scanny.outbox.poll-ms:500}")
-    @Transactional
     public void dispatchPending() {
         List<OutboxEvent> pending = outboxEventRepository.findPending(PageRequest.of(0, 100));
         for (OutboxEvent event : pending) {
             try {
                 process(event);
-                event.setProcessedAt(Instant.now());
-                outboxEventRepository.save(event);
+                // Stamp via proxy so REQUIRES_NEW actually commits independently.
+                self.stampProcessed(event);
             } catch (Exception ex) {
                 log.warn("Outbox event {} ({}) failed: {}", event.getId(), event.getEventType(), ex.getMessage());
             }
         }
+    }
+
+    /**
+     * Stamps the event as processed in its own committed transaction.
+     * Each event's completion is durable independently — a failure in a later
+     * event cannot roll back an already-stamped one.
+     *
+     * <p>Must be called via {@code self} (the Spring proxy), not {@code this},
+     * so that {@code REQUIRES_NEW} takes effect.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void stampProcessed(OutboxEvent event) {
+        event.setProcessedAt(Instant.now());
+        outboxEventRepository.save(event);
     }
 
     private void process(OutboxEvent event) throws Exception {
@@ -95,6 +119,12 @@ public class OutboxDispatcher {
                 // Ticket delivery uses WhatsAppNotificationService directly.
                 // Skipping outbox WhatsApp drains backlog / order spam that rate-limits Meta.
                 log.debug("Skipping outbox WhatsApp event {}", event.getId());
+            }
+            case OutboxService.TYPE_EFRIS -> {
+                // Delegate to EfrisSubmissionService; it throws EfrisRetryableException on
+                // transient failures so the outbox event stays unprocessed and retried next poll.
+                String orderId = String.valueOf(payload.get("orderId"));
+                efrisSubmissionService.submitForOrder(orderId);
             }
             default -> log.debug("Unknown outbox type {}", event.getEventType());
         }
