@@ -48,10 +48,10 @@
  *  API_TIMEOUT_MS     Max ms to wait for the API before falling back (default: 4000)
  */
 
+/* global process */
 import express from 'express'
-import { createReadStream, existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { pipeline } from 'node:stream/promises'
 
 // ── Config ───────────────────────────────────────────────────────────────────
 

@@ -271,8 +271,6 @@ function EventCarousel({
     )
   }
 
-  const current = events[index]
-
   return (
     <div className="carousel">
       {/* carousel-frame is the clipped, rounded photo/track layer.

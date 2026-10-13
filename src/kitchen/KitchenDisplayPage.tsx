@@ -81,6 +81,7 @@ function OrderDetailSheet({
     <Sheet open={Boolean(order)} onOpenChange={(open) => { if (!open) onClose() }}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="w-full max-w-md flex flex-col gap-0 p-0"
         style={{ background: 'var(--kds-surface, var(--background))', color: 'var(--kds-text, var(--foreground))' }}
       >

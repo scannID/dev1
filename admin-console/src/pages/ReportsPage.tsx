@@ -3,8 +3,8 @@ import { API_BASE_URL } from '../api/client'
 import { adminApi } from '../api/services'
 import type { ReportsOverview, RevenueOverview, TicketEventStats } from '../api/types'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import MonthlyOrdersDonut from '../components/MonthlyOrdersDonut'
 import { PaginationBar } from '../components/PaginationBar'
-import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 
 function currency(amount: number) {
@@ -215,23 +215,8 @@ export default function ReportsPage() {
 
         <div className="admin-card">
           <div className="admin-card-header"><div><h3>Monthly Orders</h3><p>From revenue analytics</p></div></div>
-          <div style={{ padding: '20px' }}>
-            {monthly.length === 0 ? (
-              <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No monthly data yet.</p>
-            ) : (
-              <>
-                <Sparkline
-                  data={monthly.map((w) => w.transactions)}
-                  color="var(--primary)"
-                  className="admin-sparkline"
-                  height={110}
-                  strokeWidth={1.6}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  {monthly.map((w) => <span key={w.month} style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{w.month}</span>)}
-                </div>
-              </>
-            )}
+          <div style={{ padding: '16px 20px' }}>
+            <MonthlyOrdersDonut monthly={monthly} />
           </div>
         </div>
 

@@ -271,4 +271,48 @@ public interface OrderRepository extends JpaRepository<Order, String> {
             ORDER BY SUM(o.total) DESC
             """)
     List<Object[]> aggregateCashOrdersByMerchant();
+
+    // ── Merchant Accounting queries have been moved to FinancialLedgerRepository ──
+    // All summary, ledger, export, and daily-series queries now run against the
+    // immutable financial_ledger_entries table. See FinancialLedgerRepository.
+
+    // ── Outstanding / unpaid helpers (no ledger row exists for unpaid orders) ──
+
+    /**
+     * Sum of merchantPayout for unpaid, non-cancelled orders — used in the
+     * accounting summary to surface the outstanding receivable.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(o.merchantPayout), 0L)
+            FROM Order o
+            WHERE o.business.id = :businessId
+              AND o.paymentStatus = com.scanny.model.enums.PaymentStatus.Unpaid
+              AND o.status       <> com.scanny.model.enums.OrderStatus.Cancelled
+              AND (:from IS NULL OR o.createdAt >= :from)
+              AND (:to   IS NULL OR o.createdAt <  :to)
+            """)
+    long accountingOutstandingRevenue(
+            @Param("businessId") String businessId,
+            @Param("from") Instant from,
+            @Param("to")   Instant to
+    );
+
+    /**
+     * Count of unpaid, non-cancelled orders — surface as {@code unpaidOrderCount}
+     * in the accounting summary.
+     */
+    @Query("""
+            SELECT COUNT(o)
+            FROM Order o
+            WHERE o.business.id = :businessId
+              AND o.paymentStatus = com.scanny.model.enums.PaymentStatus.Unpaid
+              AND o.status       <> com.scanny.model.enums.OrderStatus.Cancelled
+              AND (:from IS NULL OR o.createdAt >= :from)
+              AND (:to   IS NULL OR o.createdAt <  :to)
+            """)
+    long countUnpaidNonCancelledForBusiness(
+            @Param("businessId") String businessId,
+            @Param("from") Instant from,
+            @Param("to")   Instant to
+    );
 }

@@ -79,6 +79,13 @@ function ReceiptDetail({
   onReorder?: (receipt: CustomerReceipt) => void
   onSettle?: (orderId: string) => void
 }) {
+  // Local settled flag so the stamp appears immediately on this device
+  // even before the parent refreshes its receipts list.
+  const [localSettled, setLocalSettled] = useState(
+    receipt.orderStatus === 'Completed',
+  )
+  const isSettled = localSettled || receipt.orderStatus === 'Completed'
+
   // Lazy-fetch the real order status on open — covers cases where the customer
   // navigated away or closed the tab before the kitchen marked it Completed.
   useEffect(() => {
@@ -99,13 +106,6 @@ function ReceiptDetail({
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipt.orderId])
-
-  // Local settled flag so the stamp appears immediately on this device
-  // even before the parent refreshes its receipts list.
-  const [localSettled, setLocalSettled] = useState(
-    receipt.orderStatus === 'Completed',
-  )
-  const isSettled = localSettled || receipt.orderStatus === 'Completed'
 
   return (
     <div className="cm-receipt-detail">

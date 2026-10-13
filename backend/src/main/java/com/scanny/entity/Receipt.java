@@ -117,6 +117,50 @@ public class Receipt {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // ── EFRIS (URA Electronic Fiscal Receipting) ──────────────────────────────
+
+    /**
+     * Fiscal Document Number returned by URA after a successful EFRIS submission.
+     * Null until the submission succeeds (or stub mode populates it).
+     */
+    @Column(name = "efris_fdn", length = 100)
+    private String efrisFdn;
+
+    /**
+     * URA-hosted verification URL for the fiscal receipt QR code.
+     * Embed as a QR on the customer receipt so anyone can verify with URA.
+     */
+    @Column(name = "efris_qr_url", columnDefinition = "TEXT")
+    private String efrisQrUrl;
+
+    /**
+     * Lifecycle of the EFRIS submission for this receipt.
+     * PENDING → SUBMITTED (success) or FAILED (exhausted retries) or EXEMPT (merchant not enrolled).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "efris_status", length = 20)
+    private EfrisStatus efrisStatus = EfrisStatus.PENDING;
+
+    public enum EfrisStatus {
+        /** Awaiting first submission attempt. */
+        PENDING,
+        /** Successfully submitted to URA; efrisFdn and efrisQrUrl are populated. */
+        SUBMITTED,
+        /** All retry attempts exhausted without a successful URA response. */
+        FAILED,
+        /** Merchant is not enrolled in EFRIS — submission intentionally skipped. */
+        EXEMPT
+    }
+
+    public String getEfrisFdn()                        { return efrisFdn; }
+    public void setEfrisFdn(String efrisFdn)           { this.efrisFdn = efrisFdn; }
+
+    public String getEfrisQrUrl()                      { return efrisQrUrl; }
+    public void setEfrisQrUrl(String efrisQrUrl)       { this.efrisQrUrl = efrisQrUrl; }
+
+    public EfrisStatus getEfrisStatus()                { return efrisStatus; }
+    public void setEfrisStatus(EfrisStatus efrisStatus){ this.efrisStatus = efrisStatus; }
+
     @Column(name = "metadata", columnDefinition = "jsonb")
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     private String metadata;

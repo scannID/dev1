@@ -37,7 +37,6 @@ import { applyDarkMode, bindThemeHotkey, readDarkMode } from './lib/theme'
 import { buildEventManagerGateUrl, buildTicketGateUrl } from './lib/scanBase'
 import { resizeImageFile } from './lib/resizeImage'
 import {
-  loadCreatedEvents,
   loadAllCreatedEvents,
   removeCreatedEvent,
   saveCreatedEvent,
@@ -1563,7 +1562,7 @@ type PromoteStep =
 
 function PromoteEventSection({
   masterTicketId,
-  eventName,
+  eventName: _eventName,
   eventCategory,
   eventLocation,
 }: {
@@ -1580,7 +1579,7 @@ function PromoteEventSection({
   const [category, setCategory] = useState(eventCategory || '')
   const [venueAddress, setVenueAddress] = useState(eventLocation || '')
   const [busy, setBusy] = useState(false)
-  const [promoId, setPromoId] = useState<string | null>(null)
+  const [_promoId, setPromoId] = useState<string | null>(null)
   const [paymentId, setPaymentId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [status, setStatus] = useState<PromotionStatusResponse | null>(null)
@@ -2878,8 +2877,6 @@ function TicketForm({
     fontFamily: 'inherit',
     transition: 'all 160ms ease',
   })
-
-  const errStyle: CSSProperties = { color: CREATE.red, fontSize: 12 }
 
   return (
     <div

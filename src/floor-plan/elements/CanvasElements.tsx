@@ -223,7 +223,7 @@ function DraggableRect({
 
 // ─── Polygon shape (for odd-shaped zones/rooms) ───────────────────────────────
 
-export function PolygonElement({ el, isSelected, editorMode, status, onSelect, onDragEnd, onTransformEnd, onClick }: BaseProps) {
+export function PolygonElement({ el, isSelected, editorMode, status, onSelect, onDragEnd, onTransformEnd: _onTransformEnd, onClick }: BaseProps) {
   const groupRef = useRef<Konva.Group>(null)
 
   // Points stored in customStyle as JSON array of [x,y,...] relative to element origin

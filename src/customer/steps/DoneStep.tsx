@@ -6,7 +6,7 @@ import { currency, usdEquiv } from '../utils'
 export function DoneStep({
   businessName,
   orderId,
-  publicId,
+  publicId: _publicId,
   total,
   orderStatus,
   trackingLoading,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { BedDouble, CalendarCheck, LogIn, LogOut, Wrench, ArrowRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -55,9 +55,10 @@ interface ExtendDialogProps {
 
 function ExtendDialog({ room, onConfirm, onClose }: ExtendDialogProps) {
   const currentCheckOut = room.currentBooking?.checkOut ?? ''
+  const nowMs = useRef(Date.now())
   const minDate = currentCheckOut
     ? new Date(new Date(currentCheckOut).getTime() + 86400000).toISOString().slice(0, 10)
-    : new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    : new Date(nowMs.current + 86400000).toISOString().slice(0, 10)
 
   const [newDate, setNewDate] = useState(minDate)
   const [loading, setLoading] = useState(false)

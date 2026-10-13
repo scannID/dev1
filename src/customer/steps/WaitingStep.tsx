@@ -33,7 +33,7 @@ export function WaitingStep({
   error,
   splitSummary,
   onRetry,
-  onChangeNumber,
+  onChangeNumber: _onChangeNumber,
 }: {
   businessName: string
   paymentReference?: string | null

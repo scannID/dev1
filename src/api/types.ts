@@ -958,3 +958,97 @@ export interface NearbyEventsResponse {
   events: NearbyPromotedEvent[]
   total: number
 }
+
+
+// ── Accounting ────────────────────────────────────────────────────────────────
+
+/** Aggregate financial summary for a business over a date window. */
+export interface AccountingSummary {
+  /** Total customer-paid amount (subtotal + serviceFee). */
+  grossRevenue: number
+  /** Merchant's net credit: subtotal + any merchant share of the fee. */
+  netRevenue: number
+  /** Platform service fees collected across all paid orders. */
+  totalServiceFees: number
+  /** PSO portion of the service fees. */
+  totalPsoFees: number
+  /** Scanny platform portion of the service fees. */
+  totalPlatformFees: number
+  /** Recipe / COGS cost locked at payment time. */
+  totalCogs: number
+  /** netRevenue − totalCogs */
+  grossProfit: number
+  /** (grossProfit / netRevenue) × 100 */
+  marginPercent: number
+
+  paidOrderCount: number
+  unpaidOrderCount: number
+  refundedOrderCount: number
+  totalOrderCount: number
+
+  cashNetRevenue: number
+  cashOrderCount: number
+  momoNetRevenue: number
+  momoOrderCount: number
+
+  /** Outstanding amount not yet collected. */
+  outstandingRevenue: number
+
+  /** ISO-8601 start of queried window, or null for all time. */
+  from: string | null
+  /** ISO-8601 end of queried window, or null for all time. */
+  to: string | null
+}
+
+/** One row in the transaction ledger. */
+export interface AccountingLedgerEntry {
+  orderId: string
+  publicId: string
+  /** ISO-8601 */
+  createdAt: string
+  customerName: string
+  customerPhone: string
+  location: string
+  /** "MOMO" | "CASH" */
+  paymentMethod: string
+  /** "PAYMENT" | "REFUND" */
+  paymentStatus: string
+  /** "Pending" | "Preparing" | "Ready" | "Completed" | "Cancelled" */
+  orderStatus: string
+  /** Gross customer-paid amount. */
+  grossAmount: number
+  serviceFee: number
+  /** Merchant net credit. */
+  netAmount: number
+  cogs: number
+  profit: number
+  paymentReference: string
+  itemsSummary: string
+}
+
+export interface AccountingLedgerResponse {
+  entries: AccountingLedgerEntry[]
+  totalEntries: number
+  page: number
+  size: number
+  totalPages: number
+}
+
+export interface AccountingDailyRevenueSeries {
+  /** ISO date labels, e.g. "Oct 1". */
+  labels: string[]
+  /** Net revenue per day (UGX). */
+  netRevenue: number[]
+  /** Order count per day. */
+  orderCount: number[]
+}
+
+export interface AccountingLedgerParams {
+  from?: string
+  to?: string
+  /** "PAYMENT" | "REFUND" — omit for all entries */
+  entryType?: 'PAYMENT' | 'REFUND'
+  timezone?: string
+  page?: number
+  size?: number
+}

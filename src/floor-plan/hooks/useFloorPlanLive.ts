@@ -28,12 +28,8 @@ export function useFloorPlanLive(businessId: string, planId: string | null) {
   const setElementStatus = useCallback(
     async (elementId: string, status: 'FREE' | 'OCCUPIED' | 'RESERVED' | 'OUT_OF_SERVICE') => {
       if (!planId) return
-      try {
-        const snap = await floorPlanApi.setElementStatus(businessId, planId, elementId, { status })
-        setStatuses((prev) => ({ ...prev, [elementId]: snap }))
-      } catch (err) {
-        throw err
-      }
+      const snap = await floorPlanApi.setElementStatus(businessId, planId, elementId, { status })
+      setStatuses((prev) => ({ ...prev, [elementId]: snap }))
     },
     [businessId, planId]
   )

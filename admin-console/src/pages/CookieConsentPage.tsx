@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '../api/services'
 import type { CookieConsentAnalytics, ScansOrdersRange } from '../api/types'
+import ConsentTrendChart from '../components/ConsentTrendChart'
 import { InlineSpinner } from '../components/LoadingSpinner'
 
 type Range = ScansOrdersRange
@@ -12,33 +13,6 @@ const RANGES: { key: Range; label: string }[] = [
   { key: 'monthly', label: 'Monthly' },
   { key: 'yearly', label: 'Yearly' },
 ]
-
-const VW = 600
-const VH = 180
-const PL = 36
-const PR = 10
-const PT = 14
-const PB = 24
-const CW = VW - PL - PR
-const CH = VH - PT - PB
-
-function tx(i: number, n: number) {
-  return PL + (i / Math.max(n - 1, 1)) * CW
-}
-
-function ty(v: number, max: number) {
-  return PT + CH - (v / Math.max(max, 1)) * CH
-}
-
-function smooth(pts: [number, number][]) {
-  if (pts.length < 2) return ''
-  let d = `M${pts[0][0]},${pts[0][1]}`
-  for (let i = 1; i < pts.length; i++) {
-    const mx = (pts[i - 1][0] + pts[i][0]) / 2
-    d += ` C${mx},${pts[i - 1][1]} ${mx},${pts[i][1]} ${pts[i][0]},${pts[i][1]}`
-  }
-  return d
-}
 
 function formatWhen(value: string) {
   const date = new Date(value)
@@ -88,13 +62,6 @@ export default function CookieConsentPage() {
   }, [range])
 
   const series = data?.series
-  const n = series?.accepted.length ?? 0
-  const acceptedPts: [number, number][] = series
-    ? series.accepted.map((v, i) => [tx(i, n), ty(v, series.yMax)])
-    : []
-  const essentialPts: [number, number][] = series
-    ? series.essential.map((v, i) => [tx(i, n), ty(v, series.yMax)])
-    : []
 
   return (
     <>
@@ -150,51 +117,8 @@ export default function CookieConsentPage() {
         </div>
 
         <div style={{ padding: '8px 20px 20px' }}>
-          {!loading && !error && series && n > 0 ? (
-            <>
-              <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 11, color: 'var(--muted-foreground)' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 18, height: 2, background: '#ea580c', borderRadius: 2 }} />
-                  Accepted
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 18, height: 2, background: '#64748b', borderRadius: 2 }} />
-                  Essential only
-                </span>
-              </div>
-              <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" height={VH} role="img" aria-label="Cookie consent trend chart">
-                {[0, 0.25, 0.5, 0.75, 1].map((t) => {
-                  const y = PT + CH * (1 - t)
-                  return (
-                    <line
-                      key={t}
-                      x1={PL}
-                      x2={VW - PR}
-                      y1={y}
-                      y2={y}
-                      stroke="var(--border)"
-                      strokeWidth="1"
-                    />
-                  )
-                })}
-                <path d={smooth(acceptedPts)} fill="none" stroke="#ea580c" strokeWidth="2.2" />
-                <path d={smooth(essentialPts)} fill="none" stroke="#64748b" strokeWidth="2.2" />
-              </svg>
-              {series.xLabels.length > 0 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginTop: 4,
-                    fontSize: 10,
-                    color: 'var(--muted-foreground)',
-                  }}
-                >
-                  <span>{series.xLabels[0]}</span>
-                  <span>{series.xLabels[series.xLabels.length - 1]}</span>
-                </div>
-              )}
-            </>
+          {!loading && series ? (
+            <ConsentTrendChart series={series} />
           ) : (
             !loading && (
               <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>

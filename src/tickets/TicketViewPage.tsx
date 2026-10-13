@@ -288,7 +288,13 @@ export default function TicketViewPage({ accessToken }: Props) {
 
             {ticket.status === 'Active' ? (
               <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center' }}>
-               
+                <button
+                  type="button"
+                  className="tk-btn-cancel"
+                  onClick={() => void handleOpenTransfer()}
+                >
+                  Transfer ticket
+                </button>
               </div>
             ) : null}
 

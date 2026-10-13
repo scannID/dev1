@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingBag, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -78,6 +78,8 @@ import { scannyApi } from './api/services'
 import { MetricsCard } from './MetricsCard'
 import { OperationsHub, type OperationsTab } from './operations/OperationsHub'
 import { InventoryPage } from './inventory/InventoryPage'
+import { SalesPage } from './sales/SalesPage'
+import { AccountingPage } from './accounting/AccountingPage'
 import {
   InventoryAdjustPage,
   InventoryTransferPage,
@@ -312,6 +314,11 @@ function App({
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAnnouncements, setShowAnnouncements] = useState(false)
   const [darkMode, setDarkMode] = useState(() => readDarkMode())
+  // Inventory toolbar state — lifted so the topbar can host these controls
+  const [invTab, setInvTab] = useState<'stock' | 'recipes' | 'movements'>('stock')
+  const [invSearch, setInvSearch] = useState('')
+  const [invMovementSearch, setInvMovementSearch] = useState('')
+  const [invShowAdd, setInvShowAdd] = useState(false)
   const {
     broadcasts,
     unread: broadcastUnread,
@@ -352,6 +359,7 @@ function App({
       'catalog-booked': 'catalog:read',
       dashboard: 'orders:read',
       kitchen: 'kitchen:view',
+      sales: 'reports:read',
     }
     const blocked =
       merchantOnlyViews.has(view) ||
@@ -851,6 +859,8 @@ function App({
                   : []),
               ],
             },
+            { id: 'sales', label: 'Sales', icon: ShoppingBag, perm: 'reports:read' as PermissionId, merchantOnly: true },
+            { id: 'accounting', label: 'Accounting', icon: Landmark, merchantOnly: true },
             {
               id: 'operations',
               label: 'Permissions',
@@ -1084,6 +1094,8 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-suppliers' && 'Merchant · Inventory · Suppliers'}
               {!editingItem && !showAddItem && view === 'inventory-variance' && 'Merchant · Inventory · Variance'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Merchant · Orders'}
+              {!editingItem && !showAddItem && view === 'sales' && 'Merchant · Orders'}
+              {!editingItem && !showAddItem && view === 'accounting' && 'Merchant · Accounting'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Merchant · Kitchen'}
               {!editingItem && !showAddItem && operationViews.has(view) && 'Merchant · Permissions'}
               {!editingItem && !showAddItem && view === 'reports' && 'Merchant · Reports'}
@@ -1105,6 +1117,8 @@ function App({
               {!editingItem && !showAddItem && view === 'inventory-suppliers' && 'Suppliers'}
               {!editingItem && !showAddItem && view === 'inventory-variance' && 'Variance report'}
               {!editingItem && !showAddItem && view === 'dashboard' && 'Orders'}
+              {!editingItem && !showAddItem && view === 'sales' && 'Sales'}
+              {!editingItem && !showAddItem && view === 'accounting' && 'Accounting'}
               {!editingItem && !showAddItem && view === 'kitchen' && 'Kitchen display'}
               {!editingItem && !showAddItem && view === 'operations-roles' && 'Staff'}
               {!editingItem && !showAddItem && view === 'operations-settings' && 'Busy mode'}
@@ -1131,6 +1145,29 @@ function App({
               <Button className="" size="sm" onClick={() => { setAddItemSection('food'); setEditingItem(null); setShowAddItem(true) }}>
                 <Plus className="size-3.5" />
                 Add item
+              </Button>
+            )}
+            {/* Inventory toolbar — search + add ingredient, visible only on inventory view */}
+            {view === 'inventory' && !invShowAdd && invTab !== 'recipes' && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder={invTab === 'stock' ? 'Search ingredients…' : 'Search movements…'}
+                  value={invTab === 'stock' ? invSearch : invMovementSearch}
+                  onChange={(e) =>
+                    invTab === 'stock'
+                      ? setInvSearch(e.target.value)
+                      : setInvMovementSearch(e.target.value)
+                  }
+                  className="h-8 pl-8 text-sm w-44"
+                  aria-label={invTab === 'stock' ? 'Search ingredients' : 'Search movements'}
+                />
+              </div>
+            )}
+            {view === 'inventory' && invTab === 'stock' && (
+              <Button type="button" size="sm" className="h-8" onClick={() => setInvShowAdd((v) => !v)}>
+                {invShowAdd ? 'Cancel' : <><Plus className="size-3.5" />Add ingredient</>}
               </Button>
             )}
             {/* Dark mode toggle */}
@@ -1323,7 +1360,18 @@ function App({
 
             {view === 'inventory' && (
               <div className="page-content">
-                <InventoryPage businessId={business.id} catalogItems={business.items ?? []} />
+                <InventoryPage
+                  businessId={business.id}
+                  catalogItems={business.items ?? []}
+                  tab={invTab}
+                  onTabChange={setInvTab}
+                  search={invSearch}
+                  onSearchChange={setInvSearch}
+                  movementSearch={invMovementSearch}
+                  onMovementSearchChange={setInvMovementSearch}
+                  showAdd={invShowAdd}
+                  onShowAddChange={setInvShowAdd}
+                />
               </div>
             )}
 
@@ -1379,7 +1427,16 @@ function App({
                 />
               </div>
             )}
-
+            {view === 'sales' && (
+              <div className="page-content">
+                <SalesPage orders={businessOrders} onRefresh={() => void loadOrders(business.id)} />
+              </div>
+            )}
+            {view === 'accounting' && (
+              <div className="page-content">
+                <AccountingPage businessId={business.id} />
+              </div>
+            )}
             {view === 'kitchen' && (
               <div className="page-content">
                 <div style={{ marginBottom: 12 }}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -48,19 +48,50 @@ type Tab = 'stock' | 'recipes' | 'movements'
 export function InventoryPage({
   businessId,
   catalogItems,
+  tab: tabProp,
+  onTabChange,
+  search: searchProp,
+  onSearchChange,
+  movementSearch: movementSearchProp,
+  onMovementSearchChange,
+  showAdd: showAddProp,
+  onShowAddChange,
 }: {
   businessId: string
   catalogItems: CatalogItem[]
+  tab?: 'stock' | 'recipes' | 'movements'
+  onTabChange?: (tab: 'stock' | 'recipes' | 'movements') => void
+  search?: string
+  onSearchChange?: (v: string) => void
+  movementSearch?: string
+  onMovementSearchChange?: (v: string) => void
+  showAdd?: boolean
+  onShowAddChange?: (v: boolean) => void
 }) {
-  const [tab, setTab] = useState<Tab>('stock')
+  const [tabLocal, setTabLocal] = useState<Tab>('stock')
+  const [searchLocal, setSearchLocal] = useState('')
+  const [movementSearchLocal, setMovementSearchLocal] = useState('')
+  const [showAddLocal, setShowAddLocal] = useState(false)
+
+  // Data states
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [summary, setSummary] = useState<{ ingredientCount: number; lowStockCount: number; stockValueTotal: number } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [movementSearch, setMovementSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
+
+  // Use controlled value when provided, otherwise fall back to local state
+  const tab = tabProp ?? tabLocal
+  const setTab = (v: Tab) => { onTabChange ? onTabChange(v) : setTabLocal(v) }
+  const search = searchProp ?? searchLocal
+  const setSearch = (v: string) => { onSearchChange ? onSearchChange(v) : setSearchLocal(v) }
+  const movementSearch = movementSearchProp ?? movementSearchLocal
+  const setMovementSearch = (v: string) => { onMovementSearchChange ? onMovementSearchChange(v) : setMovementSearchLocal(v) }
+  const showAdd = showAddProp ?? showAddLocal
+  const setShowAdd = (fn: ((v: boolean) => boolean) | boolean) => {
+    const next = typeof fn === 'function' ? fn(showAdd) : fn
+    onShowAddChange ? onShowAddChange(next) : setShowAddLocal(next)
+  }
 
   const foodItems = useMemo(
     () => catalogItems.filter((item) => !item.itemKind || item.itemKind === 'FOOD'),
@@ -120,36 +151,6 @@ export function InventoryPage({
               {summary?.lowStockCount ?? '—'}
             </strong>
           </div>
-        </div>
-
-        <div className="inventory-page-toolbar">
-          {tab === 'recipes' ? null : (
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder={tab === 'stock' ? 'Search ingredients…' : 'Search movements…'}
-                value={tab === 'stock' ? search : movementSearch}
-                onChange={(e) =>
-                  tab === 'stock' ? setSearch(e.target.value) : setMovementSearch(e.target.value)
-                }
-                className="h-8 pl-8 text-sm"
-                aria-label={tab === 'stock' ? 'Search ingredients' : 'Search movements'}
-              />
-            </div>
-          )}
-          {tab === 'stock' ? (
-            <Button type="button" size="sm" className="h-8" onClick={() => setShowAdd((v) => !v)}>
-              {showAdd ? (
-                'Cancel'
-              ) : (
-                <>
-                  <Plus className="size-3.5" />
-                  Add ingredient
-                </>
-              )}
-            </Button>
-          ) : null}
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 import { TrendingUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { InlineSpinner } from '../components/LoadingSpinner'
+import MonthlyRevenueDonut from '../components/MonthlyRevenueDonut'
 import { PaginationBar } from '../components/PaginationBar'
-import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 import { useRevenue } from '../hooks/usePlatform'
 
@@ -29,7 +29,6 @@ export default function RevenuePaymentsPage() {
   const { overview, transactions, loading, error } = useRevenue()
   const monthly = overview?.monthly ?? []
   const txPagination = usePagination(transactions, { initialPageSize: 20 })
-  const maxRev = Math.max(...monthly.map((m) => m.revenue), 1)
   const current = overview?.currentMonth
 
   return (
@@ -78,38 +77,8 @@ export default function RevenuePaymentsPage() {
       <div className="admin-two-col">
         <div className="admin-card">
           <div className="admin-card-header"><div><h3>Monthly Revenue</h3><p>{current?.currency || 'UGX'}</p></div></div>
-          <div style={{ padding: '20px' }}>
-            {monthly.length === 0 ? (
-              <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No monthly revenue data yet.</p>
-            ) : (
-              <>
-                <div className="admin-monthly-chart">
-                  <Sparkline
-                    data={monthly.map((m) => m.revenue)}
-                    color="var(--primary)"
-                    className="admin-sparkline-overlay"
-                    height={100}
-                    strokeWidth={1.6}
-                  />
-                  <div className="admin-bar-chart admin-bar-chart--overlay" style={{ height: 140 }}>
-                    {monthly.map((m, i) => (
-                      <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>{Math.round(m.revenue / 1000)}k</span>
-                        <div
-                          className={`bar ${i === monthly.length - 1 ? 'accent' : ''}`}
-                          style={{ width: '100%', height: `${(m.revenue / maxRev) * 100}%`, borderRadius: '4px 4px 0 0' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8 }}>
-                  {monthly.map((m) => (
-                    <span key={m.month} style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{m.month}</span>
-                  ))}
-                </div>
-              </>
-            )}
+          <div style={{ padding: '16px 20px' }}>
+            <MonthlyRevenueDonut monthly={monthly} currency={current?.currency || 'UGX'} />
           </div>
         </div>
 

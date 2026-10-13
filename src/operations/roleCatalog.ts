@@ -4,6 +4,7 @@ export type PermissionId =
   | 'catalog:read'
   | 'catalog:manage'
   | 'orders:read'
+  | 'orders:create'
   | 'orders:pay'
   | 'orders:split'
   | 'orders:receipt'
@@ -39,6 +40,7 @@ export const AVAILABLE_PERMISSIONS: PermissionMeta[] = [
   { id: 'catalog:read', label: 'View catalog', group: 'Catalog' },
   { id: 'catalog:manage', label: 'Add & edit menu items', group: 'Catalog' },
   { id: 'orders:read', label: 'View orders', group: 'Orders' },
+  { id: 'orders:create', label: 'Create orders (POS)', group: 'Orders' },
   { id: 'orders:pay', label: 'Take payments', group: 'Orders' },
   { id: 'orders:split', label: 'Split bills', group: 'Orders' },
   { id: 'orders:receipt', label: 'Print receipts', group: 'Orders' },
@@ -58,6 +60,7 @@ export const BRANCH_MANAGER_PERMISSIONS: PermissionId[] = [
   'catalog:read',
   'catalog:manage',
   'orders:read',
+  'orders:create',
   'orders:pay',
   'orders:split',
   'orders:receipt',
@@ -117,6 +120,7 @@ const LEGACY_ROLE_LABELS: Partial<Record<StaffRole, string>> = {
 const LEGACY_ROLE_PERMISSIONS: Partial<Record<StaffRole, PermissionId[]>> = {
   CASHIER: [
     'orders:read',
+    'orders:create',
     'orders:pay',
     'orders:split',
     'orders:receipt',

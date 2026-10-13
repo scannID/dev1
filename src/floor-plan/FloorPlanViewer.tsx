@@ -21,12 +21,6 @@ interface FloorPlanViewerProps {
 
 function StatusBadge({ status }: { status: ElementStatusSnapshot['status'] }) {
   const style = getStatusStyle(status)
-  const colors: Record<string, string> = {
-    FREE: 'bg-green-100 text-green-800 border-green-200',
-    OCCUPIED: 'bg-red-100 text-red-800 border-red-200',
-    RESERVED: 'bg-amber-100 text-amber-800 border-amber-200',
-    OUT_OF_SERVICE: 'bg-gray-100 text-gray-600 border-gray-200',
-  }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,

@@ -59,7 +59,7 @@ export function ShapePalette({ onAddElement }: ShapePaletteProps) {
             {group.label}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {group.items.map(({ kind, label, emoji }) => {
+            {group.items.map(({ kind, label, emoji: _emoji }) => {
               const def = getDefaults(kind)
               return (
                 <button

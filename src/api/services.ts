@@ -668,6 +668,82 @@ export const promotionsApi = {
   },
 }
 
+export const accountingApi = {
+  /**
+   * GET /api/businesses/{id}/accounting/summary
+   * Aggregate financial summary. Pass ISO-8601 dates or omit for all-time.
+   * timezone: IANA zone string (e.g. "Africa/Kampala") — defaults to browser local zone.
+   */
+  getSummary: async (
+    businessId: string,
+    from?: string,
+    to?: string,
+    timezone?: string,
+  ): Promise<import('./types').AccountingSummary> => {
+    const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to)   params.set('to', to)
+    params.set('timezone', tz)
+    return api.get(`/businesses/${businessId}/accounting/summary?${params}`)
+  },
+
+  /**
+   * GET /api/businesses/{id}/accounting/ledger
+   * Paginated transaction ledger, newest first.
+   * entryType: "PAYMENT" | "REFUND" | undefined (all)
+   */
+  getLedger: async (
+    businessId: string,
+    params: import('./types').AccountingLedgerParams = {},
+  ): Promise<import('./types').AccountingLedgerResponse> => {
+    const tz = params.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    const qs = new URLSearchParams()
+    if (params.from)       qs.set('from',      params.from)
+    if (params.to)         qs.set('to',         params.to)
+    if (params.entryType)  qs.set('entryType',  params.entryType)
+    if (params.page != null) qs.set('page',     String(params.page))
+    if (params.size != null) qs.set('size',     String(params.size))
+    qs.set('timezone', tz)
+    return api.get(`/businesses/${businessId}/accounting/ledger?${qs}`)
+  },
+
+  /**
+   * GET /api/businesses/{id}/accounting/daily-revenue
+   * Daily net-revenue series for sparklines. Timezone-aware bucketing.
+   */
+  getDailyRevenue: async (
+    businessId: string,
+    days = 30,
+    timezone?: string,
+  ): Promise<import('./types').AccountingDailyRevenueSeries> => {
+    const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    return api.get(`/businesses/${businessId}/accounting/daily-revenue?days=${days}&timezone=${encodeURIComponent(tz)}`)
+  },
+
+  /**
+   * GET /api/businesses/{id}/accounting/export
+   * Triggers a browser CSV download. Uses a direct window.location redirect so
+   * the streaming response flows straight to the browser's download manager
+   * without buffering in JS memory.
+   */
+  triggerCsvExport: (
+    businessId: string,
+    from?: string,
+    to?: string,
+    timezone?: string,
+  ): void => {
+    const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to)   params.set('to', to)
+    params.set('timezone', tz)
+    // Open in same tab — the Content-Disposition: attachment header triggers download
+    window.location.href =
+      `/api/businesses/${businessId}/accounting/export?${params}`
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -683,6 +759,7 @@ export const scannyApi = {
   publicTickets: publicTicketsApi,
   announcements: announcementsApi,
   promotions: promotionsApi,
+  accounting: accountingApi,
 }
 
 export default scannyApi

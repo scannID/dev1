@@ -101,7 +101,7 @@ function QueueWaitingStep({
         } else if (res.status === 'Expired') {
           setError('Your spot in line has expired. Please rejoin the queue.')
         }
-      } catch (err: any) {
+      } catch (_err: any) {
         // network retry
       }
     }
@@ -214,7 +214,7 @@ export default function TicketPurchasePage({ masterQrToken }: Props) {
   const [feeConsent, setFeeConsent] = useState(false)
   const paymentProvider = detectProvider(paymentPhone || holderPhone)
   const [submitting, setSubmitting] = useState(false)
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const [purchaseResult, setPurchaseResult] = useState<TicketPurchaseResponse | null>(null)
 
   usePageMeta({

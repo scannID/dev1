@@ -114,6 +114,20 @@ scanny:
     ticket-template: ${WHATSAPP_TICKET_TEMPLATE:}
   digest:
     cron: ${DAILY_DIGEST_CRON:0 0 21 * * *}
+  efris:
+    # Set to true to enable EFRIS submission pipeline.
+    # When false (default), the stub is used so the full pipeline runs without hitting URA.
+    enabled: ${EFRIS_ENABLED:false}
+    # URA EFRIS API endpoint — switch to sandbox URL for testing with real creds.
+    api-url: ${EFRIS_API_URL:https://efris.ura.go.ug/efrisws/ws/tapin/getInformation}
+    # Timeout for HTTP calls to URA (milliseconds).
+    connect-timeout-ms: ${EFRIS_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${EFRIS_READ_TIMEOUT_MS:10000}
+    # Max retry attempts before marking a submission FAILED.
+    max-retries: ${EFRIS_MAX_RETRIES:3}
+    # Uganda standard VAT rate for tax-inclusive price decomposition (18%).
+    vat-rate: ${EFRIS_VAT_RATE:0.18}
+
   payments:
     default-provider: stub
     fallback-to-stub: ${PAYMENTS_FALLBACK_TO_STUB:true}
