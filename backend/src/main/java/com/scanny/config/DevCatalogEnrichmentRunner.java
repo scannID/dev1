@@ -23,6 +23,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,24 +43,45 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
     private final StarterCatalogService starterCatalogService;
     private final BusinessService businessService;
     private final OperationsService operationsService;
+    private final JdbcTemplate jdbcTemplate;
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate;
 
     public DevCatalogEnrichmentRunner(
             BusinessRepository businessRepository,
             CatalogItemRepository catalogItemRepository,
             StarterCatalogService starterCatalogService,
             BusinessService businessService,
-            OperationsService operationsService
+            OperationsService operationsService,
+            JdbcTemplate jdbcTemplate,
+            org.springframework.transaction.PlatformTransactionManager txManager
     ) {
         this.businessRepository = businessRepository;
         this.catalogItemRepository = catalogItemRepository;
         this.starterCatalogService = starterCatalogService;
         this.businessService = businessService;
         this.operationsService = operationsService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.txTemplate = new org.springframework.transaction.support.TransactionTemplate(txManager);
+        this.txTemplate.setPropagationBehavior(
+            org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        // Normalise legacy PascalCase enum values before Hibernate reads them.
+        // Runs in its own committed transaction so the subsequent findAll() sees clean data.
+        txTemplate.executeWithoutResult(status -> {
+            int updated = jdbcTemplate.update(
+                "UPDATE businesses SET type = UPPER(type) WHERE type != UPPER(type)");
+            if (updated > 0) {
+                log.info("[H2 fix] Normalised {} business type value(s) to UPPER_CASE", updated);
+            }
+            jdbcTemplate.update(
+                "UPDATE merchants SET business_type = UPPER(business_type) " +
+                "WHERE business_type IS NOT NULL AND business_type != UPPER(business_type)");
+        });
+
         int added = 0;
         for (Business business : businessRepository.findAll()) {
             if (!business.isPrimary()) {
@@ -69,7 +91,7 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
         }
         // Demo hotel if none exists yet
         boolean hasHotel = businessRepository.findAll().stream()
-                .anyMatch(b -> b.getType() == BusinessType.Hotel);
+                .anyMatch(b -> b.getType() == BusinessType.HOTEL);
         if (!hasHotel) {
             added += seedDemoHotel();
         }
@@ -179,7 +201,7 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
     }
 
     private int enrich(Business business) {
-        BusinessType type = business.getType() != null ? business.getType() : BusinessType.Restaurant;
+        BusinessType type = business.getType() != null ? business.getType() : BusinessType.RESTAURANT;
         Set<String> existingNames = new HashSet<>();
         Set<String> existingIds = new HashSet<>();
         for (CatalogItem item : catalogItemRepository.findByBusiness_IdOrderByNameAsc(business.getId())) {
@@ -189,13 +211,13 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
 
         int added = 0;
         List<FoodSpec> foods = switch (type) {
-            case Bar -> starterCatalogService.premiumBarFood();
-            case Hotel -> starterCatalogService.premiumHotelFood();
-            case Restaurant, School, Boutique -> starterCatalogService.premiumRestaurantFood();
+            case BAR -> starterCatalogService.premiumBarFood();
+            case HOTEL -> starterCatalogService.premiumHotelFood();
+            default -> starterCatalogService.premiumRestaurantFood();
         };
 
         // Boutique/School get a lighter pass — only Restaurant-like venues get full premium food
-        if (type == BusinessType.School || type == BusinessType.Boutique) {
+        if (type == BusinessType.SCHOOL || type == BusinessType.RETAIL) {
             return 0;
         }
 
@@ -221,7 +243,7 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
             added++;
         }
 
-        if (type == BusinessType.Hotel) {
+        if (type == BusinessType.HOTEL) {
             for (LodgingSpec spec : starterCatalogService.premiumHotelRooms()) {
                 if (existingNames.contains(normalize(spec.name()))) {
                     continue;
@@ -245,7 +267,7 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
                 existingIds.add(id);
                 added++;
             }
-            for (String category : CatalogCategories.defaultNames(BusinessType.Hotel)) {
+            for (String category : CatalogCategories.defaultNames(BusinessType.HOTEL)) {
                 business.addCustomCategory(category);
             }
         }
@@ -351,11 +373,11 @@ public class DevCatalogEnrichmentRunner implements ApplicationRunner {
         hotel.setName("Lakeview Grand Hotel");
         hotel.setOwnerName("Demo Hotel");
         hotel.setPhone("");
-        hotel.setType(BusinessType.Hotel);
+        hotel.setType(BusinessType.HOTEL);
         hotel.setTableLabel("Room number or guest name");
         hotel.setPaymentReference("PAY-LVG-2001");
         hotel.setAccent("#0f766e");
-        hotel.setCustomCategories(new java.util.ArrayList<>(CatalogCategories.defaultNames(BusinessType.Hotel)));
+        hotel.setCustomCategories(new java.util.ArrayList<>(CatalogCategories.defaultNames(BusinessType.HOTEL)));
         businessRepository.save(hotel);
 
         int added = 0;

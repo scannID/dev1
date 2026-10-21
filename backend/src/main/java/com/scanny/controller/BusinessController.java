@@ -6,8 +6,10 @@ import com.scanny.dto.OrdersPageResponse;
 import com.scanny.dto.PageDtos;
 import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
+import com.scanny.dto.FunnelDtos;
 import com.scanny.dto.admin.AdminAnalyticsDtos;
 import com.scanny.service.BusinessService;
+import com.scanny.service.FunnelDropService;
 import com.scanny.service.MerchantAnalyticsService;
 import com.scanny.service.OrderService;
 import com.scanny.service.QrScanService;
@@ -33,17 +35,20 @@ public class BusinessController {
     private final OrderService orderService;
     private final QrScanService qrScanService;
     private final MerchantAnalyticsService merchantAnalyticsService;
+    private final FunnelDropService funnelDropService;
 
     public BusinessController(
             BusinessService businessService,
             OrderService orderService,
             QrScanService qrScanService,
-            MerchantAnalyticsService merchantAnalyticsService
+            MerchantAnalyticsService merchantAnalyticsService,
+            FunnelDropService funnelDropService
     ) {
         this.businessService = businessService;
         this.orderService = orderService;
         this.qrScanService = qrScanService;
         this.merchantAnalyticsService = merchantAnalyticsService;
+        this.funnelDropService = funnelDropService;
     }
 
     @GetMapping("/businesses")
@@ -103,6 +108,21 @@ public class BusinessController {
             @RequestParam(defaultValue = "week") String range
     ) {
         return merchantAnalyticsService.getScansOrders(businessId, range);
+    }
+
+    /**
+     * Funnel drop-off analytics for the merchant dashboard / admin console.
+     * Returns per-step drop counts and feedback reason breakdown for the last N days.
+     *
+     * @param days look-back window in days (default 7, max 90)
+     */
+    @GetMapping("/businesses/{businessId}/analytics/funnel-drops")
+    public FunnelDtos.FunnelAnalyticsResponse getFunnelDrops(
+            @PathVariable String businessId,
+            @RequestParam(defaultValue = "7") int days
+    ) {
+        int safeDays = Math.min(Math.max(days, 1), 90);
+        return funnelDropService.getAnalytics(businessId, safeDays);
     }
 
     @PostMapping("/qr/{qrToken}/scans")

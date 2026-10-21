@@ -215,7 +215,7 @@ function StatusBadge({ status }: { status: string }) {
 
 /* ─── Main component ─────────────────────────────────────────────────────── */
 
-export function AccountingPage({ businessId }: { businessId: string }) {
+export function AccountingPage({ businessId, refreshKey = 0 }: { businessId: string; refreshKey?: number }) {
   // ── Range state ──
   const [range, setRange]           = useState<DateRange>('month')
   const [customFrom, setCustomFrom] = useState('')
@@ -259,7 +259,7 @@ export function AccountingPage({ businessId }: { businessId: string }) {
     } catch {
       // chart just won't render — not worth surfacing an error for
     }
-  }, [businessId, fromStr, toStr])
+  }, [businessId, fromStr, toStr, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Fetch ledger page ── */
   const fetchLedger = useCallback(async () => {
@@ -280,7 +280,7 @@ export function AccountingPage({ businessId }: { businessId: string }) {
     } finally {
       setLedgerLoading(false)
     }
-  }, [businessId, fromStr, toStr, payFilter, ledgerPage])
+  }, [businessId, fromStr, toStr, payFilter, ledgerPage, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Reset page when filters change */
   useEffect(() => { setLedgerPage(0) }, [businessId, fromStr, toStr, payFilter])

@@ -411,7 +411,7 @@ export default function QRActivityChart({ hourly }: Props) {
       </div>
 
       {/* ── Peak summary chips ──────────────────────────────────────────── */}
-      {hasData && (
+      {hasData && totalScans > 0 && (
         <div style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -423,35 +423,12 @@ export default function QRActivityChart({ hourly }: Props) {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '3px 8px', borderRadius: 20,
-            background: 'color-mix(in oklch, #5ac8fa 12%, transparent)',
-            border: '1px solid color-mix(in oklch, #5ac8fa 30%, transparent)',
+            background: 'var(--muted)',
+            border: '1px solid var(--border)',
           }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: '#5ac8fa', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Peak Scans</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--foreground)' }}>{hourLabel(peakScanHour.hour)}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {fmt(peakScanHour.scans)}</span>
+            <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--muted-foreground)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Busy Hours</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--foreground)' }}>8am – 10pm</span>
           </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '3px 8px', borderRadius: 20,
-            background: 'color-mix(in oklch, #f07848 12%, transparent)',
-            border: '1px solid color-mix(in oklch, #f07848 30%, transparent)',
-          }}>
-            <span style={{ fontSize: 9, fontWeight: 600, color: '#f07848', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Peak Orders</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--foreground)' }}>{hourLabel(peakOrderHour.hour)}</span>
-            <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {fmt(peakOrderHour.orders)}</span>
-          </div>
-          {totalScans > 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '3px 8px', borderRadius: 20,
-              background: 'var(--muted)',
-              border: '1px solid var(--border)',
-              marginLeft: 'auto',
-            }}>
-              <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--muted-foreground)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Busy Hours</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--foreground)' }}>8am – 10pm</span>
-            </div>
-          )}
         </div>
       )}
     </div>

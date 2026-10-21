@@ -151,7 +151,7 @@ try {
 }
 
 # 2) Realm roles
-foreach ($r in 'MERCHANT', 'ADMIN', 'CUSTOMER', 'STAFF') {
+foreach ($r in 'MERCHANT', 'ADMIN', 'CUSTOMER', 'STAFF', 'RENT_MANAGER') {
   try {
     Invoke-RestMethod -Method Post -Uri "$kc/admin/realms/$realm/roles" -Headers $H -ContentType 'application/json' -Body (@{ name = $r } | ConvertTo-Json) | Out-Null
     Write-Output "Role $r created"
@@ -213,6 +213,14 @@ Ensure-UserWithRole `
   -Password 'Pentagon@2026!' `
   -RoleName 'MERCHANT'
 
+Ensure-UserWithRole `
+  -Username 'rentmanager@scanny.local' `
+  -Email 'rentmanager@scanny.local' `
+  -FirstName 'Demo' `
+  -LastName 'Rent Manager' `
+  -Password 'RentManager@2026!' `
+  -RoleName 'RENT_MANAGER'
+
 Write-Output 'DONE'
 Write-Output ''
 Write-Output 'Local logins:'
@@ -221,4 +229,5 @@ Write-Output '  Merchant app  (:5173): lolo@scanny.local / Lolo@2026!'
 Write-Output '  Merchant app  (:5173): qtybites@scanny.local / QtyBites@2026!'
 Write-Output '  Merchant app  (:5173): pentagon@scanny.local / Pentagon@2026!'
 Write-Output '  Merchant app  (:5173): testuser / password'
+Write-Output '  Rent Manager  (:5173): rentmanager@scanny.local / RentManager@2026!'
 Write-Output '  Admin console (:5174): adminuser / Admin@2026!'

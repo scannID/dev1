@@ -744,6 +744,80 @@ export const accountingApi = {
   },
 }
 
+// ── Funnel drop-off tracking ─────────────────────────────────────────────────
+
+export interface FunnelNudgeResponse {
+  hasPendingNudge: boolean
+  /** 'menu' | 'cart' | 'details' | 'pay' — present when hasPendingNudge is true */
+  lastStep: string | null
+}
+
+export interface FunnelAnalyticsResponse {
+  totalDrops: number
+  byStep: Array<{ step: string; count: number }>
+  byFeedbackReason: Array<{ reason: string; count: number }>
+}
+
+export const funnelApi = {
+  /**
+   * Record a funnel drop-off — called via sendBeacon on page-hide
+   * and via fetch when the step changes (debounced).
+   * Fire-and-forget; never throws so it never disrupts the checkout flow.
+   */
+  recordDrop: (
+    businessId: string,
+    payload: { deviceId: string; lastStep: string; qrToken?: string; phone?: string },
+  ): void => {
+    const url = `/api/public/businesses/${encodeURIComponent(businessId)}/funnel/drop`
+    const body = JSON.stringify(payload)
+    // sendBeacon survives tab-close; falls back to fetch in environments without it
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' })
+      navigator.sendBeacon(url, blob)
+    } else {
+      void fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' }, keepalive: true }).catch(() => {})
+    }
+  },
+
+  /**
+   * Check for a pending nudge on the next scan.
+   * Calling this marks the nudge as notified server-side (shown exactly once).
+   */
+  getNudge: async (businessId: string, deviceId: string): Promise<FunnelNudgeResponse> => {
+    return api.get<FunnelNudgeResponse>(
+      `/public/businesses/${encodeURIComponent(businessId)}/funnel/nudge?deviceId=${encodeURIComponent(deviceId)}`,
+    )
+  },
+
+  /**
+   * Submit feedback from the nudge banner.
+   * Fire-and-forget; never throws.
+   */
+  submitFeedback: async (
+    businessId: string,
+    payload: { deviceId: string; reason: string; text?: string },
+  ): Promise<void> => {
+    try {
+      await api.post(
+        `/public/businesses/${encodeURIComponent(businessId)}/funnel/feedback`,
+        payload,
+      )
+    } catch {
+      // best-effort
+    }
+  },
+
+  /**
+   * Merchant analytics: funnel drop counts per step + feedback reasons.
+   * Called from the merchant/admin dashboard.
+   */
+  getAnalytics: async (businessId: string, days = 7): Promise<FunnelAnalyticsResponse> => {
+    return api.get<FunnelAnalyticsResponse>(
+      `/businesses/${encodeURIComponent(businessId)}/analytics/funnel-drops?days=${days}`,
+    )
+  },
+}
+
 export const scannyApi = {
   merchant: merchantAuthApi,
   businesses: businessApi,
@@ -760,6 +834,7 @@ export const scannyApi = {
   announcements: announcementsApi,
   promotions: promotionsApi,
   accounting: accountingApi,
+  funnel: funnelApi,
 }
 
 export default scannyApi

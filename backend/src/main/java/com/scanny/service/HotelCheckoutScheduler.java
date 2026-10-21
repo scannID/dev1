@@ -38,7 +38,7 @@ public class HotelCheckoutScheduler {
 
     @Scheduled(cron = "${scanny.hotel.checkout-cron:0 15 0 * * *}")
     public void markOverdueCheckouts() {
-        List<Business> hotels = businessRepository.findByType(BusinessType.Hotel);
+        List<Business> hotels = businessRepository.findByType(BusinessType.HOTEL);
         if (hotels.isEmpty()) {
             return;
         }

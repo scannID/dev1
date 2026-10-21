@@ -14,13 +14,14 @@ public final class CatalogCategories {
     }
 
     public static List<String> defaultNames(BusinessType type) {
-        BusinessType resolved = type != null ? type : BusinessType.Restaurant;
+        BusinessType resolved = type != null ? type : BusinessType.RESTAURANT;
         return switch (resolved) {
-            case Restaurant -> List.of("Meals", "Drinks", "Bites", "Sides", "Desserts");
-            case Bar -> List.of("Drinks", "Bites", "Tickets");
-            case School -> List.of("Meals", "Snacks", "Tickets");
-            case Boutique -> List.of("Goods", "Services");
-            case Hotel -> List.of("Meals", "Drinks", "Bites", "Sides", "Desserts", "Rooms", "Suites");
+            case RESTAURANT -> List.of("Meals", "Drinks", "Bites", "Sides", "Desserts");
+            case BAR -> List.of("Drinks", "Bites", "Tickets");
+            case SCHOOL -> List.of("Meals", "Snacks", "Tickets");
+            case RETAIL -> List.of("Goods", "Services");
+            case HOTEL -> List.of("Meals", "Drinks", "Bites", "Sides", "Desserts", "Rooms", "Suites");
+            default -> List.of("Items");
         };
     }
 

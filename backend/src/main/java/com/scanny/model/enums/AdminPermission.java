@@ -26,6 +26,7 @@ public enum AdminPermission {
     VIEW_QR_ACTIVITY("QR scan activity"),
     VIEW_COOKIE_CONSENT("Cookie consent analytics"),
     VIEW_REPORTS("Reports"),
+    VIEW_FUNNEL_DROPS("Customer funnel drop-off analytics"),
 
     // ── System ────────────────────────────────────────────────────────────────
     VIEW_SYSTEM("System health"),

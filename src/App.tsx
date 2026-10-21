@@ -330,6 +330,8 @@ function App({
   const [logoUploading, setLogoUploading] = useState(false)
   const [branchOverviewCounts, setBranchOverviewCounts] = useState<Record<string, { openOrders: number; kitchenOrders: number }>>({})
   const [branchOverviewLoading, setBranchOverviewLoading] = useState(false)
+  // Incremented whenever a payment-related realtime event arrives so AccountingPage re-fetches.
+  const [accountingRefreshKey, setAccountingRefreshKey] = useState(0)
 
   // Block disallowed views for staff (Overview + Reports are owner / general manager only)
   useEffect(() => {
@@ -547,7 +549,10 @@ function App({
             return keycloak.token
           }
         },
-        poll: () => loadOrders(business.id),
+        poll: () => {
+          void loadOrders(business.id)
+          setAccountingRefreshKey((k) => k + 1)
+        },
         pollIntervalMs: 15000,
         onEvent: (event) => {
           if (event.type?.startsWith('ORDER') || event.type === 'ORDERS_CLEARED') {
@@ -556,6 +561,13 @@ function App({
             const eventBusinessId = event.businessId ?? event.channel?.split(':')[1]
             if (eventBusinessId) {
               void loadOrders(eventBusinessId)
+            }
+            // Payment events mean the ledger has a new row — tell AccountingPage to re-fetch.
+            if (
+              event.type === 'ORDER_PAYMENT_UPDATED' ||
+              event.type === 'ORDER_CREATED'
+            ) {
+              setAccountingRefreshKey((k) => k + 1)
             }
           }
         },
@@ -1434,7 +1446,7 @@ function App({
             )}
             {view === 'accounting' && (
               <div className="page-content">
-                <AccountingPage businessId={business.id} />
+                <AccountingPage businessId={business.id} refreshKey={accountingRefreshKey} />
               </div>
             )}
             {view === 'kitchen' && (

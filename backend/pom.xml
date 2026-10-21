@@ -69,6 +69,13 @@
             <artifactId>javase</artifactId>
             <version>3.5.3</version>
         </dependency>
+
+        <!-- PDF generation for bulk unit QR sheets -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>

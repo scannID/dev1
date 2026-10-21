@@ -1,6 +1,7 @@
 package com.scanny.dto;
 
 import com.scanny.entity.Merchant;
+import com.scanny.model.enums.BusinessType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,7 +19,7 @@ public class MerchantDtos {
         String businessName,
         
         @NotNull(message = "Business type is required")
-        Merchant.BusinessType businessType,
+        BusinessType businessType,
         
         @NotBlank(message = "Email is required")
         @Email(message = "Invalid email format")
@@ -95,7 +96,7 @@ public class MerchantDtos {
         UUID id,
         String email,
         String businessName,
-        Merchant.BusinessType businessType,
+        BusinessType businessType,
         String phoneNumber,
         String qrCodeToken,
         String qrCodeUrl,

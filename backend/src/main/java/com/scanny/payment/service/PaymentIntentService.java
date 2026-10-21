@@ -6,6 +6,7 @@ import com.scanny.dto.PaymentDtos;
 import com.scanny.entity.PaymentIntent;
 import com.scanny.entity.QuickPaymentCode;
 import com.scanny.entity.QuickPaymentTransaction;
+import com.scanny.service.RentPaymentService;
 import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.TransactionStatus;
 import com.scanny.payment.PaymentContext;
@@ -56,6 +57,10 @@ public class PaymentIntentService {
     /** Lazy to avoid circular dependency: PromotionService → PaymentGatewayService → here */
     @Autowired @Lazy
     private PromotionService promotionService;
+
+    /** Lazy to avoid circular dependency: RentPaymentService → PaymentGatewayService → here */
+    @Autowired @Lazy
+    private RentPaymentService rentPaymentService;
 
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
@@ -273,6 +278,7 @@ public class PaymentIntentService {
                 intent.getId()
             );
             case EVENT_PROMOTION -> promotionService.handlePaymentPaid(intent.getId());
+            case RENT -> rentPaymentService.completePayment(intent.getReferenceId());
             default -> logger.warn("No side-effect handler for payment context {}", intent.getContext());
         }
     }
@@ -280,6 +286,9 @@ public class PaymentIntentService {
     private void onFailed(PaymentIntent intent, String failureReason) {
         if (intent.getContext() == PaymentContext.QUICK_PAY) {
             completeQuickPay(intent.getReferenceId(), TransactionStatus.Failed, failureReason);
+        }
+        if (intent.getContext() == PaymentContext.RENT) {
+            rentPaymentService.failPayment(intent.getReferenceId(), failureReason);
         }
     }
 

@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Sun,
   Ticket,
+  TrendingDown,
   Users,
   UserCog,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import CommunicationsPage from './pages/CommunicationsPage'
 import AdminsPage from './pages/AdminsPage'
+import FunnelDropsPage from './pages/FunnelDropsPage'
 import { InlineSpinner } from './components/LoadingSpinner'
 import { PaginationBar } from './components/PaginationBar'
 import { usePagination } from './hooks/usePagination'
@@ -66,7 +68,7 @@ import type { AdminPermission, AdminMeResponse } from './api/types'
 type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
   | 'users' | 'communications' | 'revenue' | 'cash-collections'
-  | 'qr-activity' | 'cookie-consent' | 'reports'
+  | 'qr-activity' | 'cookie-consent' | 'reports' | 'funnel-drops'
   | 'system' | 'audit' | 'configs' | 'admins'
 
 type NavItem = {
@@ -89,6 +91,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
   'cookie-consent': { eyebrow: 'Admin · Analytics', title: 'Cookie Consent' },
   reports: { eyebrow: 'Admin · Analytics', title: 'Reports' },
+  'funnel-drops': { eyebrow: 'Admin · Analytics', title: 'Funnel Drop-offs' },
   system: { eyebrow: 'Admin · System', title: 'System Health' },
   audit: { eyebrow: 'Admin · System', title: 'Audit Log' },
   configs: { eyebrow: 'Admin · System', title: 'Configs' },
@@ -217,9 +220,10 @@ export default function AdminApp({
       {
         label: 'Analytics',
         items: [
-          canSee('VIEW_QR_ACTIVITY')    && { id: 'qr-activity' as const,    label: 'QR Activity',      icon: QrCode },
-          canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent',   icon: Cookie },
-          canSee('VIEW_REPORTS')        && { id: 'reports' as const,        label: 'Reports',           icon: BarChart3 },
+          canSee('VIEW_QR_ACTIVITY')    && { id: 'qr-activity' as const,    label: 'QR Activity',        icon: QrCode },
+          canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent',     icon: Cookie },
+          canSee('VIEW_REPORTS')        && { id: 'reports' as const,        label: 'Reports',             icon: BarChart3 },
+          canSee('VIEW_FUNNEL_DROPS')   && { id: 'funnel-drops' as const,   label: 'Funnel Drop-offs',    icon: TrendingDown },
         ].filter(Boolean) as NavItem[],
       },
       {
@@ -374,6 +378,7 @@ export default function AdminApp({
           {view === 'qr-activity' && <QRActivityPage />}
           {view === 'cookie-consent' && <CookieConsentPage />}
           {view === 'reports' && <ReportsPage />}
+          {view === 'funnel-drops' && <FunnelDropsPage />}
           {view === 'system' && <SystemHealthPage />}
           {view === 'audit' && <AuditLogPage />}
           {view === 'configs' && <ConfigsPage />}

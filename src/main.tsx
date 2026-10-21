@@ -16,7 +16,9 @@ import NotFoundPage from './NotFoundPage'
 import TicketTransferAcceptPage from './tickets/TicketTransferPage'
 import keycloak, {
   hasPortalSession,
+  hasRentManagerSession,
   initKeycloak,
+  loginAsRentManager,
   logoutMerchant,
   waitForKeycloak,
 } from './keycloak'
@@ -28,6 +30,9 @@ import { KitchenDisplayPage } from './kitchen/KitchenDisplayPage'
 import { clearStaffSession } from './api/client'
 import ReceiptPage from './receipt/ReceiptPage'
 import EventsDiscoveryPage from './tickets/EventsDiscoveryPage'
+import RentPayPage from './rent/RentPayPage'
+import RentDashboard from './rent/RentDashboard'
+import RentCreate from './rent/RentCreate'
 
 initThemeFromStorage()
 
@@ -106,6 +111,21 @@ function resolveReceiptRoute(): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+function resolveRentPayRoute(): string | null {
+  const match = window.location.pathname.match(/^\/rent\/pay\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+function resolveRentDashboardRoute(): boolean {
+  const p = window.location.pathname
+  // Matches /rent/dashboard or /rent/dashboard/<anything> (legacy key URLs still land here)
+  return /^\/rent\/dashboard(\/.*)?$/.test(p)
+}
+
+function resolveRentCreateRoute(): boolean {
+  return /^\/rent\/create\/?$/.test(window.location.pathname)
+}
+
 /**
  * Returns true when the current pathname is not the root, not a known
  * functional route prefix, and not a marketing slug — i.e. genuinely unknown.
@@ -118,6 +138,7 @@ function resolveIsUnknownPath(): boolean {
   const knownPrefixes = [
     '/kitchen/', '/receipt/', '/b/', '/pay/', '/track/',
     '/ticket/', '/create-event', '/ticket/gate', '/events',
+    '/rent/',
   ]
   if (knownPrefixes.some((prefix) => p === prefix.replace(/\/$/, '') || p.startsWith(prefix))) return false
   // Marketing slugs
@@ -140,6 +161,9 @@ const eventsRoute = resolveEventsRoute()
 const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
 const receiptOrderId = resolveReceiptRoute()
+const rentPayToken = resolveRentPayRoute()
+const rentDashboardRoute = resolveRentDashboardRoute()
+const rentCreateRoute = resolveRentCreateRoute()
 const isUnknownPath = resolveIsUnknownPath()
 
 if (kitchenBusinessId) {
@@ -197,6 +221,139 @@ if (kitchenBusinessId) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <ReceiptPage />
+    </StrictMode>,
+  )
+} else if (rentPayToken !== null) {
+  // ── /rent/pay/:token — tenant payment page ──────────────────────────────
+  document.documentElement.classList.add('cm-app')
+  applyDarkMode(false)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RentPayPage token={rentPayToken} />
+    </StrictMode>,
+  )
+} else if (rentDashboardRoute) {
+  // ── /rent/dashboard — Keycloak-authenticated portfolio dashboard ────────
+  applyDarkMode(false)
+
+  const RENT_SESSION_KEY = 'scanny-rent-authenticated'
+  const RENT_INTENT_KEY  = 'scanny-rent-login-intent'
+
+  function RentDashboardRoot() {
+    type RPhase = 'boot' | 'login' | 'app'
+    const [phase, setPhase] = useState<RPhase>(() =>
+      (sessionStorage.getItem(RENT_SESSION_KEY) === '1' ||
+       sessionStorage.getItem(RENT_INTENT_KEY)  === '1') ? 'boot' : 'login'
+    )
+    const [showCreate, setShowCreate] = useState(false)
+
+    // Restore session after Keycloak redirect
+    useEffect(() => {
+      const hadSession = sessionStorage.getItem(RENT_SESSION_KEY) === '1'
+      const hadIntent  = sessionStorage.getItem(RENT_INTENT_KEY)  === '1'
+      if (!hadSession && !hadIntent) {
+        setPhase('login'); return
+      }
+      let cancelled = false
+      waitForKeycloak().then((authenticated) => {
+        if (cancelled) return
+        sessionStorage.removeItem(RENT_INTENT_KEY)
+        if (authenticated && hasRentManagerSession()) {
+          sessionStorage.setItem(RENT_SESSION_KEY, '1')
+          setPhase('app')
+        } else {
+          sessionStorage.removeItem(RENT_SESSION_KEY)
+          setPhase('login')
+        }
+      }).catch(() => {
+        if (cancelled) return
+        sessionStorage.removeItem(RENT_INTENT_KEY)
+        sessionStorage.removeItem(RENT_SESSION_KEY)
+        setPhase('login')
+      })
+      return () => { cancelled = true }
+    }, [])
+
+    // Boot screen while waiting for Keycloak
+    if (phase === 'boot') {
+      return (
+        <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#fff', fontFamily: 'Outfit, sans-serif' }}>
+          <p style={{ color: '#6b7280', fontSize: 14 }}>Opening Rent Manager…</p>
+        </div>
+      )
+    }
+
+    // Not authenticated — show sign-in / sign-up prompt
+    if (phase === 'login') {
+      if (showCreate) {
+        return (
+          <RentCreate
+            onDone={() => {
+              // After registration, redirect to sign-in
+              loginAsRentManager(window.location.origin + '/rent/dashboard')
+            }}
+            onCancel={() => setShowCreate(false)}
+          />
+        )
+      }
+      return (
+        <div className="scanny-page">
+          <div className="scanny-page-narrow">
+            <div className="scanny-card" style={{ textAlign: 'center' }}>
+              <p className="scanny-eyebrow">Rent Manager</p>
+              <h1 className="scanny-title">Sign in to your dashboard</h1>
+              <p className="scanny-sub" style={{ marginTop: 8, marginBottom: 24 }}>
+                Use your Koddly account to manage rent collection.
+              </p>
+              <button
+                type="button"
+                className="scanny-btn scanny-btn-primary"
+                style={{ width: '100%', marginBottom: 12 }}
+                onClick={() => {
+                  sessionStorage.setItem(RENT_INTENT_KEY, '1')
+                  loginAsRentManager(window.location.origin + '/rent/dashboard')
+                }}
+              >
+                Sign in with Koddly
+              </button>
+              <button
+                type="button"
+                style={{
+                  width: '100%', padding: '10px 0', borderRadius: 8,
+                  border: '1.5px solid #e5e7eb', background: '#fff',
+                  fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer',
+                }}
+                onClick={() => setShowCreate(true)}
+              >
+                Create an account
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // Authenticated — show the portfolio
+    return (
+      <RentDashboard
+        onOpenCreate={() => setShowCreate(true)}
+      />
+    )
+  }
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RentDashboardRoot />
+    </StrictMode>,
+  )
+} else if (rentCreateRoute) {
+  // ── /rent/create — onboarding form ──────────────────────────────────────
+  applyDarkMode(false)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RentCreate
+        onDone={() => { window.location.href = '/rent/dashboard' }}
+        onCancel={() => { window.location.href = '/' }}
+      />
     </StrictMode>,
   )
 } else if (customerRoute) {
@@ -469,6 +626,9 @@ if (kitchenBusinessId) {
           onGetStarted={handleGetStarted}
           onCreateEventTicket={() => {
             window.location.href = '/events'
+          }}
+          onOpenRentManager={() => {
+            window.location.href = '/rent/dashboard'
           }}
         />
       </>

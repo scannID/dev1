@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Clock3, Megaphone, Package, Receipt, ShoppingCart, Ticket, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
-import { businessApi, devicesApi, feesApi, fxApi, ordersApi, announcementsApi } from '../api/services'
+import { businessApi, devicesApi, feesApi, fxApi, ordersApi, announcementsApi, funnelApi } from '../api/services'
 import { operationsApi } from '../api/operations'
 import type { Business, CatalogItem, OrderStatus, RegisteredDevice } from '../api/types'
 import type { BusinessAnnouncement } from '../api/types'
@@ -32,6 +32,7 @@ import { StayBookedStep } from './steps/StayBookedStep'
 import { OrderTrackingPanel } from './OrderTrackingPanel'
 import { ReceiptsPanel } from './ReceiptsPanel'
 import { AnnouncementsCustomerPanel } from './AnnouncementsCustomerPanel'
+import { FunnelNudge } from './FunnelNudge'
 import { EventsNearbyPanel, NearbyEventsBanner } from './EventsNearbyPanel'
 import {
   cartLineKey,
@@ -191,6 +192,10 @@ export default function CustomerApp({
   const [announcements, setAnnouncements] = useState<BusinessAnnouncement[]>([])
   const [showAnnouncements, setShowAnnouncements] = useState(false)
   const [showEvents, setShowEvents] = useState(false)
+
+  // ── Funnel nudge state ─────────────────────────────────────────────────────
+  const [nudgeStep, setNudgeStep] = useState<string | null>(null)
+  const nudgeFetchedRef = useRef(false)
   const [receipts, setReceipts] = useState<CustomerReceipt[]>(() => loadReceipts())
   const receiptCount = receipts.length
   const [ordersPaused, setOrdersPaused] = useState(false)
@@ -497,6 +502,54 @@ export default function CustomerApp({
       }
     })
   }, [businessId, business])
+
+  // ── Funnel: fetch pending nudge once after business loads ──────────────────
+  // Calling this endpoint marks the nudge as notified server-side (shown once).
+  useEffect(() => {
+    if (!business || nudgeFetchedRef.current) return
+    nudgeFetchedRef.current = true
+    const deviceId = getOrCreateDeviceId()
+    funnelApi.getNudge(businessId, deviceId).then((res) => {
+      if (res.hasPendingNudge && res.lastStep) {
+        setNudgeStep(res.lastStep)
+      }
+    }).catch(() => {
+      // best-effort — never blocks the menu
+    })
+  }, [businessId, business])
+
+  // ── Funnel: record drop-off on step change + page hide ────────────────────
+  // Records the current step so if the customer leaves we have their last position.
+  // Fires on every PROGRESS_STEPS transition (debounced via server-side upsert).
+  // Also attaches a pagehide listener so the sendBeacon fires on tab close.
+  useEffect(() => {
+    // Only track steps before order is placed
+    if (placedOrderId) return
+    if (!PROGRESS_STEPS.includes(step)) return
+
+    const deviceId = getOrCreateDeviceId()
+    const payload = {
+      deviceId,
+      lastStep: step,
+      qrToken: qrToken ?? undefined,
+      phone: phone.trim() || undefined,
+    }
+
+    // Immediately record the current step
+    funnelApi.recordDrop(businessId, payload)
+
+    // Re-fire via sendBeacon on page hide so tab-close is captured
+    function handlePageHide() {
+      funnelApi.recordDrop(businessId, { ...payload, phone: phone.trim() || undefined })
+    }
+    window.addEventListener('pagehide', handlePageHide)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  // phone intentionally excluded — we don't re-run just because they're typing;
+  // the pagehide listener captures the latest phone value at exit time via closure.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, qrToken, step, placedOrderId])
 
   useEffect(() => {
     let cancelled = false
@@ -1749,6 +1802,16 @@ export default function CustomerApp({
         <AnnouncementsCustomerPanel
           announcements={announcements}
           onClose={() => setShowAnnouncements(false)}
+        />
+      ) : null}
+
+      {/* ── Funnel nudge banner — shown on next scan after a drop-off ── */}
+      {nudgeStep && !placedOrderId ? (
+        <FunnelNudge
+          businessId={businessId}
+          deviceId={getOrCreateDeviceId()}
+          lastStep={nudgeStep}
+          onDismiss={() => setNudgeStep(null)}
         />
       ) : null}
 

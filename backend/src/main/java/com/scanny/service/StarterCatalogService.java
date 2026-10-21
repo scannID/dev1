@@ -14,26 +14,26 @@ public class StarterCatalogService {
         List<CatalogItem> items = new ArrayList<>();
         int index = 1;
 
-        switch (type != null ? type : BusinessType.Restaurant) {
-            case Restaurant -> {
+        switch (type != null ? type : BusinessType.RESTAURANT) {
+            case RESTAURANT -> {
                 index = addFood(items, businessId, index, premiumRestaurantFood());
             }
-            case Bar -> {
+            case BAR -> {
                 index = addFood(items, businessId, index, premiumBarFood());
             }
-            case School -> {
+            case SCHOOL -> {
                 index = addFood(items, businessId, index, List.of(
                         food("Lunch plate", "Meals", 8000, "Balanced canteen plate with protein, starch, and greens."),
                         food("Term event ticket", "Tickets", 10000, "Entry for the term school event.")
                 ));
             }
-            case Boutique -> {
+            case RETAIL -> {
                 index = addFood(items, businessId, index, List.of(
                         food("Featured item", "Goods", 35000, "Curated retail pick ready for pricing."),
                         food("Delivery booking", "Services", 5000, "Same-day delivery within the city.")
                 ));
             }
-            case Hotel -> {
+            case HOTEL -> {
                 index = addFood(items, businessId, index, premiumHotelFood());
                 index = addLodging(items, businessId, index, premiumHotelRooms());
             }
@@ -109,10 +109,10 @@ public class StarterCatalogService {
     }
 
     public String defaultTableLabel(BusinessType type) {
-        if (type == BusinessType.Hotel) {
+        if (type == BusinessType.HOTEL) {
             return "Room number or guest name";
         }
-        return type == BusinessType.Boutique
+        return type == BusinessType.RETAIL
                 ? "Delivery or pickup note"
                 : "Table, seat, or location";
     }

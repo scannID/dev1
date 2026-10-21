@@ -5,5 +5,6 @@ public enum PaymentContext {
     ORDER_SPLIT,
     QUICK_PAY,
     TICKET,
-    EVENT_PROMOTION
+    EVENT_PROMOTION,
+    RENT
 }

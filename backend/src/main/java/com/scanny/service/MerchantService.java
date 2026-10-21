@@ -5,6 +5,7 @@ import com.scanny.dto.MerchantDtos;
 import com.scanny.dto.MerchantDtos.*;
 import com.scanny.entity.Merchant;
 import com.scanny.exception.ApiException;
+import com.scanny.model.enums.BusinessType;
 import com.scanny.repository.MerchantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -250,16 +251,16 @@ public class MerchantService {
      * Local Keycloak demo accounts are always provisioned without a signup form,
      * so map known emails/names to the right venue type (e.g. Pentagon = Hotel).
      */
-    static Merchant.BusinessType resolveLocalDemoBusinessType(String email, String businessName) {
+    static BusinessType resolveLocalDemoBusinessType(String email, String businessName) {
         String e = email == null ? "" : email.toLowerCase(java.util.Locale.ROOT).trim();
         String n = businessName == null ? "" : businessName.toLowerCase(java.util.Locale.ROOT).trim();
         if (e.startsWith("pentagon@") || n.contains("pentagon") || n.contains("hotel") || n.contains("suite")) {
-            return Merchant.BusinessType.HOTEL;
+            return BusinessType.HOTEL;
         }
         if (e.startsWith("city-lounge@") || n.contains("lounge") || n.contains(" bar")) {
-            return Merchant.BusinessType.BAR;
+            return BusinessType.BAR;
         }
-        return Merchant.BusinessType.RESTAURANT;
+        return BusinessType.RESTAURANT;
     }
 
     /** Keep already-provisioned local demo merchants on the intended type. */
@@ -268,9 +269,9 @@ public class MerchantService {
         if (merchant == null || merchant.getEmail() == null) {
             return merchant;
         }
-        Merchant.BusinessType intended = resolveLocalDemoBusinessType(merchant.getEmail(), merchant.getBusinessName());
-        if (intended == Merchant.BusinessType.HOTEL && merchant.getBusinessType() != Merchant.BusinessType.HOTEL) {
-            merchant.setBusinessType(Merchant.BusinessType.HOTEL);
+        BusinessType intended = resolveLocalDemoBusinessType(merchant.getEmail(), merchant.getBusinessName());
+        if (intended == BusinessType.HOTEL && merchant.getBusinessType() != BusinessType.HOTEL) {
+            merchant.setBusinessType(BusinessType.HOTEL);
             if (merchant.getBusinessName() != null
                     && !merchant.getBusinessName().toLowerCase(java.util.Locale.ROOT).contains("hotel")) {
                 merchant.setBusinessName(merchant.getBusinessName().trim() + " Hotel");

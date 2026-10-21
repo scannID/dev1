@@ -116,5 +116,29 @@ export function logoutMerchant(redirectUri: string) {
   return Promise.resolve()
 }
 
+function hasRentManagerRole(): boolean {
+  const roles = (keycloak.tokenParsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? []
+  return roles.includes('RENT_MANAGER')
+}
+
+export function hasRentManagerSession(): boolean {
+  return (
+    keycloak.authenticated === true &&
+    keycloak.tokenParsed?.azp === MERCHANT_CLIENT_ID &&
+    Boolean(keycloak.token) &&
+    hasRentManagerRole()
+  )
+}
+
+export function logoutRentManager(redirectUri: string): Promise<void> {
+  keycloak.clearToken()
+  window.location.replace(redirectUri)
+  return Promise.resolve()
+}
+
+export function loginAsRentManager(redirectUri?: string): void {
+  keycloak.login({ redirectUri: redirectUri ?? window.location.href })
+}
+
 export { MERCHANT_CLIENT_ID }
 export default keycloak

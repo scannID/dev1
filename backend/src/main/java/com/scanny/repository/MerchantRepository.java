@@ -1,6 +1,7 @@
 package com.scanny.repository;
 
 import com.scanny.entity.Merchant;
+import com.scanny.model.enums.BusinessType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,7 +37,7 @@ public interface MerchantRepository extends JpaRepository<Merchant, UUID> {
     List<Merchant> findByStatusOrderByCreatedAtDesc(Merchant.MerchantStatus status);
 
     // Find merchants by business type
-    List<Merchant> findByBusinessTypeOrderByCreatedAtDesc(Merchant.BusinessType businessType);
+    List<Merchant> findByBusinessTypeOrderByCreatedAtDesc(BusinessType businessType);
 
     // Find merchants by plan
     List<Merchant> findByPlanOrderByCreatedAtDesc(Merchant.SubscriptionPlan plan);

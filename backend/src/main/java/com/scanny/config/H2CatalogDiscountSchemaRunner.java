@@ -50,6 +50,21 @@ public class H2CatalogDiscountSchemaRunner implements ApplicationRunner {
         ensureColumn("businesses", "geo_query", "VARCHAR(255) NOT NULL DEFAULT ''");
         ensureColumn("admin_users", "pending", "BOOLEAN NOT NULL DEFAULT TRUE");
 
+        // ── Rent model extensions (V59) ───────────────────────────────────────
+        // Flyway is disabled on H2; manually ensure new rent columns exist.
+        ensureColumn("rent_units",      "due_day_of_month",       "SMALLINT NOT NULL DEFAULT 5");
+        ensureColumn("rent_units",      "grace_period_days",      "SMALLINT NOT NULL DEFAULT 0");
+        ensureColumn("rent_properties", "timezone",               "VARCHAR(64) NOT NULL DEFAULT 'Africa/Kampala'");
+        ensureColumn("rent_properties", "partial_payment_allowed","BOOLEAN NOT NULL DEFAULT TRUE");
+        ensureColumn("rent_properties", "min_payment_amount",     "INTEGER NOT NULL DEFAULT 0");
+        ensureColumn("rent_tenants",    "lease_end",              "DATE");
+
+        // ── Fix BusinessType enum casing ──────────────────────────────────────
+        // Old H2 data has PascalCase values (e.g. 'Hotel', 'Restaurant').
+        // The enum now uses UPPER_CASE. Normalise once so findAll() doesn't crash.
+        jdbcTemplate.execute("UPDATE businesses SET type = UPPER(type) WHERE type != UPPER(type)");
+        jdbcTemplate.execute("UPDATE merchants SET business_type = UPPER(business_type) WHERE business_type IS NOT NULL AND business_type != UPPER(business_type)");
+
         log.info("Ensured catalog discount + fee-split columns exist (H2)");
     }
 

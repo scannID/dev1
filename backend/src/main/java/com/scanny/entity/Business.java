@@ -3,9 +3,8 @@ package com.scanny.entity;
 import com.scanny.model.enums.BusinessType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
@@ -86,7 +85,7 @@ public class Business {
     @Column(nullable = false)
     private String phone = "";
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = com.scanny.config.BusinessTypeConverter.class)
     @Column(nullable = false)
     private BusinessType type;
 

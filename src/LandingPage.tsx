@@ -6,6 +6,7 @@ import {
   ClipboardList,
   ShoppingBag,
   CreditCard,
+  Building2,
 } from 'lucide-react'
 import { usePageMeta } from './hooks/usePageMeta'
 
@@ -1526,11 +1527,13 @@ function GetStartedButton({ onClick }: { onClick?: () => void }) {
 type KodteLandingTicketProps = {
   onGetStarted?: () => void
   onCreateEventTicket?: () => void
+  onOpenRentManager?: () => void
 }
 
 export default function KodteLandingTicket({
   onGetStarted,
   onCreateEventTicket,
+  onOpenRentManager,
 }: KodteLandingTicketProps = {}) {
   usePageMeta({
     title: 'Koddly — Scan, order and pay',
@@ -1881,6 +1884,29 @@ export default function KodteLandingTicket({
               >
                 <Scissors size={14} />
                  Ticketing
+              </button>
+
+              <button
+                onClick={onOpenRentManager}
+                className="kodte-stamp-btn kodte-nav-btn-secondary"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px dashed ${C.ink}66`,
+                  color: C.ink,
+                  borderRadius: 6,
+                  padding: '7px 14px',
+                  fontFamily: FONT,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  letterSpacing: '0.03em',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <Building2 size={14} />
+                Rent Manager
               </button>
 
               <GetStartedButton onClick={onGetStarted} />

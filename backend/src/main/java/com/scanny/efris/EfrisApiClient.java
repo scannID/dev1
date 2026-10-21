@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.scanny.entity.Order;
 import com.scanny.entity.OrderLineItem;
+import com.scanny.model.enums.ItemKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -57,7 +58,7 @@ public class EfrisApiClient {
     private static final String INVOICE_TYPE_NORMAL   = "1";   // Normal sale
     private static final String INVOICE_TYPE_CREDIT   = "2";   // Credit note (refund)
     private static final String CURRENCY_CODE         = "UGX";
-    private static final String GOODS_SERVICE_FLAG    = "2";    // 2 = Services (restaurants/hotels)
+    // goodsServiceFlag is now resolved per line item — see goodsServiceFlagFor()
     private static final String TAX_CATEGORY          = "A";    // A = Standard 18% VAT
     private static final String TAX_RATE              = "18";
 
@@ -191,13 +192,15 @@ public class EfrisApiClient {
             g.put("itemCode",          item.getId() != null ? String.valueOf(item.getId()) : "ITEM" + itemIndex);
             g.put("itemName",          item.getName());
             g.put("quantity",          qty);
-            g.put("unitOfMeasure",     "PKG");
+            // UOM is now resolved per ItemKind (EA, PKG, DAY, HUR) rather than
+            // hard-coding "PKG" for every business type.
+            g.put("unitOfMeasure",     item.getItemKind() != null ? item.getItemKind().uraUom() : "EA");
             g.put("unitPrice",         unitPrice);
             g.put("total",             lineTotal);
             g.put("taxRate",           TAX_RATE);
             g.put("taxAmount",         taxAmt);
             g.put("netAmount",         netAmt);
-            g.put("goodsServiceFlag",  GOODS_SERVICE_FLAG);
+            g.put("goodsServiceFlag",  goodsServiceFlagFor(item.getItemKind()));
             g.put("taxCategory",       TAX_CATEGORY);
         }
 
@@ -287,6 +290,21 @@ public class EfrisApiClient {
 
     private static String efrisTimestamp(ZonedDateTime dt) {
         return dt.format(EFRIS_FMT);
+    }
+
+    /**
+     * Maps an {@link ItemKind} to the URA EFRIS {@code goodsServiceFlag}:
+     * <ul>
+     *   <li>{@code "1"} — Goods (physical products sold by retail/boutique merchants)</li>
+     *   <li>{@code "2"} — Services (food, lodging, salon, parking, events — anything
+     *       that is consumed rather than physically taken away)</li>
+     * </ul>
+     * Defaults to {@code "2"} (Services) for any unknown/null kind so that existing
+     * business types continue to work without code changes.
+     */
+    private static String goodsServiceFlagFor(ItemKind kind) {
+        if (kind == ItemKind.PRODUCT) return "1";  // physical goods
+        return "2";                                 // services (food, lodging, etc.)
     }
 
     /**

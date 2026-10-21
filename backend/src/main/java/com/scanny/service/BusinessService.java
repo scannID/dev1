@@ -240,7 +240,7 @@ public class BusinessService {
         Merchant merchant = merchantAccessService.requireCurrentMerchant();
         String businessName = request.businessName().trim();
         String ownerName = request.ownerName().trim();
-        BusinessType type = request.type() != null ? request.type() : BusinessType.Restaurant;
+        BusinessType type = request.type() != null ? request.type() : BusinessType.RESTAURANT;
 
         if (businessName.isBlank() || ownerName.isBlank()) {
             throw new ApiException(400, "Business name and owner name are required.");
@@ -348,7 +348,7 @@ public class BusinessService {
                 for (String category : CatalogCategories.defaultNames(desiredType)) {
                     business.addCustomCategory(category);
                 }
-                if (desiredType == BusinessType.Hotel) {
+                if (desiredType == BusinessType.HOTEL) {
                     ensureHotelLodgingCatalog(business);
                 }
                 if (merchant.getBusinessName() != null
@@ -357,7 +357,7 @@ public class BusinessService {
                     business.setName(merchant.getBusinessName());
                 }
                 dirty = true;
-            } else if (desiredType == BusinessType.Hotel) {
+            } else if (desiredType == BusinessType.HOTEL) {
                 int before = business.getItems() != null ? business.getItems().size() : 0;
                 ensureHotelLodgingCatalog(business);
                 int after = business.getItems() != null ? business.getItems().size() : 0;
@@ -439,19 +439,15 @@ public class BusinessService {
         });
     }
 
-    private static BusinessType mapMerchantType(Merchant.BusinessType type) {
+    private static BusinessType mapMerchantType(BusinessType type) {
         if (type == null) {
-            return BusinessType.Restaurant;
+            return BusinessType.RESTAURANT;
         }
         return switch (type) {
-            case BAR -> BusinessType.Bar;
-            case EVENT -> BusinessType.Boutique;
-            case SALON -> BusinessType.Boutique;
-            case RETAIL -> BusinessType.Boutique;
-            case PARKING -> BusinessType.Boutique;
-            case OTHER -> BusinessType.Restaurant;
-            case RESTAURANT -> BusinessType.Restaurant;
-            case HOTEL -> BusinessType.Hotel;
+            case BAR -> BusinessType.BAR;
+            case HOTEL -> BusinessType.HOTEL;
+            case SCHOOL -> BusinessType.SCHOOL;
+            case RETAIL, EVENT, SALON, PARKING, OTHER, RESTAURANT -> BusinessType.RESTAURANT;
         };
     }
 }

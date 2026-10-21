@@ -1,5 +1,6 @@
 package com.scanny.entity;
 
+import com.scanny.model.enums.BusinessType;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -27,7 +28,7 @@ public class Merchant {
     private String businessName;
 
     @Column(name = "business_type", nullable = false, length = 50)
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = com.scanny.config.BusinessTypeConverter.class)
     private BusinessType businessType;
 
     @Column(name = "business_description", columnDefinition = "TEXT")
@@ -201,17 +202,7 @@ public class Merchant {
         updatedAt = LocalDateTime.now();
     }
 
-    // Enums
-    public enum BusinessType {
-        RESTAURANT,
-        HOTEL,
-        BAR,
-        PARKING,
-        EVENT,
-        SALON,
-        RETAIL,
-        OTHER
-    }
+    // Enums — BusinessType is the canonical com.scanny.model.enums.BusinessType
 
     public enum PaymentType {
         MOBILE_MONEY,

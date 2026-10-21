@@ -96,6 +96,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/health", "/api/health", "/actuator/health", "/actuator/health/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/merchant/register").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/rent-manager/register").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/businesses/*/menu").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/businesses/*/scans").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/businesses/*/orders").permitAll()
@@ -135,6 +136,7 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/api/auth/merchant/**").hasRole("MERCHANT")
                 .requestMatchers("/api/auth/staff/**").hasRole("STAFF")
+                .requestMatchers("/api/auth/rent-manager/**").hasRole("RENT_MANAGER")
                 .requestMatchers("/api/businesses/*/operations/kitchen/**").permitAll()
                 .requestMatchers("/api/businesses/*/operations/tables/**").permitAll()
                 .requestMatchers("/api/businesses/*/operations/table-sessions/**").permitAll()
