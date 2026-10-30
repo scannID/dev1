@@ -55,6 +55,9 @@ management:
 
 scanny:
   scan-base-url: ${SCAN_BASE_URL:http://localhost:5173}
+  # Used by rent QR codes — must be reachable by phones on the same network.
+  # Falls back to scan-base-url so a single SCAN_BASE_URL env var covers both.
+  customer-url: ${SCAN_BASE_URL:http://localhost:5173}
   geocoding:
     nominatim-url: ${SCANNY_GEOCODING_URL:https://nominatim.openstreetmap.org/search}
     user-agent: ${SCANNY_GEOCODING_UA:KoddlyPromotions/1.0 (support@koddly.app)}

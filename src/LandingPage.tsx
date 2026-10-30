@@ -1906,10 +1906,28 @@ export default function KodteLandingTicket({
                 }}
               >
                 <Building2 size={14} />
-                Rent Manager
+                Property Management
               </button>
 
-              <GetStartedButton onClick={onGetStarted} />
+              <button
+                onClick={onGetStarted}
+                className="kodte-stamp-btn"
+                style={{
+                  background: 'transparent',
+                  border: `2.5px solid ${C.stamp}`,
+                  color: C.stamp,
+                  borderRadius: 8,
+                  padding: '7px 16px',
+                  fontFamily: FONT,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  transform: 'rotate(-2deg)',
+                }}
+              >
+                Restaurants &amp; Hotels
+              </button>
             </div>
           </div>
         </header>
@@ -2019,21 +2037,6 @@ export default function KodteLandingTicket({
                 }}
               >
                 <GetStartedButton onClick={onGetStarted} />
-
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontFamily: FONT,
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    color: C.inkSoft,
-                  }}
-                >
-
-
-                </span>
               </div>
             </div>
 

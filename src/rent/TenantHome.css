@@ -1,0 +1,157 @@
+.th { --th-ink:#14213d; --th-ink2:#1f3a5f; --th-gold:#f4b942; --th-ok:#34d399; --th-bad:#f87171;
+  display:flex; flex-direction:column; gap:14px; }
+
+/* Hero */
+.th-hero { position:relative; overflow:hidden; border-radius:24px; padding:18px 18px 20px; color:#fff;
+  background:radial-gradient(120% 90% at 100% 0%, var(--th-ink2) 0%, var(--th-ink) 62%);
+  box-shadow:0 14px 34px -14px rgba(20,33,61,.6); }
+.th-hero::after { content:""; position:absolute; right:-60px; bottom:-60px; width:180px; height:180px; border-radius:50%;
+  border:28px solid rgba(255,255,255,.04); pointer-events:none; }
+
+.th-calm{--tone:var(--th-gold)} .th-warn{--tone:#fb923c} .th-bad{--tone:var(--th-bad)} .th-ok{--tone:var(--th-ok)}
+
+.th-hero-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.th-month { font-size:13px; font-weight:700; padding:5px 12px; border-radius:999px; background:rgba(255,255,255,.12); }
+.th-chip { font-size:12px; font-weight:700; padding:5px 11px; border-radius:999px; background:rgba(255,255,255,.1); color:#e5e7eb; }
+.th-chip.paid { background:rgba(52,211,153,.18); color:#6ee7b7; }
+.th-chip.overdue { background:rgba(248,113,113,.2); color:#fecaca; }
+.th-chip.partial { background:rgba(244,185,66,.2); color:#fde68a; }
+
+.th-hero-body { display:flex; align-items:center; gap:18px; }
+
+.th-ring { position:relative; width:124px; height:124px; flex:none; }
+.th-ring svg { width:100%; height:100%; }
+.th-ring-bg { fill:none; stroke:rgba(255,255,255,.12); stroke-width:10; }
+.th-ring-fg { fill:none; stroke:var(--tone); stroke-width:10; stroke-linecap:round; transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1); }
+.th-ring-label { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.th-ring-label strong { font-size:38px; line-height:1; font-weight:800; letter-spacing:-.02em; }
+.th-ring-label span { font-size:11px; opacity:.75; margin-top:4px; }
+
+.th-hero-info { display:flex; flex-direction:column; min-width:0; }
+.th-k { font-size:12px; opacity:.7; }
+.th-amount { font-size:25px; font-weight:800; letter-spacing:-.02em; margin:2px 0 6px; }
+.th-sub { font-size:12px; opacity:.75; }
+
+.th-progress { margin-top:18px; }
+.th-progress-row { display:flex; justify-content:space-between; font-size:12px; opacity:.85; margin-bottom:6px; }
+.th-progress-track { height:7px; border-radius:99px; background:rgba(255,255,255,.14); overflow:hidden; }
+.th-progress-track div { height:100%; border-radius:99px; background:var(--tone); }
+
+.th-pay { margin-top:18px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; border:0; cursor:pointer;
+  padding:14px; border-radius:14px; font:inherit; font-size:15px; font-weight:800; color:var(--th-ink); background:var(--tone); }
+.th-pay:active { transform:scale(.985); }
+.th-pay:focus-visible, .th-cal-head button:focus-visible { outline:3px solid #fff; outline-offset:2px; }
+
+/* Calendar */
+.th-cal { background:var(--rp-card, #fff); border:1px solid var(--rp-border, #e5e7eb); border-radius:22px; padding:16px; }
+.th-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.th-cal-head h3 { margin:0; font-size:15px; font-weight:800; }
+.th-cal-head button { width:32px; height:32px; display:grid; place-items:center; border-radius:10px; border:1px solid var(--rp-border, #e5e7eb);
+  background:transparent; color:inherit; cursor:pointer; }
+
+.th-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); row-gap:4px; text-align:center; }
+.th-cal-dow { margin-bottom:4px; font-size:11px; font-weight:700; color:var(--rp-muted, #6b7280); }
+
+.th-day { position:relative; height:36px; display:grid; place-items:center; font-size:13px; font-weight:600; z-index:0; }
+.th-day.in { background:color-mix(in srgb, var(--th-ink) 8%, transparent); }
+.th-day.past { background:color-mix(in srgb, var(--th-ink) 16%, transparent); }
+.th-day.start { border-radius:12px 0 0 12px; font-weight:800; }
+.th-day.due { border-radius:0 12px 12px 0; background:var(--th-gold); color:var(--th-ink); font-weight:800; }
+.th-day.start { background:var(--th-ink); color:#fff; }
+.th-day.today::before { content:""; position:absolute; inset:2px; border-radius:50%; border:2px solid var(--th-gold); z-index:-1;
+  background:#fff; }
+.th-day.today { font-weight:800; color:var(--th-ink); }
+.th-day.today.due, .th-day.today.start { color:inherit; }
+.th-day.today.due::before, .th-day.today.start::before { background:transparent; border-color:#fff; }
+
+.th-legend { display:flex; gap:14px; justify-content:center; margin-top:14px; font-size:11px; color:var(--rp-muted, #6b7280); }
+.th-legend span { display:flex; align-items:center; gap:6px; }
+.lg { width:10px; height:10px; border-radius:3px; display:inline-block; }
+.lg.start { background:var(--th-ink); } .lg.due { background:var(--th-gold); }
+.lg.today { border-radius:50%; border:2px solid var(--th-gold); }
+
+@media (prefers-color-scheme: dark) {
+  .th-day.in { background:rgba(255,255,255,.07); } .th-day.past { background:rgba(255,255,255,.14); }
+  .th-day.today::before { background:#0f172a; } .th-day.today { color:#fff; }
+}
+
+@media (prefers-reduced-motion: reduce) { .th-ring-fg { transition:none; } }
+
+/* ── Lease strip ────────────────────────────────────────────────────────── */
+
+.th-lease {
+  background: var(--rp-card, #fff);
+  border: 1px solid var(--rp-border, #e5e7eb);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.th-lease-dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rp-text, #111827);
+}
+
+.th-lease-dates span:nth-child(2) {
+  color: var(--rp-muted, #6b7280);
+  font-weight: 400;
+}
+
+.th-lease-bar {
+  margin-top: 10px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--th-ink) 10%, transparent);
+  overflow: hidden;
+}
+
+.th-lease-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--th-ink);
+  transition: width .6s ease;
+}
+
+.th-lease-days {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--rp-muted, #6b7280);
+}
+
+.th-lease-notice {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--th-gold) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--th-gold) 25%, transparent);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #92400e;
+}
+
+/* Expired / pending lease states inside the hero */
+.th-lease-state {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.th-lease-state.ended {
+  background: rgba(248,113,113,.15);
+  color: #fecaca;
+}
+
+.th-lease-state.pending {
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  .th-lease-notice { color: #fcd34d; }
+}

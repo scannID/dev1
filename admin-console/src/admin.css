@@ -32,6 +32,12 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   color: var(--sidebar-foreground);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-sidebar.sidebar-collapsed {
+  width: 64px;
 }
 
 .admin-brand {
@@ -39,6 +45,55 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   align-items: center;
   gap: 10px;
   padding: 4px 4px 2px;
+}
+
+.admin-sidebar.sidebar-collapsed .admin-brand {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.admin-sidebar.sidebar-collapsed .admin-brand-text {
+  display: none;
+}
+
+/* Collapse toggle button */
+.admin-sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--sidebar-accent);
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+.admin-sidebar-collapse-btn:hover {
+  background: oklch(from var(--foreground) l c h / 10%);
+}
+
+.admin-sidebar.sidebar-collapsed .admin-sidebar-collapse-btn {
+  margin-left: 0;
+}
+
+/* Icon-only nav when collapsed */
+.admin-sidebar.sidebar-collapsed .admin-nav button {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* Collapsed profile row */
+.admin-profile.admin-profile-collapsed {
+  justify-content: center;
+  gap: 0;
+  flex-direction: column;
+  padding: 8px 4px;
 }
 
 .admin-brand-logo {
@@ -518,7 +573,7 @@ form :where(input, select, textarea)[aria-invalid='true'] {
 }
 
 @media (max-width: 720px) {
-  .admin-sidebar { width: 200px; }
+  .admin-sidebar:not(.sidebar-collapsed) { width: 200px; }
   .admin-metric-grid { grid-template-columns: 1fr; }
 }
 

@@ -3,14 +3,19 @@ package com.scanny.service;
 import com.scanny.dto.RentDtos;
 import com.scanny.entity.RentAccount;
 import com.scanny.entity.RentCharge;
+import com.scanny.entity.RentPayment;
 import com.scanny.entity.RentProperty;
 import com.scanny.entity.RentTenant;
 import com.scanny.entity.RentUnit;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.RentChargeStatus;
+import com.scanny.model.enums.RentPaymentMethod;
+import com.scanny.model.enums.RentPaymentStatus;
 import com.scanny.repository.RentChargeRepository;
+import com.scanny.repository.RentPaymentRepository;
 import com.scanny.repository.RentTenantRepository;
 import com.scanny.repository.RentUnitRepository;
+import com.scanny.rent.gateway.ManualGateway;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -30,20 +35,26 @@ public class RentChargeService {
     private final RentChargeRepository chargeRepository;
     private final RentUnitRepository unitRepository;
     private final RentTenantRepository tenantRepository;
+    private final RentPaymentRepository paymentRepository;
     private final RentPropertyService propertyService;
     private final AuditService auditService;
+    private final ManualGateway manualGateway;
 
     public RentChargeService(
             RentChargeRepository chargeRepository,
             RentUnitRepository unitRepository,
             RentTenantRepository tenantRepository,
+            RentPaymentRepository paymentRepository,
             RentPropertyService propertyService,
-            AuditService auditService) {
+            AuditService auditService,
+            ManualGateway manualGateway) {
         this.chargeRepository = chargeRepository;
         this.unitRepository = unitRepository;
         this.tenantRepository = tenantRepository;
+        this.paymentRepository = paymentRepository;
         this.propertyService = propertyService;
         this.auditService = auditService;
+        this.manualGateway = manualGateway;
     }
 
     // ── Generate charges ──────────────────────────────────────────────────────
@@ -103,6 +114,7 @@ public class RentChargeService {
             charge.setDueDate(dueDate);
             charge.setStatus(RentChargeStatus.UNPAID);
             charge.setCreatedAt(Instant.now());
+            charge.setCreatedBy(account.getEmail());
 
             created.add(RentDtos.ChargeResponse.from(chargeRepository.save(charge)));
         }
@@ -158,6 +170,7 @@ public class RentChargeService {
                     charge.setDueDate(dueDate);
                     charge.setStatus(RentChargeStatus.UNPAID);
                     charge.setCreatedAt(Instant.now());
+                    charge.setCreatedBy(account.getEmail());
 
                     RentDtos.ChargeResponse result = RentDtos.ChargeResponse.from(
                             chargeRepository.save(charge));
@@ -222,9 +235,17 @@ public class RentChargeService {
             throw new ApiException(400, "Invalid status: " + req.status());
         }
 
+        // Require a note for manual overrides (WAIVE or mark-as-PAID)
+        if ((newStatus == RentChargeStatus.WAIVED || newStatus == RentChargeStatus.PAID)
+                && (req.notes() == null || req.notes().isBlank())) {
+            throw new ApiException(400,
+                    "A note is required when overriding status to " + newStatus);
+        }
+
         charge.setStatus(newStatus);
         if (req.notes() != null) charge.setNotes(req.notes().trim());
         charge.setUpdatedAt(Instant.now());
+        charge.setCreatedBy(account.getEmail());
 
         RentDtos.ChargeResponse result = RentDtos.ChargeResponse.from(chargeRepository.save(charge));
         auditService.success("RENT_CHARGE_STATUS_UPDATED", "rent_charge",
@@ -240,7 +261,7 @@ public class RentChargeService {
      */
     @Transactional
     public void recomputeStatus(RentCharge charge) {
-        int paid = charge.getPaidAmount();
+        long paid = charge.getPaidAmount();
         if (paid <= 0) {
             // no change if no completed payment yet
             return;
@@ -251,6 +272,93 @@ public class RentChargeService {
         charge.setStatus(newStatus);
         charge.setUpdatedAt(Instant.now());
         chargeRepository.save(charge);
+    }
+
+    // ── Manual payment recording ──────────────────────────────────────────────
+
+    /**
+     * Records a manual payment (cash, MoMo transfer, bank deposit, etc.) against
+     * a charge.  Uses the {@link com.scanny.rent.gateway.ManualGateway} to generate
+     * a transaction reference, then creates a {@link RentPayment} row with
+     * status {@code COMPLETED} and recomputes the charge status.
+     *
+     * <p>Overpayment is rejected unless {@code carryCredit = true}.
+     *
+     * @param account   the recording manager (must have manager access)
+     * @param propertyId target property
+     * @param chargeId   the charge to pay against
+     * @param req        amount, method, reference, carryCredit flag
+     * @return the created payment summary
+     */
+    @Transactional
+    public RentDtos.PaymentSummary recordManualPayment(
+            RentAccount account,
+            String propertyId,
+            Long chargeId,
+            RentDtos.RecordManualPaymentRequest req) {
+
+        RentProperty property = propertyService.requireProperty(propertyId);
+        propertyService.requireManagerAccess(account, property);
+
+        RentCharge charge = requireCharge(chargeId);
+        if (!charge.getUnit().getProperty().getId().equals(propertyId)) {
+            throw new ApiException(403, "Charge does not belong to this property");
+        }
+
+        // Parse payment method
+        RentPaymentMethod method;
+        try {
+            method = RentPaymentMethod.valueOf(req.method().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400,
+                    "Invalid payment method: " + req.method() + ". Must be CASH, MOMO, BANK, or OTHER");
+        }
+
+        // Overpayment guard
+        long outstanding = charge.getOutstandingAmount();
+        if (req.amount() > outstanding && !req.carryCredit()) {
+            throw new ApiException(400,
+                    "Payment amount (" + req.amount() + ") exceeds outstanding balance ("
+                    + outstanding + "). Set carryCredit=true to accept the surplus as credit.");
+        }
+
+        // Use ManualGateway to generate a transaction reference
+        var gatewayResult = manualGateway.initiate(
+                new com.scanny.rent.gateway.RentPaymentGateway.GatewayCommand(
+                        charge,
+                        charge.getTenant() != null ? charge.getTenant().getPhone() : "",
+                        charge.getTenant() != null ? charge.getTenant().getName() : "",
+                        req.amount(),
+                        req.reference(),
+                        account.getId()));
+
+        RentPayment payment = new RentPayment();
+        payment.setCharge(charge);
+        payment.setTransactionRef(gatewayResult.transactionRef());
+        payment.setAmount(req.amount());
+        payment.setCurrency(charge.getCurrency());
+        payment.setPaymentMethod(method);
+        payment.setStatus(RentPaymentStatus.Completed);
+        payment.setPaidAt(Instant.now());
+        payment.setRecordedBy(account.getId());
+        payment.setCreatedBy(account.getEmail());
+
+        RentPayment saved = paymentRepository.save(payment);
+
+        // Add to the charge's in-memory payments list so recomputeStatus sees it
+        charge.getPayments().add(saved);
+
+        // Recompute charge status
+        recomputeStatus(charge);
+
+        auditService.success("RENT_MANUAL_PAYMENT_RECORDED", "rent_payment",
+                String.valueOf(saved.getId()),
+                Map.of("chargeId", String.valueOf(chargeId),
+                       "amount", req.amount(),
+                       "method", method.name(),
+                       "by", account.getEmail()));
+
+        return RentDtos.PaymentSummary.from(saved);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

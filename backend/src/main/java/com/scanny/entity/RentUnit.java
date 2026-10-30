@@ -38,12 +38,12 @@ public class RentUnit {
     @Column(nullable = false, length = 32)
     private String floor = "";
 
-    /** Monthly rent amount in the property's currency. */
+    /** Monthly rent amount in the property's currency (stored as whole-number UGX). */
     @Column(name = "monthly_amount", nullable = false)
-    private int monthlyAmount;
+    private long monthlyAmount;
 
     @Column(name = "deposit_amount", nullable = false)
-    private int depositAmount = 0;
+    private long depositAmount = 0;
 
     /**
      * Per-unit QR token — {@code /rent/pay/:qrToken} takes the tenant directly
@@ -76,6 +76,12 @@ public class RentUnit {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "created_by", length = 255)
+    private String createdBy = "system";
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
     // ── Getters / setters ────────────────────────────────────────────────────
 
     public String getId()                        { return id; }
@@ -90,11 +96,11 @@ public class RentUnit {
     public String getFloor()                     { return floor; }
     public void setFloor(String f)               { this.floor = f != null ? f : ""; }
 
-    public int getMonthlyAmount()                { return monthlyAmount; }
-    public void setMonthlyAmount(int a)          { this.monthlyAmount = a; }
+    public long getMonthlyAmount()               { return monthlyAmount; }
+    public void setMonthlyAmount(long a)         { this.monthlyAmount = a; }
 
-    public int getDepositAmount()                { return depositAmount; }
-    public void setDepositAmount(int a)          { this.depositAmount = a; }
+    public long getDepositAmount()               { return depositAmount; }
+    public void setDepositAmount(long a)         { this.depositAmount = a; }
 
     public String getQrToken()                   { return qrToken; }
     public void setQrToken(String t)             { this.qrToken = t; }
@@ -116,6 +122,12 @@ public class RentUnit {
 
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }
+
+    public String getCreatedBy()                 { return createdBy; }
+    public void setCreatedBy(String by)          { this.createdBy = by != null ? by : "system"; }
+
+    public Instant getUpdatedAt()                { return updatedAt; }
+    public void setUpdatedAt(Instant t)          { this.updatedAt = t; }
 
     /** Returns the active tenant in this unit, or null if vacant. */
     public RentTenant getActiveTenant() {

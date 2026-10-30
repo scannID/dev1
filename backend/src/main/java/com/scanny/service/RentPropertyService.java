@@ -2,25 +2,36 @@ package com.scanny.service;
 
 import com.scanny.dto.RentDtos;
 import com.scanny.entity.RentAccount;
+import com.scanny.entity.RentCharge;
 import com.scanny.entity.RentProperty;
 import com.scanny.entity.RentPropertyAccess;
 import com.scanny.entity.RentTenant;
 import com.scanny.entity.RentUnit;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.PropertyAccessRole;
+import com.scanny.model.enums.RentChargeStatus;
+import com.scanny.repository.RentChargeRepository;
+import com.scanny.repository.RentPaymentRepository;
 import com.scanny.repository.RentPropertyAccessRepository;
 import com.scanny.repository.RentPropertyRepository;
 import com.scanny.repository.RentTenantRepository;
 import com.scanny.repository.RentUnitRepository;
+import com.scanny.service.LeaseService;
+import com.scanny.util.PhoneNormalizer;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,10 +46,13 @@ public class RentPropertyService {
     private final RentPropertyAccessRepository accessRepository;
     private final RentUnitRepository unitRepository;
     private final RentTenantRepository tenantRepository;
+    private final RentChargeRepository chargeRepository;
+    private final RentPaymentRepository paymentRepository;
     private final RentAccountService accountService;
     private final AuditService auditService;
+    private final LeaseService leaseService;
 
-    @Value("${scanny.customer-url:http://localhost:5173}")
+    @Value("${scanny.customer-url}")
     private String customerUrl;
 
     public RentPropertyService(
@@ -46,14 +60,20 @@ public class RentPropertyService {
             RentPropertyAccessRepository accessRepository,
             RentUnitRepository unitRepository,
             RentTenantRepository tenantRepository,
+            RentChargeRepository chargeRepository,
+            RentPaymentRepository paymentRepository,
             RentAccountService accountService,
-            AuditService auditService) {
+            AuditService auditService,
+            LeaseService leaseService) {
         this.propertyRepository = propertyRepository;
         this.accessRepository = accessRepository;
         this.unitRepository = unitRepository;
         this.tenantRepository = tenantRepository;
+        this.chargeRepository = chargeRepository;
+        this.paymentRepository = paymentRepository;
         this.accountService = accountService;
         this.auditService = auditService;
+        this.leaseService = leaseService;
     }
 
     // ── Property CRUD ─────────────────────────────────────────────────────────
@@ -75,7 +95,7 @@ public class RentPropertyService {
         property.setAddress(req.address() != null ? req.address().trim() : "");
         property.setCity(req.city() != null ? req.city().trim() : "");
         property.setOwnerName(req.ownerName().trim());
-        property.setOwnerMomo(req.ownerMomo().trim());
+        property.setOwnerMomo(PhoneNormalizer.normalize(req.ownerMomo().trim()));
         property.setCurrency(req.currency() != null && !req.currency().isBlank()
                 ? req.currency().trim() : "UGX");
         property.setTimezone(req.timezone() != null && !req.timezone().isBlank()
@@ -86,6 +106,7 @@ public class RentPropertyService {
                 req.minPaymentAmount() != null ? req.minPaymentAmount() : 0);
         property.setQrToken(generateQrToken());
         property.setCreatedAt(Instant.now());
+        property.setCreatedBy(creator.getEmail());
 
         // If an owner email is provided, link or create that owner account
         if (req.ownerEmail() != null && !req.ownerEmail().isBlank()) {
@@ -142,7 +163,7 @@ public class RentPropertyService {
         if (req.address() != null)                                property.setAddress(req.address().trim());
         if (req.city() != null)                                   property.setCity(req.city().trim());
         if (req.ownerName() != null && !req.ownerName().isBlank()) property.setOwnerName(req.ownerName().trim());
-        if (req.ownerMomo() != null && !req.ownerMomo().isBlank()) property.setOwnerMomo(req.ownerMomo().trim());
+        if (req.ownerMomo() != null && !req.ownerMomo().isBlank()) property.setOwnerMomo(PhoneNormalizer.normalize(req.ownerMomo().trim()));
         if (req.currency() != null && !req.currency().isBlank())  property.setCurrency(req.currency().trim());
         if (req.timezone() != null && !req.timezone().isBlank())  property.setTimezone(req.timezone().trim());
         if (req.partialPaymentAllowed() != null)                   property.setPartialPaymentAllowed(req.partialPaymentAllowed());
@@ -156,35 +177,108 @@ public class RentPropertyService {
         return result;
     }
 
-    // ── Portfolio ─────────────────────────────────────────────────────────────
+    // ── Property dashboard ────────────────────────────────────────────────────
 
+    /**
+     * Assembles the full property dashboard DTO inside one read transaction.
+     * Required because {@code spring.jpa.open-in-view=false} — lazy collections
+     * (units/tenants/payments) must be touched before the session closes.
+     */
     @Transactional(readOnly = true)
-    public List<RentDtos.PortfolioEntry> getPortfolio(RentAccount account) {
-        List<RentProperty> properties = propertyRepository.findAllByAccountId(account.getId());
-        return properties.stream().map(p -> buildPortfolioEntry(p, account.getId())).toList();
+    public RentDtos.PropertyDashboard getPropertyDashboard(
+            RentAccount account, String propertyId, String period) {
+
+        RentProperty property = requireProperty(propertyId);
+        requireAnyAccess(account, property);
+
+        String currentPeriod = period != null && !period.isBlank()
+                ? period.trim()
+                : YearMonth.now().toString();
+
+        List<RentUnit> units = unitRepository.findByPropertyIdWithTenants(propertyId).stream()
+                .sorted(Comparator.comparing(RentUnit::getUnitNumber, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        List<RentCharge> periodCharges = chargeRepository.findByPropertyIdAndPeriodLabelForDashboard(
+                propertyId, currentPeriod);
+
+        Map<String, RentCharge> chargeByUnitId = periodCharges.stream()
+                .collect(Collectors.toMap(
+                        c -> c.getUnit().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
+
+        List<RentDtos.UnitDashboardRow> rows = units.stream().map(u -> {
+            RentCharge charge = chargeByUnitId.get(u.getId());
+            return new RentDtos.UnitDashboardRow(
+                    RentDtos.UnitResponse.from(u, customerUrl),
+                    charge != null ? RentDtos.ChargeResponse.from(charge) : null);
+        }).toList();
+
+        long totalUnits = units.size();
+        long occupied = units.stream().filter(u -> u.getActiveTenant() != null).count();
+        long paid = periodCharges.stream().filter(c -> c.getStatus() == RentChargeStatus.PAID).count();
+        long unpaid = periodCharges.stream()
+                .filter(c -> c.getStatus() == RentChargeStatus.UNPAID || c.getStatus() == RentChargeStatus.PARTIAL)
+                .count();
+        long overdueCount = chargeRepository.countOverdueByPropertyId(propertyId, LocalDate.now());
+        long totalCollected = paymentRepository.sumCollectedByPropertyIdAndPeriod(propertyId, currentPeriod);
+
+        List<RentDtos.PaymentSummary> recentPayments = paymentRepository
+                .findRecentCompletedByPropertyId(propertyId, PageRequest.of(0, 20))
+                .stream().map(RentDtos.PaymentSummary::from).toList();
+
+        List<RentDtos.PropertyAccessResponse> accessList = listAccess(propertyId);
+
+        // Prefer already-fetched unit counts so PropertyResponse does not touch a lazy collection.
+        return new RentDtos.PropertyDashboard(
+                new RentDtos.PropertyResponse(
+                        property.getId(), property.getName(), property.getAddress(), property.getCity(),
+                        property.getOwnerName(), property.getOwnerMomo(), property.getCurrency(),
+                        property.getTimezone(), property.isPartialPaymentAllowed(), property.getMinPaymentAmount(),
+                        property.getQrToken(),
+                        customerUrl + "/rent/pay/" + property.getQrToken(),
+                        (int) totalUnits, (int) occupied, property.getCreatedAt()),
+                currentPeriod, totalUnits, occupied,
+                paid, unpaid, overdueCount, totalCollected,
+                rows, recentPayments, accessList);
     }
 
-    private RentDtos.PortfolioEntry buildPortfolioEntry(RentProperty p, String accountId) {
-        List<RentUnit> units = unitRepository.findByProperty_IdOrderByUnitNumberAsc(p.getId());
-        int totalUnits = units.size();
-        int occupied = (int) units.stream().filter(u -> u.getActiveTenant() != null).count();
+    // ── Portfolio ─────────────────────────────────────────────────────────────
 
-        // Overdue: charges that are UNPAID/PARTIAL past due
-        int overdue = 0;
-        // We keep this lightweight — just count units with active tenant having unpaid charges
-        // (full overdue query is in dashboard)
+    /**
+     * Returns the portfolio for an account in 2 DB round-trips regardless of
+     * how many properties the account has:
+     * <ol>
+     *   <li>One aggregation query for unit counts + role per property.</li>
+     *   <li>One aggregation query for occupied (active-tenant) counts across all properties.</li>
+     * </ol>
+     * Previously this was O(N) queries (one per property) due to per-property
+     * unit list + access role lookups.
+     */
+    @Transactional(readOnly = true)
+    public List<RentDtos.PortfolioEntry> getPortfolio(RentAccount account) {
+        List<com.scanny.repository.projection.PortfolioSummaryProjection> summaries =
+                propertyRepository.findPortfolioSummary(account.getId());
+        if (summaries.isEmpty()) return List.of();
 
-        PropertyAccessRole role = accessRepository
-                .findByAccount_IdAndProperty_Id(accountId, p.getId())
-                .map(RentPropertyAccess::getRole)
-                .orElse(PropertyAccessRole.MANAGER);
+        // Build a map of propertyId → occupiedCount in one query
+        Map<String, Long> occupancy = propertyRepository.findOccupancyByAccountId(account.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        com.scanny.repository.projection.PropertyOccupancyProjection::getPropertyId,
+                        com.scanny.repository.projection.PropertyOccupancyProjection::getOccupiedCount));
 
-        return new RentDtos.PortfolioEntry(
-                p.getId(), p.getName(), p.getCity(),
-                role.name(),
-                totalUnits, occupied, overdue,
-                0L,   // total collected — filled per-request in dashboard for performance
-                p.getCurrency());
+        return summaries.stream().map(s -> new RentDtos.PortfolioEntry(
+                s.getPropertyId(),
+                s.getPropertyName(),
+                s.getCity(),
+                s.getRole().name(),
+                (int) s.getTotalUnits(),
+                occupancy.getOrDefault(s.getPropertyId(), 0L).intValue(),
+                0,     // overdueCount — not included in portfolio for perf; shown in the full dashboard
+                0L,    // totalCollectedThisMonth — fetched on demand in the full dashboard
+                s.getCurrency()
+        )).toList();
     }
 
     // ── Access management ─────────────────────────────────────────────────────
@@ -269,6 +363,7 @@ public class RentPropertyService {
         // Auto-generate a unique 128-bit URL-safe QR token for this unit
         unit.setQrToken(generateUnitQrToken());
         unit.setCreatedAt(Instant.now());
+        unit.setCreatedBy(account.getEmail());
 
         RentDtos.UnitResponse result = RentDtos.UnitResponse.from(unitRepository.save(unit), customerUrl);
         auditService.success("RENT_UNIT_ADDED", "rent_unit", unit.getId(),
@@ -334,26 +429,45 @@ public class RentPropertyService {
             tenantRepository.save(existing);
         });
 
+        // Resolve activation date: prefer req.activationDate, fall back to moveInDate, then today
+        LocalDate activationDate;
+        if (req.activationDate() != null && !req.activationDate().isBlank()) {
+            activationDate = LocalDate.parse(req.activationDate());
+        } else if (req.moveInDate() != null && !req.moveInDate().isBlank()) {
+            activationDate = LocalDate.parse(req.moveInDate());
+        } else {
+            activationDate = LocalDate.now();
+        }
+
+        int termMonths = (req.termMonths() != null && req.termMonths() >= 1) ? req.termMonths() : 12;
+        LocalDate computedLeaseEnd = com.scanny.entity.RentLease
+                .clampedDatePlusMonths(activationDate, termMonths);
+
         RentTenant tenant = new RentTenant();
         tenant.setId(generateTenantId());
         tenant.setUnit(unit);
         tenant.setName(req.name().trim());
-        tenant.setPhone(req.phone().trim());
+        tenant.setPhone(PhoneNormalizer.normalize(req.phone().trim()));
         tenant.setEmail(req.email() != null ? req.email().trim() : "");
-        if (req.moveInDate() != null && !req.moveInDate().isBlank()) {
-            tenant.setMoveInDate(LocalDate.parse(req.moveInDate()));
-        }
-        if (req.leaseEnd() != null && !req.leaseEnd().isBlank()) {
-            tenant.setLeaseEnd(LocalDate.parse(req.leaseEnd()));
+        tenant.setMoveInDate(activationDate);   // activation date is also the move-in date
+        tenant.setLeaseEnd(computedLeaseEnd);
+        if (req.nationalIdNumber() != null && !req.nationalIdNumber().isBlank()) {
+            tenant.setNationalIdNumber(req.nationalIdNumber().trim());
         }
         tenant.setActive(true);
         tenant.setPayToken(generatePayToken());
+        tenant.setCreatedBy(account.getEmail());
 
-        RentDtos.TenantSummary result = RentDtos.TenantSummary.fromWithUrl(
-                tenantRepository.save(tenant), customerUrl);
-        auditService.success("RENT_TENANT_ADDED", "rent_tenant", tenant.getId(),
+        RentTenant saved = tenantRepository.save(tenant);
+
+        // Create the lease — this also generates all current/past cycle charges
+        leaseService.createLease(saved, unit, property, activationDate, termMonths, account.getEmail());
+
+        RentDtos.TenantSummary result = RentDtos.TenantSummary.fromWithUrl(saved, customerUrl);
+        auditService.success("RENT_TENANT_ADDED", "rent_tenant", saved.getId(),
                 Map.of("unitId", unitId, "propertyId", propertyId,
-                       "tenantName", tenant.getName(), "by", account.getEmail()));
+                       "tenantName", saved.getName(), "by", account.getEmail(),
+                       "activationDate", activationDate.toString(), "termMonths", termMonths));
         return result;
     }
 
@@ -370,7 +484,7 @@ public class RentPropertyService {
             throw new ApiException(403, "Tenant does not belong to this property");
         }
 
-        if (req.phone() != null && !req.phone().isBlank()) tenant.setPhone(req.phone().trim());
+        if (req.phone() != null && !req.phone().isBlank()) tenant.setPhone(PhoneNormalizer.normalize(req.phone().trim()));
         if (req.email() != null)                           tenant.setEmail(req.email().trim());
         if (req.leaseEnd() != null) {
             tenant.setLeaseEnd(req.leaseEnd().isBlank() ? null : LocalDate.parse(req.leaseEnd()));

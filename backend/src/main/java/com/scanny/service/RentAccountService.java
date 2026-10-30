@@ -34,7 +34,7 @@ public class RentAccountService {
     private final RentAccountRepository accountRepository;
     private final KeycloakAdminService keycloakAdminService;
 
-    @Value("${scanny.customer-url:http://localhost:5173}")
+    @Value("${scanny.customer-url}")
     private String customerUrl;
 
     public RentAccountService(

@@ -36,7 +36,7 @@ public class OutboxDispatcher {
     private final EfrisSubmissionService efrisSubmissionService;
 
     // Self-reference via Spring proxy so @Transactional(REQUIRES_NEW) on
-    // stampProcessed() fires correctly when called from within this bean.
+    // processAndStamp() fires correctly when called from within this bean.
     @Autowired @Lazy
     private OutboxDispatcher self;
 
@@ -65,9 +65,9 @@ public class OutboxDispatcher {
         List<OutboxEvent> pending = outboxEventRepository.findPending(PageRequest.of(0, 100));
         for (OutboxEvent event : pending) {
             try {
-                process(event);
-                // Stamp via proxy so REQUIRES_NEW actually commits independently.
-                self.stampProcessed(event);
+                // Delegate entirely to a REQUIRES_NEW transaction so that a Hibernate
+                // session failure on one event cannot poison the next event's session.
+                self.processAndStamp(event.getId());
             } catch (Exception ex) {
                 log.warn("Outbox event {} ({}) failed: {}", event.getId(), event.getEventType(), ex.getMessage());
             }
@@ -75,15 +75,15 @@ public class OutboxDispatcher {
     }
 
     /**
-     * Stamps the event as processed in its own committed transaction.
-     * Each event's completion is durable independently — a failure in a later
-     * event cannot roll back an already-stamped one.
-     *
-     * <p>Must be called via {@code self} (the Spring proxy), not {@code this},
-     * so that {@code REQUIRES_NEW} takes effect.
+     * Loads, processes, and stamps a single outbox event inside its own
+     * independent transaction. Any exception rolls back only this event's
+     * transaction and cannot corrupt the caller's Hibernate session.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void stampProcessed(OutboxEvent event) {
+    public void processAndStamp(Long eventId) throws Exception {
+        OutboxEvent event = outboxEventRepository.findById(eventId).orElse(null);
+        if (event == null || event.getProcessedAt() != null) return; // already done
+        process(event);
         event.setProcessedAt(Instant.now());
         outboxEventRepository.save(event);
     }

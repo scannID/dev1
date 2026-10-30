@@ -55,7 +55,7 @@ public class RentQrService {
     private static final Logger log = LoggerFactory.getLogger(RentQrService.class);
 
     /** QR size used for the bulk PDF grid cells (points ≈ 1/72 inch). */
-    private static final int PDF_QR_PX = 200;
+    private static final int PDF_QR_PX = 400;
 
     /** Number of QR columns per A4 page. */
     private static final int COLS = 3;
@@ -66,7 +66,7 @@ public class RentQrService {
     private static final float PAGE_MARGIN_PT  = 28f;
     private static final float LABEL_HEIGHT_PT = 22f;
 
-    @Value("${scanny.customer-url:http://localhost:5173}")
+    @Value("${scanny.customer-url}")
     private String customerUrl;
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -176,7 +176,9 @@ public class RentQrService {
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-        hints.put(EncodeHintType.MARGIN, 1);
+        // QR spec requires a 4-module quiet zone; margin < 4 causes scan failures
+        // on strict readers, especially from printed stickers.
+        hints.put(EncodeHintType.MARGIN, 4);
         return new QRCodeWriter().encode(url, BarcodeFormat.QR_CODE, size, size, hints);
     }
 

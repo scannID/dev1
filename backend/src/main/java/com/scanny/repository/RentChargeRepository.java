@@ -33,6 +33,19 @@ public interface RentChargeRepository extends JpaRepository<RentCharge, Long> {
             @Param("propertyId") String propertyId,
             @Param("periodLabel") String periodLabel);
 
+    /** Period charges with associations needed for dashboard DTO mapping (OSIV off). */
+    @Query("""
+        SELECT DISTINCT c FROM RentCharge c
+        JOIN FETCH c.unit u
+        JOIN FETCH c.tenant
+        LEFT JOIN FETCH c.payments
+        WHERE u.property.id = :propertyId
+          AND c.periodLabel = :periodLabel
+        """)
+    List<RentCharge> findByPropertyIdAndPeriodLabelForDashboard(
+            @Param("propertyId") String propertyId,
+            @Param("periodLabel") String periodLabel);
+
     /** Overdue charges: status UNPAID or PARTIAL, due date in the past — scoped to one property. */
     @Query("""
         SELECT c FROM RentCharge c
@@ -43,6 +56,18 @@ public interface RentChargeRepository extends JpaRepository<RentCharge, Long> {
         ORDER BY c.dueDate ASC
         """)
     List<RentCharge> findOverdueByPropertyId(
+            @Param("propertyId") String propertyId,
+            @Param("today") LocalDate today);
+
+    /** Count of overdue charges for a property — avoids loading full entities just for a count. */
+    @Query("""
+        SELECT COUNT(c) FROM RentCharge c
+        JOIN c.unit u
+        WHERE u.property.id = :propertyId
+          AND c.status IN ('UNPAID', 'PARTIAL', 'OVERDUE')
+          AND c.dueDate < :today
+        """)
+    long countOverdueByPropertyId(
             @Param("propertyId") String propertyId,
             @Param("today") LocalDate today);
 
@@ -92,4 +117,10 @@ public interface RentChargeRepository extends JpaRepository<RentCharge, Long> {
     List<String> findTenantIdsWithChargeForPeriod(@Param("periodLabel") String periodLabel);
 
     boolean existsByTenant_IdAndPeriodLabel(String tenantId, String periodLabel);
+
+    /** All charges for a lease, ordered by due date. */
+    List<RentCharge> findByLease_IdOrderByDueDateAsc(String leaseId);
+
+    /** Charge for a specific lease cycle (by period label). */
+    Optional<RentCharge> findByLease_IdAndPeriodLabel(String leaseId, String periodLabel);
 }

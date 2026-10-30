@@ -2,6 +2,7 @@ package com.scanny.dto;
 
 import com.scanny.entity.RentAccount;
 import com.scanny.entity.RentCharge;
+import com.scanny.entity.RentMaintenanceRequest;
 import com.scanny.entity.RentPayment;
 import com.scanny.entity.RentProperty;
 import com.scanny.entity.RentPropertyAccess;
@@ -82,7 +83,7 @@ public final class RentDtos {
              * Minimum partial payment amount (minor units). Only applies when
              * partialPaymentAllowed = true. Null or 0 = no floor.
              */
-            @Min(0) Integer minPaymentAmount
+            @Min(0) Long minPaymentAmount
     ) {}
 
     /** Grant another account access to a property. */
@@ -96,8 +97,8 @@ public final class RentDtos {
     public record CreateUnitRequest(
             @NotBlank @Size(max = 64) String unitNumber,
             @Size(max = 32) String floor,
-            @Min(1) int monthlyAmount,
-            int depositAmount,
+            @Min(1) long monthlyAmount,
+            long depositAmount,
             /**
              * Day of the month (1–28) rent is due. Null = inherit property default (5).
              * Clamped to 28 to avoid month-length edge cases.
@@ -114,8 +115,8 @@ public final class RentDtos {
     public record UpdateUnitRequest(
             @Size(max = 64) String unitNumber,
             @Size(max = 32) String floor,
-            @Min(0) Integer monthlyAmount,
-            @Min(0) Integer depositAmount,
+            @Min(0) Long monthlyAmount,
+            @Min(0) Long depositAmount,
             /** 1–28, null = no change. */
             Integer dueDayOfMonth,
             /** >= 0, null = no change. */
@@ -127,12 +128,22 @@ public final class RentDtos {
             @NotBlank @Size(max = 255) String name,
             @NotBlank @Size(max = 32) String phone,
             @Email @Size(max = 255) String email,
-            String moveInDate,   // ISO date string "2026-11-01", nullable
+            /**
+             * ISO date string "YYYY-MM-DD". The date the lease starts ticking and
+             * from which rent cycles are anchored. Defaults to today if not provided.
+             */
+            String activationDate,
+            /** Lease term in whole months. Must be ≥ 1. Defaults to 12. */
+            Integer termMonths,
+            String moveInDate,   // ISO date string "2026-11-01", nullable (alias for activationDate on tenant record)
             /**
              * Optional end date of the current lease (ISO date string "2027-10-31").
-             * Null means open-ended / no fixed expiry.
+             * Computed automatically from activationDate + termMonths; this field is
+             * accepted for backward compatibility but the computed value takes precedence.
              */
-            String leaseEnd
+            String leaseEnd,
+            /** Optional national ID number for identification. */
+            @Size(max = 64) String nationalIdNumber
     ) {}
 
     /**
@@ -148,7 +159,11 @@ public final class RentDtos {
     /** Manually update a charge's status (e.g. waive it). */
     public record UpdateChargeStatusRequest(
             @NotBlank String status,  // UNPAID | PAID | PARTIAL | WAIVED | OVERDUE
-            @Size(max = 1000) String notes
+            /**
+             * Required note explaining the override. Must be non-blank when the
+             * status is WAIVED or PAID (manual override). May be empty otherwise.
+             */
+            @Size(max = 2000) String notes
     ) {}
 
     /** Customer initiates a rent payment from the pay page. */
@@ -163,7 +178,7 @@ public final class RentDtos {
              * When null the server defaults to the full outstanding balance
              * (i.e. full-pay shortcut — always valid regardless of partial settings).
              */
-            @Min(1) Integer amount
+            @Min(1) Long amount
     ) {}
 
     /** Update core property settings (name, address, payment config, etc.). */
@@ -176,7 +191,7 @@ public final class RentDtos {
             @Size(max = 8) String currency,
             @Size(max = 64) String timezone,
             Boolean partialPaymentAllowed,
-            @Min(0) Integer minPaymentAmount
+            @Min(0) Long minPaymentAmount
     ) {}
 
     /** Update a tenant's contact info or lease end date. */
@@ -216,7 +231,7 @@ public final class RentDtos {
             String currency,
             String timezone,
             boolean partialPaymentAllowed,
-            int minPaymentAmount,
+            long minPaymentAmount,
             String qrToken,
             String qrCodeUrl,   // full /rent/pay/:qrToken URL for printing
             int unitCount,
@@ -260,8 +275,8 @@ public final class RentDtos {
             String propertyId,
             String unitNumber,
             String floor,
-            int monthlyAmount,
-            int depositAmount,
+            long monthlyAmount,
+            long depositAmount,
             String currency,
             int dueDayOfMonth,
             int gracePeriodDays,
@@ -272,7 +287,7 @@ public final class RentDtos {
     ) {
         public static UnitResponse from(RentUnit u, String baseUrl) {
             TenantSummary ts = u.getActiveTenant() != null
-                    ? TenantSummary.from(u.getActiveTenant()) : null;
+                    ? TenantSummary.fromWithUrl(u.getActiveTenant(), baseUrl) : null;
             String unitQr = u.getQrToken();
             return new UnitResponse(
                     u.getId(),
@@ -324,9 +339,9 @@ public final class RentDtos {
             String tenantName,
             String unitId,
             String unitNumber,
-            int amount,
-            int paidAmount,
-            int outstandingAmount,
+            long amount,
+            long paidAmount,
+            long outstandingAmount,
             String currency,
             String periodLabel,
             LocalDate dueDate,
@@ -361,7 +376,7 @@ public final class RentDtos {
     public record PaymentSummary(
             Long id,
             String transactionRef,
-            int amount,
+            long amount,
             String currency,
             String paymentMethod,
             String status,
@@ -373,7 +388,7 @@ public final class RentDtos {
         public static PaymentSummary from(RentPayment p) {
             return new PaymentSummary(
                     p.getId(), p.getTransactionRef(),
-                    p.getAmount(), p.getCurrency(), p.getPaymentMethod(),
+                    p.getAmount(), p.getCurrency(), p.getPaymentMethod().name(),
                     p.getStatus().name(),
                     p.getPaidAt(), p.getFailedAt(), p.getFailureReason(),
                     p.getCreatedAt());
@@ -401,24 +416,36 @@ public final class RentDtos {
             String tenantFirstName,
             // ── Charge / balance ──────────────────────────────────────────────
             /** Full monthly rent amount for the period (minor units). */
-            Integer totalRent,
+            Long totalRent,
             /** Sum of completed payments so far this period (minor units). */
-            Integer paidAmount,
+            Long paidAmount,
             /** Outstanding balance = totalRent − paidAmount (minor units). */
-            Integer balance,
+            Long balance,
             /** ISO year-month label of the current charge period, e.g. "2026-11". */
             String periodLabel,
-            /** ISO date of the charge due date. */
+            /** Start date of the current rent cycle — anchored to the lease activation day-of-month. */
+            java.time.LocalDate periodStart,
+            /** ISO date of the charge due date (end of current cycle). */
             java.time.LocalDate dueDate,
             /**
              * Days until due date (positive = days remaining, negative = days overdue).
-             * Computed server-side using the property's timezone so mobile clients
-             * always see the correct countdown regardless of their locale.
-             * Null when no active charge exists (property-level token with no unit selected).
+             * Computed server-side using the property's timezone.
+             * Null when no active charge exists.
              */
             Integer daysRemaining,
             /** Computed charge status — UNPAID, PARTIAL, PAID, OVERDUE, WAIVED. */
             String chargeStatus,
+            // ── Lease ─────────────────────────────────────────────────────────
+            /** ISO date the lease started (tenancy activation date). */
+            java.time.LocalDate tenancyStart,
+            /** ISO date the lease expires. */
+            java.time.LocalDate leaseEnd,
+            /** Total lease term in months. */
+            Integer leaseTermMonths,
+            /** Which month of the lease the tenant is currently in (1-based). */
+            Integer monthNumber,
+            /** Days remaining on the whole lease (may be negative if expired). */
+            Long leaseDaysRemaining,
             // ── Payment config ────────────────────────────────────────────────
             /** Whether the tenant may pay less than the full outstanding balance. */
             boolean partialPaymentAllowed,
@@ -426,7 +453,7 @@ public final class RentDtos {
              * Minimum partial payment amount (minor units).
              * 0 when partialPaymentAllowed = false or no minimum is configured.
              */
-            int minPaymentAmount,
+            long minPaymentAmount,
             // ── Recent payments ───────────────────────────────────────────────
             /** Most recent completed payments for this charge period (max 5). */
             List<PaymentSummary> recentPayments,
@@ -439,7 +466,7 @@ public final class RentDtos {
             String unitId,
             String unitNumber,
             String floor,
-            int monthlyAmount,
+            long monthlyAmount,
             boolean hasActiveTenant
     ) {}
 
@@ -451,7 +478,7 @@ public final class RentDtos {
             String paymentId,
             /** MoMo number the payer should expect a push from. */
             String paymentDestination,
-            int amount,
+            long amount,
             String currency,
             String periodLabel
     ) {}
@@ -465,7 +492,7 @@ public final class RentDtos {
             String transactionRef,
             /** Pending | Completed | Failed */
             String status,
-            int amount,
+            long amount,
             String currency,
             java.time.Instant paidAt,
             java.time.Instant failedAt,
@@ -517,5 +544,101 @@ public final class RentDtos {
             int overdueCount,
             long totalCollectedThisMonth,
             String currency
+    ) {}
+
+    // ── Maintenance ───────────────────────────────────────────────────────────
+
+    public record MaintenanceRequest(
+            String id,
+            String propertyId,
+            String propertyName,
+            String unitId,
+            String unitNumber,
+            String tenantName,
+            String tenantPhone,
+            String title,
+            String description,
+            /** LOW | NORMAL | HIGH | URGENT */
+            String priority,
+            String status,
+            java.time.Instant submittedAt,
+            java.time.Instant resolvedAt
+    ) {
+        public static MaintenanceRequest from(RentMaintenanceRequest r) {
+            return new MaintenanceRequest(
+                r.getId(),
+                r.getProperty().getId(),
+                r.getProperty().getName(),
+                r.getUnit() != null ? r.getUnit().getId() : null,
+                r.getUnit() != null ? r.getUnit().getUnitNumber() : null,
+                r.getTenantName(),
+                r.getTenantPhone(),
+                r.getTitle(),
+                r.getDescription(),
+                r.getPriority(),
+                r.getStatus(),
+                r.getSubmittedAt(),
+                r.getResolvedAt()
+            );
+        }
+    }
+
+    public record SubmitMaintenanceRequest(
+            String title,
+            String description,
+            String tenantName,
+            String tenantPhone,
+            /** Optional: LOW | NORMAL | HIGH | URGENT. Defaults to NORMAL. */
+            String priority
+    ) {}
+
+    public record UpdateMaintenanceStatusRequest(
+            String status
+    ) {}
+
+    // ── Manual payment recording ─────────────────────────────────────────────
+
+    /**
+     * Records a manual (non-gateway) payment against a charge.
+     * The manager observed the tenant paying in cash, MoMo transfer, or bank
+     * deposit, and is logging it here.
+     *
+     * <p>Overpayment is rejected unless {@code carryCredit = true}, in which
+     * case the excess is recorded as a completed payment that exceeds the
+     * charge amount — the charge is marked PAID and the surplus is visible
+     * in {@code paidAmount > amount}.
+     */
+    public record RecordManualPaymentRequest(
+            @Min(1) long amount,
+            /** CASH | MOMO | BANK | OTHER */
+            @NotBlank String method,
+            /** Optional reference (e.g. receipt number, MoMo transaction ID). */
+            @Size(max = 255) String reference,
+            /**
+             * When true, an amount exceeding the outstanding balance is accepted
+             * and recorded as credit. When false (default), overpayment is rejected
+             * with a 400 error.
+             */
+            boolean carryCredit
+    ) {}
+
+    // ── Lease ─────────────────────────────────────────────────────────────────
+
+    /** Summary of a lease returned by assignment and lookup endpoints. */
+    public record LeaseResponse(
+            String id,
+            String tenantId,
+            String unitId,
+            long monthlyAmountSnapshot,
+            String currency,
+            java.time.LocalDate activationDate,
+            int termMonths,
+            java.time.LocalDate leaseEnd,
+            /** PENDING | ACTIVE | EXPIRED | TERMINATED */
+            String status,
+            /** Which month of the lease (1-based, 0 if not yet started). */
+            int monthNumber,
+            /** Calendar days remaining on the full lease (negative if expired). */
+            long leaseDaysRemaining
     ) {}
 }

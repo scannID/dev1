@@ -9,6 +9,7 @@ import com.scanny.repository.RentTenantRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -48,10 +49,10 @@ public class RentChargeScheduler {
         this.chargeRepository = chargeRepository;
     }
 
-    @Scheduled(cron = "${scanny.rent.charge-gen-cron:0 0 6 1 * *}")
+    @Scheduled(cron = "${scanny.rent.charge-gen-cron:0 0 6 1 * *}", zone = "Africa/Kampala")
     @Transactional
     public void generateMonthlyCharges() {
-        YearMonth month = YearMonth.now();
+        YearMonth month = YearMonth.now(java.time.ZoneId.of("Africa/Kampala"));
         String periodLabel = month.toString();           // e.g. "2026-11"
 
         log.info("[Rent] Auto-generating charges for period {}", periodLabel);
@@ -97,6 +98,7 @@ public class RentChargeScheduler {
             charge.setDueDate(dueDate);
             charge.setStatus(RentChargeStatus.UNPAID);
             charge.setCreatedAt(Instant.now());
+            charge.setCreatedBy("scheduler");
 
             chargeRepository.save(charge);
             created++;

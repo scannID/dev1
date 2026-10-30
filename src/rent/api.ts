@@ -1,5 +1,4 @@
 /**
-/**
  * Rent collection API client.
  *
  * Auth strategy:
@@ -31,6 +30,8 @@ import type {
   UpdatePropertyRequest,
   UpdateTenantRequest,
   RegisterRentManagerRequest,
+  MaintenanceRequest,
+  SubmitMaintenanceRequest,
 } from './types'
 
 // ── Base URL ──────────────────────────────────────────────────────────────────
@@ -165,6 +166,17 @@ export const rentPublicApi = {
   /** Resolve a pay-page token into context for the payment form. */
   resolvePayContext: (token: string): Promise<TenantPayContext> =>
     get(`/public/rent/pay/${encodeURIComponent(token)}`),
+
+  /** Submit a maintenance request from the tenant app. */
+  submitMaintenance: (
+    token: string,
+    req: { title: string; description: string; tenantName?: string; tenantPhone?: string },
+  ): Promise<MaintenanceRequest> =>
+    post(`/public/rent/maintenance/${encodeURIComponent(token)}`, req),
+
+  /** Fetch maintenance requests for the current tenant/unit token. */
+  listMyMaintenance: (token: string): Promise<MaintenanceRequest[]> =>
+    get(`/public/rent/maintenance/${encodeURIComponent(token)}`),
 
   /** Initiate a MoMo rent payment. */
   initiatePayment: (
@@ -373,4 +385,19 @@ export const rentDashboardApi = {
       URL.revokeObjectURL(url)
     }).catch(() => {})
   },
+
+  /** List all maintenance requests for a property (landlord dashboard). */
+  listMaintenance: (propertyId: string): Promise<MaintenanceRequest[]> =>
+    get(`/public/rent/dashboard/properties/${encodeURIComponent(propertyId)}/maintenance`),
+
+  /** Update the status of a maintenance request (landlord). */
+  updateMaintenanceStatus: (
+    propertyId: string,
+    requestId: string,
+    status: string,
+  ): Promise<MaintenanceRequest> =>
+    post(
+      `/public/rent/dashboard/properties/${encodeURIComponent(propertyId)}/maintenance/${encodeURIComponent(requestId)}/status`,
+      { status },
+    ),
 }

@@ -115,28 +115,31 @@ export interface TenantPayContext {
   /** First name only — backend strips the surname. */
   tenantFirstName: string | null
   // ── Charge / balance ───────────────────────────────────────────────────────
-  /** Full monthly rent for the period (minor units). */
   totalRent: number | null
-  /** Sum of completed payments so far this period (minor units). */
   paidAmount: number | null
-  /** Outstanding balance = totalRent − paidAmount. */
   balance: number | null
   periodLabel: string | null
+  /** Start date of the current rent cycle (ISO). */
+  periodStart: string | null
   /** ISO date string of the charge due date. */
   dueDate: string | null
-  /**
-   * Days until overdue (positive = days left, negative = days overdue).
-   * Null when no charge exists (property-level token, unit not yet selected).
-   */
   daysRemaining: number | null
-  /** UNPAID | PARTIAL | PAID | OVERDUE | WAIVED — null when no charge. */
   chargeStatus: string | null
+  // ── Lease ──────────────────────────────────────────────────────────────────
+  /** Lease activation date (ISO). */
+  tenancyStart: string | null
+  /** Lease expiry date (ISO). */
+  leaseEnd: string | null
+  /** Total lease term in months. */
+  leaseTermMonths: number | null
+  /** Which month of the lease (1-based, 0 if not yet started). */
+  monthNumber: number | null
+  /** Days remaining on the whole lease (negative if expired). */
+  leaseDaysRemaining: number | null
   // ── Payment config ─────────────────────────────────────────────────────────
   partialPaymentAllowed: boolean
-  /** Minimum partial payment in minor units. 0 = no floor. */
   minPaymentAmount: number
   recentPayments: PaymentSummary[]
-  /** Populated only when tokenType === "property". */
   units: UnitPickOption[]
 }
 
@@ -243,8 +246,12 @@ export interface CreateTenantRequest {
   name: string
   phone: string
   email?: string
+  /** ISO date string — lease activation date. Defaults to today. */
+  activationDate?: string
+  /** Lease term in months (min 1, default 12). */
+  termMonths?: number
   moveInDate?: string
-  /** ISO date string — optional fixed lease end date, e.g. "2027-10-31". */
+  /** ISO date string — optional fixed lease end date (computed automatically from activationDate + termMonths). */
   leaseEnd?: string
 }
 
@@ -285,4 +292,29 @@ export interface UpdateTenantRequest {
   email?: string
   /** ISO date string "YYYY-MM-DD" or empty string to clear. */
   leaseEnd?: string
+}
+
+// ── Maintenance requests ──────────────────────────────────────────────────────
+
+export interface MaintenanceRequest {
+  id: string
+  propertyId: string
+  propertyName: string
+  unitId: string | null
+  unitNumber: string | null
+  tenantName: string | null
+  tenantPhone: string | null
+  title: string
+  description: string | null
+  /** OPEN | IN_PROGRESS | RESOLVED | CLOSED */
+  status: string
+  submittedAt: string
+  resolvedAt: string | null
+}
+
+export interface SubmitMaintenanceRequest {
+  title: string
+  description?: string
+  tenantName?: string
+  tenantPhone?: string
 }

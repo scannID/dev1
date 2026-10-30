@@ -29,6 +29,7 @@ public class RateLimitService {
     private final int quickPayCreatePerMin;
     private final int paymentsInitiatePerMin;
     private final int paymentsStatusPerMin;
+    private final int rentPayPerMin;
     private final Map<String, WindowCounter> localCounters = new ConcurrentHashMap<>();
 
     public RateLimitService(
@@ -45,7 +46,8 @@ public class RateLimitService {
             @Value("${scanny.rate-limit.websocket-per-min:30}") int websocketPerMin,
             @Value("${scanny.rate-limit.quick-pay-create-per-min:10}") int quickPayCreatePerMin,
             @Value("${scanny.rate-limit.payments-initiate-per-min:20}") int paymentsInitiatePerMin,
-            @Value("${scanny.rate-limit.payments-status-per-min:60}") int paymentsStatusPerMin
+            @Value("${scanny.rate-limit.payments-status-per-min:60}") int paymentsStatusPerMin,
+            @Value("${scanny.rate-limit.rent-pay-per-min:30}") int rentPayPerMin
     ) {
         this.redisTemplate = redisTemplateProvider.getIfAvailable();
         this.enabled = enabled;
@@ -61,6 +63,7 @@ public class RateLimitService {
         this.quickPayCreatePerMin = quickPayCreatePerMin;
         this.paymentsInitiatePerMin = paymentsInitiatePerMin;
         this.paymentsStatusPerMin = paymentsStatusPerMin;
+        this.rentPayPerMin = rentPayPerMin;
     }
 
     public String resolveBucket(HttpServletRequest request) {
@@ -110,6 +113,10 @@ public class RateLimitService {
         }
         if (path.startsWith("/ws/")) {
             return "websocket:" + websocketPerMin;
+        }
+        // ── Rent pay page (public, no auth) ───────────────────────────────────
+        if (path.startsWith("/api/public/rent/pay/")) {
+            return "rent-pay:" + rentPayPerMin;
         }
         return null;
     }

@@ -80,7 +80,6 @@ public class JwtConfig {
                     }
                 }
             }
-            // Keycloak sometimes puts a single audience as a string claim.
             Object raw = jwt.getClaim("aud");
             if (raw instanceof String s && accepted.contains(s)) {
                 return OAuth2TokenValidatorResult.success();

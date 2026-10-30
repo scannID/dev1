@@ -15,8 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
+import jakarta.persistence.UniqueConstraint;import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +49,7 @@ public class RentCharge {
     private RentUnit unit;
 
     @Column(nullable = false)
-    private int amount;
+    private long amount;
 
     @Column(nullable = false, length = 8)
     private String currency = "UGX";
@@ -76,8 +75,28 @@ public class RentCharge {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "created_by", length = 255)
+    private String createdBy = "system";
+
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    /**
+     * The start date of this rent cycle.
+     * Null for legacy charges created before the Lease feature (V64).
+     * Together with {@code dueDate} this defines the exact cycle window shown
+     * on the tenant pay page calendar.
+     */
+    @Column(name = "period_start")
+    private LocalDate periodStart;
+
+    /**
+     * The lease this charge belongs to.
+     * Null for legacy charges created via the manual generation flow before V64.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lease_id")
+    private RentLease lease;
 
     // ── Getters / setters ────────────────────────────────────────────────────
 
@@ -90,8 +109,8 @@ public class RentCharge {
     public RentUnit getUnit()                    { return unit; }
     public void setUnit(RentUnit u)              { this.unit = u; }
 
-    public int getAmount()                       { return amount; }
-    public void setAmount(int a)                 { this.amount = a; }
+    public long getAmount()                      { return amount; }
+    public void setAmount(long a)                { this.amount = a; }
 
     public String getCurrency()                  { return currency; }
     public void setCurrency(String c)            { this.currency = c != null ? c : "UGX"; }
@@ -114,19 +133,28 @@ public class RentCharge {
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }
 
-    public Instant getUpdatedAt()                { return updatedAt; }
-    public void setUpdatedAt(Instant t)          { this.updatedAt = t; }
+    public String getCreatedBy()                 { return createdBy; }
+    public void setCreatedBy(String by)          { this.createdBy = by != null ? by : "system"; }
+
+    public Instant getUpdatedAt()                      { return updatedAt; }
+    public void setUpdatedAt(Instant t)                { this.updatedAt = t; }
+
+    public LocalDate getPeriodStart()                  { return periodStart; }
+    public void setPeriodStart(LocalDate d)            { this.periodStart = d; }
+
+    public RentLease getLease()                        { return lease; }
+    public void setLease(RentLease l)                  { this.lease = l; }
 
     /** Sum of completed payments toward this charge. */
-    public int getPaidAmount() {
+    public long getPaidAmount() {
         return payments.stream()
                 .filter(p -> p.getStatus() == com.scanny.model.enums.RentPaymentStatus.Completed)
-                .mapToInt(RentPayment::getAmount)
+                .mapToLong(RentPayment::getAmount)
                 .sum();
     }
 
     /** Remaining balance after completed payments. */
-    public int getOutstandingAmount() {
+    public long getOutstandingAmount() {
         return Math.max(0, amount - getPaidAmount());
     }
 }

@@ -5,6 +5,8 @@ import {
   Banknote,
   Bell,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Cookie,
   CreditCard,
   FileText,
@@ -128,6 +130,9 @@ export default function AdminApp({
   const [view, setView] = useState<View>('overview')
   const [showNotifications, setShowNotifications] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('scanny-admin-sidebar-collapsed') === '1' } catch { return false }
+  })
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('scanny-dark-mode')
     return saved ? JSON.parse(saved) : false
@@ -159,6 +164,10 @@ export default function AdminApp({
     document.body.classList.toggle('dark', darkMode)
     localStorage.setItem('scanny-dark-mode', JSON.stringify(darkMode))
   }, [darkMode])
+
+  useEffect(() => {
+    try { localStorage.setItem('scanny-admin-sidebar-collapsed', sidebarCollapsed ? '1' : '0') } catch { /* ignore */ }
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     function handleKeyPress(e: KeyboardEvent) {
@@ -260,13 +269,22 @@ export default function AdminApp({
   return (
     <div className="admin-shell">
       <Toaster />
-      <aside className="admin-sidebar" aria-label="Admin navigation">
+      <aside className={`admin-sidebar${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} aria-label="Admin navigation">
         <div className="admin-brand">
           <img src="/koddlylogo3.png" alt="Koddly" className="admin-brand-logo" />
           <div className="admin-brand-text">
             <strong>Koddly</strong>
             <span>Admin Console</span>
           </div>
+          <button
+            type="button"
+            className="admin-sidebar-collapse-btn"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed((c) => !c)}
+          >
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
         </div>
 
         <Separator className="my-1" />
@@ -274,17 +292,18 @@ export default function AdminApp({
         <nav className="admin-nav" aria-label="Admin sections">
           {navSections.map((section) => (
             <div key={section.label} className="admin-nav-section">
-              <p className="admin-nav-label">{section.label}</p>
+              {!sidebarCollapsed && <p className="admin-nav-label">{section.label}</p>}
               {section.items.map(({ id, label, icon: Icon, badge, badgeType }) => (
                 <button
                   key={id}
                   type="button"
+                  title={sidebarCollapsed ? label : undefined}
                   className={view === id ? 'active' : ''}
                   onClick={() => setView(id)}
                 >
                   <Icon size={16} />
-                  <span style={{ flex: 1 }}>{label}</span>
-                  {badge ? (
+                  {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
+                  {!sidebarCollapsed && badge ? (
                     <span className={`admin-nav-badge ${badgeType === 'green' ? 'green' : ''}`}>
                       {badge}
                     </span>
@@ -295,12 +314,14 @@ export default function AdminApp({
           ))}
         </nav>
 
-        <div className="admin-profile">
+        <div className={`admin-profile${sidebarCollapsed ? ' admin-profile-collapsed' : ''}`}>
           <div className="admin-profile-avatar">{initials}</div>
-          <div className="admin-profile-info">
-            <strong>{kcUsername}</strong>
-            <span>{profileLabel}</span>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="admin-profile-info">
+              <strong>{kcUsername}</strong>
+              <span>{profileLabel}</span>
+            </div>
+          )}
           <button
             type="button"
             className="admin-dark-toggle"

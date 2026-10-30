@@ -1,5 +1,5 @@
 import { type ChangeEvent, type CSSProperties, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronsUpDown, Eye, Home, ImagePlus, Info, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingBag, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
+import { ArrowLeftRight, Banknote, BarChart3, BedDouble, Bell, CalendarCheck, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, Home, ImagePlus, Info, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Pencil, Plus, Scale, Search, Settings2, ShoppingBag, ShoppingCart, Sun, Trash2, Trash, UtensilsCrossed, Warehouse, X } from 'lucide-react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -308,6 +308,9 @@ function App({
   const [ordersNavOpen, setOrdersNavOpen] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('scanny-merchant-sidebar-collapsed') === '1' } catch { return false }
+  })
   const [showAddItem, setShowAddItem] = useState(false)
   const [addItemSection, setAddItemSection] = useState<'food' | 'lodging'>('food')
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null)
@@ -448,6 +451,10 @@ function App({
     document.body.classList.toggle('mobile-nav-open', showMobileNav)
     return () => document.body.classList.remove('mobile-nav-open')
   }, [showMobileNav])
+
+  useEffect(() => {
+    try { localStorage.setItem('scanny-merchant-sidebar-collapsed', sidebarCollapsed ? '1' : '0') } catch { /* ignore */ }
+  }, [sidebarCollapsed])
 
   const loadBranchOverviewCounts = useCallback(async () => {
     const pairs = await Promise.all(
@@ -811,7 +818,7 @@ function App({
   return (
     <main className="company-shell">
       <Toaster />
-      <aside className={`company-sidebar${showMobileNav ? ' mobile-open' : ''}`} aria-label="Company workspace navigation">
+      <aside className={`company-sidebar${showMobileNav ? ' mobile-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`} aria-label="Company workspace navigation">
         {/* Mobile close button */}
         <button
           type="button"
@@ -831,6 +838,15 @@ function App({
             <strong>Koddly</strong>
             <span>{staffMode ? (staffRole ?? 'Staff') + ' Portal' : 'Merchant Portal'}</span>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed((c) => !c)}
+          >
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
         </div>
 
         <nav className="side-nav" aria-label="Workspace sections">
@@ -985,19 +1001,21 @@ function App({
                     }}
                   >
                     <Icon size={20} />
-                    <span style={{ flex: 1 }}>{label}</span>
-                    {typeof count === 'number' ? (
+                    {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
+                    {!sidebarCollapsed && typeof count === 'number' ? (
                       <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
                         {count}
                       </Badge>
                     ) : null}
-                    <ChevronDown
-                      size={16}
-                      className={`side-nav-chevron${groupOpen ? ' open' : ''}`}
-                      aria-hidden="true"
-                    />
+                    {!sidebarCollapsed && (
+                      <ChevronDown
+                        size={16}
+                        className={`side-nav-chevron${groupOpen ? ' open' : ''}`}
+                        aria-hidden="true"
+                      />
+                    )}
                   </button>
-                  {groupOpen ? (
+                  {groupOpen && !sidebarCollapsed && (
                     <div className="side-nav-sub" role="group" aria-label={`${label} sections`}>
                       {visibleChildren.map(({ id: childId, label: childLabel, icon: ChildIcon, count: childCount }) => (
                         <button
@@ -1026,7 +1044,8 @@ function App({
                         </button>
                       ))}
                     </div>
-                  ) : null}
+                  )}
+
                 </div>
               )
             }
@@ -1036,6 +1055,7 @@ function App({
                 type="button"
                 className={!showAddItem && !editingItem && view === id ? 'active' : ''}
                 key={id}
+                title={sidebarCollapsed ? label : undefined}
                 onClick={() => {
                   setShowAddItem(false)
                   setEditingItem(null)
@@ -1044,8 +1064,8 @@ function App({
                 }}
               >
                 <Icon size={20} />
-                <span style={{ flex: 1 }}>{label}</span>
-                {typeof count === 'number' ? (
+                {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
+                {!sidebarCollapsed && typeof count === 'number' ? (
                   <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
                     {count}
                   </Badge>

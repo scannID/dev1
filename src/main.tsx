@@ -32,7 +32,6 @@ import ReceiptPage from './receipt/ReceiptPage'
 import EventsDiscoveryPage from './tickets/EventsDiscoveryPage'
 import RentPayPage from './rent/RentPayPage'
 import RentDashboard from './rent/RentDashboard'
-import RentCreate from './rent/RentCreate'
 
 initThemeFromStorage()
 
@@ -122,10 +121,6 @@ function resolveRentDashboardRoute(): boolean {
   return /^\/rent\/dashboard(\/.*)?$/.test(p)
 }
 
-function resolveRentCreateRoute(): boolean {
-  return /^\/rent\/create\/?$/.test(window.location.pathname)
-}
-
 /**
  * Returns true when the current pathname is not the root, not a known
  * functional route prefix, and not a marketing slug — i.e. genuinely unknown.
@@ -163,7 +158,6 @@ const gateScanRoute = resolveGateScanRoute()
 const receiptOrderId = resolveReceiptRoute()
 const rentPayToken = resolveRentPayRoute()
 const rentDashboardRoute = resolveRentDashboardRoute()
-const rentCreateRoute = resolveRentCreateRoute()
 const isUnknownPath = resolveIsUnknownPath()
 
 if (kitchenBusinessId) {
@@ -240,29 +234,28 @@ if (kitchenBusinessId) {
   const RENT_INTENT_KEY  = 'scanny-rent-login-intent'
 
   function RentDashboardRoot() {
-    type RPhase = 'boot' | 'login' | 'app'
-    const [phase, setPhase] = useState<RPhase>(() =>
-      (sessionStorage.getItem(RENT_SESSION_KEY) === '1' ||
-       sessionStorage.getItem(RENT_INTENT_KEY)  === '1') ? 'boot' : 'login'
-    )
-    const [showCreate, setShowCreate] = useState(false)
+    type RPhase = 'boot' | 'login' | 'app' | 'redirecting'
+    const [phase, setPhase] = useState<RPhase>('boot')
+    const RENT_FORCE_LOGIN_KEY = 'scanny-rent-force-login'
 
-    // Restore session after Keycloak redirect
+    // Always init Keycloak first, then decide whether to redirect or show app
     useEffect(() => {
-      const hadSession = sessionStorage.getItem(RENT_SESSION_KEY) === '1'
-      const hadIntent  = sessionStorage.getItem(RENT_INTENT_KEY)  === '1'
-      if (!hadSession && !hadIntent) {
-        setPhase('login'); return
-      }
       let cancelled = false
       waitForKeycloak().then((authenticated) => {
         if (cancelled) return
         sessionStorage.removeItem(RENT_INTENT_KEY)
-        if (authenticated && hasRentManagerSession()) {
+        const forceLogin = sessionStorage.getItem(RENT_FORCE_LOGIN_KEY) === '1'
+        if (!forceLogin && authenticated && hasRentManagerSession()) {
           sessionStorage.setItem(RENT_SESSION_KEY, '1')
           setPhase('app')
         } else {
           sessionStorage.removeItem(RENT_SESSION_KEY)
+          // If Keycloak returned authenticated but with the WRONG role (e.g. merchant
+          // SSO cookie still alive), we must force a fresh credential prompt so the
+          // user isn't silently bounced back with the wrong session in a blink loop.
+          if (authenticated && !hasRentManagerSession()) {
+            sessionStorage.setItem(RENT_FORCE_LOGIN_KEY, '1')
+          }
           setPhase('login')
         }
       }).catch(() => {
@@ -274,86 +267,52 @@ if (kitchenBusinessId) {
       return () => { cancelled = true }
     }, [])
 
-    // Boot screen while waiting for Keycloak
-    if (phase === 'boot') {
+    // When phase flips to 'login', redirect to Keycloak exactly once.
+    useEffect(() => {
+      if (phase !== 'login') return
+      sessionStorage.setItem(RENT_INTENT_KEY, '1')
+      const forceLogin = sessionStorage.getItem(RENT_FORCE_LOGIN_KEY) === '1'
+      sessionStorage.removeItem(RENT_FORCE_LOGIN_KEY)
+      keycloak
+        .login({
+          redirectUri: window.location.origin + '/rent/dashboard',
+          ...(forceLogin ? { prompt: 'login' as const } : {}),
+        })
+        .catch(() => {
+          sessionStorage.removeItem(RENT_INTENT_KEY)
+        })
+    }, [phase])
+
+    function handleLogout() {
+      setPhase('redirecting')
+      sessionStorage.removeItem(RENT_SESSION_KEY)
+      sessionStorage.removeItem(RENT_INTENT_KEY)
+      sessionStorage.setItem(RENT_FORCE_LOGIN_KEY, '1')
+      window.setTimeout(() => {
+        // Ends the Keycloak SSO session; prompt=login on the next visit
+        // forces credentials even if a cookie briefly remains.
+        void keycloak.logout({
+          redirectUri: window.location.origin + '/rent/dashboard',
+        })
+      }, 650)
+    }
+
+    if (phase === 'boot' || phase === 'login' || phase === 'redirecting') {
       return (
         <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#fff', fontFamily: 'Outfit, sans-serif' }}>
-          <p style={{ color: '#6b7280', fontSize: 14 }}>Opening Rent Manager…</p>
+          {phase === 'redirecting'
+            ? <WaveLoader label="Signing you out…" />
+            : <p style={{ color: '#6b7280', fontSize: 14 }}>{phase === 'boot' ? 'Opening Property Management…' : 'Redirecting to sign in…'}</p>
+          }
         </div>
       )
     }
 
-    // Not authenticated — show sign-in / sign-up prompt
-    if (phase === 'login') {
-      if (showCreate) {
-        return (
-          <RentCreate
-            onDone={() => {
-              // After registration, redirect to sign-in
-              loginAsRentManager(window.location.origin + '/rent/dashboard')
-            }}
-            onCancel={() => setShowCreate(false)}
-          />
-        )
-      }
-      return (
-        <div className="scanny-page">
-          <div className="scanny-page-narrow">
-            <div className="scanny-card" style={{ textAlign: 'center' }}>
-              <p className="scanny-eyebrow">Rent Manager</p>
-              <h1 className="scanny-title">Sign in to your dashboard</h1>
-              <p className="scanny-sub" style={{ marginTop: 8, marginBottom: 24 }}>
-                Use your Koddly account to manage rent collection.
-              </p>
-              <button
-                type="button"
-                className="scanny-btn scanny-btn-primary"
-                style={{ width: '100%', marginBottom: 12 }}
-                onClick={() => {
-                  sessionStorage.setItem(RENT_INTENT_KEY, '1')
-                  loginAsRentManager(window.location.origin + '/rent/dashboard')
-                }}
-              >
-                Sign in with Koddly
-              </button>
-              <button
-                type="button"
-                style={{
-                  width: '100%', padding: '10px 0', borderRadius: 8,
-                  border: '1.5px solid #e5e7eb', background: '#fff',
-                  fontSize: 14, fontWeight: 600, color: '#374151', cursor: 'pointer',
-                }}
-                onClick={() => setShowCreate(true)}
-              >
-                Create an account
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    // Authenticated — show the portfolio
-    return (
-      <RentDashboard
-        onOpenCreate={() => setShowCreate(true)}
-      />
-    )
+    return <RentDashboard onLogout={handleLogout} />
   }
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <RentDashboardRoot />
-    </StrictMode>,
-  )
-} else if (rentCreateRoute) {
-  // ── /rent/create — onboarding form ──────────────────────────────────────
-  applyDarkMode(false)
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <RentCreate
-        onDone={() => { window.location.href = '/rent/dashboard' }}
-        onCancel={() => { window.location.href = '/' }}
-      />
     </StrictMode>,
   )
 } else if (customerRoute) {

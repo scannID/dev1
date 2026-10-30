@@ -111,9 +111,13 @@ export function isStaffSession() {
 }
 
 export function logoutMerchant(redirectUri: string) {
-  keycloak.clearToken()
-  window.location.replace(redirectUri)
-  return Promise.resolve()
+  // End the Keycloak SSO session server-side so the session cookie is cleared.
+  // This prevents the rent dashboard from picking up a stale merchant SSO cookie.
+  return keycloak.logout({ redirectUri }).catch(() => {
+    // Fallback: just clear local token and navigate
+    keycloak.clearToken()
+    window.location.replace(redirectUri)
+  })
 }
 
 function hasRentManagerRole(): boolean {
@@ -131,13 +135,16 @@ export function hasRentManagerSession(): boolean {
 }
 
 export function logoutRentManager(redirectUri: string): Promise<void> {
-  keycloak.clearToken()
-  window.location.replace(redirectUri)
-  return Promise.resolve()
+  // End the Keycloak SSO session so the next visit cannot silent-SSO back in.
+  sessionStorage.setItem('scanny-rent-force-login', '1')
+  return keycloak.logout({ redirectUri })
 }
 
-export function loginAsRentManager(redirectUri?: string): void {
-  keycloak.login({ redirectUri: redirectUri ?? window.location.href })
+export function loginAsRentManager(redirectUri?: string, forceLogin = false): void {
+  keycloak.login({
+    redirectUri: redirectUri ?? window.location.href,
+    ...(forceLogin ? { prompt: 'login' as const } : {}),
+  })
 }
 
 export { MERCHANT_CLIENT_ID }

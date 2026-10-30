@@ -31,6 +31,12 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   color: var(--sidebar-foreground);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.company-sidebar.sidebar-collapsed {
+  width: 64px;
 }
 
 /* Brand row */
@@ -39,6 +45,58 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   align-items: center;
   gap: 10px;
   padding: 4px 4px 0;
+}
+
+.company-sidebar.sidebar-collapsed .sidebar-brand {
+  justify-content: center;
+  gap: 0;
+}
+
+/* Hide text + collapse button label when collapsed */
+.company-sidebar.sidebar-collapsed .sidebar-brand-text {
+  display: none;
+}
+
+/* Collapse toggle button */
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 6px;
+  border: 1px solid var(--sidebar-border, var(--border));
+  background: var(--sidebar-accent);
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+.sidebar-collapse-btn:hover {
+  background: oklch(from var(--foreground) l c h / 10%);
+}
+
+/* When collapsed: show collapse button centred below logo */
+.company-sidebar.sidebar-collapsed .sidebar-collapse-btn {
+  margin-left: 0;
+  margin-top: 4px;
+}
+
+.company-sidebar.sidebar-collapsed .sidebar-brand {
+  flex-direction: column;
+  padding-bottom: 4px;
+}
+
+/* Nav icon-only alignment when collapsed */
+.company-sidebar.sidebar-collapsed .side-nav button {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.company-sidebar.sidebar-collapsed .side-nav-sub {
+  display: none;
 }
 
 .company-sidebar .sidebar-brand-logo {

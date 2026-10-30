@@ -3,16 +3,19 @@ package com.scanny.service;
 import com.scanny.dto.PaymentDtos;
 import com.scanny.dto.RentDtos;
 import com.scanny.entity.RentCharge;
+import com.scanny.entity.RentMaintenanceRequest;
 import com.scanny.entity.RentPayment;
 import com.scanny.entity.RentProperty;
 import com.scanny.entity.RentTenant;
 import com.scanny.entity.RentUnit;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.RentChargeStatus;
+import com.scanny.model.enums.RentPaymentMethod;
 import com.scanny.model.enums.RentPaymentStatus;
 import com.scanny.payment.PaymentContext;
 import com.scanny.payment.service.PaymentGatewayService;
 import com.scanny.repository.RentChargeRepository;
+import com.scanny.repository.RentMaintenanceRepository;
 import com.scanny.repository.RentPaymentRepository;
 import com.scanny.repository.RentPropertyRepository;
 import com.scanny.repository.RentTenantRepository;
@@ -59,11 +62,13 @@ public class RentPaymentService {
     private final RentPropertyRepository propertyRepository;
     private final RentPropertyService propertyService;
     private final RentChargeService chargeService;
+    private final LeaseService leaseService;
     private final PaymentGatewayService paymentGatewayService;
     private final OutboxService outboxService;
     private final AuditService auditService;
+    private final RentMaintenanceRepository maintenanceRepository;
 
-    @Value("${scanny.customer-url:http://localhost:5173}")
+    @Value("${scanny.customer-url}")
     private String customerUrl;
 
     public RentPaymentService(
@@ -74,9 +79,11 @@ public class RentPaymentService {
             RentPropertyRepository propertyRepository,
             RentPropertyService propertyService,
             RentChargeService chargeService,
+            LeaseService leaseService,
             PaymentGatewayService paymentGatewayService,
             OutboxService outboxService,
-            AuditService auditService) {
+            AuditService auditService,
+            RentMaintenanceRepository maintenanceRepository) {
         this.paymentRepository = paymentRepository;
         this.chargeRepository = chargeRepository;
         this.unitRepository = unitRepository;
@@ -84,9 +91,11 @@ public class RentPaymentService {
         this.propertyRepository = propertyRepository;
         this.propertyService = propertyService;
         this.chargeService = chargeService;
+        this.leaseService = leaseService;
         this.paymentGatewayService = paymentGatewayService;
         this.outboxService = outboxService;
         this.auditService = auditService;
+        this.maintenanceRepository = maintenanceRepository;
     }
 
     // ── Resolve pay context ───────────────────────────────────────────────────
@@ -125,22 +134,60 @@ public class RentPaymentService {
         RentUnit unit     = tenant.getUnit();
         RentProperty prop = unit.getProperty();
 
-        String period = currentPeriod();
+        // Look up the active lease for this tenant's unit
+        java.util.Optional<com.scanny.entity.RentLease> leaseOpt =
+                leaseService.findActiveLeaseForTenant(tenant.getId());
+
+        // Determine the current period — prefer lease cycle start, fall back to YearMonth.now()
+        LocalDate today = LocalDate.now(java.time.ZoneId.of(
+                prop.getTimezone() != null ? prop.getTimezone() : "Africa/Kampala"));
+        String period;
+        LocalDate periodStart = null;
+        if (leaseOpt.isPresent()) {
+            var lease = leaseOpt.get();
+            LocalDate cs = lease.currentCycleStart(today);
+            periodStart = cs;
+            if (cs != null) {
+                period = LeaseService.toPeriodLabel(lease.currentCycleDueDate(today));
+            } else {
+                period = currentPeriod();
+            }
+        } else {
+            period = currentPeriod();
+        }
+
         RentCharge charge = chargeRepository
                 .findByTenant_IdAndPeriodLabel(tenant.getId(), period)
                 .orElse(null);
 
-        int totalRent  = (charge != null) ? charge.getAmount()    : unit.getMonthlyAmount();
-        int paid       = (charge != null) ? charge.getPaidAmount() : 0;
-        int balance    = (charge != null) ? charge.getOutstandingAmount() : totalRent;
+        long totalRent  = (charge != null) ? charge.getAmount()    : unit.getMonthlyAmount();
+        long paid       = (charge != null) ? charge.getPaidAmount() : 0;
+        long balance    = (charge != null) ? charge.getOutstandingAmount() : totalRent;
         LocalDate due  = (charge != null) ? charge.getDueDate()
                                           : unit.dueDateForPeriod(period);
+        // Prefer the charge's periodStart (set by the lease), fall back to lease-computed value
+        if (charge != null && charge.getPeriodStart() != null) {
+            periodStart = charge.getPeriodStart();
+        }
         String status  = (charge != null) ? charge.getStatus().name() : "UNPAID";
 
         List<RentDtos.PaymentSummary> recent = recentPayments(charge);
-
-        // First name only — never expose full name to public token holder
         String firstName = firstWord(tenant.getName());
+
+        // Lease context fields
+        LocalDate tenancyStart = leaseOpt.map(l -> l.getActivationDate()).orElse(tenant.getMoveInDate());
+        LocalDate leaseEndDate = leaseOpt.map(l -> l.getLeaseEnd()).orElse(tenant.getLeaseEnd());
+        Integer leaseTermMonths = leaseOpt.map(l -> l.getTermMonths()).orElse(null);
+        Integer monthNumber = leaseOpt.map(l -> l.currentMonthNumber(today)).orElse(null);
+        Long leaseDaysRemaining = null;
+        if (leaseOpt.isPresent()) {
+            var l = leaseOpt.get();
+            if (l.isCurrentlyActive()) {
+                leaseDaysRemaining = today.until(l.getLeaseEnd(), java.time.temporal.ChronoUnit.DAYS);
+            } else if (l.getStatus() == com.scanny.model.enums.RentLeaseStatus.EXPIRED) {
+                leaseDaysRemaining = -(long) Math.abs(today.until(l.getLeaseEnd(), java.time.temporal.ChronoUnit.DAYS));
+            }
+        }
 
         return new RentDtos.TenantPayContext(
                 "tenant",
@@ -148,9 +195,10 @@ public class RentPaymentService {
                 unit.getId(), unit.getUnitNumber(),
                 tenant.getId(), firstName,
                 totalRent, paid, balance,
-                period, due,
+                period, periodStart, due,
                 computeDaysRemaining(due, prop.getTimezone(), unit.getGracePeriodDays()),
                 status,
+                tenancyStart, leaseEndDate, leaseTermMonths, monthNumber, leaseDaysRemaining,
                 prop.isPartialPaymentAllowed(), prop.getMinPaymentAmount(),
                 recent,
                 List.of());
@@ -160,22 +208,55 @@ public class RentPaymentService {
         RentProperty prop  = unit.getProperty();
         RentTenant tenant  = unit.getActiveTenant();
 
-        String period = currentPeriod();
+        // Look up the active lease for this unit
+        java.util.Optional<com.scanny.entity.RentLease> leaseOpt = (tenant != null)
+                ? leaseService.findActiveLeaseForTenant(tenant.getId())
+                : java.util.Optional.empty();
+
+        LocalDate today = LocalDate.now(java.time.ZoneId.of(
+                prop.getTimezone() != null ? prop.getTimezone() : "Africa/Kampala"));
+        String period;
+        LocalDate periodStart = null;
+        if (leaseOpt.isPresent()) {
+            var lease = leaseOpt.get();
+            LocalDate cs = lease.currentCycleStart(today);
+            periodStart = cs;
+            period = (cs != null) ? LeaseService.toPeriodLabel(lease.currentCycleDueDate(today)) : currentPeriod();
+        } else {
+            period = currentPeriod();
+        }
+
         RentCharge charge = (tenant != null)
                 ? chargeRepository.findByTenant_IdAndPeriodLabel(tenant.getId(), period).orElse(null)
                 : null;
 
-        int totalRent  = (charge != null) ? charge.getAmount()
+        long totalRent  = (charge != null) ? charge.getAmount()
                        : (tenant != null ? unit.getMonthlyAmount() : 0);
-        int paid       = (charge != null) ? charge.getPaidAmount() : 0;
-        int balance    = (charge != null) ? charge.getOutstandingAmount() : totalRent;
+        long paid       = (charge != null) ? charge.getPaidAmount() : 0;
+        long balance    = (charge != null) ? charge.getOutstandingAmount() : totalRent;
         LocalDate due  = (charge != null) ? charge.getDueDate()
                                           : unit.dueDateForPeriod(period);
+        if (charge != null && charge.getPeriodStart() != null) {
+            periodStart = charge.getPeriodStart();
+        }
         String status  = (charge != null) ? charge.getStatus().name()
                        : (tenant != null ? "UNPAID" : null);
 
         List<RentDtos.PaymentSummary> recent = recentPayments(charge);
         String firstName = (tenant != null) ? firstWord(tenant.getName()) : null;
+
+        // Lease context fields
+        LocalDate tenancyStart = leaseOpt.map(l -> l.getActivationDate()).orElse(tenant != null ? tenant.getMoveInDate() : null);
+        LocalDate leaseEndDate = leaseOpt.map(l -> l.getLeaseEnd()).orElse(tenant != null ? tenant.getLeaseEnd() : null);
+        Integer leaseTermMonths = leaseOpt.map(l -> l.getTermMonths()).orElse(null);
+        Integer monthNumber = leaseOpt.map(l -> l.currentMonthNumber(today)).orElse(null);
+        Long leaseDaysRemaining = null;
+        if (leaseOpt.isPresent()) {
+            var l = leaseOpt.get();
+            if (l.isCurrentlyActive()) {
+                leaseDaysRemaining = today.until(l.getLeaseEnd(), java.time.temporal.ChronoUnit.DAYS);
+            }
+        }
 
         return new RentDtos.TenantPayContext(
                 "unit",
@@ -184,11 +265,12 @@ public class RentPaymentService {
                 tenant != null ? tenant.getId() : null,
                 firstName,
                 totalRent, paid, balance,
-                period, due,
+                period, periodStart, due,
                 tenant != null
                         ? computeDaysRemaining(due, prop.getTimezone(), unit.getGracePeriodDays())
                         : null,
                 status,
+                tenancyStart, leaseEndDate, leaseTermMonths, monthNumber, leaseDaysRemaining,
                 prop.isPartialPaymentAllowed(), prop.getMinPaymentAmount(),
                 recent,
                 List.of());
@@ -209,6 +291,7 @@ public class RentPaymentService {
                 null, null, null, null,
                 null, null, null,
                 currentPeriod(), null, null, null,
+                null, null, null, null, null, null,
                 prop.isPartialPaymentAllowed(), prop.getMinPaymentAmount(),
                 List.of(), options);
     }
@@ -247,13 +330,13 @@ public class RentPaymentService {
         // 2. Resolve or auto-create the charge — verify it belongs to this unit
         RentCharge charge = resolveOrCreateCharge(unit, chargeId);
 
-        int outstanding = charge.getOutstandingAmount();
+        long outstanding = charge.getOutstandingAmount();
         if (outstanding <= 0) {
             throw new ApiException(400, "This charge is already fully paid");
         }
 
         // 3. Determine and validate the requested amount (server-side — never trust client)
-        int requestedAmount = (req.amount() != null) ? req.amount() : outstanding;
+        long requestedAmount = (req.amount() != null) ? req.amount() : outstanding;
 
         if (requestedAmount <= 0) {
             throw new ApiException(400, "Payment amount must be greater than zero");
@@ -267,7 +350,7 @@ public class RentPaymentService {
                     "Partial payments are not allowed for this property. "
                     + "Please pay the full balance of " + outstanding + " " + property.getCurrency());
         }
-        int minAmount = property.getMinPaymentAmount();
+        long minAmount = property.getMinPaymentAmount();
         if (minAmount > 0 && requestedAmount < minAmount) {
             throw new ApiException(400,
                     "Minimum payment is " + minAmount + " " + property.getCurrency());
@@ -282,7 +365,7 @@ public class RentPaymentService {
         payment.setTransactionRef(transactionRef);
         payment.setAmount(requestedAmount);
         payment.setCurrency(property.getCurrency());
-        payment.setPaymentMethod(req.paymentMethod() != null ? req.paymentMethod() : "MobileMoney");
+        payment.setPaymentMethod(RentPaymentMethod.MOMO);
         payment.setStatus(RentPaymentStatus.Pending);
         payment.setCreatedAt(Instant.now());
         paymentRepository.save(payment);
@@ -294,7 +377,7 @@ public class RentPaymentService {
                     PaymentContext.RENT,
                     transactionRef,
                     req.paymentMethod(),
-                    requestedAmount,
+                    (int) requestedAmount,
                     property.getCurrency(),
                     req.customerPhone().trim(),
                     req.customerName() != null ? req.customerName().trim() : "",
@@ -575,5 +658,92 @@ public class RentPaymentService {
         if (name == null || name.isBlank()) return null;
         int space = name.indexOf(' ');
         return space > 0 ? name.substring(0, space) : name;
+    }
+
+    // ── Maintenance requests ──────────────────────────────────────────────────
+
+    /**
+     * Tenant submits a maintenance request via the QR tenant app.
+     * Resolves the property/unit from the pay token.
+     */
+    @Transactional
+    public RentDtos.MaintenanceRequest submitMaintenanceRequest(
+            String token, RentDtos.SubmitMaintenanceRequest req) {
+        // Resolve token → property + optional unit (same logic as resolvePayContext)
+        RentProperty property = null;
+        RentUnit unit = null;
+
+        // Try property token first
+        var propOpt = propertyRepository.findByQrToken(token);
+        if (propOpt.isPresent()) {
+            property = propOpt.get();
+        } else {
+            // Try unit token
+            var unitOpt = unitRepository.findByQrToken(token);
+            if (unitOpt.isPresent()) {
+                unit = unitOpt.get();
+                property = unit.getProperty();
+            } else {
+                // Try tenant pay token
+                var tenantOpt = tenantRepository.findByPayToken(token);
+                if (tenantOpt.isPresent()) {
+                    unit = tenantOpt.get().getUnit();
+                    property = unit.getProperty();
+                } else {
+                    throw new ApiException(404, "Token not found");
+                }
+            }
+        }
+
+        RentMaintenanceRequest r = new RentMaintenanceRequest();
+        r.setId(UUID.randomUUID().toString());
+        r.setProperty(property);
+        r.setUnit(unit);
+        r.setTenantName(req.tenantName());
+        r.setTenantPhone(req.tenantPhone());
+        r.setTitle(req.title());
+        r.setDescription(req.description());
+        r.setPriority(req.priority() != null && !req.priority().isBlank()
+                ? req.priority().toUpperCase() : "NORMAL");
+        r.setStatus("OPEN");
+        r.setSubmittedAt(Instant.now());
+        r.setCreatedBy("tenant");
+        maintenanceRepository.save(r);
+        return RentDtos.MaintenanceRequest.from(r);
+    }
+
+    /**
+     * Returns all maintenance requests submitted via a given pay token's property/unit.
+     */
+    @Transactional(readOnly = true)
+    public List<RentDtos.MaintenanceRequest> listMaintenanceByToken(String token) {
+        RentUnit unit = null;
+        RentProperty property = null;
+
+        var propOpt = propertyRepository.findByQrToken(token);
+        if (propOpt.isPresent()) {
+            property = propOpt.get();
+        } else {
+            var unitOpt = unitRepository.findByQrToken(token);
+            if (unitOpt.isPresent()) {
+                unit = unitOpt.get();
+                property = unit.getProperty();
+            } else {
+                var tenantOpt = tenantRepository.findByPayToken(token);
+                if (tenantOpt.isPresent()) {
+                    unit = tenantOpt.get().getUnit();
+                    property = unit.getProperty();
+                }
+            }
+        }
+
+        if (unit != null) {
+            return maintenanceRepository.findByUnitIdOrderBySubmittedAtDesc(unit.getId())
+                    .stream().map(RentDtos.MaintenanceRequest::from).toList();
+        } else if (property != null) {
+            return maintenanceRepository.findByPropertyIdOrderBySubmittedAtDesc(property.getId())
+                    .stream().map(RentDtos.MaintenanceRequest::from).toList();
+        }
+        return List.of();
     }
 }

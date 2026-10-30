@@ -8,10 +8,12 @@ import com.scanny.entity.RentUnit;
 import com.scanny.exception.ApiException;
 import com.scanny.model.enums.RentChargeStatus;
 import com.scanny.repository.RentChargeRepository;
+import com.scanny.repository.RentMaintenanceRepository;
 import com.scanny.repository.RentPaymentRepository;
 import com.scanny.repository.RentUnitRepository;
 import com.scanny.service.RentAccountService;
 import com.scanny.service.RentChargeService;
+import com.scanny.service.LeaseService;
 import com.scanny.service.RentPropertyService;
 import com.scanny.service.RentQrService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -67,29 +69,35 @@ public class RentDashboardController {
     private final RentAccountService accountService;
     private final RentPropertyService propertyService;
     private final RentChargeService chargeService;
+    private final LeaseService leaseService;
     private final RentUnitRepository unitRepository;
     private final RentChargeRepository chargeRepository;
     private final RentPaymentRepository paymentRepository;
     private final RentQrService rentQrService;
+    private final RentMaintenanceRepository maintenanceRepository;
 
-    @Value("${scanny.customer-url:http://localhost:5173}")
+    @Value("${scanny.customer-url}")
     private String customerUrl;
 
     public RentDashboardController(
             RentAccountService accountService,
             RentPropertyService propertyService,
             RentChargeService chargeService,
+            LeaseService leaseService,
             RentUnitRepository unitRepository,
             RentChargeRepository chargeRepository,
             RentPaymentRepository paymentRepository,
-            RentQrService rentQrService) {
+            RentQrService rentQrService,
+            RentMaintenanceRepository maintenanceRepository) {
         this.accountService = accountService;
         this.propertyService = propertyService;
         this.chargeService = chargeService;
+        this.leaseService = leaseService;
         this.unitRepository = unitRepository;
         this.chargeRepository = chargeRepository;
         this.paymentRepository = paymentRepository;
         this.rentQrService = rentQrService;
+        this.maintenanceRepository = maintenanceRepository;
     }
 
     // ── Auth resolution ───────────────────────────────────────────────────────
@@ -161,51 +169,7 @@ public class RentDashboardController {
             @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @PathVariable String propertyId,
             @RequestParam(required = false) String period) {
-
-        RentAccount account = resolveAccount(jwt, accessKey);
-        RentProperty property = propertyService.requireProperty(propertyId);
-        propertyService.requireAnyAccess(account, property);
-
-        String currentPeriod = period != null && !period.isBlank()
-                ? period.trim()
-                : YearMonth.now().toString();
-
-        List<RentUnit> units = unitRepository.findByProperty_IdOrderByUnitNumberAsc(propertyId);
-        List<RentCharge> periodCharges = chargeRepository.findByPropertyIdAndPeriodLabel(
-                propertyId, currentPeriod);
-
-        Map<String, RentCharge> chargeByUnitId = periodCharges.stream()
-                .collect(Collectors.toMap(
-                        c -> c.getUnit().getId(),
-                        Function.identity(),
-                        (a, b) -> a));
-
-        List<RentDtos.UnitDashboardRow> rows = units.stream().map(u -> {
-            RentCharge charge = chargeByUnitId.get(u.getId());
-            return new RentDtos.UnitDashboardRow(
-                    RentDtos.UnitResponse.from(u, customerUrl),
-                    charge != null ? RentDtos.ChargeResponse.from(charge) : null);
-        }).toList();
-
-        long totalUnits   = units.size();
-        long occupied     = units.stream().filter(u -> u.getActiveTenant() != null).count();
-        long paid         = periodCharges.stream().filter(c -> c.getStatus() == RentChargeStatus.PAID).count();
-        long unpaid       = periodCharges.stream()
-                .filter(c -> c.getStatus() == RentChargeStatus.UNPAID || c.getStatus() == RentChargeStatus.PARTIAL).count();
-        long overdueCount = chargeRepository.findOverdueByPropertyId(propertyId, LocalDate.now()).size();
-        long totalCollected = paymentRepository.sumCollectedByPropertyIdAndPeriod(propertyId, currentPeriod);
-
-        List<RentDtos.PaymentSummary> recentPayments = paymentRepository
-                .findRecentCompletedByPropertyId(propertyId, PageRequest.of(0, 20))
-                .stream().map(RentDtos.PaymentSummary::from).toList();
-
-        List<RentDtos.PropertyAccessResponse> accessList = propertyService.listAccess(propertyId);
-
-        return new RentDtos.PropertyDashboard(
-                RentDtos.PropertyResponse.from(property, customerUrl),
-                currentPeriod, totalUnits, occupied,
-                paid, unpaid, overdueCount, totalCollected,
-                rows, recentPayments, accessList);
+        return propertyService.getPropertyDashboard(resolveAccount(jwt, accessKey), propertyId, period);
     }
 
     // ── Unit management ───────────────────────────────────────────────────────
@@ -297,6 +261,27 @@ public class RentDashboardController {
         return propertyService.listAccess(propertyId);
     }
 
+    // ── Lease lookup ──────────────────────────────────────────────────────────
+
+    /**
+     * Returns the active lease for a unit, if any.
+     */
+    @GetMapping("/properties/{propertyId}/units/{unitId}/lease")
+    public RentDtos.LeaseResponse getUnitLease(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @PathVariable String propertyId,
+            @PathVariable String unitId) {
+        RentAccount account = resolveAccount(jwt, accessKey);
+        propertyService.requireAnyAccess(account, propertyService.requireProperty(propertyId));
+        var unit = unitRepository.findById(unitId)
+                .filter(u -> u.getProperty().getId().equals(propertyId))
+                .orElseThrow(() -> new ApiException(404, "Unit not found"));
+        return leaseService.findActiveLease(unitId)
+                .map(leaseService::toResponse)
+                .orElseThrow(() -> new ApiException(404, "No active lease for this unit"));
+    }
+
     // ── Charge management ─────────────────────────────────────────────────────
 
     @PostMapping("/properties/{propertyId}/charges/generate")
@@ -338,6 +323,24 @@ public class RentDashboardController {
             @PathVariable Long chargeId,
             @Valid @RequestBody RentDtos.UpdateChargeStatusRequest request) {
         return chargeService.updateStatus(resolveAccount(jwt, accessKey), propertyId, chargeId, request);
+    }
+
+    // ── Manual payment recording ──────────────────────────────────────────────
+
+    /**
+     * Records a manual payment (cash, MoMo transfer, bank deposit) against a
+     * charge. Overpayment is rejected unless {@code carryCredit = true}.
+     */
+    @PostMapping("/properties/{propertyId}/charges/{chargeId}/payments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RentDtos.PaymentSummary recordManualPayment(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @PathVariable String propertyId,
+            @PathVariable Long chargeId,
+            @Valid @RequestBody RentDtos.RecordManualPaymentRequest request) {
+        return chargeService.recordManualPayment(
+                resolveAccount(jwt, accessKey), propertyId, chargeId, request);
     }
 
     // ── QR token regeneration ─────────────────────────────────────────────────
@@ -465,5 +468,34 @@ public class RentDashboardController {
     private static String escapeCsv(String value) {
         if (value == null) return "";
         return value.replace("\"", "\"\"");
+    }
+
+    // ── Maintenance ───────────────────────────────────────────────────────────
+
+    @GetMapping("/properties/{propertyId}/maintenance")
+    public java.util.List<RentDtos.MaintenanceRequest> listMaintenance(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt,
+            @org.springframework.web.bind.annotation.RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @org.springframework.web.bind.annotation.PathVariable String propertyId) {
+        resolveAccount(jwt, accessKey); // auth check
+        return maintenanceRepository.findByPropertyIdOrderBySubmittedAtDesc(propertyId)
+                .stream().map(RentDtos.MaintenanceRequest::from).toList();
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/properties/{propertyId}/maintenance/{requestId}/status")
+    public RentDtos.MaintenanceRequest updateMaintenanceStatus(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt,
+            @org.springframework.web.bind.annotation.RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @org.springframework.web.bind.annotation.PathVariable String propertyId,
+            @org.springframework.web.bind.annotation.PathVariable String requestId,
+            @org.springframework.web.bind.annotation.RequestBody RentDtos.UpdateMaintenanceStatusRequest req) {
+        resolveAccount(jwt, accessKey);
+        var r = maintenanceRepository.findById(requestId)
+                .orElseThrow(() -> new ApiException(404, "Request not found"));
+        if (!r.getProperty().getId().equals(propertyId)) throw new ApiException(403, "Forbidden");
+        r.setStatus(req.status());
+        if ("RESOLVED".equals(req.status()) && r.getResolvedAt() == null) r.setResolvedAt(java.time.Instant.now());
+        maintenanceRepository.save(r);
+        return RentDtos.MaintenanceRequest.from(r);
     }
 }

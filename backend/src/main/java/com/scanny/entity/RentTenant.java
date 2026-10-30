@@ -59,12 +59,25 @@ public class RentTenant {
     @Column(name = "pay_token", nullable = false, unique = true, length = 128)
     private String payToken;
 
+    /**
+     * Optional national ID number for identification purposes.
+     * Not validated — stored as-entered.
+     */
+    @Column(name = "national_id_number", length = 64)
+    private String nationalIdNumber;
+
     @OneToMany(mappedBy = "tenant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("dueDate DESC")
     private List<RentCharge> charges = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    @Column(name = "created_by", length = 255)
+    private String createdBy = "system";
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     // ── Getters / setters ────────────────────────────────────────────────────
 
@@ -95,9 +108,18 @@ public class RentTenant {
     public String getPayToken()                  { return payToken; }
     public void setPayToken(String t)            { this.payToken = t; }
 
+    public String getNationalIdNumber()          { return nationalIdNumber; }
+    public void setNationalIdNumber(String n)    { this.nationalIdNumber = n; }
+
     public List<RentCharge> getCharges()         { return charges; }
     public void setCharges(List<RentCharge> c)   { this.charges = c; }
 
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }
+
+    public String getCreatedBy()                 { return createdBy; }
+    public void setCreatedBy(String by)          { this.createdBy = by != null ? by : "system"; }
+
+    public Instant getUpdatedAt()                { return updatedAt; }
+    public void setUpdatedAt(Instant t)          { this.updatedAt = t; }
 }

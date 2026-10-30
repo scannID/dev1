@@ -107,4 +107,26 @@ public class PublicRentController {
                 .map(RentDtos.PaymentStatusResponse::from)
                 .orElseThrow(() -> new ApiException(404, "Payment not found"));
     }
+
+    /**
+     * Tenant submits a maintenance request via the QR tenant app.
+     * Resolved against the pay token to identify the property/unit.
+     * Public — no auth required.
+     */
+    @PostMapping("/maintenance/{token}")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RentDtos.MaintenanceRequest submitMaintenance(
+            @PathVariable String token,
+            @RequestBody RentDtos.SubmitMaintenanceRequest req) {
+        return rentPaymentService.submitMaintenanceRequest(token, req);
+    }
+
+    /**
+     * Tenant fetches their own maintenance requests by pay token.
+     */
+    @GetMapping("/maintenance/{token}")
+    public java.util.List<RentDtos.MaintenanceRequest> listMyMaintenance(
+            @PathVariable String token) {
+        return rentPaymentService.listMaintenanceByToken(token);
+    }
 }

@@ -56,6 +56,9 @@ public class RentAccount {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "created_by", length = 255)
+    private String createdBy = "system";
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 
@@ -81,6 +84,9 @@ public class RentAccount {
 
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }
+
+    public String getCreatedBy()                 { return createdBy; }
+    public void setCreatedBy(String by)          { this.createdBy = by != null ? by : "system"; }
 
     public Instant getUpdatedAt()                { return updatedAt; }
     public void setUpdatedAt(Instant t)          { this.updatedAt = t; }
