@@ -59,6 +59,11 @@ public class H2CatalogDiscountSchemaRunner implements ApplicationRunner {
         ensureColumn("rent_properties", "min_payment_amount",     "INTEGER NOT NULL DEFAULT 0");
         ensureColumn("rent_tenants",    "lease_end",              "DATE");
 
+        // ── Rent fee fields (V65) ─────────────────────────────────────────────
+        ensureColumn("rent_properties", "late_fee_type",          "VARCHAR(16) NOT NULL DEFAULT 'NONE'");
+        ensureColumn("rent_properties", "late_fee_amount",        "BIGINT NOT NULL DEFAULT 0");
+        ensureColumn("rent_properties", "platform_fee_override",  "BIGINT NOT NULL DEFAULT 0");
+
         // ── Fix BusinessType enum casing ──────────────────────────────────────
         // Old H2 data has PascalCase values (e.g. 'Hotel', 'Restaurant').
         // The enum now uses UPPER_CASE. Normalise once so findAll() doesn't crash.

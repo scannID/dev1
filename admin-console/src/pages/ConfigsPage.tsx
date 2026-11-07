@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { Lock, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,9 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useConfigs } from '@/hooks/usePlatform'
 import { configsApi } from '@/api/services'
 import type { ConfigAction, ConfigMap, ConfigSection } from '@/api/types'
+
+// ── Config access password (first gate) ──────────────────────────────────────
+const CONFIG_ACCESS_PASSWORD = 'bauza'
 
 function asString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback
@@ -59,14 +63,59 @@ export default function ConfigsPage() {
   const [saved, setSaved] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
-  // ── Danger zone password gate ──
-  const [passwordGateAction, setPasswordGateAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [passwordError, setPasswordError] = useState(false)
+  // ── Config access gate (first layer — password "bauza") ──────────────────
+  const [configUnlocked, setConfigUnlocked] = useState(false)
+  const [accessPassword, setAccessPassword] = useState('')
+  const [accessError, setAccessError] = useState(false)
 
-  // ── Danger zone confirmation state ──
-  const [pendingAction, setPendingAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
+  function tryUnlock(e: React.FormEvent) {
+    e.preventDefault()
+    if (accessPassword === CONFIG_ACCESS_PASSWORD) {
+      setConfigUnlocked(true)
+      setAccessError(false)
+    } else {
+      setAccessError(true)
+      setAccessPassword('')
+    }
+  }
+
+  // ── Danger zone single-dialog state (second layer — server-verified) ──────
+  const [dangerAction, setDangerAction] = useState<(typeof DANGER_ACTIONS)[number] | null>(null)
+  const [dangerPassword, setDangerPassword] = useState('')
   const [confirmText, setConfirmText] = useState('')
+  const [dangerError, setDangerError] = useState<string | null>(null)
+
+  function openDangerDialog(action: ConfigAction) {
+    const d = DANGER_ACTIONS.find(a => a.action === action)
+    if (d) {
+      setDangerAction(d)
+      setDangerPassword('')
+      setConfirmText('')
+      setDangerError(null)
+    }
+  }
+
+  async function executeDangerAction() {
+    if (!dangerAction) return
+    if (confirmText !== dangerAction.action) {
+      setDangerError('Type the action name exactly to confirm.')
+      return
+    }
+    setDangerError(null)
+    try {
+      const result = await runAction(dangerAction.action, dangerPassword)
+      setActionMessage(result.message)
+      toast.success(result.message || `Action "${dangerAction.action}" completed`)
+      if (dangerAction.action === 'reset-platform') await refresh()
+      setDangerAction(null)
+      setDangerPassword('')
+      setConfirmText('')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Failed to run ${dangerAction.action}`
+      setDangerError(message)
+      toast.error(message)
+    }
+  }
 
   // ── System busy mode state ──
   const [systemBusy, setSystemBusy] = useState(false)
@@ -153,48 +202,6 @@ export default function ConfigsPage() {
     }
   }
 
-  function handleAction(action: ConfigAction) {
-    const d = DANGER_ACTIONS.find(a => a.action === action)
-    if (d) {
-      setPasswordGateAction(d)
-      setPasswordInput('')
-      setPasswordError(false)
-    }
-  }
-
-  function submitPasswordGate() {
-    if (passwordInput !== 'koddly123') {
-      setPasswordError(true)
-      setPasswordInput('')
-      return
-    }
-    const d = passwordGateAction
-    setPasswordGateAction(null)
-    setPasswordInput('')
-    setPasswordError(false)
-    if (d) {
-      setPendingAction(d)
-      setConfirmText('')
-    }
-  }
-
-  async function executePendingAction() {
-    if (!pendingAction) return
-    try {
-      const result = await runAction(pendingAction.action)
-      setActionMessage(result.message)
-      toast.success(result.message || `Action "${pendingAction.action}" completed`)
-      if (pendingAction.action === 'reset-platform') await refresh()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to run ${pendingAction.action}`
-      setActionMessage(message)
-      toast.error(message)
-    } finally {
-      setPendingAction(null)
-      setConfirmText('')
-    }
-  }
-
   if (loading && !draft) {
     return <LoadingSpinner fullPage label="Loading configs…" />
   }
@@ -209,6 +216,39 @@ export default function ConfigsPage() {
   }
 
   if (!draft) return null
+
+  // ── Config access gate (first layer) ──────────────────────────────────────
+  if (!configUnlocked) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '10vh' }}>
+        <div className="admin-card" style={{ maxWidth: 400, width: '100%', padding: '32px 28px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Lock size={22} style={{ color: 'var(--muted-foreground)' }} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Access Locked</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted-foreground)' }}>Enter the config access password to continue</p>
+            </div>
+          </div>
+          <form onSubmit={tryUnlock} style={{ display: 'grid', gap: 12 }}>
+            <Input
+              type="password"
+              value={accessPassword}
+              onChange={(e) => { setAccessPassword(e.target.value); setAccessError(false) }}
+              placeholder="Password"
+              autoFocus
+              style={{ borderColor: accessError ? 'var(--destructive)' : undefined, height: 40 }}
+            />
+            {accessError && (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>Incorrect password. Try again.</p>
+            )}
+            <Button type="submit" className="w-full">Unlock</Button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -580,7 +620,7 @@ export default function ConfigsPage() {
                 variant="destructive"
                 size="sm"
                 disabled={saving === d.action}
-                onClick={() => handleAction(d.action)}
+                onClick={() => openDangerDialog(d.action)}
               >
                 {saving === d.action ? 'Running…' : 'Run'}
               </Button>
@@ -589,83 +629,61 @@ export default function ConfigsPage() {
         </div>
       </div>
 
-      {/* ── Danger Zone password gate ── */}
-      <AlertDialog open={Boolean(passwordGateAction)} onOpenChange={(open) => { if (!open) { setPasswordGateAction(null); setPasswordInput(''); setPasswordError(false) } }}>
+      {/* ── Danger Zone combined dialog (password + type-to-confirm) ── */}
+      <AlertDialog open={Boolean(dangerAction)} onOpenChange={(open) => { if (!open) { setDangerAction(null); setDangerPassword(''); setConfirmText(''); setDangerError(null) } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle style={{ color: 'var(--destructive)' }}>
-              Danger Zone — Authentication Required
+            <AlertDialogTitle style={{ color: 'var(--destructive)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldAlert size={16} />
+              {dangerAction?.title}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Enter the admin password to proceed with{' '}
-              <strong>{passwordGateAction?.title}</strong>.
+              <strong>{dangerAction?.desc}</strong>
+              <br /><br />
+              This action is <strong>irreversible</strong>. You must provide the danger zone password
+              and type the action name to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
+
+          {/* Password field */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            <Label style={{ fontSize: 12, fontWeight: 600 }}>Danger zone password</Label>
             <Input
               type="password"
-              value={passwordInput}
-              onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false) }}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitPasswordGate() }}
-              placeholder="Enter password"
+              value={dangerPassword}
+              onChange={(e) => { setDangerPassword(e.target.value); setDangerError(null) }}
+              placeholder="Enter danger zone password"
               autoFocus
-              style={{ borderColor: passwordError ? 'var(--destructive)' : undefined }}
+              style={{ borderColor: dangerError ? 'var(--destructive)' : undefined }}
             />
-            {passwordError && (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>
-                Incorrect password.
-              </p>
-            )}
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setPasswordGateAction(null); setPasswordInput(''); setPasswordError(false) }}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={!passwordInput}
-              onClick={submitPasswordGate}
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
-      {/* ── Danger Zone confirmation dialog ── */}
-      <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open) => { if (!open) { setPendingAction(null); setConfirmText('') } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle style={{ color: 'var(--destructive)' }}>
-              {pendingAction?.title}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <strong>{pendingAction?.desc}</strong>
-              <br /><br />
-              This action is <strong>irreversible</strong>. To confirm, type{' '}
-              <code style={{ background: 'var(--muted)', padding: '1px 5px', borderRadius: 4, fontSize: 12 }}>
-                {pendingAction?.action}
-              </code>{' '}
-              below.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            placeholder={pendingAction?.action}
-            autoFocus
-            style={{ marginTop: 4 }}
-          />
+          {/* Type-to-confirm */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            <Label style={{ fontSize: 12, fontWeight: 600 }}>
+              Type <code style={{ background: 'var(--muted)', padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{dangerAction?.action}</code> to confirm
+            </Label>
+            <Input
+              value={confirmText}
+              onChange={(e) => { setConfirmText(e.target.value); setDangerError(null) }}
+              placeholder={dangerAction?.action}
+            />
+          </div>
+
+          {dangerError && (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--destructive)' }}>{dangerError}</p>
+          )}
+
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setPendingAction(null); setConfirmText('') }}>
+            <AlertDialogCancel onClick={() => { setDangerAction(null); setDangerPassword(''); setConfirmText(''); setDangerError(null) }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              disabled={confirmText !== pendingAction?.action || saving === pendingAction?.action}
-              onClick={() => void executePendingAction()}
+              disabled={!dangerPassword || confirmText !== dangerAction?.action || saving === dangerAction?.action}
+              onClick={() => void executeDangerAction()}
             >
-              {saving === pendingAction?.action ? 'Running…' : 'I understand, run it'}
+              {saving === dangerAction?.action ? 'Running…' : 'I understand, run it'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -24,7 +24,7 @@ function RentLoader() {
           flex-direction: column;
           align-items: center;
           gap: 20px;
-          color: #2563eb;
+          color: #ea580c;
         }
         .rl-icons {
           display: flex;
@@ -38,17 +38,19 @@ function RentLoader() {
           width: 52px;
           height: 52px;
           border-radius: 16px;
-          background: color-mix(in srgb, #2563eb 10%, transparent);
-          color: #2563eb;
-          animation: rl-bounce 1.2s ease-in-out infinite;
+          background: color-mix(in srgb, #ea580c 12%, transparent);
+          color: #ea580c;
+          animation: rl-bounce 0.85s ease-in-out infinite;
           will-change: transform;
         }
         .rl-icon:nth-child(1) { animation-delay: 0s; }
-        .rl-icon:nth-child(2) { animation-delay: 0.2s; }
-        .rl-icon:nth-child(3) { animation-delay: 0.4s; }
+        .rl-icon:nth-child(2) { animation-delay: 0.2125s; }
+        .rl-icon:nth-child(3) { animation-delay: 0.425s; }
         @keyframes rl-bounce {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-14px); }
+          0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+          25% { transform: translate3d(-2px, -10px, 0) rotate(3deg); }
+          50% { transform: translate3d(0, 0, 0) rotate(4deg); }
+          75% { transform: translate3d(2px, -10px, 0) rotate(-3deg); }
         }
         .rl-label {
           margin: 0;
@@ -58,7 +60,7 @@ function RentLoader() {
           animation: rl-fade 1.6s ease-in-out infinite;
         }
         @keyframes rl-fade {
-          0%, 100% { opacity: 0.5; }
+          0%, 100% { opacity: 0.55; }
           50% { opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -137,6 +139,7 @@ function statusText(s: string | null) {
 
 type Tab = 'home' | 'pay' | 'receipts' | 'maintenance'
 type PayPhase = 'form' | 'pending' | 'confirmed'
+type PayMode = 'current' | 'ahead'
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -153,6 +156,7 @@ export default function RentPayPage({ token }: { token: string }) {
 
   // ── Pay ─────────────────────────────────────────────────────────────────
   const [payPhase, setPayPhase] = useState<PayPhase>('form')
+  const [payMode, setPayMode] = useState<PayMode>('current')
   const [phone, setPhone] = useState('')
   const [payAmount, setPayAmount] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -218,7 +222,11 @@ export default function RentPayPage({ token }: { token: string }) {
     setSubmitting(true)
     const balance = ctx.balance ?? 0
     let amount: number | undefined
-    if (ctx.partialPaymentAllowed && payAmount.trim()) {
+
+    if (payMode === 'ahead') {
+      // Pay-ahead: always the full monthly rent for the next period
+      amount = ctx.totalRent ?? undefined
+    } else if (ctx.partialPaymentAllowed && payAmount.trim()) {
       const parsed = parseInt(payAmount.replace(/,/g, ''), 10)
       if (isNaN(parsed) || parsed <= 0) { setFormError('Enter a valid amount'); setSubmitting(false); return }
       if (parsed > balance) { setFormError(`Cannot exceed ${money(balance, ctx.currency)}`); setSubmitting(false); return }
@@ -230,7 +238,7 @@ export default function RentPayPage({ token }: { token: string }) {
     try {
       const res = await rentPublicApi.initiatePayment(
         token,
-        { customerPhone: phone.trim(), amount },
+        { customerPhone: phone.trim(), amount, payAhead: payMode === 'ahead' || undefined },
         selectedUnit?.unitId ?? ctx.unitId ?? undefined,
         null,
       )
@@ -422,86 +430,199 @@ export default function RentPayPage({ token }: { token: string }) {
         <div className="rp-section">
           {payPhase === 'form' && (
             <>
+              {/* ── Header ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <button type="button" onClick={() => setTab('home')} style={{ background: 'none', border: 'none', color: 'var(--rp-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
                   <ArrowLeft size={18} />
                 </button>
                 <div>
-                  <p style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{money(balance, ctx.currency)}</p>
+                  <p style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+                    {payMode === 'ahead'
+                      ? `Pay ahead · ${money(ctx.totalRent ?? 0, ctx.currency)}`
+                      : money(balance, ctx.currency)}
+                  </p>
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--rp-muted)' }}>
                     {ctx.propertyName}{unitLabel ? ` · Unit ${unitLabel}` : ''}{ctx.periodLabel ? ` · ${periodLabel(ctx.periodLabel)}` : ''}
                   </p>
                 </div>
               </div>
 
-              <div className="rp-card">
-                <form onSubmit={handlePay} noValidate>
-                  <div className="rp-field">
-                    <label className="rp-label" htmlFor="rp-phone">
-                      Mobile money number <span style={{ color: 'var(--rp-red)' }}>*</span>
-                    </label>
-                    <input
-                      id="rp-phone"
-                      className="rp-input"
-                      type="tel"
-                      inputMode="tel"
-                      placeholder="07XX XXX XXX"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                      disabled={submitting}
-                      autoComplete="tel"
-                    />
-                    <span className="rp-hint">You'll receive a MoMo prompt on this number</span>
+              {/* ── Due date info banner ── */}
+              {ctx.dueDate && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', borderRadius: 12, marginBottom: 14,
+                  background: isOverdue
+                    ? 'color-mix(in srgb, var(--rp-red) 10%, transparent)'
+                    : isPaid
+                    ? 'color-mix(in srgb, var(--rp-green) 8%, transparent)'
+                    : 'color-mix(in srgb, var(--rp-blue) 8%, transparent)',
+                  border: `1px solid ${isOverdue ? 'color-mix(in srgb, var(--rp-red) 25%, transparent)' : isPaid ? 'color-mix(in srgb, var(--rp-green) 25%, transparent)' : 'color-mix(in srgb, var(--rp-blue) 25%, transparent)'}`,
+                }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {isPaid ? 'Paid through' : isOverdue ? 'Was due' : 'Rent due'}
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 800, color: isOverdue ? 'var(--rp-red)' : 'var(--rp-text)' }}>
+                      {new Date(ctx.dueDate).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
                   </div>
+                  {ctx.daysRemaining != null && !isPaid && (
+                    <span style={{
+                      fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+                      background: isOverdue ? 'var(--rp-red)' : ctx.daysRemaining <= 3 ? '#f59e0b' : 'var(--rp-blue)',
+                      color: '#fff',
+                    }}>
+                      {ctx.daysRemaining < 0
+                        ? `${Math.abs(ctx.daysRemaining)}d overdue`
+                        : ctx.daysRemaining === 0
+                          ? 'due today'
+                          : `${ctx.daysRemaining}d left`}
+                    </span>
+                  )}
+                  {isPaid && (
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: 'var(--rp-green)', color: '#fff' }}>
+                      ✓ Paid
+                    </span>
+                  )}
+                </div>
+              )}
 
-                  {ctx.partialPaymentAllowed && balance > 0 && (
-                    <div className="rp-field">
-                      <label className="rp-label" htmlFor="rp-amount">
-                        Amount{' '}
-                        <span style={{ fontWeight: 400, color: 'var(--rp-muted)' }}>
-                          (blank = full {money(balance, ctx.currency)})
+              {/* ── Pay-ahead toggle (only when current is paid or no balance) ── */}
+              {(isPaid || balance <= 0) && ctx.totalRent != null && ctx.totalRent > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPayMode('current')}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      border: '1px solid var(--rp-border)',
+                      background: payMode === 'current' ? 'var(--rp-blue)' : 'transparent',
+                      color: payMode === 'current' ? '#fff' : 'var(--rp-muted)',
+                    }}
+                  >
+                    Current period
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayMode('ahead')}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      border: '1px solid var(--rp-border)',
+                      background: payMode === 'ahead' ? 'var(--rp-blue)' : 'transparent',
+                      color: payMode === 'ahead' ? '#fff' : 'var(--rp-muted)',
+                    }}
+                  >
+                    Pay ahead (next period)
+                  </button>
+                </div>
+              )}
+
+              {/* ── Already paid + no pay-ahead selected → show a confirmation ── */}
+              {isPaid && payMode === 'current' ? (
+                <div className="rp-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+                  <div style={{ fontSize: 44, marginBottom: 10 }}>✓</div>
+                  <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: 'var(--rp-green)' }}>You're all caught up!</h2>
+                  <p style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 800 }}>{money(ctx.totalRent ?? 0, ctx.currency)}</p>
+                  <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--rp-muted)' }}>
+                    {ctx.periodLabel ? `${periodLabel(ctx.periodLabel)} is fully paid.` : 'Rent is fully paid for this period.'}
+                  </p>
+                  {ctx.dueDate && (
+                    <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--rp-muted)' }}>
+                      Next payment due:{' '}
+                      <strong style={{ color: 'var(--rp-text)' }}>
+                        {new Date(ctx.dueDate).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </strong>
+                    </p>
+                  )}
+                  <button type="button" className="rp-pay-btn" onClick={() => setTab('home')}>Back to home</button>
+                </div>
+              ) : (
+                /* ── Payment form ── */
+                <div className="rp-card">
+                  {payMode === 'ahead' && (
+                    <div style={{ padding: '10px 12px', borderRadius: 10, background: 'color-mix(in srgb, var(--rp-blue) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--rp-blue) 20%, transparent)', marginBottom: 14, fontSize: 12, color: 'var(--rp-muted)' }}>
+                      <strong style={{ color: 'var(--rp-text)' }}>Paying ahead</strong> — this covers your next rent period.
+                      {ctx.totalRent != null && (
+                        <span style={{ display: 'block', marginTop: 2, fontSize: 13, fontWeight: 700, color: 'var(--rp-text)' }}>
+                          Amount: {money(ctx.totalRent, ctx.currency)}
                         </span>
-                      </label>
-                      <input
-                        id="rp-amount"
-                        className="rp-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={ctx.minPaymentAmount ?? 1}
-                        max={balance}
-                        value={payAmount}
-                        onChange={(e) => setPayAmount(e.target.value)}
-                        placeholder={balance.toLocaleString()}
-                        disabled={submitting}
-                      />
-                      {ctx.minPaymentAmount > 0 && (
-                        <span className="rp-hint">Minimum: {money(ctx.minPaymentAmount, ctx.currency)}</span>
                       )}
                     </div>
                   )}
 
-                  <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--rp-bg)', marginBottom: 14, fontSize: 12, color: 'var(--rp-muted)' }}>
-                    Paying to <strong style={{ color: 'var(--rp-text)' }}>{ctx.ownerName}</strong>
-                  </div>
+                  <form onSubmit={handlePay} noValidate>
+                    <div className="rp-field">
+                      <label className="rp-label" htmlFor="rp-phone">
+                        Mobile money number <span style={{ color: 'var(--rp-red)' }}>*</span>
+                      </label>
+                      <input
+                        id="rp-phone"
+                        className="rp-input"
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="07XX XXX XXX"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        disabled={submitting}
+                        autoComplete="tel"
+                      />
+                      <span className="rp-hint">You'll receive a MoMo prompt on this number</span>
+                    </div>
 
-                  {formError && <p className="rp-error">{formError}</p>}
+                    {ctx.partialPaymentAllowed && balance > 0 && payMode === 'current' && (
+                      <div className="rp-field">
+                        <label className="rp-label" htmlFor="rp-amount">
+                          Amount{' '}
+                          <span style={{ fontWeight: 400, color: 'var(--rp-muted)' }}>
+                            (blank = full {money(balance, ctx.currency)})
+                          </span>
+                        </label>
+                        <input
+                          id="rp-amount"
+                          className="rp-input"
+                          type="number"
+                          inputMode="numeric"
+                          min={ctx.minPaymentAmount ?? 1}
+                          max={balance}
+                          value={payAmount}
+                          onChange={(e) => setPayAmount(e.target.value)}
+                          placeholder={balance.toLocaleString()}
+                          disabled={submitting}
+                        />
+                        {ctx.minPaymentAmount > 0 && (
+                          <span className="rp-hint">Minimum: {money(ctx.minPaymentAmount, ctx.currency)}</span>
+                        )}
+                      </div>
+                    )}
 
-                  <button
-                    type="submit"
-                    disabled={submitting || !phone.trim()}
-                    className={`rp-pay-btn${isOverdue ? ' danger' : ''}`}
-                    style={{ marginTop: 0 }}
-                  >
-                    <CreditCard size={17} />
-                    {submitting ? 'Starting…' : `Pay ${
-                      payAmount.trim() && ctx.partialPaymentAllowed
-                        ? money(parseInt(payAmount.replace(/,/g, ''), 10) || 0, ctx.currency)
-                        : money(balance, ctx.currency)
-                    }`}
-                  </button>
-                </form>
-              </div>
+                    <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--rp-bg)', marginBottom: 14, fontSize: 12, color: 'var(--rp-muted)' }}>
+                      Paying to <strong style={{ color: 'var(--rp-text)' }}>{ctx.ownerName}</strong>
+                    </div>
+
+                    {formError && <p className="rp-error">{formError}</p>}
+
+                    <button
+                      type="submit"
+                      disabled={submitting || !phone.trim()}
+                      className={`rp-pay-btn${isOverdue ? ' danger' : ''}`}
+                      style={{ marginTop: 0 }}
+                    >
+                      <CreditCard size={17} />
+                      {submitting
+                        ? 'Starting…'
+                        : payMode === 'ahead'
+                          ? `Pay ahead ${money(ctx.totalRent ?? 0, ctx.currency)}`
+                          : `Pay ${
+                              payAmount.trim() && ctx.partialPaymentAllowed
+                                ? money(parseInt(payAmount.replace(/,/g, ''), 10) || 0, ctx.currency)
+                                : money(balance, ctx.currency)
+                            }`}
+                    </button>
+                  </form>
+                </div>
+              )}
             </>
           )}
 
@@ -536,7 +657,7 @@ export default function RentPayPage({ token }: { token: string }) {
                   <p style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800 }}>{money(payResult.amount, payResult.currency)}</p>
                   <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--rp-muted)' }}>Your landlord has been notified.</p>
                   <p style={{ margin: 0, fontSize: 10, color: '#d1d5db', fontFamily: 'monospace' }}>Ref: {payResult.transactionRef}</p>
-                  <button type="button" className="rp-pay-btn" style={{ marginTop: 18 }} onClick={() => { setTab('home'); setPayPhase('form'); setPayResult(null) }}>
+                  <button type="button" className="rp-pay-btn" style={{ marginTop: 18 }} onClick={() => { setTab('home'); setPayPhase('form'); setPayResult(null); setPayMode('current') }}>
                     Back to home
                   </button>
                 </>
@@ -545,7 +666,7 @@ export default function RentPayPage({ token }: { token: string }) {
                   <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--rp-muted)', lineHeight: 1.6 }}>
                     The payment did not go through. Please try again.
                   </p>
-                  <button type="button" className="rp-pay-btn danger" onClick={() => { setPayPhase('form'); setPayResult(null); setFormError(null) }}>
+                  <button type="button" className="rp-pay-btn danger" onClick={() => { setPayPhase('form'); setPayResult(null); setFormError(null); setPayMode('current') }}>
                     Try again
                   </button>
                 </>

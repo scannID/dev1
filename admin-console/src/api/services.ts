@@ -269,8 +269,8 @@ export const configsApi = {
     return api.put<ConfigSectionResponse>(`/admin/configs/${section}`, { config })
   },
 
-  runAction: async (action: ConfigAction): Promise<ConfigActionResult> => {
-    return api.post<ConfigActionResult>(`/admin/configs/actions/${action}`)
+  runAction: async (action: ConfigAction, password?: string): Promise<ConfigActionResult> => {
+    return api.post<ConfigActionResult>(`/admin/configs/actions/${action}`, password ? { password } : {})
   },
 
   getSystemBusy: async (): Promise<ConfigActionResult> => {
@@ -372,3 +372,108 @@ export const adminApi = {
 }
 
 export default adminApi
+
+// ── Rent admin API ────────────────────────────────────────────────────────────
+
+import type {
+  AdminRentSummary,
+  RentAccountingSummary,
+  AdminPropertiesResponse,
+  AdminPropertyDetail,
+  UpdatePropertyFeesRequest,
+} from './types'
+
+export const rentAdminApi = {
+  getSummary: (): Promise<AdminRentSummary> =>
+    api.get<AdminRentSummary>('/admin/rent/summary'),
+
+  getAccounting: (): Promise<RentAccountingSummary> =>
+    api.get<RentAccountingSummary>('/admin/rent/accounting'),
+
+  listProperties: (params?: { page?: number; limit?: number; search?: string }): Promise<AdminPropertiesResponse> => {
+    const q = new URLSearchParams()
+    q.set('page',  String(params?.page  ?? 1))
+    q.set('limit', String(params?.limit ?? 25))
+    if (params?.search) q.set('search', params.search)
+    return api.get<AdminPropertiesResponse>(`/admin/rent/properties?${q.toString()}`)
+  },
+
+  getProperty: (propertyId: string): Promise<AdminPropertyDetail> =>
+    api.get<AdminPropertyDetail>(`/admin/rent/properties/${propertyId}`),
+
+  updateFees: (propertyId: string, req: UpdatePropertyFeesRequest): Promise<AdminPropertyDetail['property']> =>
+    api.post(`/admin/rent/properties/${propertyId}/fees`, req),
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Accounting Ledger API
+// ══════════════════════════════════════════════════════════════════════════════
+
+import type {
+  AccountingPeriod,
+  JournalEntry,
+  JournalLine,
+  TrialBalance,
+  AccountingDashboard,
+  PostingFailure,
+  EntryPageResponse,
+  FailurePageResponse,
+} from './types'
+
+export const accountingApi = {
+  // ── Periods ───────────────────────────────────────────────────────────────
+  async getPeriods(): Promise<AccountingPeriod[]> {
+    return api.get('/admin/accounting/periods')
+  },
+
+  async closePeriod(label: string): Promise<AccountingPeriod> {
+    return api.post(`/admin/accounting/periods/${label}/close`)
+  },
+
+  async getTrialBalance(label: string): Promise<TrialBalance> {
+    return api.get(`/admin/accounting/periods/${label}/trial-balance`)
+  },
+
+  // ── Journal entries ───────────────────────────────────────────────────────
+  async getEntries(params: {
+    page?: number
+    size?: number
+    module?: string
+    from?: string
+    to?: string
+  }): Promise<EntryPageResponse> {
+    const query = new URLSearchParams()
+    if (params.page != null) query.set('page', String(params.page))
+    if (params.size != null) query.set('size', String(params.size))
+    if (params.module) query.set('module', params.module)
+    if (params.from) query.set('from', params.from)
+    if (params.to) query.set('to', params.to)
+    return api.get(`/admin/accounting/entries?${query}`)
+  },
+
+  async getLines(entryId: number): Promise<JournalLine[]> {
+    return api.get(`/admin/accounting/entries/${entryId}/lines`)
+  },
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  async getDashboard(): Promise<AccountingDashboard> {
+    return api.get('/admin/accounting/dashboard')
+  },
+
+  // ── Dead-letter queue ─────────────────────────────────────────────────────
+  async getFailures(params: {
+    status?: string
+    page?: number
+    size?: number
+  }): Promise<FailurePageResponse> {
+    const query = new URLSearchParams()
+    if (params.status) query.set('status', params.status)
+    if (params.page != null) query.set('page', String(params.page))
+    if (params.size != null) query.set('size', String(params.size))
+    return api.get(`/admin/accounting/failures?${query}`)
+  },
+
+  async resolveFailure(id: number): Promise<PostingFailure> {
+    return api.post(`/admin/accounting/failures/${id}/resolve`)
+  },
+}

@@ -17,6 +17,8 @@ import com.scanny.model.enums.OrderStatus;
 import com.scanny.model.enums.PaymentStatus;
 import com.scanny.model.enums.RoomStatus;
 import com.scanny.entity.Merchant;
+import com.scanny.accounting.AccountingEvent;
+import com.scanny.accounting.AccountingEventPublisher;
 import com.scanny.payment.model.FeeSplit;
 import com.scanny.repository.CatalogItemRepository;
 import com.scanny.repository.MerchantRepository;
@@ -62,6 +64,7 @@ public class OrderService {
     private final InventoryService inventoryService;
     private final SystemBusyModeService systemBusyModeService;
     private final LedgerWriterService ledgerWriterService;
+    private final AccountingEventPublisher accountingEventPublisher;
 
     public OrderService(
             BusinessService businessService,
@@ -75,7 +78,8 @@ public class OrderService {
             TableService tableService,
             InventoryService inventoryService,
             SystemBusyModeService systemBusyModeService,
-            LedgerWriterService ledgerWriterService
+            LedgerWriterService ledgerWriterService,
+            AccountingEventPublisher accountingEventPublisher
     ) {
         this.businessService = businessService;
         this.orderRepository = orderRepository;
@@ -89,6 +93,7 @@ public class OrderService {
         this.inventoryService = inventoryService;
         this.systemBusyModeService = systemBusyModeService;
         this.ledgerWriterService = ledgerWriterService;
+        this.accountingEventPublisher = accountingEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -512,6 +517,50 @@ public class OrderService {
             }
         } catch (Exception ex) {
             logger.error("LedgerWriterService failed for order {} — accounting row was NOT written: {}",
+                    savedOrder.getId(), ex.getMessage(), ex);
+        }
+
+        // ── Double-entry accounting events ────────────────────────────────────
+        // Published in this same transaction so the outbox row is atomically
+        // consistent with the order status change.
+        try {
+            if (paymentStatus == PaymentStatus.Paid && oldStatus != PaymentStatus.Paid) {
+                String method = savedOrder.getPaymentMethod() != null
+                        ? savedOrder.getPaymentMethod() : "MOMO";
+                // Retrieve fee split from the saved order fields
+                long gross      = savedOrder.getTotal();
+                long commission = savedOrder.getPlatformFee();
+                long payee      = gross - commission;
+                accountingEventPublisher.publish(new AccountingEvent(
+                        "ORDER_PAID:" + savedOrder.getId(),
+                        "CASH".equalsIgnoreCase(method) ? "ORDER_PAID_CASH" : "ORDER_PAID",
+                        "RESTAURANTS",
+                        savedOrder.getId(),
+                        gross, commission, payee, 0L, 0L, 0L,
+                        savedOrder.getBusiness().getId(),
+                        null, null, null,
+                        method,
+                        "Order paid — " + savedOrder.getId(),
+                        null
+                ));
+            } else if (paymentStatus == PaymentStatus.Refunded && oldStatus == PaymentStatus.Paid) {
+                long gross      = savedOrder.getTotal();
+                long commission = savedOrder.getPlatformFee();
+                accountingEventPublisher.publish(new AccountingEvent(
+                        "ORDER_REFUNDED:" + savedOrder.getId(),
+                        "ORDER_REFUNDED",
+                        "RESTAURANTS",
+                        savedOrder.getId(),
+                        gross, commission, gross - commission, 0L, 0L, 0L,
+                        savedOrder.getBusiness().getId(),
+                        null, null, null,
+                        null,
+                        "Order refunded — " + savedOrder.getId(),
+                        null
+                ));
+            }
+        } catch (Exception ex) {
+            logger.error("[Accounting] Failed to publish accounting event for order {}: {}",
                     savedOrder.getId(), ex.getMessage(), ex);
         }
 

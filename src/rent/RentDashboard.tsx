@@ -1,6 +1,6 @@
 ﻿import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { Building2, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, FileText, Home, LayoutGrid, LogOut, Maximize2, Menu, Minimize2, Moon, Plus, Search, Sun, Users, Wallet, Wrench, X } from 'lucide-react'
+import { Building2, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, FileText, Home, LayoutGrid, LogOut, Maximize2, Menu, Minimize2, Moon, Plus, Search, SlidersHorizontal, Sun, Users, Wallet, Wrench, X } from 'lucide-react'
 import { rentDashboardApi } from './api'
 import { logoutRentManager } from '../keycloak'
 import { applyDarkMode, persistDarkMode, readDarkMode } from '../lib/theme'
@@ -157,11 +157,12 @@ function QRCodePanel({
           style={{
             marginTop: 12,
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: 'row',
             alignItems: 'flex-start',
-            gap: 10,
+            gap: 16,
           }}
         >
+          {/* QR image */}
           {dataUrl ? (
             <img
               ref={imgRef}
@@ -173,6 +174,7 @@ function QRCodePanel({
                 borderRadius: 8,
                 border: '1px solid var(--border)',
                 background: '#fff',
+                flexShrink: 0,
               }}
             />
           ) : (
@@ -180,50 +182,21 @@ function QRCodePanel({
               {genError ?? 'Generating…'}
             </p>
           )}
-          {sublabel && (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--muted-foreground)' }}>{sublabel}</p>
-          )}
-          <p
-            style={{
-              margin: 0,
-              fontSize: 11,
-              color: 'var(--muted-foreground)',
-              wordBreak: 'break-all',
-              maxWidth: 320,
-              fontFamily: 'ui-monospace, monospace',
-            }}
-          >
-            {url}
-          </p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+
+          {/* Buttons column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
               type="button"
               onClick={handlePrint}
               disabled={!dataUrl}
-              style={{
-                fontSize: 12,
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                cursor: 'pointer',
-                color: 'var(--foreground)',
-              }}
+              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', color: 'var(--foreground)' }}
             >
               Print
             </button>
             <button
               type="button"
               onClick={handleCopy}
-              style={{
-                fontSize: 12,
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                cursor: 'pointer',
-                color: 'var(--foreground)',
-              }}
+              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', color: 'var(--foreground)' }}
             >
               Copy link
             </button>
@@ -231,15 +204,7 @@ function QRCodePanel({
               <a
                 href={dataUrl}
                 download={`${label.replace(/\s+/g, '-')}.png`}
-                style={{
-                  fontSize: 12,
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'var(--card)',
-                  textDecoration: 'none',
-                  color: 'var(--foreground)',
-                }}
+                style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', textDecoration: 'none', color: 'var(--foreground)', textAlign: 'center' }}
               >
                 Download PNG
               </a>
@@ -425,7 +390,7 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<string>(currentPeriod())
-  const [activeTab, setActiveTab] = useState<'units' | 'settings' | 'access'>('units')
+  const [activeTab, setActiveTab] = useState<'units' | 'config' | 'access'>('units')
 
   // Add unit inline form
   const [showAddUnit, setShowAddUnit] = useState(false)
@@ -486,6 +451,16 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
   const [grantError, setGrantError] = useState<string | null>(null)
   const [grantOk, setGrantOk] = useState(false)
 
+  // Fee config form
+  const [feeLateFeeType, setFeeLateFeeType] = useState('NONE')
+  const [feeLateFeeAmount, setFeeLateFeeAmount] = useState('0')
+  const [feePlatformOverride, setFeePlatformOverride] = useState('0')
+  const [feeGracePeriod, setFeeGracePeriod] = useState('0')
+  const [feeOverdueDays, setFeeOverdueDays] = useState('0')
+  const [savingFees, setSavingFees] = useState(false)
+  const [feeSaveError, setFeeSaveError] = useState<string | null>(null)
+  const [feeSaveOk, setFeeSaveOk] = useState(false)
+
   const seededRef = useRef(false)
 
   const load = useCallback(async () => {
@@ -503,6 +478,16 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
         setPropTimezone(d.property.timezone)
         setPropPartial(d.property.partialPaymentAllowed)
         setPropMinPayment(String(d.property.minPaymentAmount))
+        // Seed fee fields
+        setFeeLateFeeType(d.property.lateFeeType || 'NONE')
+        setFeeLateFeeAmount(
+          d.property.lateFeeType === 'PERCENT'
+            ? String(d.property.lateFeeAmount / 100)
+            : String(d.property.lateFeeAmount)
+        )
+        setFeePlatformOverride(String(d.property.platformFeeOverride))
+        setFeeGracePeriod(String(d.property.gracePeriodDays ?? 0))
+        setFeeOverdueDays(String(d.property.overdueAfterDays ?? 0))
         seededRef.current = true
       }
     } catch (err) {
@@ -725,30 +710,46 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
     }
   }
 
-  async function handleSaveProperty(e: FormEvent) {
+  async function handleSaveConfig(e: FormEvent) {
     e.preventDefault()
+    // Save property details + fees in one call
+    setFeeSaveError(null)
+    setFeeSaveOk(false)
     setPropSaveError(null)
     setPropSaveOk(false)
+    setSavingFees(true)
     setSavingProp(true)
     try {
+      const storedAmount = feeLateFeeType === 'PERCENT'
+        ? Math.round(Number(feeLateFeeAmount) * 100)
+        : Math.round(Number(feeLateFeeAmount))
       await rentDashboardApi.updateProperty(propertyId, {
-        name: propName.trim(),
-        address: propAddress.trim(),
-        city: propCity.trim(),
-        ownerName: propOwnerName.trim(),
-        ownerMomo: propOwnerMomo.trim(),
-        timezone: propTimezone.trim(),
+        // Property details
+        name:                propName.trim(),
+        address:             propAddress.trim(),
+        city:                propCity.trim(),
+        ownerName:           propOwnerName.trim(),
+        ownerMomo:           propOwnerMomo.trim(),
+        timezone:            propTimezone.trim(),
         partialPaymentAllowed: propPartial,
-        minPaymentAmount: Number(propMinPayment) || 0,
+        minPaymentAmount:    Number(propMinPayment) || 0,
+        // Fees
+        lateFeeType:         feeLateFeeType,
+        lateFeeAmount:       storedAmount,
+        platformFeeOverride: Math.round(Number(feePlatformOverride)) || 0,
+        gracePeriodDays:     Number(feeGracePeriod) || 0,
+        overdueAfterDays:    Number(feeOverdueDays) || 0,
       })
-      setPropSaveOk(true)
+      setFeeSaveOk(true)
       await load()
     } catch (err) {
-      setPropSaveError(err instanceof Error ? err.message : 'Could not save property')
+      setFeeSaveError(err instanceof Error ? err.message : 'Could not save configuration')
     } finally {
+      setSavingFees(false)
       setSavingProp(false)
     }
   }
+
 
   async function handleGrantAccess(e: FormEvent) {
     e.preventDefault()
@@ -798,9 +799,9 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
   }
 
   const d = dashboard!
-  const tabs: { key: 'units' | 'settings' | 'access'; label: string }[] = [
-    { key: 'units', label: 'Units' },
-    ...(canManage ? [{ key: 'settings' as const, label: 'Settings' }] : []),
+  const tabs: { key: 'units' | 'config' | 'access'; label: string }[] = [
+    { key: 'units',  label: 'Units'  },
+    ...(canManage ? [{ key: 'config' as const, label: 'Config' }] : []),
     ...(canManage ? [{ key: 'access' as const, label: 'Access' }] : []),
   ]
 
@@ -864,10 +865,10 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
       {/* ── Units tab ─────────────────────────────────────────────────────── */}
       {activeTab === 'units' && (
         <div>
-          {/* Period controls */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+          {/* Period controls row */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              Period
+              Billing period
               <input
                 type="month"
                 value={period}
@@ -875,232 +876,334 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
                 style={{ ...fieldInputStyle, width: 'auto', padding: '6px 8px' }}
               />
             </label>
-            {canManage && (
-              <button type="button" onClick={handleGenerateCharges} style={btnPrimaryStyle}>
-                Generate all charges
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => rentDashboardApi.triggerCsvExport(propertyId, period)}
+                style={btnSecondaryStyle}
+              >
+                Export CSV
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => rentDashboardApi.triggerCsvExport(propertyId, period)}
-              style={btnSecondaryStyle}
-            >
-              Export CSV
-            </button>
-          </div>
-
-          {/* Stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
-            <Stat label="Units" value={d.totalUnits} />
-            <Stat label="Occupied" value={d.occupiedUnits} />
-            <Stat label="Paid" value={d.paidThisPeriod} color="var(--primary)" />
-            <Stat label="Unpaid" value={d.unpaidThisPeriod} />
-            <Stat label="Overdue" value={d.overdueCount} color="var(--destructive)" />
-            <Stat label="Collected" value={money(d.totalCollectedThisPeriod, currency)} />
-          </div>
-
-          {/* Property QR near the top so it is visible without scrolling past the unit table */}
-          <section
-            style={{
-              marginBottom: 20,
-              padding: 16,
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              background: 'var(--card)',
-            }}
-          >
-            <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Property QR</h3>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--muted-foreground)' }}>
-              Building entrance QR — tenants scan, pick their unit, then pay or view activity.
-            </p>
-            <QRCodePanel
-              url={d.property.qrCodeUrl}
-              label={d.property.name}
-              sublabel="Shows all units on this property"
-              defaultExpanded
-              size={160}
-            />
-            {canManage && (
-              <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-                <button type="button" onClick={handleRegeneratePropertyQr} style={btnSecondaryStyle}>
-                  Regenerate QR
+              {canManage && (
+                <button type="button" onClick={handleGenerateCharges} style={btnPrimaryStyle}>
+                  Generate all charges
                 </button>
-                <button
-                  type="button"
-                  onClick={() => rentDashboardApi.downloadBulkQrPdf(propertyId, d.property.name)}
-                  style={btnSecondaryStyle}
-                >
-                  Download bulk QR PDF
-                </button>
-              </div>
-            )}
-          </section>
-
-          {/* Units table */}
-          <div className="overflow-hidden rounded-xl border border-border bg-card" style={{ marginBottom: 16 }}>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-border">
-                  <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Unit</TableHead>
-                  <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Tenant</TableHead>
-                  <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Monthly</TableHead>
-                  <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
-                  <TableHead className="pr-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Pay link</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {d.units.map((row) => (
-                  <UnitRow
-                    key={row.unit.id}
-                    row={row}
-                    currency={currency}
-                    canManage={canManage}
-                    onGenerateCharge={handleGenerateSingle}
-                    onShowQr={setActiveQrUnit}
-                    onEditUnit={openEditUnit}
-                    onManageTenant={openManageTenant}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Add unit inline form */}
-          {canManage && (
-            <div style={{ marginBottom: 20 }}>
-              {!showAddUnit ? (
-                <button type="button" onClick={() => setShowAddUnit(true)} style={btnSecondaryStyle}>
-                  <Plus size={16} /> Add unit
-                </button>
-              ) : (
-                <form
-                  onSubmit={handleAddUnit}
-                  style={{
-                    display: 'grid',
-                    gap: 10,
-                    padding: 16,
-                    border: '1px solid var(--border)',
-                    borderRadius: 12,
-                    background: 'var(--card)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: 14 }}>Add unit</strong>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddUnit(false)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Unit number *</span>
-                      <input className="scanny-input" value={addUnitNum} onChange={(e) => setAddUnitNum(e.target.value)} style={fieldInputStyle} placeholder="A1" disabled={addingUnit} />
-                    </label>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Floor</span>
-                      <input className="scanny-input" value={addUnitFloor} onChange={(e) => setAddUnitFloor(e.target.value)} style={fieldInputStyle} placeholder="Ground" disabled={addingUnit} />
-                    </label>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Monthly amount *</span>
-                      <input className="scanny-input" type="number" value={addUnitAmount} onChange={(e) => setAddUnitAmount(e.target.value)} style={fieldInputStyle} placeholder="500000" disabled={addingUnit} />
-                    </label>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Deposit</span>
-                      <input className="scanny-input" type="number" value={addUnitDeposit} onChange={(e) => setAddUnitDeposit(e.target.value)} style={fieldInputStyle} placeholder="0" disabled={addingUnit} />
-                    </label>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Due day</span>
-                      <input className="scanny-input" type="number" value={addUnitDueDay} onChange={(e) => setAddUnitDueDay(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
-                    </label>
-                    <label style={{ display: 'grid' }}>
-                      <span style={fieldLabelStyle}>Grace (days)</span>
-                      <input className="scanny-input" type="number" value={addUnitGrace} onChange={(e) => setAddUnitGrace(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
-                    </label>
-                  </div>
-                  {addUnitError && <p className="scanny-error" style={{ fontSize: 13 }}>{addUnitError}</p>}
-                  <button type="submit" disabled={addingUnit} style={btnPrimaryStyle}>
-                    {addingUnit ? 'Adding…' : 'Add unit'}
-                  </button>
-                </form>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Recent payments */}
-          {d.recentPayments.length > 0 && (
-            <section style={{ marginBottom: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px' }}>Recent payments</h3>
-              <div style={{ display: 'grid', gap: 6 }}>
-                {d.recentPayments.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      padding: '10px 12px',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      background: 'var(--card)',
-                      fontSize: 13,
-                    }}
-                  >
-                    <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.transactionRef}</span>
-                    <span>{money(p.amount, currency)} · {p.status}</span>
-                  </div>
-                ))}
+          {/* Stats row — compact single-row card */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(6, 1fr)',
+            gap: 0,
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            overflow: 'hidden',
+            marginBottom: 16,
+            background: 'var(--card)',
+          }}>
+            {[
+              { label: 'Units',     value: String(d.totalUnits) },
+              { label: 'Occupied',  value: String(d.occupiedUnits) },
+              { label: 'Paid',      value: String(d.paidThisPeriod),    color: 'var(--primary)' },
+              { label: 'Unpaid',    value: String(d.unpaidThisPeriod) },
+              { label: 'Overdue',   value: String(d.overdueCount),      color: d.overdueCount > 0 ? 'var(--destructive)' : undefined },
+              { label: 'Collected', value: money(d.totalCollectedThisPeriod, currency), color: 'var(--primary)' },
+            ].map((s, i) => (
+              <div key={s.label} style={{ padding: '14px 16px', borderRight: i < 5 ? '1px solid var(--border)' : undefined }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 500 }}>{s.label}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700, color: s.color ?? 'var(--foreground)' }}>{s.value}</p>
               </div>
-            </section>
-          )}
+            ))}
+          </div>
 
+          {/* Two-column: units table (left) + QR panel (right) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, alignItems: 'start' }}>
+
+            {/* Left: units table + add unit */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Units</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>Rent, tenants and payment status for the period</p>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border">
+                      <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Unit</TableHead>
+                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Tenant</TableHead>
+                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Monthly rent</TableHead>
+                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
+                      <TableHead className="pr-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Pay link</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {d.units.map((row) => (
+                      <UnitRow
+                        key={row.unit.id}
+                        row={row}
+                        currency={currency}
+                        canManage={canManage}
+                        onGenerateCharge={handleGenerateSingle}
+                        onShowQr={setActiveQrUnit}
+                        onEditUnit={openEditUnit}
+                        onManageTenant={openManageTenant}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Add unit */}
+              {canManage && (
+                <div>
+                  {!showAddUnit ? (
+                    <button type="button" onClick={() => setShowAddUnit(true)} style={btnSecondaryStyle}>
+                      <Plus size={16} /> Add unit
+                    </button>
+                  ) : (
+                    <form
+                      onSubmit={handleAddUnit}
+                      style={{ display: 'grid', gap: 10, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: 14 }}>Add unit</strong>
+                        <button type="button" onClick={() => setShowAddUnit(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Unit number *</span>
+                          <input className="scanny-input" value={addUnitNum} onChange={(e) => setAddUnitNum(e.target.value)} style={fieldInputStyle} placeholder="A1" disabled={addingUnit} />
+                        </label>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Floor</span>
+                          <input className="scanny-input" value={addUnitFloor} onChange={(e) => setAddUnitFloor(e.target.value)} style={fieldInputStyle} placeholder="Ground" disabled={addingUnit} />
+                        </label>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Monthly amount *</span>
+                          <input className="scanny-input" type="number" value={addUnitAmount} onChange={(e) => setAddUnitAmount(e.target.value)} style={fieldInputStyle} placeholder="500000" disabled={addingUnit} />
+                        </label>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Deposit</span>
+                          <input className="scanny-input" type="number" value={addUnitDeposit} onChange={(e) => setAddUnitDeposit(e.target.value)} style={fieldInputStyle} placeholder="0" disabled={addingUnit} />
+                        </label>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Due day</span>
+                          <input className="scanny-input" type="number" value={addUnitDueDay} onChange={(e) => setAddUnitDueDay(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
+                        </label>
+                        <label style={{ display: 'grid' }}>
+                          <span style={fieldLabelStyle}>Grace (days)</span>
+                          <input className="scanny-input" type="number" value={addUnitGrace} onChange={(e) => setAddUnitGrace(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
+                        </label>
+                      </div>
+                      {addUnitError && <p className="scanny-error" style={{ fontSize: 13 }}>{addUnitError}</p>}
+                      <button type="submit" disabled={addingUnit} style={btnPrimaryStyle}>
+                        {addingUnit ? 'Adding…' : 'Add unit'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* Recent payments */}
+              {d.recentPayments.length > 0 && (
+                <section>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px' }}>Recent payments</h3>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {d.recentPayments.map((p) => (
+                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', fontSize: 13 }}>
+                        <span style={{ fontFamily: 'ui-monospace, monospace' }}>{p.transactionRef}</span>
+                        <span>{money(p.amount, currency)} · {p.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* Right: Property QR panel */}
+            <div style={{ position: 'sticky', top: 16, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>Property QR</h3>
+              <QRCodePanel
+                url={d.property.qrCodeUrl}
+                label={d.property.name}
+                sublabel="Shows all units on this property"
+                defaultExpanded
+                size={160}
+              />
+              {canManage && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                  <button type="button" onClick={handleRegeneratePropertyQr} style={btnSecondaryStyle}>
+                    Regenerate QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rentDashboardApi.downloadBulkQrPdf(propertyId, d.property.name)}
+                    style={btnSecondaryStyle}
+                  >
+                    Bulk QR PDF
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       )}
 
-      {/* ── Settings tab ──────────────────────────────────────────────────── */}
-      {activeTab === 'settings' && canManage && (
-        <form onSubmit={handleSaveProperty} style={{ display: 'grid', gap: 14, maxWidth: 560 }}>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Property name</span>
-            <input className="scanny-input" value={propName} onChange={(e) => setPropName(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Address</span>
-            <input className="scanny-input" value={propAddress} onChange={(e) => setPropAddress(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>City</span>
-            <input className="scanny-input" value={propCity} onChange={(e) => setPropCity(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, fontSize: 12, color: 'var(--muted-foreground)', fontWeight: 600 }}>
-            Owner details
+      {/* ── Config tab ────────────────────────────────────────────────────── */}
+      {activeTab === 'config' && canManage && (
+        <form onSubmit={(e) => void handleSaveConfig(e)} style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
+
+          {/* ── Live summary cards ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {[
+              { label: 'Late fee',  value: d.property.lateFeeType === 'FLAT'
+                  ? `${(d.property.lateFeeAmount || 0).toLocaleString()} UGX`
+                  : d.property.lateFeeType === 'PERCENT'
+                    ? `${((d.property.lateFeeAmount || 0) / 100).toFixed(2)}%`
+                    : 'None' },
+              { label: 'Grace period', value: `${d.property.gracePeriodDays || 0} days` },
+              { label: 'Platform fee', value: d.property.platformFeeOverride > 0
+                  ? `${d.property.platformFeeOverride.toLocaleString()} UGX`
+                  : 'Default' },
+            ].map((s) => (
+              <div key={s.label} style={{ padding: '12px 14px', background: 'var(--muted)', borderRadius: 10 }}>
+                <p style={{ margin: 0, fontSize: 10, color: 'var(--muted-foreground)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{s.label}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{s.value}</p>
+              </div>
+            ))}
           </div>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Owner name</span>
-            <input className="scanny-input" value={propOwnerName} onChange={(e) => setPropOwnerName(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Owner MoMo number</span>
-            <input className="scanny-input" value={propOwnerMomo} onChange={(e) => setPropOwnerMomo(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Timezone</span>
-            <input className="scanny-input" value={propTimezone} onChange={(e) => setPropTimezone(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'grid' }}>
-            <span style={fieldLabelStyle}>Min payment amount</span>
-            <input className="scanny-input" type="number" value={propMinPayment} onChange={(e) => setPropMinPayment(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" checked={propPartial} onChange={(e) => setPropPartial(e.target.checked)} disabled={savingProp} />
-            <span style={{ fontSize: 14 }}>Allow partial payments</span>
-          </label>
-          {propSaveError && <p className="scanny-error">{propSaveError}</p>}
-          {propSaveOk && <p className="scanny-hint scanny-hint-ok">Saved.</p>}
-          <button type="submit" disabled={savingProp} style={btnPrimaryStyle}>
-            {savingProp ? 'Saving…' : 'Save settings'}
+
+          {/* ── Section: Property details ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              Property details
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Property name</span>
+                <input className="scanny-input" value={propName} onChange={(e) => setPropName(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>City</span>
+                <input className="scanny-input" value={propCity} onChange={(e) => setPropCity(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+              </label>
+            </div>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Address</span>
+              <input className="scanny-input" value={propAddress} onChange={(e) => setPropAddress(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Owner name</span>
+                <input className="scanny-input" value={propOwnerName} onChange={(e) => setPropOwnerName(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Owner MoMo number</span>
+                <input className="scanny-input" value={propOwnerMomo} onChange={(e) => setPropOwnerMomo(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+              </label>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Timezone</span>
+                <input className="scanny-input" value={propTimezone} onChange={(e) => setPropTimezone(e.target.value)} style={fieldInputStyle} disabled={savingProp} placeholder="Africa/Kampala" />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Currency</span>
+                <input className="scanny-input" value={d.property.currency} style={fieldInputStyle} disabled readOnly />
+              </label>
+            </div>
+          </div>
+
+          {/* ── Section: Payment settings ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              Payment settings
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Min payment amount (UGX)</span>
+                <input className="scanny-input" type="number" min={0} value={propMinPayment} onChange={(e) => setPropMinPayment(e.target.value)} style={fieldInputStyle} disabled={savingProp} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>0 = no minimum floor</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Platform fee override (UGX)</span>
+                <input className="scanny-input" type="number" min={0} step={500} value={feePlatformOverride} onChange={(e) => setFeePlatformOverride(e.target.value)} style={fieldInputStyle} disabled={savingFees} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>0 = use platform default</span>
+              </label>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={propPartial} onChange={(e) => setPropPartial(e.target.checked)} disabled={savingProp} style={{ width: 16, height: 16 }} />
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Allow partial payments</span>
+                <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>Tenants can pay any amount between the minimum and the full balance</p>
+              </div>
+            </label>
+          </div>
+
+          {/* ── Section: Late fees ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              Late fees
+            </div>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Late fee type</span>
+              <select className="scanny-select" value={feeLateFeeType} onChange={(e) => { setFeeLateFeeType(e.target.value); setFeeLateFeeAmount('0') }} style={fieldInputStyle} disabled={savingFees}>
+                <option value="NONE">None — no late fee</option>
+                <option value="FLAT">Flat amount (UGX)</option>
+                <option value="PERCENT">Percentage of rent</option>
+              </select>
+            </label>
+            {feeLateFeeType !== 'NONE' && (
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>{feeLateFeeType === 'FLAT' ? 'Late fee amount (UGX)' : 'Late fee percentage'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input className="scanny-input" type="number" min={0} step={feeLateFeeType === 'PERCENT' ? 0.01 : 1000} value={feeLateFeeAmount} onChange={(e) => setFeeLateFeeAmount(e.target.value)} style={{ ...fieldInputStyle, width: 160 }} disabled={savingFees} />
+                  <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>{feeLateFeeType === 'PERCENT' ? '%' : 'UGX'}</span>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  {feeLateFeeType === 'FLAT'
+                    ? `Added once when a charge goes overdue. Tenant owes rent + ${Number(feeLateFeeAmount).toLocaleString()} UGX.`
+                    : `${Number(feeLateFeeAmount).toFixed(2)}% of the rent charge added when overdue.`}
+                </span>
+              </label>
+            )}
+          </div>
+
+          {/* ── Section: Grace period & overdue ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              Grace period & overdue timing
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Grace period (days)</span>
+                <input className="scanny-input" type="number" min={0} max={30} value={feeGracePeriod} onChange={(e) => setFeeGracePeriod(e.target.value)} style={{ ...fieldInputStyle, width: 120 }} disabled={savingFees} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Days after due date before overdue is possible.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Mark overdue after (days)</span>
+                <input className="scanny-input" type="number" min={0} max={60} value={feeOverdueDays} onChange={(e) => setFeeOverdueDays(e.target.value)} style={{ ...fieldInputStyle, width: 120 }} disabled={savingFees} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Total days past due before late fees apply. 0 = system default (7).</span>
+              </label>
+            </div>
+            {/* Visual timeline */}
+            <div style={{ padding: '12px 14px', background: 'var(--muted)', borderRadius: 10, fontSize: 12, color: 'var(--muted-foreground)', lineHeight: 1.6 }}>
+              Due date {'→'} <strong>{feeGracePeriod || 0}d grace</strong> {'→'} overdue possible {'→'} late fee after <strong>{feeOverdueDays || 7}d</strong> total
+              {feeLateFeeType !== 'NONE' && (
+                <span> ({feeLateFeeType === 'FLAT' ? `${Number(feeLateFeeAmount).toLocaleString()} UGX` : `${Number(feeLateFeeAmount).toFixed(2)}%`} added)</span>
+              )}
+            </div>
+          </div>
+
+          {feeSaveError && <p className="scanny-error">{feeSaveError}</p>}
+          {feeSaveOk && <p className="scanny-hint scanny-hint-ok">Configuration saved.</p>}
+          <button type="submit" disabled={savingFees || savingProp} style={btnPrimaryStyle}>
+            {(savingFees || savingProp) ? 'Saving…' : 'Save configuration'}
           </button>
         </form>
       )}
@@ -1446,6 +1549,8 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
 
 // ── PortfolioList ──────────────────────────────────────────────────────────────
 
+const PORTFOLIO_PAGE_SIZE_OPTIONS = [8, 16, 24, 50] as const
+
 function PortfolioList({
   portfolio,
   onSelect,
@@ -1455,6 +1560,12 @@ function PortfolioList({
   onSelect: (id: string, role: string) => void
   onAddProperty: () => void
 }) {
+  const [pageSize, setPageSize] = useState<number>(8)
+  const [page, setPage] = useState(0)
+
+  // Reset to page 0 whenever the portfolio or page size changes
+  useEffect(() => { setPage(0) }, [portfolio.length, pageSize])
+
   if (portfolio.length === 0) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
@@ -1466,6 +1577,10 @@ function PortfolioList({
       </div>
     )
   }
+
+  const totalPages = Math.max(1, Math.ceil(portfolio.length / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageItems = portfolio.slice(safePage * pageSize, safePage * pageSize + pageSize)
 
   return (
     <div>
@@ -1492,7 +1607,7 @@ function PortfolioList({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {portfolio.map((p) => (
+            {pageItems.map((p) => (
               <TableRow
                 key={p.propertyId}
                 className="border-b border-border hover:bg-muted/40 cursor-pointer"
@@ -1518,13 +1633,74 @@ function PortfolioList({
           </TableBody>
         </Table>
       </div>
+
+      {/* ── Pagination footer ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+        {/* Page size selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted-foreground)' }}>
+          <span>Show</span>
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            style={{
+              fontSize: 12, padding: '2px 6px', borderRadius: 6,
+              border: '1px solid var(--border)', background: 'var(--card)',
+              color: 'var(--foreground)', cursor: 'pointer',
+            }}
+          >
+            {PORTFOLIO_PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <span>per page</span>
+        </div>
+
+        {/* Prev / Next */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted-foreground)' }}>
+            <span>
+              {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, portfolio.length)} of {portfolio.length}
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                type="button"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--card)',
+                  cursor: safePage === 0 ? 'not-allowed' : 'pointer',
+                  opacity: safePage === 0 ? 0.4 : 1,
+                }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--card)',
+                  cursor: safePage >= totalPages - 1 ? 'not-allowed' : 'pointer',
+                  opacity: safePage >= totalPages - 1 ? 0.4 : 1,
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── AddUnitModal (used by the overview "Add unit" actions) ────────────────────
 
-function AddUnitModal({ propertyId, onClose, onCreated }: { propertyId: string; onClose: () => void; onCreated: () => void }) {
+function AddUnitModal({ propertyId, onClose, onCreated }: { propertyId: string; onClose: () => void; onCreated: (unit: RentUnit) => void }) {
   const [unitNumber, setUnitNumber] = useState('')
   const [floor, setFloor] = useState('')
   const [monthlyAmount, setMonthlyAmount] = useState('')
@@ -1986,7 +2162,7 @@ function MaintenanceTab({ allDashboards }: { allDashboards: PropertyDashboard[] 
 
 // ── Main RentDashboard ────────────────────────────────────────────────────────
 
-type SidebarTab = 'overview' | 'units' | 'tenants' | 'rent' | 'maintenance' | 'leases'
+type SidebarTab = 'overview' | 'units' | 'tenants' | 'rent' | 'maintenance' | 'leases' | 'config'
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900)
@@ -2015,6 +2191,9 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   const [matrixFullscreen, setMatrixFullscreen] = useState(false)
   const [matrixFilter, setMatrixFilter] = useState<'all' | 'occupied' | 'vacant'>('all')
   const [matrixSearch, setMatrixSearch] = useState('')
+  // Fullscreen properties list pagination
+  const [matrixFsPage, setMatrixFsPage] = useState(0)
+  const [matrixFsPageSize, setMatrixFsPageSize] = useState(8)
 
   // Apply dark mode class whenever it changes
   useEffect(() => { applyDarkMode(darkMode) }, [darkMode])
@@ -2202,6 +2381,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
     { key: 'rent', label: 'Rent', icon: Wallet },
     { key: 'maintenance', label: 'Maintenance', icon: Wrench },
     { key: 'leases', label: 'Leases', icon: FileText },
+    { key: 'config', label: 'Config', icon: SlidersHorizontal },
   ]
 
   // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -2705,7 +2885,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                   type="button"
                   title="Open matrix fullscreen"
                   aria-label="Open matrix fullscreen"
-                  onClick={() => setMatrixFullscreen(true)}
+                  onClick={() => { setMatrixFullscreen(true); setMatrixFsPage(0) }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 30, height: 30, borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit',
@@ -2860,7 +3040,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               </div>
               <button
                 type="button"
-                onClick={() => { setMatrixFullscreen(false); setSelectedUnitId(null); setMatrixSearch('') }}
+                onClick={() => { setMatrixFullscreen(false); setSelectedUnitId(null); setMatrixSearch(''); setMatrixFsPage(0) }}
                 style={{ ...btnSecondaryStyle, padding: '8px 14px' }}
               >
                 <Minimize2 size={15} /> Exit fullscreen
@@ -2869,9 +3049,95 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
 
             {/* Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                {renderMatrixGroups(true)}
-                {renderSelectedFooter()}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Properties list (paginated, 8 per page) */}
+                {(() => {
+                  const [fsPage, setFsPage] = [matrixFsPage, setMatrixFsPage]
+                  const totalFsPages = Math.max(1, Math.ceil(allD.length / matrixFsPageSize))
+                  const safeFsPage = Math.min(fsPage, totalFsPages - 1)
+                  const pageProperties = allD.slice(safeFsPage * matrixFsPageSize, (safeFsPage + 1) * matrixFsPageSize)
+                  return (
+                    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                      {/* Properties header */}
+                      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Building2 size={14} color="var(--muted-foreground)" />
+                          <span style={{ fontSize: 13, fontWeight: 700 }}>Properties</span>
+                          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>· {allD.length} total</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted-foreground)' }}>
+                          <span>Show</span>
+                          <select
+                            value={matrixFsPageSize}
+                            onChange={(e) => { setMatrixFsPageSize(Number(e.target.value)); setMatrixFsPage(0) }}
+                            style={{
+                              fontSize: 12, padding: '2px 6px', borderRadius: 6,
+                              border: '1px solid var(--border)', background: 'var(--card)',
+                              color: 'var(--foreground)', cursor: 'pointer',
+                            }}
+                          >
+                            {[8, 16, 24, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                          <span>per page</span>
+                        </div>
+                      </div>
+                      {/* Properties table */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                              {['Property', 'City', 'Units', 'Occupied', 'Occupancy'].map((h) => (
+                                <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--muted-foreground)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageProperties.map((pd) => {
+                              const occ = pd.totalUnits > 0 ? Math.round((pd.occupiedUnits / pd.totalUnits) * 100) : 0
+                              return (
+                                <tr key={pd.property.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '8px 14px', fontWeight: 600 }}>{pd.property.name}</td>
+                                  <td style={{ padding: '8px 14px', color: 'var(--muted-foreground)' }}>{pd.property.city || '—'}</td>
+                                  <td style={{ padding: '8px 14px' }}>{pd.totalUnits}</td>
+                                  <td style={{ padding: '8px 14px' }}>{pd.occupiedUnits}</td>
+                                  <td style={{ padding: '8px 14px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <div style={{ flex: 1, height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden', minWidth: 50 }}>
+                                        <div style={{ height: '100%', width: `${occ}%`, background: occ >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)', borderRadius: 99 }} />
+                                      </div>
+                                      <span style={{ fontWeight: 700, color: occ >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)', minWidth: 32 }}>{occ}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Pagination footer */}
+                      {(totalFsPages > 1 || allD.length > 0) && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                          <span>{safeFsPage * matrixFsPageSize + 1}–{Math.min((safeFsPage + 1) * matrixFsPageSize, allD.length)} of {allD.length} properties</span>
+                          {totalFsPages > 1 && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button type="button" disabled={safeFsPage === 0} onClick={() => setFsPage((p) => Math.max(0, p - 1))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: safeFsPage === 0 ? 'not-allowed' : 'pointer', opacity: safeFsPage === 0 ? 0.4 : 1 }}>
+                                <ChevronLeft size={13} />
+                              </button>
+                              <button type="button" disabled={safeFsPage >= totalFsPages - 1} onClick={() => setFsPage((p) => Math.min(totalFsPages - 1, p + 1))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: safeFsPage >= totalFsPages - 1 ? 'not-allowed' : 'pointer', opacity: safeFsPage >= totalFsPages - 1 ? 0.4 : 1 }}>
+                                <ChevronRight size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+                {/* Unit matrix */}
+                <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                  {renderMatrixGroups(true)}
+                  {renderSelectedFooter()}
+                </div>
               </div>
             </div>
           </div>
@@ -3048,6 +3314,265 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
     )
   }
 
+  // ── Config tab state ──────────────────────────────────────────────────────
+
+  const [configPropId, setConfigPropId] = useState<string | null>(null)
+  const [cfgName, setCfgName] = useState('')
+  const [cfgAddress, setCfgAddress] = useState('')
+  const [cfgCity, setCfgCity] = useState('')
+  const [cfgOwnerName, setCfgOwnerName] = useState('')
+  const [cfgOwnerMomo, setCfgOwnerMomo] = useState('')
+  const [cfgTimezone, setCfgTimezone] = useState('Africa/Kampala')
+  const [cfgPartial, setCfgPartial] = useState(true)
+  const [cfgMinPayment, setCfgMinPayment] = useState('0')
+  const [cfgLateFeeType, setCfgLateFeeType] = useState('NONE')
+  const [cfgLateFeeAmount, setCfgLateFeeAmount] = useState('0')
+  const [cfgPlatformOverride, setCfgPlatformOverride] = useState('0')
+  const [cfgGracePeriod, setCfgGracePeriod] = useState('0')
+  const [cfgOverdueDays, setCfgOverdueDays] = useState('0')
+  const [cfgSaving, setCfgSaving] = useState(false)
+  const [cfgSaveOk, setCfgSaveOk] = useState(false)
+  const [cfgSaveError, setCfgSaveError] = useState<string | null>(null)
+  const cfgSeededRef = useRef<string | null>(null)
+
+  function seedConfig(pd: typeof tabDashboards[0]) {
+    if (cfgSeededRef.current === pd.property.id) return
+    cfgSeededRef.current = pd.property.id
+    const p = pd.property
+    setCfgName(p.name)
+    setCfgAddress(p.address)
+    setCfgCity(p.city)
+    setCfgOwnerName(p.ownerName)
+    setCfgOwnerMomo(p.ownerMomo)
+    setCfgTimezone(p.timezone || 'Africa/Kampala')
+    setCfgPartial(p.partialPaymentAllowed)
+    setCfgMinPayment(String(p.minPaymentAmount ?? 0))
+    setCfgLateFeeType(p.lateFeeType || 'NONE')
+    setCfgLateFeeAmount(
+      p.lateFeeType === 'PERCENT'
+        ? String((p.lateFeeAmount ?? 0) / 100)
+        : String(p.lateFeeAmount ?? 0)
+    )
+    setCfgPlatformOverride(String(p.platformFeeOverride ?? 0))
+    setCfgGracePeriod(String(p.gracePeriodDays ?? 0))
+    setCfgOverdueDays(String(p.overdueAfterDays ?? 0))
+  }
+
+  async function handleSaveConfig(e: FormEvent, propertyId: string) {
+    e.preventDefault()
+    setCfgSaveError(null)
+    setCfgSaveOk(false)
+    setCfgSaving(true)
+    try {
+      const storedAmount = cfgLateFeeType === 'PERCENT'
+        ? Math.round(Number(cfgLateFeeAmount) * 100)
+        : Math.round(Number(cfgLateFeeAmount))
+      await rentDashboardApi.updateProperty(propertyId, {
+        name: cfgName.trim(),
+        address: cfgAddress.trim(),
+        city: cfgCity.trim(),
+        ownerName: cfgOwnerName.trim(),
+        ownerMomo: cfgOwnerMomo.trim(),
+        timezone: cfgTimezone.trim(),
+        partialPaymentAllowed: cfgPartial,
+        minPaymentAmount: Number(cfgMinPayment) || 0,
+        lateFeeType: cfgLateFeeType,
+        lateFeeAmount: storedAmount,
+        platformFeeOverride: Math.round(Number(cfgPlatformOverride)) || 0,
+        gracePeriodDays: Number(cfgGracePeriod) || 0,
+        overdueAfterDays: Number(cfgOverdueDays) || 0,
+      })
+      cfgSeededRef.current = null // force re-seed on next visit
+      setCfgSaveOk(true)
+      await loadAllDashboards()
+    } catch (err) {
+      setCfgSaveError(err instanceof Error ? err.message : 'Could not save configuration')
+    } finally {
+      setCfgSaving(false)
+    }
+  }
+
+  function renderConfig() {
+    if (loading) return <div style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading…</div>
+    if (tabDashboards.length === 0) return <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No properties found.</p>
+
+    // Auto-select first property if none selected
+    const activePd = tabDashboards.find(pd => pd.property.id === configPropId) ?? tabDashboards[0]
+    if (activePd.property.id !== configPropId) {
+      setConfigPropId(activePd.property.id)
+    }
+    seedConfig(activePd)
+
+    const p = activePd.property
+
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Config</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted-foreground)' }}>Property settings, fees and overdue timing</p>
+        </div>
+
+        {/* Property selector when multiple properties */}
+        {tabDashboards.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+            {tabDashboards.map(pd => (
+              <button
+                key={pd.property.id}
+                type="button"
+                onClick={() => { setConfigPropId(pd.property.id); cfgSeededRef.current = null }}
+                style={{
+                  padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid',
+                  background: activePd.property.id === pd.property.id ? 'var(--primary)' : 'var(--card)',
+                  color: activePd.property.id === pd.property.id ? 'var(--primary-foreground)' : 'var(--foreground)',
+                  borderColor: activePd.property.id === pd.property.id ? 'var(--primary)' : 'var(--border)',
+                }}
+              >
+                {pd.property.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Live summary */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>
+          {[
+            { label: 'Late fee', value: p.lateFeeType === 'FLAT' ? `${(p.lateFeeAmount || 0).toLocaleString()} UGX` : p.lateFeeType === 'PERCENT' ? `${((p.lateFeeAmount || 0) / 100).toFixed(2)}%` : 'None' },
+            { label: 'Grace period', value: `${p.gracePeriodDays || 0} days` },
+            { label: 'Overdue after', value: `${p.overdueAfterDays || 7} days` },
+            { label: 'Platform fee', value: p.platformFeeOverride > 0 ? `${p.platformFeeOverride.toLocaleString()} UGX` : 'Default' },
+          ].map(s => (
+            <div key={s.label} style={{ padding: '12px 14px', background: 'var(--muted)', borderRadius: 10 }}>
+              <p style={{ margin: 0, fontSize: 10, color: 'var(--muted-foreground)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{s.label}</p>
+              <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 700, color: 'var(--foreground)' }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={(e) => void handleSaveConfig(e, activePd.property.id)} style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
+
+          {/* ── Property details ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Property details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Property name</span>
+                <input className="scanny-input" value={cfgName} onChange={(e) => setCfgName(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>City</span>
+                <input className="scanny-input" value={cfgCity} onChange={(e) => setCfgCity(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+              </label>
+            </div>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Address</span>
+              <input className="scanny-input" value={cfgAddress} onChange={(e) => setCfgAddress(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Owner name</span>
+                <input className="scanny-input" value={cfgOwnerName} onChange={(e) => setCfgOwnerName(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Owner MoMo number</span>
+                <input className="scanny-input" value={cfgOwnerMomo} onChange={(e) => setCfgOwnerMomo(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+              </label>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Timezone</span>
+                <input className="scanny-input" value={cfgTimezone} onChange={(e) => setCfgTimezone(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} placeholder="Africa/Kampala" />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Currency</span>
+                <input className="scanny-input" value={p.currency} style={fieldInputStyle} disabled readOnly />
+              </label>
+            </div>
+          </div>
+
+          {/* ── Payment settings ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Payment settings</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Min payment amount (UGX)</span>
+                <input className="scanny-input" type="number" min={0} value={cfgMinPayment} onChange={(e) => setCfgMinPayment(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>0 = no minimum floor</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Platform fee override (UGX)</span>
+                <input className="scanny-input" type="number" min={0} step={500} value={cfgPlatformOverride} onChange={(e) => setCfgPlatformOverride(e.target.value)} style={fieldInputStyle} disabled={cfgSaving} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>0 = use platform default</span>
+              </label>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={cfgPartial} onChange={(e) => setCfgPartial(e.target.checked)} disabled={cfgSaving} style={{ width: 16, height: 16 }} />
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Allow partial payments</span>
+                <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>Tenants can pay any amount between the minimum and the full balance</p>
+              </div>
+            </label>
+          </div>
+
+          {/* ── Late fees ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Late fees</div>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Late fee type</span>
+              <select className="scanny-select" value={cfgLateFeeType} onChange={(e) => { setCfgLateFeeType(e.target.value); setCfgLateFeeAmount('0') }} style={fieldInputStyle} disabled={cfgSaving}>
+                <option value="NONE">None — no late fee</option>
+                <option value="FLAT">Flat amount (UGX)</option>
+                <option value="PERCENT">Percentage of rent</option>
+              </select>
+            </label>
+            {cfgLateFeeType !== 'NONE' && (
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>{cfgLateFeeType === 'FLAT' ? 'Late fee amount (UGX)' : 'Late fee percentage'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input className="scanny-input" type="number" min={0} step={cfgLateFeeType === 'PERCENT' ? 0.01 : 1000} value={cfgLateFeeAmount} onChange={(e) => setCfgLateFeeAmount(e.target.value)} style={{ ...fieldInputStyle, width: 160 }} disabled={cfgSaving} />
+                  <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>{cfgLateFeeType === 'PERCENT' ? '%' : 'UGX'}</span>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+                  {cfgLateFeeType === 'FLAT'
+                    ? `Added once when a charge goes overdue. Tenant owes rent + ${Number(cfgLateFeeAmount).toLocaleString()} UGX.`
+                    : `${Number(cfgLateFeeAmount).toFixed(2)}% of the rent charge added when overdue.`}
+                </span>
+              </label>
+            )}
+          </div>
+
+          {/* ── Grace period & overdue timing ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>Grace period & overdue timing</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Grace period (days)</span>
+                <input className="scanny-input" type="number" min={0} max={30} value={cfgGracePeriod} onChange={(e) => setCfgGracePeriod(e.target.value)} style={{ ...fieldInputStyle, width: 120 }} disabled={cfgSaving} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Days after due date before a charge can be marked overdue.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Mark overdue after (days)</span>
+                <input className="scanny-input" type="number" min={0} max={60} value={cfgOverdueDays} onChange={(e) => setCfgOverdueDays(e.target.value)} style={{ ...fieldInputStyle, width: 120 }} disabled={cfgSaving} />
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>Total days past due before late fees apply. 0 = system default (7).</span>
+              </label>
+            </div>
+            <div style={{ padding: '12px 14px', background: 'var(--muted)', borderRadius: 10, fontSize: 12, color: 'var(--muted-foreground)', lineHeight: 1.6 }}>
+              Due date {'→'} <strong>{cfgGracePeriod || 0}d grace</strong> {'→'} overdue possible {'→'} late fee after <strong>{cfgOverdueDays || 7}d</strong> total
+              {cfgLateFeeType !== 'NONE' && (
+                <span> ({cfgLateFeeType === 'FLAT' ? `${Number(cfgLateFeeAmount).toLocaleString()} UGX` : `${Number(cfgLateFeeAmount).toFixed(2)}%`} added)</span>
+              )}
+            </div>
+          </div>
+
+          {cfgSaveError && <p className="scanny-error">{cfgSaveError}</p>}
+          {cfgSaveOk && <p className="scanny-hint scanny-hint-ok">Configuration saved.</p>}
+          <button type="submit" disabled={cfgSaving} style={btnPrimaryStyle}>
+            {cfgSaving ? 'Saving…' : 'Save configuration'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
   // ── Leases tab ────────────────────────────────────────────────────────────
 
   function renderLeases() {
@@ -3142,7 +3667,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               <Menu size={22} />
             </button>
             <span style={{ fontSize: 15, fontWeight: 700 }}>
-              {sidebarTab === 'overview' ? 'Overview' : sidebarTab === 'units' ? 'Properties' : sidebarTab === 'tenants' ? 'Tenants' : sidebarTab === 'rent' ? 'Rent' : sidebarTab === 'maintenance' ? 'Maintenance' : 'Leases'}
+              {sidebarTab === 'overview' ? 'Overview' : sidebarTab === 'units' ? 'Properties' : sidebarTab === 'tenants' ? 'Tenants' : sidebarTab === 'rent' ? 'Rent' : sidebarTab === 'maintenance' ? 'Maintenance' : sidebarTab === 'config' ? 'Config' : 'Leases'}
             </span>
           </div>
         )}
@@ -3158,6 +3683,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
           {sidebarTab === 'rent' && renderRent()}
           {sidebarTab === 'maintenance' && renderMaintenance()}
           {sidebarTab === 'leases' && renderLeases()}
+          {sidebarTab === 'config' && renderConfig()}
         </div>
       </main>
       {showAdd && <AddPropertyModal onCreated={handleCreatedProperty} onClose={() => setShowAdd(false)} />}

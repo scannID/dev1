@@ -273,10 +273,10 @@ export function useConfigs() {
     }
   }, [])
 
-  const runAction = useCallback(async (action: ConfigAction) => {
+  const runAction = useCallback(async (action: ConfigAction, password?: string) => {
     setSaving(action)
     try {
-      return await adminApi.configs.runAction(action)
+      return await adminApi.configs.runAction(action, password)
     } finally {
       setSaving(null)
     }

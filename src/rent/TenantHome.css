@@ -155,3 +155,55 @@
 @media (prefers-color-scheme: dark) {
   .th-lease-notice { color: #fcd34d; }
 }
+
+/* ── Tenancy info card ──────────────────────────────────────────────────── */
+
+.th-info-card {
+  background: var(--rp-card, #fff);
+  border: 1px solid var(--rp-border, #e5e7eb);
+  border-radius: 18px;
+  padding: 6px 0;
+}
+
+.th-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--rp-border, #e5e7eb);
+  font-size: 13px;
+}
+
+.th-info-row:last-child {
+  border-bottom: none;
+}
+
+.th-info-label {
+  color: var(--rp-muted, #6b7280);
+  font-weight: 500;
+}
+
+.th-info-val {
+  font-weight: 600;
+  color: var(--rp-text, #111827);
+}
+
+.th-info-val--strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.th-info-val--warn {
+  color: var(--th-bad, #f87171);
+}
+
+.th-info-due-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--th-bad, #f87171);
+}

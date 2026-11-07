@@ -60,4 +60,33 @@ public interface RentPaymentRepository extends JpaRepository<RentPayment, Long> 
     long sumCollectedByPropertyIdAndPeriod(
             @Param("propertyId") String propertyId,
             @Param("periodLabel") String periodLabel);
+
+    /** Platform-wide total rent collected across ALL properties for a given period. */
+    @Query("""
+        SELECT COALESCE(SUM(p.amount), 0)
+        FROM RentPayment p
+        JOIN p.charge c
+        WHERE c.periodLabel = :periodLabel
+          AND p.status = 'Completed'
+        """)
+    long sumCollectedAllPropertiesForPeriod(@Param("periodLabel") String periodLabel);
+
+    /** Platform-wide total rent collected all time. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM RentPayment p WHERE p.status = 'Completed'")
+    long sumCollectedAllTime();
+
+    /** Count of completed rent payments. */
+    long countByStatus(RentPaymentStatus status);
+
+    /** Per-property revenue summary for the accounting view. */
+    @Query("""
+        SELECT u.property.id, u.property.name, COALESCE(SUM(p.amount), 0)
+        FROM RentPayment p
+        JOIN p.charge c
+        JOIN c.unit u
+        WHERE p.status = 'Completed'
+        GROUP BY u.property.id, u.property.name
+        ORDER BY SUM(p.amount) DESC
+        """)
+    List<Object[]> sumCollectedPerProperty();
 }

@@ -50,8 +50,11 @@ public class AdminConfigController {
 
     @PostMapping("/actions/{action}")
     @ResponseStatus(HttpStatus.OK)
-    public AdminConfigDtos.ActionResult runAction(@PathVariable String action) {
-        return adminConfigService.runAction(action);
+    public AdminConfigDtos.ActionResult runAction(
+            @PathVariable String action,
+            @RequestBody(required = false) Map<String, String> body) {
+        String password = body != null ? body.get("password") : null;
+        return adminConfigService.runAction(action, password);
     }
 
     /** GET current system busy state — used by the admin UI toggle. */

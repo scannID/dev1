@@ -71,6 +71,18 @@ public interface RentChargeRepository extends JpaRepository<RentCharge, Long> {
             @Param("propertyId") String propertyId,
             @Param("today") LocalDate today);
 
+    /** Count of overdue (status = OVERDUE) charges for a property — no date param needed. */
+    @Query("""
+        SELECT COUNT(c) FROM RentCharge c
+        JOIN c.unit u
+        WHERE u.property.id = :propertyId
+          AND c.status = 'OVERDUE'
+        """)
+    long countOverdueByPropertyId(@Param("propertyId") String propertyId);
+
+    /** Platform-wide count by status — used by the admin summary. */
+    long countByStatus(RentChargeStatus status);
+
     /**
      * Platform-wide overdue charges — UNPAID or PARTIAL with due date before today.
      * Used by the scheduler to bulk-update status to OVERDUE.

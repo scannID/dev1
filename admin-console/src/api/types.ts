@@ -625,29 +625,35 @@ export type AdminPermission =
   | 'VIEW_USERS'
   | 'VIEW_COMMUNICATIONS'
   | 'VIEW_REVENUE'
+  | 'VIEW_CASH_COLLECTIONS'
   | 'VIEW_QR_ACTIVITY'
   | 'VIEW_COOKIE_CONSENT'
   | 'VIEW_REPORTS'
+  | 'VIEW_FUNNEL_DROPS'
   | 'VIEW_SYSTEM'
   | 'VIEW_AUDIT'
   | 'VIEW_CONFIGS'
+  | 'VIEW_RENT'
   | 'MANAGE_ADMINS'
 
 export const ADMIN_PERMISSION_META: Record<AdminPermission, { label: string; group: string }> = {
-  VIEW_OVERVIEW:       { label: 'Overview',           group: 'Platform' },
-  VIEW_MERCHANTS:      { label: 'Merchants',           group: 'Platform' },
-  VIEW_ORDERS:         { label: 'All Orders',          group: 'Platform' },
-  VIEW_TICKETING:      { label: 'Ticketing',           group: 'Platform' },
-  VIEW_USERS:          { label: 'Users',               group: 'Platform' },
-  VIEW_COMMUNICATIONS: { label: 'Communications',      group: 'Platform' },
-  VIEW_REVENUE:        { label: 'Revenue & Payments',  group: 'Finance' },
-  VIEW_QR_ACTIVITY:    { label: 'QR Activity',         group: 'Analytics' },
-  VIEW_COOKIE_CONSENT: { label: 'Cookie Consent',      group: 'Analytics' },
-  VIEW_REPORTS:        { label: 'Reports',             group: 'Analytics' },
-  VIEW_SYSTEM:         { label: 'System Health',       group: 'System' },
-  VIEW_AUDIT:          { label: 'Audit Log',           group: 'System' },
-  VIEW_CONFIGS:        { label: 'Configs',             group: 'System' },
-  MANAGE_ADMINS:       { label: 'Manage Admins',       group: 'System' },
+  VIEW_OVERVIEW:        { label: 'Overview',           group: 'Overview' },
+  VIEW_MERCHANTS:       { label: 'Merchants',           group: 'Restaurants' },
+  VIEW_ORDERS:          { label: 'All Orders',          group: 'Restaurants' },
+  VIEW_TICKETING:       { label: 'Ticketing',           group: 'Ticketing' },
+  VIEW_USERS:           { label: 'Users',               group: 'Restaurants' },
+  VIEW_COMMUNICATIONS:  { label: 'Communications',      group: 'Restaurants' },
+  VIEW_REVENUE:         { label: 'Revenue & Payments',  group: 'Restaurants' },
+  VIEW_CASH_COLLECTIONS:{ label: 'Cash Collections',    group: 'Restaurants' },
+  VIEW_QR_ACTIVITY:     { label: 'QR Activity',         group: 'Restaurants' },
+  VIEW_COOKIE_CONSENT:  { label: 'Cookie Consent',      group: 'Analytics' },
+  VIEW_REPORTS:         { label: 'Reports',             group: 'Ticketing' },
+  VIEW_FUNNEL_DROPS:    { label: 'Funnel Drop-offs',    group: 'Ticketing' },
+  VIEW_SYSTEM:          { label: 'System Health',       group: 'System' },
+  VIEW_AUDIT:           { label: 'Audit Log',           group: 'System' },
+  VIEW_CONFIGS:         { label: 'Configs',             group: 'System' },
+  VIEW_RENT:            { label: 'Rent Properties',     group: 'Properties' },
+  MANAGE_ADMINS:        { label: 'Manage Admins',       group: 'System' },
 }
 
 /** Permissions that can be granted to invited sub-admins (MANAGE_ADMINS is super-admin only). */
@@ -701,4 +707,189 @@ export interface AdminPromotionRow {
   impressions: number
   clicks: number
   createdAt: string
+}
+
+// ── Rent / Property admin types ───────────────────────────────────────────────
+
+export interface AdminRentSummary {
+  totalProperties: number
+  activeTenants: number
+  totalUnits: number
+  overdueCharges: number
+}
+
+export interface RentPropertyRevenue {
+  propertyId: string
+  propertyName: string
+  totalCollected: number
+}
+
+export interface RentAccountingSummary {
+  totalCollectedAllTime: number
+  collectedThisMonth: number
+  collectedLastMonth: number
+  totalPayments: number
+  overdueCharges: number
+  unpaidCharges: number
+  totalProperties: number
+  activeTenants: number
+  currentPeriod: string
+  perPropertyRevenue: RentPropertyRevenue[]
+}
+
+export interface AdminPropertyRow {
+  id: string
+  name: string
+  city: string
+  ownerName: string
+  ownerMomo: string
+  currency: string
+  /** NONE | FLAT | PERCENT */
+  lateFeeType: string
+  /** Flat UGX amount, or percentage × 100 (500 = 5.00%) */
+  lateFeeAmount: number
+  /** Per-property platform fee override in UGX. 0 = use platform default. */
+  platformFeeOverride: number
+  unitCount: number
+  activeTenantCount: number
+  overdueCount: number
+  createdAt: string
+}
+
+export interface AdminPropertiesResponse {
+  properties: AdminPropertyRow[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface AdminTenantRow {
+  id: string
+  name: string
+  phone: string
+  email: string
+  unitNumber: string
+  monthlyAmount: number
+  moveInDate: string | null
+  leaseEnd: string | null
+  active: boolean
+}
+
+export interface AdminPropertyDetail {
+  property: {
+    id: string
+    name: string
+    address: string
+    city: string
+    ownerName: string
+    ownerMomo: string
+    currency: string
+    lateFeeType: string
+    lateFeeAmount: number
+    platformFeeOverride: number
+    unitCount: number
+    activeTenantsCount: number
+    createdAt: string
+    qrToken: string
+    qrCodeUrl: string
+  }
+  totalUnits: number
+  occupiedUnits: number
+  overdueCount: number
+  tenants: AdminTenantRow[]
+}
+
+export interface UpdatePropertyFeesRequest {
+  lateFeeType?: string
+  lateFeeAmount?: number
+  platformFeeOverride?: number
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Accounting Ledger Types
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface AccountingPeriod {
+  id: number
+  periodLabel: string
+  status: 'OPEN' | 'CLOSED'
+  opensAt: string
+  closesAt: string
+  closedBy: string | null
+  closedAt: string | null
+}
+
+export interface JournalEntry {
+  id: number
+  entryDate: string
+  periodLabel: string
+  sourceModule: string
+  sourceEventType: string
+  sourceRecordId: string | null
+  description: string
+  status: string
+  dimMerchantId: string | null
+  dimPropertyId: string | null
+  dimTenantId: string | null
+  dimEventId: string | null
+  dimPaymentMethod: string | null
+  postedAt: string
+}
+
+export interface JournalLine {
+  id: number
+  accountCode: string
+  accountName: string
+  side: 'DEBIT' | 'CREDIT'
+  amount: number
+  memo: string | null
+}
+
+export interface TrialBalanceLine {
+  code: string
+  name: string
+  accountType: string
+  normalBalance: 'DEBIT' | 'CREDIT'
+  totalDebits: number
+  totalCredits: number
+}
+
+export interface TrialBalance {
+  periodLabel: string
+  lines: TrialBalanceLine[]
+  totalDebits: number
+  totalCredits: number
+  balanceStatus: 'BALANCED' | 'UNBALANCED'
+}
+
+export interface AccountingDashboard {
+  currentPeriod: string
+  periodStatus: 'OPEN' | 'CLOSED' | 'NO_OPEN_PERIOD'
+  pendingFailures: number
+  revenueByModule: Array<{ module: string; revenue: number }>
+}
+
+export interface PostingFailure {
+  id: number
+  sourceModule: string
+  sourceEventType: string
+  sourceEventId: string
+  lastError: string | null
+  retryCount: number
+  status: 'PENDING' | 'RESOLVED'
+  createdAt: string
+}
+
+export interface EntryPageResponse {
+  entries: JournalEntry[]
+  total: number
+  totalPages: number
+  page: number
+  size: number
+}
+
+export interface FailurePageResponse {
+  failures: PostingFailure[]
+  total: number
+  pendingCount: number
 }

@@ -35,7 +35,8 @@ public class AdminConfigService {
             "platformName", "Scanny",
             "supportEmail", "support@scanny.app",
             "qrScanBaseUrl", "http://localhost:5173/b",
-            "merchantPortalUrl", "http://localhost:5173"
+            "merchantPortalUrl", "http://localhost:5173",
+            "dangerZonePassword", "koddly123"
         ),
         "auth", Map.of(
             "keycloakUrl", "http://localhost:8080",
@@ -169,8 +170,73 @@ public class AdminConfigService {
         return getSectionConfig(key);
     }
 
+    // ── Danger zone rate limiter ─────────────────────────────────────────────
+    private volatile long lastDangerActionAt = 0;
+    private static final long DANGER_COOLDOWN_MS = 5000; // 5s between actions
+    private static final int MAX_PASSWORD_ATTEMPTS = 5;
+    private final java.util.concurrent.atomic.AtomicInteger passwordAttempts = new java.util.concurrent.atomic.AtomicInteger(0);
+    private volatile long attemptsResetAt = 0;
+
+    /**
+     * Verifies the danger-zone password before executing a destructive action.
+     * The password is stored in the "platform" config section under "dangerZonePassword"
+     * and defaults to "koddly123" — it should be changed after first login.
+     */
+    private void verifyDangerZoneAccess(String action, String password) {
+        // Rate limit: max 5 failed attempts per 60s
+        long now = System.currentTimeMillis();
+        if (attemptsResetAt == 0 || now > attemptsResetAt) {
+            passwordAttempts.set(0);
+            attemptsResetAt = now + 60_000;
+        }
+        if (passwordAttempts.get() >= MAX_PASSWORD_ATTEMPTS) {
+            throw new ApiException(429, "Too many attempts. Wait 60 seconds and try again.");
+        }
+
+        // Cooldown between actual executions
+        if (now - lastDangerActionAt < DANGER_COOLDOWN_MS) {
+            throw new ApiException(429, "Action rate limited. Wait a few seconds.");
+        }
+
+        if (password == null || password.isBlank()) {
+            passwordAttempts.incrementAndGet();
+            throw new ApiException(403, "Danger zone password is required.");
+        }
+
+        // Read the stored password from platform config
+        PlatformConfig stored = platformConfigRepository.findById("platform").orElse(null);
+        String expected = "koddly123"; // fallback default
+        if (stored != null && stored.getPayload() != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> payload = objectMapper.readValue(stored.getPayload(),
+                    new TypeReference<Map<String, Object>>() {});
+                Object configured = payload.get("dangerZonePassword");
+                if (configured instanceof String s && !s.isBlank()) expected = s;
+            } catch (Exception ignored) {}
+        }
+
+        if (!password.equals(expected)) {
+            passwordAttempts.incrementAndGet();
+            throw new ApiException(403, "Incorrect danger zone password.");
+        }
+
+        // Reset attempts on success
+        passwordAttempts.set(0);
+        lastDangerActionAt = now;
+    }
+
     @Transactional
-    public AdminConfigDtos.ActionResult runAction(String action) {
+    public AdminConfigDtos.ActionResult runAction(String action, String password) {
+        // Only destructive actions require password verification
+        boolean isDestructive = "purge-test-data".equals(action)
+                             || "clear-qr-scan-logs".equals(action)
+                             || "revoke-all-sessions".equals(action)
+                             || "reset-platform".equals(action);
+        if (isDestructive) {
+            verifyDangerZoneAccess(action, password);
+        }
+
         AdminConfigDtos.ActionResult result = switch (action) {
             case "purge-test-data" -> purgeTestData();
             case "clear-qr-scan-logs" -> clearQrScanLogs();

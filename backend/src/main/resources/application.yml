@@ -2,7 +2,7 @@ spring:
   application:
     name: scanny-backend
   profiles:
-    default: dev
+    default: h2
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration

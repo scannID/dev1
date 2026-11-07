@@ -33,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.scanny.accounting.AccountingEvent;
+import com.scanny.accounting.AccountingEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -67,6 +69,7 @@ public class RentPaymentService {
     private final OutboxService outboxService;
     private final AuditService auditService;
     private final RentMaintenanceRepository maintenanceRepository;
+    private final AccountingEventPublisher accountingEventPublisher;
 
     @Value("${scanny.customer-url}")
     private String customerUrl;
@@ -83,19 +86,21 @@ public class RentPaymentService {
             PaymentGatewayService paymentGatewayService,
             OutboxService outboxService,
             AuditService auditService,
-            RentMaintenanceRepository maintenanceRepository) {
-        this.paymentRepository = paymentRepository;
-        this.chargeRepository = chargeRepository;
-        this.unitRepository = unitRepository;
-        this.tenantRepository = tenantRepository;
+            RentMaintenanceRepository maintenanceRepository,
+            AccountingEventPublisher accountingEventPublisher) {
+        this.paymentRepository          = paymentRepository;
+        this.chargeRepository           = chargeRepository;
+        this.unitRepository             = unitRepository;
+        this.tenantRepository           = tenantRepository;
         this.propertyRepository = propertyRepository;
         this.propertyService = propertyService;
         this.chargeService = chargeService;
         this.leaseService = leaseService;
         this.paymentGatewayService = paymentGatewayService;
         this.outboxService = outboxService;
-        this.auditService = auditService;
-        this.maintenanceRepository = maintenanceRepository;
+        this.auditService              = auditService;
+        this.maintenanceRepository     = maintenanceRepository;
+        this.accountingEventPublisher  = accountingEventPublisher;
     }
 
     // ── Resolve pay context ───────────────────────────────────────────────────
@@ -327,12 +332,18 @@ public class RentPaymentService {
         RentUnit unit = resolveUnit(token, unitId);
         RentProperty property = unit.getProperty();
 
-        // 2. Resolve or auto-create the charge — verify it belongs to this unit
-        RentCharge charge = resolveOrCreateCharge(unit, chargeId);
+        // 2. Resolve or auto-create the charge — verify it belongs to this unit.
+        //    When payAhead=true the tenant is paying for the NEXT period.
+        boolean payAhead = Boolean.TRUE.equals(req.payAhead());
+        RentCharge charge = payAhead
+                ? resolveOrCreateNextPeriodCharge(unit)
+                : resolveOrCreateCharge(unit, chargeId);
 
         long outstanding = charge.getOutstandingAmount();
         if (outstanding <= 0) {
-            throw new ApiException(400, "This charge is already fully paid");
+            throw new ApiException(400, payAhead
+                    ? "Next period is already fully paid"
+                    : "This charge is already fully paid");
         }
 
         // 3. Determine and validate the requested amount (server-side — never trust client)
@@ -464,6 +475,36 @@ public class RentPaymentService {
             chargeService.recomputeStatus(charge);
             sendPaymentReceipts(payment, charge);
         }
+
+        // ── Accounting event ──────────────────────────────────────────────────
+        try {
+            RentCharge chg    = chargeRepository.findById(payment.getCharge().getId()).orElse(null);
+            long chargeAmount = chg != null ? chg.getAmount() : payment.getAmount();
+            long platformFee  = chg != null && chg.getUnit() != null
+                    && chg.getUnit().getProperty() != null
+                    ? chg.getUnit().getProperty().getPlatformFeeOverride()
+                    : 0L;
+            String propId     = chg != null && chg.getUnit() != null
+                    && chg.getUnit().getProperty() != null
+                    ? chg.getUnit().getProperty().getId() : null;
+            String tenantId   = chg != null && chg.getTenant() != null
+                    ? chg.getTenant().getId() : null;
+            accountingEventPublisher.publish(new AccountingEvent(
+                    "RENT_PAYMENT:" + payment.getTransactionRef(),
+                    "RENT_PAYMENT_RECEIVED",
+                    "RENT",
+                    payment.getTransactionRef(),
+                    chargeAmount, platformFee, chargeAmount - platformFee,
+                    0L, 0L, 0L,
+                    null, propId, tenantId, null,
+                    payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : "MOMO",
+                    "Rent payment — " + payment.getTransactionRef(),
+                    null
+            ));
+        } catch (Exception ex) {
+            log.error("[Accounting] Failed to publish rent payment event {}: {}",
+                    payment.getTransactionRef(), ex.getMessage(), ex);
+        }
     }
 
     /**
@@ -583,6 +624,31 @@ public class RentPaymentService {
                     autoCharge.setStatus(RentChargeStatus.UNPAID);
                     autoCharge.setCreatedAt(Instant.now());
                     return chargeRepository.save(autoCharge);
+                });
+    }
+
+    /**
+     * Finds or auto-creates a charge for the <em>next</em> rent period so a
+     * tenant can pay ahead before the cycle starts.
+     */
+    private RentCharge resolveOrCreateNextPeriodCharge(RentUnit unit) {
+        RentTenant tenant = unit.getActiveTenant();
+        if (tenant == null) {
+            throw new ApiException(400, "No active tenant in unit " + unit.getUnitNumber());
+        }
+        String nextPeriod = YearMonth.now().plusMonths(1).toString(); // e.g. "2026-12"
+        return chargeRepository.findByTenant_IdAndPeriodLabel(tenant.getId(), nextPeriod)
+                .orElseGet(() -> {
+                    RentCharge c = new RentCharge();
+                    c.setTenant(tenant);
+                    c.setUnit(unit);
+                    c.setAmount(unit.getMonthlyAmount());
+                    c.setCurrency(unit.getProperty().getCurrency());
+                    c.setPeriodLabel(nextPeriod);
+                    c.setDueDate(unit.dueDateForPeriod(nextPeriod));
+                    c.setStatus(RentChargeStatus.UNPAID);
+                    c.setCreatedAt(Instant.now());
+                    return chargeRepository.save(c);
                 });
     }
 

@@ -20,5 +20,8 @@ public interface RentTenantRepository extends JpaRepository<RentTenant, String> 
     /** All active tenants across the platform — used by the charge scheduler. */
     List<RentTenant> findByActiveTrue();
 
+    /** Count of active tenants platform-wide — used by admin summary. */
+    long countByActiveTrue();
+
     boolean existsByPayToken(String payToken);
 }

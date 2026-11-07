@@ -178,7 +178,14 @@ public final class RentDtos {
              * When null the server defaults to the full outstanding balance
              * (i.e. full-pay shortcut — always valid regardless of partial settings).
              */
-            @Min(1) Long amount
+            @Min(1) Long amount,
+            /**
+             * When true, the tenant is paying for the <em>next</em> rent period
+             * (advance / future payment). The server will auto-create the next
+             * period's charge if it doesn't exist yet and apply the payment to it.
+             * When false or null, payment is applied to the current period's charge.
+             */
+            Boolean payAhead
     ) {}
 
     /** Update core property settings (name, address, payment config, etc.). */
@@ -191,7 +198,17 @@ public final class RentDtos {
             @Size(max = 8) String currency,
             @Size(max = 64) String timezone,
             Boolean partialPaymentAllowed,
-            @Min(0) Long minPaymentAmount
+            @Min(0) Long minPaymentAmount,
+            /** NONE | FLAT | PERCENT — null = no change */
+            @Size(max = 16) String lateFeeType,
+            /** Flat UGX amount or percentage × 100. Null = no change. */
+            @Min(0) Long lateFeeAmount,
+            /** Per-property platform fee override in UGX. 0 = use platform default. Null = no change. */
+            @Min(0) Long platformFeeOverride,
+            /** Default grace period in days. Null = no change. */
+            Integer gracePeriodDays,
+            /** Days after due date before overdue. Null = no change. */
+            Integer overdueAfterDays
     ) {}
 
     /** Update a tenant's contact info or lease end date. */
@@ -232,6 +249,14 @@ public final class RentDtos {
             String timezone,
             boolean partialPaymentAllowed,
             long minPaymentAmount,
+            /** NONE | FLAT | PERCENT */
+            String lateFeeType,
+            /** Flat UGX amount, or percentage × 100 (e.g. 500 = 5.00%). */
+            long lateFeeAmount,
+            /** Per-property platform fee override (0 = use platform default). */
+            long platformFeeOverride,
+            int gracePeriodDays,
+            int overdueAfterDays,
             String qrToken,
             String qrCodeUrl,   // full /rent/pay/:qrToken URL for printing
             int unitCount,
@@ -247,6 +272,8 @@ public final class RentDtos {
                     p.getId(), p.getName(), p.getAddress(), p.getCity(),
                     p.getOwnerName(), p.getOwnerMomo(), p.getCurrency(),
                     p.getTimezone(), p.isPartialPaymentAllowed(), p.getMinPaymentAmount(),
+                    p.getLateFeeType(), p.getLateFeeAmount(), p.getPlatformFeeOverride(),
+                    p.getGracePeriodDays(), p.getOverdueAfterDays(),
                     p.getQrToken(),
                     baseUrl + "/rent/pay/" + p.getQrToken(),
                     units, (int) active, p.getCreatedAt());

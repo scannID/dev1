@@ -35,7 +35,11 @@ public enum AdminPermission {
 
     // ── Admin management ──────────────────────────────────────────────────────
     /** Only super admins have this; controls who can manage other admins. */
-    MANAGE_ADMINS("Invite and manage sub-admins");
+    MANAGE_ADMINS("Invite and manage sub-admins"),
+
+    // ── Rent / Property management ────────────────────────────────────────────
+    /** View and configure all rent properties across all managers. */
+    VIEW_RENT("Rent properties, tenants, and fee configuration");
 
     private final String description;
 

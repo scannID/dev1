@@ -1,5 +1,7 @@
 package com.scanny.service;
 
+import com.scanny.accounting.AccountingEvent;
+import com.scanny.accounting.AccountingEventPublisher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scanny.dto.PublicTicketDtos;
@@ -37,6 +39,11 @@ public class TicketPurchaseService {
     );
     private static final int SERVICE_FEE_PER_TRANSACTION = 700;
 
+    // Accounting: platform commission per ticket, sourced from config.
+    // Defaults to SERVICE_FEE_PER_TRANSACTION but overridable without a redeploy.
+    @Value("${scanny.tickets.platform-commission-ugx:700}")
+    private long platformCommissionUgx;
+
     private final TicketRepository ticketRepository;
     private final TicketQueueRepository ticketQueueRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
@@ -46,6 +53,7 @@ public class TicketPurchaseService {
     private final long holdTtlMinutes;
     private final SystemBusyModeService systemBusyModeService;
     private final TicketWaitlistService ticketWaitlistService;
+    private final AccountingEventPublisher accountingEventPublisher;
 
     /** Queue activates automatically when concurrent requests for an event exceed this. */
     private final int queueActivationThreshold;
@@ -63,16 +71,18 @@ public class TicketPurchaseService {
             @Value("${scanny.tickets.hold-ttl-minutes:10}") long holdTtlMinutes,
             SystemBusyModeService systemBusyModeService,
             TicketWaitlistService ticketWaitlistService,
+            AccountingEventPublisher accountingEventPublisher,
             @Value("${scanny.tickets.queue-activation-threshold:3}") int queueActivationThreshold) {
-        this.ticketRepository = ticketRepository;
-        this.ticketQueueRepository = ticketQueueRepository;
+        this.ticketRepository         = ticketRepository;
+        this.ticketQueueRepository    = ticketQueueRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
-        this.ticketService = ticketService;
-        this.objectMapper = objectMapper;
-        this.environment = environment;
-        this.holdTtlMinutes = Math.max(1, holdTtlMinutes);
-        this.systemBusyModeService = systemBusyModeService;
-        this.ticketWaitlistService = ticketWaitlistService;
+        this.ticketService            = ticketService;
+        this.objectMapper             = objectMapper;
+        this.environment              = environment;
+        this.holdTtlMinutes           = Math.max(1, holdTtlMinutes);
+        this.systemBusyModeService    = systemBusyModeService;
+        this.ticketWaitlistService    = ticketWaitlistService;
+        this.accountingEventPublisher = accountingEventPublisher;
         this.queueActivationThreshold = Math.max(1, queueActivationThreshold);
     }
 
@@ -341,6 +351,30 @@ public class TicketPurchaseService {
         ticketRepository.save(ticket);
 
         ticketService.refreshStatsBroadcast();
+
+        // ── Accounting event ──────────────────────────────────────────────────
+        try {
+            long price      = ticket.getPrice();
+            long commission = platformCommissionUgx;
+            long payee      = Math.max(0, price - commission);
+            accountingEventPublisher.publish(new AccountingEvent(
+                    "TICKET_SOLD:" + attendeeTicketId,
+                    "TICKET_SOLD",   // maps to TICKET_SOLD posting rule (deferred revenue)
+                    "TICKETING",
+                    attendeeTicketId,
+                    price, commission, payee,
+                    0L, 0L, 0L,
+                    null, null, null,
+                    ticket.getMasterTicketId(),
+                    "MOMO",
+                    "Ticket sold — " + ticket.getEventName(),
+                    null
+            ));
+        } catch (Exception ex) {
+            org.slf4j.LoggerFactory.getLogger(TicketPurchaseService.class)
+                .error("[Accounting] Failed to publish ticket sold event for {}: {}",
+                    attendeeTicketId, ex.getMessage(), ex);
+        }
     }
 
     /** Call after purchase transaction commits (from controller). */

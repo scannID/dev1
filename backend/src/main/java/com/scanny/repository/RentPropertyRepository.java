@@ -64,4 +64,28 @@ public interface RentPropertyRepository extends JpaRepository<RentProperty, Stri
 
     /** Properties where the given account is the registered owner account. */
     List<RentProperty> findByOwnerAccount_IdOrderByNameAsc(String ownerAccountId);
+
+    // ── Admin queries (eager-fetch units for count without lazy load) ─────────
+
+    /**
+     * Admin: all properties with their units eagerly fetched, ordered by creation date desc.
+     * DISTINCT prevents duplicate rows from the JOIN.
+     */
+    @Query("""
+        SELECT DISTINCT p FROM RentProperty p
+        LEFT JOIN FETCH p.units
+        ORDER BY p.createdAt DESC
+        """)
+    List<RentProperty> findAllWithUnitsForAdmin();
+
+    /**
+     * Admin: single property with units and each unit's tenants eagerly fetched.
+     */
+    @Query("""
+        SELECT DISTINCT p FROM RentProperty p
+        LEFT JOIN FETCH p.units u
+        LEFT JOIN FETCH u.tenants
+        WHERE p.id = :propertyId
+        """)
+    Optional<RentProperty> findByIdWithUnitsAndTenantsForAdmin(@Param("propertyId") String propertyId);
 }

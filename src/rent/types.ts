@@ -24,6 +24,16 @@ export interface RentProperty {
   partialPaymentAllowed: boolean
   /** Minimum partial payment amount (minor units). 0 = no floor. */
   minPaymentAmount: number
+  /** Late fee type: NONE | FLAT | PERCENT */
+  lateFeeType: string
+  /** Flat UGX amount, or percentage × 100 (500 = 5.00%) */
+  lateFeeAmount: number
+  /** Per-property platform fee override (0 = use platform default) */
+  platformFeeOverride: number
+  /** Default grace period in days after due date */
+  gracePeriodDays: number
+  /** Days after due date before overdue */
+  overdueAfterDays: number
   qrToken: string
   qrCodeUrl: string   // /rent/pay/:qrToken
   unitCount: number
@@ -273,6 +283,8 @@ export interface InitiateRentPaymentRequest {
   paymentMethod?: string
   /** Amount in minor units. Null / omitted = pay full outstanding balance. */
   amount?: number
+  /** When true, pays for the next period (advance payment). */
+  payAhead?: boolean
 }
 
 export interface UpdatePropertyRequest {
@@ -285,6 +297,16 @@ export interface UpdatePropertyRequest {
   timezone?: string
   partialPaymentAllowed?: boolean
   minPaymentAmount?: number
+  /** Late fee type: NONE | FLAT | PERCENT */
+  lateFeeType?: string
+  /** Flat UGX amount, or percentage × 100 (500 = 5.00%) */
+  lateFeeAmount?: number
+  /** Per-property platform fee override (0 = use platform default) */
+  platformFeeOverride?: number
+  /** Default grace period in days */
+  gracePeriodDays?: number
+  /** Days after due date before overdue */
+  overdueAfterDays?: number
 }
 
 export interface UpdateTenantRequest {

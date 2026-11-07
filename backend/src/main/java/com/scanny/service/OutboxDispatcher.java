@@ -2,6 +2,8 @@ package com.scanny.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scanny.accounting.AccountingEventConsumer;
+import com.scanny.accounting.AccountingEventPublisher;
 import com.scanny.efris.EfrisSubmissionService;
 import com.scanny.entity.OutboxEvent;
 import com.scanny.entity.PaymentIntent;
@@ -34,6 +36,7 @@ public class OutboxDispatcher {
     private final AuditService auditService;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final EfrisSubmissionService efrisSubmissionService;
+    private final AccountingEventConsumer accountingEventConsumer;
 
     // Self-reference via Spring proxy so @Transactional(REQUIRES_NEW) on
     // processAndStamp() fires correctly when called from within this bean.
@@ -48,16 +51,18 @@ public class OutboxDispatcher {
             @Lazy OrderService orderService,
             AuditService auditService,
             WhatsAppNotificationService whatsAppNotificationService,
-            @Lazy EfrisSubmissionService efrisSubmissionService
+            @Lazy EfrisSubmissionService efrisSubmissionService,
+            AccountingEventConsumer accountingEventConsumer
     ) {
-        this.outboxEventRepository = outboxEventRepository;
-        this.objectMapper = objectMapper;
-        this.realtimeEventPublisher = realtimeEventPublisher;
-        this.paymentIntentService = paymentIntentService;
-        this.orderService = orderService;
-        this.auditService = auditService;
+        this.outboxEventRepository     = outboxEventRepository;
+        this.objectMapper              = objectMapper;
+        this.realtimeEventPublisher    = realtimeEventPublisher;
+        this.paymentIntentService      = paymentIntentService;
+        this.orderService              = orderService;
+        this.auditService              = auditService;
         this.whatsAppNotificationService = whatsAppNotificationService;
-        this.efrisSubmissionService = efrisSubmissionService;
+        this.efrisSubmissionService    = efrisSubmissionService;
+        this.accountingEventConsumer   = accountingEventConsumer;
     }
 
     @Scheduled(fixedDelayString = "${scanny.outbox.poll-ms:500}")
@@ -125,6 +130,12 @@ public class OutboxDispatcher {
                 // transient failures so the outbox event stays unprocessed and retried next poll.
                 String orderId = String.valueOf(payload.get("orderId"));
                 efrisSubmissionService.submitForOrder(orderId);
+            }
+            case AccountingEventPublisher.OUTBOX_TYPE -> {
+                // Route to the PostingService via AccountingEventConsumer.
+                // Failures are written to accounting.posting_failures — never re-thrown —
+                // so a bad accounting event never blocks other outbox processing.
+                accountingEventConsumer.consume(event.getPayloadJson());
             }
             default -> log.debug("Unknown outbox type {}", event.getEventType());
         }

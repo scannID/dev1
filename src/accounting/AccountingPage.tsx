@@ -633,7 +633,7 @@ export function AccountingPage({ businessId, refreshKey = 0 }: { businessId: str
             <table className="sales-table sales-table--ledger">
               <thead>
                 <tr>
-                  {['Date', 'Customer', 'Items', 'Method', 'Gross', 'Net', 'COGS', 'Profit', 'Payment', 'Status'].map((h) => (
+                  {['Date', 'Method', 'Gross', 'Net', 'COGS', 'Profit', 'Payment', 'Status'].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -641,23 +641,13 @@ export function AccountingPage({ businessId, refreshKey = 0 }: { businessId: str
               <tbody>
                 {(!ledger || ledger.entries.length === 0) ? (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: 32, color: 'var(--muted-foreground)', fontSize: 13 }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--muted-foreground)', fontSize: 13 }}>
                       No transactions found for this period.
                     </td>
                   </tr>
                 ) : ledger.entries.map((e) => (
                   <tr key={e.orderId}>
                     <td style={{ whiteSpace: 'nowrap', color: 'var(--muted-foreground)' }}>{shortDate(e.createdAt)}</td>
-                    <td>
-                      <span style={{ fontWeight: 500 }}>{e.customerName || '—'}</span>
-                      {e.customerPhone ? (
-                        <span style={{ display: 'block', fontSize: 10, color: 'var(--muted-foreground)' }}>{e.customerPhone}</span>
-                      ) : null}
-                    </td>
-                    <td style={{ color: 'var(--muted-foreground)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        title={e.itemsSummary}>
-                      {e.itemsSummary || '—'}
-                    </td>
                     <td>
                       <span style={{
                         fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20,

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Banknote,
   Bell,
+  BookOpen,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -58,8 +59,10 @@ import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import CommunicationsPage from './pages/CommunicationsPage'
+import AccountingPage from './pages/AccountingPage'
 import AdminsPage from './pages/AdminsPage'
 import FunnelDropsPage from './pages/FunnelDropsPage'
+import RentPropertiesPage from './pages/RentPropertiesPage'
 import { InlineSpinner } from './components/LoadingSpinner'
 import { PaginationBar } from './components/PaginationBar'
 import { usePagination } from './hooks/usePagination'
@@ -71,7 +74,8 @@ type View =
   | 'overview' | 'merchants' | 'orders' | 'ticketing'
   | 'users' | 'communications' | 'revenue' | 'cash-collections'
   | 'qr-activity' | 'cookie-consent' | 'reports' | 'funnel-drops'
-  | 'system' | 'audit' | 'configs' | 'admins'
+  | 'system' | 'audit' | 'configs' | 'admins' | 'rent-properties'
+  | 'accounting-restaurants' | 'accounting-ticketing' | 'accounting-properties' | 'accounting-ledger'
 
 type NavItem = {
   id: View
@@ -82,22 +86,27 @@ type NavItem = {
 }
 
 const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
-  overview: { eyebrow: 'Admin · Platform', title: 'Overview' },
-  merchants: { eyebrow: 'Admin · Platform', title: 'Merchants' },
-  orders: { eyebrow: 'Admin · Platform', title: 'All Orders' },
-  ticketing: { eyebrow: 'Admin · Platform', title: 'Ticketing' },
-  users: { eyebrow: 'Admin · Platform', title: 'Users' },
-  communications: { eyebrow: 'Admin · Platform', title: 'Communications' },
-  revenue: { eyebrow: 'Admin · Finance', title: 'Revenue & Payments' },
-  'cash-collections': { eyebrow: 'Admin · Finance', title: 'Cash Collections' },
-  'qr-activity': { eyebrow: 'Admin · Analytics', title: 'QR Activity' },
-  'cookie-consent': { eyebrow: 'Admin · Analytics', title: 'Cookie Consent' },
-  reports: { eyebrow: 'Admin · Analytics', title: 'Reports' },
-  'funnel-drops': { eyebrow: 'Admin · Analytics', title: 'Funnel Drop-offs' },
-  system: { eyebrow: 'Admin · System', title: 'System Health' },
-  audit: { eyebrow: 'Admin · System', title: 'Audit Log' },
-  configs: { eyebrow: 'Admin · System', title: 'Configs' },
-  admins: { eyebrow: 'Admin · System', title: 'Admin Accounts' },
+  overview:                  { eyebrow: 'Admin',                   title: 'Overview' },
+  'accounting-restaurants':  { eyebrow: 'Admin · Accounting',      title: 'Restaurants' },
+  'accounting-ticketing':    { eyebrow: 'Admin · Accounting',      title: 'Ticketing' },
+  'accounting-properties':   { eyebrow: 'Admin · Accounting',      title: 'Properties' },
+  'accounting-ledger':       { eyebrow: 'Admin · Accounting',      title: 'Ledger' },
+  merchants:                 { eyebrow: 'Admin · Restaurants',     title: 'Merchants' },
+  orders:                    { eyebrow: 'Admin · Restaurants',     title: 'All Orders' },
+  ticketing:                 { eyebrow: 'Admin · Ticketing',       title: 'Events & Tickets' },
+  users:                     { eyebrow: 'Admin · Restaurants',     title: 'Users' },
+  communications:            { eyebrow: 'Admin · Restaurants',     title: 'Communications' },
+  revenue:                   { eyebrow: 'Admin · Restaurants',     title: 'Revenue & Payments' },
+  'cash-collections':        { eyebrow: 'Admin · Restaurants',     title: 'Cash Collections' },
+  'qr-activity':             { eyebrow: 'Admin · Restaurants',     title: 'QR Activity' },
+  'cookie-consent':          { eyebrow: 'Admin · Analytics',       title: 'Cookie Consent' },
+  reports:                   { eyebrow: 'Admin · Ticketing',       title: 'Reports' },
+  'funnel-drops':            { eyebrow: 'Admin · Ticketing',       title: 'Funnel Drop-offs' },
+  system:                    { eyebrow: 'Admin · System',          title: 'System Health' },
+  audit:              { eyebrow: 'Admin · System',          title: 'Audit Log' },
+  configs:            { eyebrow: 'Admin · System',          title: 'Configs' },
+  admins:             { eyebrow: 'Admin · System',          title: 'Admin Accounts' },
+  'rent-properties':  { eyebrow: 'Admin · Properties',      title: 'Properties' },
 }
 
 function relativeTime(iso: string) {
@@ -209,39 +218,59 @@ export default function AdminApp({
     }
     return [
       {
-        label: 'Platform',
+        label: null,
         items: [
-          canSee('VIEW_OVERVIEW')       && { id: 'overview' as const,       label: 'Overview',        icon: LayoutGrid },
-          canSee('VIEW_MERCHANTS')      && { id: 'merchants' as const,      label: 'Merchants',       icon: Building2 },
-          canSee('VIEW_ORDERS')         && { id: 'orders' as const,         label: 'All Orders',      icon: ShoppingCart },
-          canSee('VIEW_TICKETING')      && { id: 'ticketing' as const,      label: 'Ticketing',       icon: Ticket },
-          canSee('VIEW_USERS')          && { id: 'users' as const,          label: 'Users',           icon: Users },
-          canSee('VIEW_COMMUNICATIONS') && { id: 'communications' as const, label: 'Communications',  icon: Megaphone },
+          canSee('VIEW_OVERVIEW') && { id: 'overview' as const, label: 'Overview', icon: LayoutGrid },
         ].filter(Boolean) as NavItem[],
       },
       {
-        label: 'Finance',
+        label: 'Accounting',
         items: [
+          (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-restaurants' as const, label: 'Restaurants', icon: Building2 },
+          (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-ticketing' as const, label: 'Ticketing', icon: Ticket },
+          (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-properties' as const, label: 'Properties', icon: Building2 },
+          (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-ledger' as const, label: 'Ledger', icon: BookOpen },
+        ].filter(Boolean) as NavItem[],
+      },
+      {
+        label: 'Restaurants',
+        items: [
+          canSee('VIEW_MERCHANTS')         && { id: 'merchants' as const,         label: 'Merchants',          icon: Building2 },
+          canSee('VIEW_ORDERS')            && { id: 'orders' as const,            label: 'All Orders',         icon: ShoppingCart },
           canSee('VIEW_REVENUE')           && { id: 'revenue' as const,           label: 'Revenue & Payments', icon: CreditCard },
           canSee('VIEW_CASH_COLLECTIONS')  && { id: 'cash-collections' as const,  label: 'Cash Collections',   icon: Banknote },
+          canSee('VIEW_QR_ACTIVITY')       && { id: 'qr-activity' as const,       label: 'QR Activity',        icon: QrCode },
+          canSee('VIEW_USERS')             && { id: 'users' as const,             label: 'Users',              icon: Users },
+          canSee('VIEW_COMMUNICATIONS')    && { id: 'communications' as const,    label: 'Communications',     icon: Megaphone },
+        ].filter(Boolean) as NavItem[],
+      },
+      {
+        label: 'Ticketing',
+        items: [
+          canSee('VIEW_TICKETING')    && { id: 'ticketing' as const,     label: 'Events & Tickets', icon: Ticket },
+          canSee('VIEW_REPORTS')      && { id: 'reports' as const,       label: 'Reports',          icon: BarChart3 },
+          canSee('VIEW_FUNNEL_DROPS') && { id: 'funnel-drops' as const,  label: 'Funnel Drop-offs', icon: TrendingDown },
+        ].filter(Boolean) as NavItem[],
+      },
+      {
+        label: 'Properties',
+        items: [
+          canSee('VIEW_RENT') && { id: 'rent-properties' as const, label: 'Properties', icon: Building2 },
         ].filter(Boolean) as NavItem[],
       },
       {
         label: 'Analytics',
         items: [
-          canSee('VIEW_QR_ACTIVITY')    && { id: 'qr-activity' as const,    label: 'QR Activity',        icon: QrCode },
-          canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent',     icon: Cookie },
-          canSee('VIEW_REPORTS')        && { id: 'reports' as const,        label: 'Reports',             icon: BarChart3 },
-          canSee('VIEW_FUNNEL_DROPS')   && { id: 'funnel-drops' as const,   label: 'Funnel Drop-offs',    icon: TrendingDown },
+          canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent', icon: Cookie },
         ].filter(Boolean) as NavItem[],
       },
       {
         label: 'System',
         items: [
           canSee('VIEW_SYSTEM')  && systemItem,
-          canSee('VIEW_AUDIT')   && { id: 'audit' as const,   label: 'Audit Log', icon: FileText },
-          canSee('VIEW_CONFIGS') && { id: 'configs' as const, label: 'Configs',   icon: Settings },
-          isSuperAdmin && { id: 'admins' as const, label: 'Admin Accounts', icon: UserCog },
+          canSee('VIEW_AUDIT')   && { id: 'audit' as const,   label: 'Audit Log',      icon: FileText },
+          canSee('VIEW_CONFIGS') && { id: 'configs' as const, label: 'Configs',        icon: Settings },
+          isSuperAdmin           && { id: 'admins' as const,  label: 'Admin Accounts', icon: UserCog },
         ].filter(Boolean) as NavItem[],
       },
     ].filter((s) => s.items.length > 0)
@@ -256,6 +285,36 @@ export default function AdminApp({
       setView(allItems[0].id)
     }
   }, [navSections, me, view])
+
+  // ── Collapsible nav sections ─────────────────────────────────────────────
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('scanny-admin-nav-collapsed')
+      return saved ? new Set(JSON.parse(saved) as string[]) : new Set<string>()
+    } catch { return new Set<string>() }
+  })
+
+  // Keep the section containing the active view always open
+  useEffect(() => {
+    const activeSection = navSections.find((s) => s.items.some((i) => i.id === view))
+    if (!activeSection) return
+    setCollapsedSections((prev) => {
+      if (!prev.has(activeSection.label)) return prev
+      const next = new Set(prev)
+      next.delete(activeSection.label)
+      return next
+    })
+  }, [view, navSections])
+
+  function toggleSection(label: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev)
+      if (next.has(label)) { next.delete(label) } else { next.add(label) }
+      try { localStorage.setItem('scanny-admin-nav-collapsed', JSON.stringify([...next])) } catch { /* ignore */ }
+      return next
+    })
+  }
+
 
   const meta = PAGE_META[view]
   const profileLabel = isSuperAdmin ? 'Super Admin' : 'Admin'
@@ -290,28 +349,50 @@ export default function AdminApp({
         <Separator className="my-1" />
 
         <nav className="admin-nav" aria-label="Admin sections">
-          {navSections.map((section) => (
-            <div key={section.label} className="admin-nav-section">
-              {!sidebarCollapsed && <p className="admin-nav-label">{section.label}</p>}
-              {section.items.map(({ id, label, icon: Icon, badge, badgeType }) => (
-                <button
-                  key={id}
-                  type="button"
-                  title={sidebarCollapsed ? label : undefined}
-                  className={view === id ? 'active' : ''}
-                  onClick={() => setView(id)}
-                >
-                  <Icon size={16} />
-                  {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
-                  {!sidebarCollapsed && badge ? (
-                    <span className={`admin-nav-badge ${badgeType === 'green' ? 'green' : ''}`}>
-                      {badge}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          ))}
+          {navSections.map((section) => {
+            const sectionKey = section.label ?? '__no-label__'
+            const isSectionCollapsed = !sidebarCollapsed && collapsedSections.has(sectionKey)
+            const hasActive = section.items.some((i) => i.id === view)
+            return (
+              <div key={sectionKey} className="admin-nav-section">
+                {!sidebarCollapsed && section.label && (
+                  <button
+                    type="button"
+                    className={`admin-nav-section-toggle${hasActive ? ' has-active' : ''}`}
+                    onClick={() => toggleSection(sectionKey)}
+                    aria-expanded={!isSectionCollapsed}
+                  >
+                    <span>{section.label}</span>
+                    <ChevronRight
+                      size={11}
+                      className={`admin-nav-section-chevron${isSectionCollapsed ? '' : ' open'}`}
+                    />
+                  </button>
+                )}
+                <div className={`admin-nav-section-items${isSectionCollapsed ? ' collapsed' : ''}`}>
+                  <div>
+                    {section.items.map(({ id, label, icon: Icon, badge, badgeType }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        title={sidebarCollapsed ? label : undefined}
+                        className={view === id ? 'active' : ''}
+                        onClick={() => setView(id)}
+                      >
+                        <Icon size={16} />
+                        {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
+                        {!sidebarCollapsed && badge ? (
+                          <span className={`admin-nav-badge ${badgeType === 'green' ? 'green' : ''}`}>
+                            {badge}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </nav>
 
         <div className={`admin-profile${sidebarCollapsed ? ' admin-profile-collapsed' : ''}`}>
@@ -404,6 +485,11 @@ export default function AdminApp({
           {view === 'audit' && <AuditLogPage />}
           {view === 'configs' && <ConfigsPage />}
           {view === 'admins' && <AdminsPage />}
+          {view === 'rent-properties' && <RentPropertiesPage />}
+          {view === 'accounting-restaurants' && <AccountingPage initialTab="restaurants" />}
+          {view === 'accounting-ticketing' && <AccountingPage initialTab="ticketing" />}
+          {view === 'accounting-properties' && <AccountingPage initialTab="properties" />}
+          {view === 'accounting-ledger' && <AccountingPage initialTab="ledger" />}
         </div>
 
         <Sheet open={showNotifications} onOpenChange={setShowNotifications}>

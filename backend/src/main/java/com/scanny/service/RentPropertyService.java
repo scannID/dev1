@@ -168,6 +168,11 @@ public class RentPropertyService {
         if (req.timezone() != null && !req.timezone().isBlank())  property.setTimezone(req.timezone().trim());
         if (req.partialPaymentAllowed() != null)                   property.setPartialPaymentAllowed(req.partialPaymentAllowed());
         if (req.minPaymentAmount() != null)                        property.setMinPaymentAmount(req.minPaymentAmount());
+        if (req.lateFeeType() != null)                             property.setLateFeeType(req.lateFeeType());
+        if (req.lateFeeAmount() != null)                           property.setLateFeeAmount(req.lateFeeAmount());
+        if (req.platformFeeOverride() != null)                     property.setPlatformFeeOverride(req.platformFeeOverride());
+        if (req.gracePeriodDays() != null)                         property.setGracePeriodDays(req.gracePeriodDays());
+        if (req.overdueAfterDays() != null)                        property.setOverdueAfterDays(req.overdueAfterDays());
 
         property.setUpdatedAt(Instant.now());
         RentDtos.PropertyResponse result = RentDtos.PropertyResponse.from(
@@ -235,6 +240,8 @@ public class RentPropertyService {
                         property.getId(), property.getName(), property.getAddress(), property.getCity(),
                         property.getOwnerName(), property.getOwnerMomo(), property.getCurrency(),
                         property.getTimezone(), property.isPartialPaymentAllowed(), property.getMinPaymentAmount(),
+                        property.getLateFeeType(), property.getLateFeeAmount(), property.getPlatformFeeOverride(),
+                        property.getGracePeriodDays(), property.getOverdueAfterDays(),
                         property.getQrToken(),
                         customerUrl + "/rent/pay/" + property.getQrToken(),
                         (int) totalUnits, (int) occupied, property.getCreatedAt()),

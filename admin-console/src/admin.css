@@ -141,6 +141,61 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   padding: 8px 10px 4px;
 }
 
+/* ── Collapsible section toggle ──────────── */
+.admin-nav-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.12s;
+  text-align: left;
+}
+
+.admin-nav-section-toggle:hover {
+  color: var(--foreground);
+}
+
+.admin-nav-section-toggle.has-active {
+  color: var(--primary);
+}
+
+.admin-nav-section-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotate(0deg);
+}
+
+.admin-nav-section-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* ── Section items collapse ──────────────── */
+.admin-nav-section-items {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  transition: grid-template-rows 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-nav-section-items.collapsed {
+  grid-template-rows: 0fr;
+}
+
+.admin-nav-section-items > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+
+
 .admin-nav button {
   position: relative;
   display: flex;
@@ -333,6 +388,10 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   box-shadow: 0 1px 3px oklch(0 0 0 / 5%);
 }
 
+/* Hover lift for the two overview chart panels */
+.overview-panel {
+}
+
 .admin-metric-card .metric-label {
   font-size: 10px;
   font-weight: 500;
@@ -366,7 +425,135 @@ form :where(input, select, textarea)[aria-invalid='true'] {
 .admin-metric-card .metric-delta.up { color: #16a34a; }
 .admin-metric-card .metric-delta.down { color: var(--destructive); }
 
-/* ── Section card ────────────────────────── */
+/* ── Metric card hover tooltip ───────────── */
+.amc-tooltip {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: color-mix(in oklch, var(--card) 94%, var(--foreground) 6%);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px oklch(0 0 0 / 14%);
+  overflow: hidden;
+}
+
+.amc-tooltip-title {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.amc-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.amc-tooltip-row span {
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.amc-tooltip-row strong {
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.amc-tooltip-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+
+.admin-metric-card--detail {
+  gap: 8px;
+  padding: 20px;
+}
+
+.amc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.amc-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.admin-metric-card--detail .metric-value {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.amc-stat-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 4px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.amc-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 12px;
+}
+
+.amc-stat:first-child {
+  padding-left: 0;
+}
+
+.amc-stat:last-child {
+  padding-right: 0;
+}
+
+.amc-stat-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.amc-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.amc-stat-divider {
+  width: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+
 .admin-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -406,6 +593,12 @@ form :where(input, select, textarea)[aria-invalid='true'] {
 .admin-three-col {
   display: grid;
   grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+.admin-three-col-eq {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -569,7 +762,8 @@ form :where(input, select, textarea)[aria-invalid='true'] {
 @media (max-width: 1100px) {
   .admin-metric-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-two-col,
-  .admin-three-col { grid-template-columns: 1fr; }
+  .admin-three-col,
+  .admin-three-col-eq { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {

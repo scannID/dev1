@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Scissors,
   Check,
@@ -7,13 +7,19 @@ import {
   ShoppingBag,
   CreditCard,
   Building2,
+  Key,
+  Banknote,
+  Wrench,
+  FileText,
+  UtensilsCrossed,
+  Ticket,
 } from 'lucide-react'
 import { usePageMeta } from './hooks/usePageMeta'
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Concept: a kitchen order ticket, not a SaaS dashboard.
    Paper, modern Outfit typography, a rubber stamp, a spike of tickets.
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const C = {
   paper: '#efe6d2',
@@ -27,12 +33,12 @@ const C = {
 
 const FONT = "'Outfit Variable', 'Outfit', ui-sans-serif, system-ui, sans-serif"
 
-// Landing hero only — events page uses /hero-bg.jpg separately.
+// Landing hero only � events page uses /hero-bg.jpg separately.
 const heroPhoto = '/hero-restaurant.jpg'
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Zigzag ticket edge
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 function Zigzag({ color = C.paperLt, flip = false }) {
   const teeth = 26
@@ -59,9 +65,9 @@ function Zigzag({ color = C.paperLt, flip = false }) {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Punch holes
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 function PunchHoles() {
   return (
@@ -87,9 +93,9 @@ function PunchHoles() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Signature: a live printing order ticket
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const orderLines = [
   { qty: '2x', item: 'Rolex, extra onion' },
@@ -195,7 +201,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
                 letterSpacing: '0.1em',
               }}
             >
-              BREW HOUSE CAFÉ · ONE CODE, ALL ORDERS
+              BREW HOUSE CAF� � ONE CODE, ALL ORDERS
             </div>
           </div>
 
@@ -260,11 +266,11 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
               color: C.inkSoft,
             }}
           >
-            <span>ORDER № 0482</span>
+            <span>ORDER ? 0482</span>
 
             <span>
               {visible < orderLines.length
-                ? 'PRINTING…'
+                ? 'PRINTING�'
                 : 'IN KITCHEN'}
             </span>
           </div>
@@ -327,9 +333,9 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Order tracker — slides out from the receipt after CONFIRMED
-   ───────────────────────────────────────────────────────────── */
+/* -------------------------------------------------------------
+   Order tracker � slides out from the receipt after CONFIRMED
+   ------------------------------------------------------------- */
 
 const trackSteps = [
   { key: 'received', label: 'Received' },
@@ -378,7 +384,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
           color: C.inkSoft, marginBottom: 18,
           fontFamily: FONT,
         }}>
-          ORDER № 0482 · TRACKING
+          ORDER ? 0482 � TRACKING
         </div>
 
         {/* Vertical step list */}
@@ -440,9 +446,9 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Order scene — receipt → tracker slides in from right → ticket book
-   ───────────────────────────────────────────────────────────── */
+/* -------------------------------------------------------------
+   Order scene � receipt ? tracker slides in from right ? ticket book
+   ------------------------------------------------------------- */
 
 type ScenePhase = 'receipt' | 'tracker' | 'tickets'
 
@@ -467,7 +473,7 @@ function OrderScene() {
   return (
     <div style={{ position: 'relative', width: '100%', minHeight: 420 }}>
 
-      {/* ── Receipt + tracker side by side (phases: receipt, tracker) ── */}
+      {/* -- Receipt + tracker side by side (phases: receipt, tracker) -- */}
       <div style={{
         position: phase === 'tickets' ? 'absolute' : 'relative',
         inset: 0,
@@ -484,7 +490,7 @@ function OrderScene() {
         <OrderTracker visible={confirmed} onComplete={handleTrackComplete} />
       </div>
 
-      {/* ── Ticket book (phase: tickets) — split-flap departures board ── */}
+      {/* -- Ticket book (phase: tickets) � split-flap departures board -- */}
       <div style={{
         position: phase !== 'tickets' ? 'absolute' : 'relative',
         inset: 0,
@@ -573,7 +579,7 @@ function EventTicketStub() {
             marginBottom: 6,
           }}
         >
-          ADMIT ONE · EVENT TICKET
+          ADMIT ONE � EVENT TICKET
         </div>
 
         <div
@@ -597,7 +603,7 @@ function EventTicketStub() {
             marginBottom: 14,
           }}
         >
-          JINJA · SAT 24 OCT · GATE 7:00 PM
+          JINJA � SAT 24 OCT � GATE 7:00 PM
         </div>
 
         <div
@@ -736,9 +742,9 @@ function EventTicketStub() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Ticket Book replacement — "DEPARTURES BOARD" split-flap widget
-   ───────────────────────────────────────────────────────────── */
+/* -------------------------------------------------------------
+   Ticket Book replacement � "DEPARTURES BOARD" split-flap widget
+   ------------------------------------------------------------- */
 
 const FB = {
   board: C.paper,
@@ -764,7 +770,7 @@ function flapPad(str: string, len: number) {
   return s + ' '.repeat(len - s.length)
 }
 
-/* Single flap cell — flips on character change */
+/* Single flap cell � flips on character change */
 function FlapChar({ char, delay = 0, size = 15 }: { char: string; delay?: number; size?: number }) {
   const [display, setDisplay] = useState(char)
   const [flip, setFlip] = useState(false)
@@ -924,7 +930,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
           </div>
         </div>
 
-        {/* title — per-character flap */}
+        {/* title � per-character flap */}
         <div style={{ overflowX: 'auto', marginBottom: 12 }}>
           <FlapWord text={ev.title} width={FLAP_TITLE_WIDTH} size={19} />
         </div>
@@ -947,7 +953,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
 
         <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
 
-        {/* sold counter — digit flaps */}
+        {/* sold counter � digit flaps */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FlapNumber value={sold} digits={3} size={17} />
@@ -971,25 +977,290 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
+   Property management � animated rent ledger scene
+   ------------------------------------------------------------- */
+
+const rentUnits = [
+  { unit: 'A1', tenant: 'Nakato Grace',   status: 'PAID',    amount: '450,000' },
+  { unit: 'A2', tenant: 'Ssemakula Dan',  status: 'OVERDUE', amount: '380,000' },
+  { unit: 'B1', tenant: 'Atim Christine', status: 'PAID',    amount: '520,000' },
+  { unit: 'B2', tenant: 'Okello James',   status: 'UNPAID',  amount: '400,000' },
+  { unit: 'C1', tenant: 'Nambi Sarah',    status: 'PARTIAL', amount: '460,000' },
+]
+
+function statusChip(s: string) {
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    PAID:    { bg: `${C.ok}22`,    color: C.ok,    label: '? PAID' },
+    OVERDUE: { bg: `${C.stamp}22`, color: C.stamp, label: '! OVERDUE' },
+    UNPAID:  { bg: `${C.ink}11`,   color: C.inkSoft, label: '� UNPAID' },
+    PARTIAL: { bg: `${C.spike}22`, color: C.spike, label: '~ PARTIAL' },
+  }
+  const m = map[s] ?? map.UNPAID
+  return (
+    <span style={{
+      fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+      background: m.bg, color: m.color,
+      padding: '2px 7px', borderRadius: 4,
+      whiteSpace: 'nowrap',
+    }}>{m.label}</span>
+  )
+}
+
+function RentLedger() {
+  const [visible, setVisible] = useState(0)
+  const [highlight, setHighlight] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    function run() {
+      setVisible(0)
+      setHighlight(null)
+      let i = 0
+      const iv = setInterval(() => {
+        if (cancelled) return
+        i += 1
+        setVisible(i)
+        if (i >= rentUnits.length) {
+          clearInterval(iv)
+          // pulse overdue row
+          setTimeout(() => { if (!cancelled) setHighlight(1) }, 600)
+          setTimeout(() => { if (!cancelled) setHighlight(null) }, 1800)
+          setTimeout(() => { if (!cancelled) run() }, 5000)
+        }
+      }, 420)
+      return () => clearInterval(iv)
+    }
+
+    const stop = run()
+    return () => { cancelled = true; stop?.() }
+  }, [])
+
+  return (
+    <div style={{ position: 'relative', width: 300, transform: 'rotate(-1.2deg)' }}>
+      <div style={{ boxShadow: '0 30px 60px rgba(38,32,26,0.25)', borderRadius: 3, overflow: 'hidden' }}>
+        <Zigzag />
+        <div style={{ background: C.paperLt, padding: '20px 22px 26px', fontFamily: FONT }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 4 }}>
+            <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '0.06em', color: C.ink }}>Koddly</div>
+            <div style={{ fontSize: 9.5, fontWeight: 500, color: C.inkSoft, letterSpacing: '0.1em' }}>SUNSET COURT � RENT LEDGER</div>
+          </div>
+          <div style={{ borderTop: `1px dashed ${C.ink}55`, margin: '12px 0' }} />
+
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: '0 8px', fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', color: C.inkSoft, marginBottom: 8 }}>
+            <span>UNIT</span><span>TENANT</span><span>STATUS</span>
+          </div>
+
+          {/* Rows */}
+          <div style={{ minHeight: rentUnits.length * 32 }}>
+            {rentUnits.map((r, i) => (
+              <div key={r.unit} style={{
+                display: 'grid',
+                gridTemplateColumns: '28px 1fr auto',
+                gap: '0 8px',
+                alignItems: 'center',
+                padding: '5px 6px',
+                marginBottom: 2,
+                borderRadius: 5,
+                background: highlight === i
+                  ? `${C.stamp}18`
+                  : i % 2 === 0 ? `${C.ink}05` : 'transparent',
+                opacity: i < visible ? 1 : 0,
+                transform: i < visible ? 'translateY(0)' : 'translateY(4px)',
+                transition: 'opacity .25s ease, transform .25s ease, background .4s ease',
+              }}>
+                <span style={{ fontSize: 10.5, fontWeight: 800, color: C.stamp }}>{r.unit}</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.tenant}</span>
+                {statusChip(r.status)}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: `1px dashed ${C.ink}55`, margin: '12px 0 8px' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 600, color: C.inkSoft }}>
+            <span>{visible} / {rentUnits.length} UNITS LOADED</span>
+            <span style={{ color: C.ok }}>
+              {visible >= rentUnits.length ? '? LIVE' : '? SYNCING�'}
+            </span>
+          </div>
+
+          {/* Barcode nod */}
+          <div style={{ display: 'flex', gap: 1.5, marginTop: 14, justifyContent: 'center' }}>
+            {Array.from({ length: 34 }, (_, i) => (
+              <div key={i} style={{ width: 2, height: (i * 7) % 5 === 0 ? 20 : 12, background: C.ink }} />
+            ))}
+          </div>
+        </div>
+        <Zigzag flip />
+      </div>
+    </div>
+  )
+}
+
+const rentFeatures = [
+  {
+    Icon: Key,
+    title: 'Tenant QR access',
+    body: 'Each tenant gets a personal QR link. Scan to pay, view history, request maintenance.',
+    photo: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=500&q=80',
+    objectPosition: 'center 40%',
+  },
+  {
+    Icon: Banknote,
+    title: 'Rent collection',
+    body: 'Mobile money payments straight to your ledger. Track paid, partial, and overdue in one view.',
+    photo: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=500&q=80',
+    objectPosition: 'center 30%',
+  },
+  {
+    Icon: Wrench,
+    title: 'Maintenance requests',
+    body: 'Tenants report issues from their phone. You track and close them from the dashboard.',
+    photo: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=500&q=80',
+    objectPosition: 'center 50%',
+  },
+  {
+    Icon: FileText,
+    title: 'Lease management',
+    body: 'Move-in dates, lease terms, renewal notices. Everything in one place.',
+    photo: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=500&q=80',
+    objectPosition: 'center 30%',
+  },
+]
+
+function RentFeatureCards() {
+  const rot = [1.2, -0.8, 0.6, -1.4]
+  return (
+    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+      <h2 style={{
+        textAlign: 'center', fontFamily: FONT, fontWeight: 800, fontSize: 20,
+        letterSpacing: '0.08em', color: C.ink, marginBottom: 30,
+      }}>
+        WHAT'S INCLUDED
+      </h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20 }}>
+        {rentFeatures.map(({ Icon, title, body, photo, objectPosition }, i) => (
+          <div key={title} style={{
+            position: 'relative', background: C.paperLt, borderRadius: 4,
+            padding: '0 20px 22px',
+            boxShadow: '0 14px 30px rgba(38,32,26,0.14)',
+            transform: `rotate(${rot[i]}deg)`,
+          }}>
+            <Zigzag />
+            <div style={{ position: 'relative', margin: '0 -20px', padding: '14px 16px 0', background: `linear-gradient(180deg, ${C.paper} 0%, ${C.paperLt} 100%)` }}>
+              <div style={{
+                position: 'absolute', top: 6, left: '50%',
+                transform: `translateX(-50%) rotate(${rot[i] > 0 ? -5 : 5}deg)`,
+                width: 48, height: 16, background: `${C.stamp}44`,
+                boxShadow: '0 2px 4px rgba(38,32,26,0.12)', zIndex: 2, pointerEvents: 'none',
+              }} />
+              <div style={{
+                position: 'relative', height: 128, overflow: 'hidden', borderRadius: 4,
+                border: `1px solid ${C.spike}40`,
+                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.45), 0 10px 22px rgba(38,32,26,0.16)',
+                background: C.paper,
+              }}>
+                <img src={photo} alt="" loading="lazy" decoding="async" style={{
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  objectPosition, display: 'block',
+                  filter: 'sepia(0.14) contrast(1.06) saturate(1.08)', transform: 'scale(1.02)',
+                }} />
+                <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, rgba(239,230,210,0.05) 0%, rgba(239,230,210,0.55) 88%, rgba(247,241,227,0.95) 100%)` }} />
+              </div>
+            </div>
+            <div style={{ padding: '0 0 4px' }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 8, background: C.paperLt,
+                border: `1.5px solid ${C.stamp}55`, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', marginTop: -22, marginBottom: 14,
+                boxShadow: '0 4px 10px rgba(38,32,26,0.18)', position: 'relative', zIndex: 1,
+              }}>
+                <Icon size={17} color={C.stamp} strokeWidth={2} />
+              </div>
+              <h3 style={{
+                fontFamily: FONT, fontWeight: 800, fontSize: 'clamp(14px, 2vw, 16px)',
+                letterSpacing: '0.02em', color: C.ink, marginBottom: 8, lineHeight: 1.3,
+              }}>
+                {title.toUpperCase()}
+              </h3>
+              <p style={{
+                fontFamily: FONT, fontSize: 'clamp(12px, 1.5vw, 13.5px)', fontWeight: 400,
+                lineHeight: 1.65, color: C.inkSoft, margin: 0,
+              }}>
+                {body}
+              </p>
+            </div>
+            <Zigzag flip />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const rentPhotos = [
+  {
+    url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=500&q=80',
+    caption: 'Units, tracked',
+    rot: -4,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=500&q=80',
+    caption: 'Keys, handed over',
+    rot: 3,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=500&q=80',
+    caption: 'Rent, collected',
+    rot: -2,
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=500&q=80',
+    caption: 'Issues, resolved',
+    rot: 5,
+  },
+]
+
+function RentPhotoStrip() {
+  return (
+    <section style={{ padding: '10px 24px 90px' }}>
+      <div style={{ fontFamily: FONT, fontSize: 11.5, fontWeight: 600, color: C.stamp, letterSpacing: '0.1em', marginBottom: 10, textAlign: 'center' }}>
+        FROM THE PROPERTY
+      </div>
+      <h2 style={{ fontFamily: FONT, fontWeight: 700, fontSize: 'clamp(18px,2.5vw,26px)', letterSpacing: '-0.01em', color: C.inkSoft, margin: '0 0 34px', textAlign: 'center' }}>
+        Real landlords, real tenants
+      </h2>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 28, flexWrap: 'wrap', maxWidth: 1000, margin: '0 auto' }}>
+        {rentPhotos.map((p) => (
+          <Polaroid key={p.caption} {...p} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------
    Steps
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const steps = [
   {
     n: '01',
-    title: 'Build your catalog',
-    body: 'Items, prices, photos. Save and it’s live.',
+    title: 'Set up your space',
+    body: 'Restaurant catalog, event tiers, or rental units — configure once and go live instantly.',
   },
   {
     n: '02',
-    title: 'Share your QR',
-    body: 'On the table. Customers scan and order.',
+    title: 'Share one QR code',
+    body: 'Guests order from the table. Fans buy tickets at the gate. Tenants pay rent from their phone.',
   },
   {
     n: '03',
-    title: 'Run the counter',
-    body: 'Tickets print in. Mark ready, mark paid.',
+    title: 'Run everything live',
+    body: 'One dashboard covers orders, ticket sales, and rent collection — all in real time.',
   },
 ]
 
@@ -1061,9 +1332,9 @@ function TicketStack() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Features
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const topFeatures = [
   {
@@ -1076,7 +1347,7 @@ const topFeatures = [
   {
     Icon: ClipboardList,
     title: 'Live order dashboard',
-    body: 'Orders land in real time — pending to ready in a tap.',
+    body: 'Orders land in real time � pending to ready in a tap.',
     photo: '/features/dashboard.jpg',
     objectPosition: 'center top',
   },
@@ -1273,18 +1544,22 @@ function FeatureCards() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Venues
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const venues = [
   { name: 'Serena Hotel', city: 'Kampala' },
+  { name: 'Riverside Sessions', city: 'Jinja' },
+  { name: 'Sunset Court Apartments', city: 'Kampala' },
   { name: 'Cafe Javas', city: 'Kampala' },
-  { name: 'Speke Resort Munyonyo', city: 'Kampala' },
-  { name: 'Sheraton Kampala', city: 'Kampala' },
+  { name: 'Neon Garden Rave', city: 'Kampala' },
+  { name: 'Hillview Residences', city: 'Entebbe' },
   { name: 'Source of the Nile Grill', city: 'Jinja' },
-  { name: 'Lake Victoria Serena', city: 'Entebbe' },
+  { name: 'Lake Breeze Brunch', city: 'Entebbe' },
   { name: 'Igongo Cultural Centre', city: 'Mbarara' },
+  { name: 'Green Valley Estates', city: 'Mbarara' },
+  { name: 'Afrobeats Friday', city: 'Kampala' },
   { name: 'Acholi Inn', city: 'Gulu' },
 ]
 
@@ -1337,7 +1612,7 @@ function Manifest() {
               {v.name}
             </span>
 
-            <span>· {v.city.toUpperCase()}</span>
+            <span>� {v.city.toUpperCase()}</span>
           </div>
         ))}
       </div>
@@ -1345,13 +1620,13 @@ function Manifest() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Photo strip — real photographs, taped in like proofs pinned to
+/* -------------------------------------------------------------
+   Photo strip � real photographs, taped in like proofs pinned to
    a corkboard above the counter. This is the one place real
    photography enters an otherwise illustrated page, so it's kept
    small, tactile, and framed like physical prints rather than a
    generic hero image or stock-photo banner.
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
 const galleryPhotos = [
   {
@@ -1492,13 +1767,13 @@ function PhotoStrip() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------
    Main
-   ───────────────────────────────────────────────────────────── */
+   ------------------------------------------------------------- */
 
-/* ─────────────────────────────────────────────────────────────
-   Shared "Get Started" button — matches the header stamp style
-   ───────────────────────────────────────────────────────────── */
+/* -------------------------------------------------------------
+   Shared "Get Started" button � matches the header stamp style
+   ------------------------------------------------------------- */
 
 function GetStartedButton({ onClick }: { onClick?: () => void }) {
   return (
@@ -1536,9 +1811,9 @@ export default function KodteLandingTicket({
   onOpenRentManager,
 }: KodteLandingTicketProps = {}) {
   usePageMeta({
-    title: 'Koddly — Scan, order and pay',
+    title: 'Koddly — QR ordering, tickets & rent',
     description:
-      'One QR code lets customers scan, order, and pay from their phone. Sell event tickets at the gate. Built for restaurants, bars, and venues across Uganda.',
+      'One QR code for restaurants, event organisers, and landlords. Scan to order, buy tickets, or pay rent — all from one live dashboard.',
     canonicalPath: '/',
     suppressSuffix: true,
   })
@@ -1642,7 +1917,7 @@ export default function KodteLandingTicket({
           transform: rotate(-2deg) scale(1.03);
         }
 
-        /* ── Ticket section two-col on wide screens ── */
+        /* -- Ticket section two-col on wide screens -- */
         .kodte-ticket-section {
           padding: 20px 24px 90px;
           text-align: center;
@@ -1768,6 +2043,16 @@ export default function KodteLandingTicket({
         @media (max-width: 420px) {
           .kodte-footer-grid {
             grid-template-columns: 1fr;
+          }
+        }
+
+        .kodte-rent-hero {
+          flex-direction: row;
+        }
+        @media (max-width: 760px) {
+          .kodte-rent-hero {
+            flex-direction: column;
+            align-items: center;
           }
         }
       `}</style>
@@ -1926,7 +2211,7 @@ export default function KodteLandingTicket({
                   transform: 'rotate(-2deg)',
                 }}
               >
-                Restaurants &amp; Hotels
+                Restaurants &amp; Bars
               </button>
             </div>
           </div>
@@ -1940,7 +2225,7 @@ export default function KodteLandingTicket({
             overflow: 'hidden',
           }}
         >
-          {/* Backdrop photo — a real counter, faded under a paper wash
+          {/* Backdrop photo � a real counter, faded under a paper wash
               so the illustration reads as printed on top of it rather
               than a photo competing with the ticket graphics. */}
           <div
@@ -1964,7 +2249,7 @@ export default function KodteLandingTicket({
               }}
             />
 
-            {/* paper-toned scrim — readable text on the left, photo visible on the right */}
+            {/* paper-toned scrim � readable text on the left, photo visible on the right */}
             <div
               style={{
                 position: 'absolute',
@@ -2023,9 +2308,7 @@ export default function KodteLandingTicket({
                   opacity: 1,
                 }}
               >
-                Gone are the days of paper menus, long queues, and chasing payments at
-                the till. One QR code lets your guests scan, order, and pay from their
-                phone — while you run everything from one live dashboard.
+                One platform, one QR code — restaurants take orders, event organisers sell tickets at the gate, and landlords collect rent. Everything runs from one live dashboard.
               </p>
 
               <div
@@ -2050,6 +2333,149 @@ export default function KodteLandingTicket({
 
         <Manifest />
 
+        {/* THREE MODULES */}
+        <section
+          style={{
+            padding: '72px 24px 56px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT,
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: C.stamp,
+              letterSpacing: '0.1em',
+              marginBottom: 10,
+            }}
+          >
+            ONE PLATFORM
+          </div>
+          <h2
+            style={{
+              fontFamily: FONT,
+              fontWeight: 800,
+              fontSize: 'clamp(18px,2.8vw,30px)',
+              letterSpacing: '-0.02em',
+              color: C.ink,
+              margin: '0 0 14px',
+            }}
+          >
+            Everything runs on one QR code
+          </h2>
+          <p
+            style={{
+              fontFamily: FONT,
+              fontSize: 13.5,
+              fontWeight: 400,
+              lineHeight: 1.7,
+              color: C.inkSoft,
+              maxWidth: 520,
+              margin: '0 auto 48px',
+            }}
+          >
+            Koddly is built around a single mechanic — scan a QR, get things done. We've applied that to three operations that still run on paper and chasing.
+          </p>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: 20,
+              maxWidth: 880,
+              margin: '0 auto',
+            }}
+          >
+            {([
+              {
+                Icon: UtensilsCrossed,
+                label: 'RESTAURANTS & BARS',
+                headline: 'QR Ordering',
+                body: 'Guests scan, order, and pay from their phone. Orders land on the kitchen dashboard instantly. No app download needed.',
+                rot: -1.2,
+              },
+              {
+                Icon: Ticket,
+                label: 'EVENT ORGANISERS',
+                headline: 'Ticket Sales & Gate Scanning',
+                body: 'Sell tiered tickets online, scan QR codes at the gate, and watch live attendance counts from any device.',
+                rot: 0.8,
+              },
+              {
+                Icon: Building2,
+                label: 'LANDLORDS & PROPERTY MANAGERS',
+                headline: 'Rent Collection',
+                body: 'Tenants scan a QR code per unit to pay rent by mobile money. Track paid, partial, and overdue across all units.',
+                rot: -0.5,
+              },
+            ] as const).map(({ Icon, label, headline, body, rot }) => (
+              <div
+                key={label}
+                style={{
+                  background: C.paperLt,
+                  borderRadius: 4,
+                  padding: '24px 22px 26px',
+                  boxShadow: '0 14px 30px rgba(38,32,26,0.14)',
+                  transform: `rotate(${rot}deg)`,
+                  fontFamily: FONT,
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 10,
+                    background: C.paperLt,
+                    border: `1.5px solid ${C.stamp}55`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                    boxShadow: '0 4px 10px rgba(38,32,26,0.14)',
+                  }}
+                >
+                  <Icon size={20} color={C.stamp} strokeWidth={1.8} />
+                </div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    color: C.stamp,
+                    marginBottom: 8,
+                  }}
+                >
+                  {label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: C.ink,
+                    marginBottom: 10,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {headline}
+                </div>
+                <p
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 400,
+                    lineHeight: 1.65,
+                    color: C.inkSoft,
+                    margin: 0,
+                  }}
+                >
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* STEPS */}
         <section
           style={{
@@ -2067,7 +2493,7 @@ export default function KodteLandingTicket({
               marginBottom: 10,
             }}
           >
-            THE SPIKE
+            HOW IT WORKS
           </div>
 
           <h2
@@ -2080,13 +2506,13 @@ export default function KodteLandingTicket({
               margin: '0 0 8px',
             }}
           >
-            Three tickets to live
+            Three steps to your first scan
           </h2>
 
           <TicketStack />
         </section>
 
-        {/* PHOTO STRIP — real photography, taped in like counter proofs */}
+        {/* PHOTO STRIP � real photography, taped in like counter proofs */}
         <PhotoStrip />
 
         {/* EVENT TICKETING */}
@@ -2132,7 +2558,7 @@ export default function KodteLandingTicket({
               margin: '0 auto 28px',
             }}
           >
-            Same platform, same QR — sell tickets, scan at the gate, watch sales live.
+            Same platform, same QR � sell tickets, scan at the gate, watch sales live.
           </p>
           </div>
 
@@ -2149,6 +2575,70 @@ export default function KodteLandingTicket({
         >
           <FeatureCards />
         </section>
+
+        {/* PROPERTY MANAGEMENT */}
+        <section
+          style={{
+            padding: '80px 24px 0',
+            borderTop: `1px dashed ${C.ink}44`,
+          }}
+        >
+          {/* Eyebrow + headline */}
+          <div style={{ textAlign: 'center', marginBottom: 50 }}>
+            <div style={{ fontFamily: FONT, fontSize: 11.5, fontWeight: 600, color: C.stamp, letterSpacing: '0.1em', marginBottom: 10 }}>
+              ALSO ON KODDLY
+            </div>
+            <h2 style={{ fontFamily: FONT, fontWeight: 800, fontSize: 'clamp(18px,2.5vw,26px)', letterSpacing: '-0.01em', color: C.ink, margin: '0 0 16px', lineHeight: 1.05 }}>
+              PROPERTY MANAGEMENT
+            </h2>
+            <p style={{ fontFamily: FONT, fontSize: 14, fontWeight: 400, lineHeight: 1.7, color: C.inkSoft, maxWidth: 480, margin: '0 auto' }}>
+              Collect rent, manage leases, handle maintenance requests � all from one dashboard. Tenants scan a QR to pay and report issues from their phone.
+            </p>
+          </div>
+
+          {/* Ledger scene + callout side by side on wide, stacked on mobile */}
+          <div
+            className="kodte-rent-hero"
+            style={{ maxWidth: 1040, margin: '0 auto 70px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(24px, 5vw, 60px)', flexWrap: 'wrap' }}
+          >
+            <div style={{ flexShrink: 0 }}>
+              <RentLedger />
+            </div>
+
+            {/* Three benefit tickets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 320 }}>
+              {[
+                { n: '01', title: 'Add your property', body: 'Units, monthly amounts, grace periods. Set up in minutes.' },
+                { n: '02', title: 'QR codes per unit', body: 'Print a QR code for every unit. Tenants scan it to pay rent straight from their phone.' },
+                { n: '03', title: 'Track everything', body: 'Paid, overdue, partial � live. Reminders go out automatically.' },
+              ].map((s, i) => (
+                <div key={s.n} style={{
+                  background: C.paperLt,
+                  borderRadius: 2,
+                  padding: '14px 18px 16px',
+                  transform: `rotate(${[-1.5, 1, -0.5][i]}deg)`,
+                  boxShadow: '0 10px 24px rgba(38,32,26,0.14)',
+                  fontFamily: FONT,
+                }}>
+                  <PunchHoles />
+                  <div style={{ fontWeight: 800, fontSize: 24, color: `${C.ink}33`, marginTop: 8 }}>{s.n}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, margin: '4px 0 6px' }}>{s.title}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 400, lineHeight: 1.6, color: C.inkSoft }}>{s.body}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* PROPERTY FEATURE CARDS */}
+        <section style={{ padding: '0 24px 90px' }}>
+          <RentFeatureCards />
+        </section>
+
+        {/* PROPERTY PHOTO STRIP */}
+        <RentPhotoStrip />
+
+
 
         {/* CTA */}
         <section
@@ -2194,7 +2684,7 @@ export default function KodteLandingTicket({
                   margin: '0 0 14px',
                 }}
               >
-                READY TO OPEN THE COUNTER?
+                READY TO GO LIVE?
               </h2>
 
               <p
@@ -2207,8 +2697,7 @@ export default function KodteLandingTicket({
                   margin: '0 0 28px',
                 }}
               >
-                Menus or tickets — five minutes to your
-                first scan. No card, no install.
+                Orders, tickets, or rent — five minutes to your first scan. No card, no install.
               </p>
 
               <GetStartedButton onClick={onGetStarted} />
@@ -2288,6 +2777,7 @@ export default function KodteLandingTicket({
                   'QR Menus',
                   'Order Dashboard',
                   'Event Ticketing',
+                  'Property Management',
                   'Payments',
                 ].map((l) => (
                   <button
@@ -2411,7 +2901,7 @@ export default function KodteLandingTicket({
               }}
             >
               <span>
-                © {new Date().getFullYear()} Qbilabs SMC.
+                � {new Date().getFullYear()} Qbilabs SMC.
                 All rights reserved.
               </span>
             </div>

@@ -49,9 +49,24 @@ export default function TenantHome({
 
   const totalDays = Math.max(1, diffDays(start, end))
   const elapsed = Math.min(totalDays, Math.max(0, diffDays(start, today)))
-  const remaining = ctx.daysRemaining ?? diffDays(today, end)
+
+  // Use backend-computed daysRemaining when available (it uses the property timezone
+  // and grace-period days). Fall back to a local diff only when not provided.
+  // For a PAID charge the ring shows "all paid" regardless, so daysRemaining is only
+  // used for the countdown display on unpaid/partial charges.
+  const remaining = ctx.daysRemaining != null
+    ? ctx.daysRemaining
+    : ctx.dueDate
+      ? diffDays(today, startOfDay(new Date(ctx.dueDate)))
+      : diffDays(today, end)
+
   const overdue = remaining < 0
   const isPaid = statusKey === 'paid'
+
+  // When a unit has a tenant but no charge has been generated yet (balance = null / 0
+  // and status is not explicitly set), don't show an alarming "X days left" countdown.
+  const hasNoCharge = ctx.totalRent == null || (ctx.balance === 0 && ctx.paidAmount === 0 && !ctx.chargeStatus)
+  const effectiveRemaining = hasNoCharge ? null : remaining
 
   // ── Month title: "Month X of Y" when lease info is available ──────────────
   const monthNo = ctx.tenancyStart ? monthsBetween(new Date(ctx.tenancyStart), start) + 1 : null
@@ -70,8 +85,8 @@ export default function TenantHome({
 
   // ── Ring ─────────────────────────────────────────────────────────────────
   const R = 54, C = 2 * Math.PI * R
-  const ringPct = isPaid ? 1 : overdue ? 1 : elapsed / totalDays
-  const tone = isPaid ? 'ok' : overdue ? 'bad' : remaining <= 3 ? 'warn' : 'calm'
+  const ringPct = isPaid ? 1 : (effectiveRemaining == null ? 0.5 : overdue ? 1 : elapsed / totalDays)
+  const tone = isPaid ? 'ok' : (effectiveRemaining == null ? 'calm' : overdue ? 'bad' : effectiveRemaining <= 3 ? 'warn' : 'calm')
 
   // ── Calendar ─────────────────────────────────────────────────────────────
   const [offset, setOffset] = useState(0)
@@ -97,7 +112,15 @@ export default function TenantHome({
           <div
             className="th-ring"
             role="img"
-            aria-label={overdue ? `${Math.abs(remaining)} days overdue` : `${remaining} days remaining`}
+            aria-label={
+              isPaid
+                ? 'Rent fully paid'
+                : effectiveRemaining == null
+                  ? 'Active tenancy'
+                  : overdue
+                    ? `${Math.abs(effectiveRemaining)} days overdue`
+                    : `${effectiveRemaining} days remaining`
+            }
           >
             <svg viewBox="0 0 128 128">
               <circle className="th-ring-bg" cx="64" cy="64" r={R} />
@@ -110,8 +133,20 @@ export default function TenantHome({
             <div className="th-ring-label">
               {isPaid
                 ? <strong>✓</strong>
-                : <strong>{Math.abs(remaining)}</strong>}
-              <span>{isPaid ? 'all paid' : overdue ? 'days overdue' : remaining === 1 ? 'day left' : 'days left'}</span>
+                : effectiveRemaining == null
+                  ? <strong>—</strong>
+                  : <strong>{Math.abs(effectiveRemaining)}</strong>}
+              <span>
+                {isPaid
+                  ? 'all paid'
+                  : effectiveRemaining == null
+                    ? 'active'
+                    : overdue
+                      ? 'days overdue'
+                      : effectiveRemaining === 1
+                        ? 'day left'
+                        : 'days left'}
+              </span>
             </div>
           </div>
 
@@ -178,7 +213,9 @@ export default function TenantHome({
           {cells.map((d, i) => {
             if (!d) return <span key={i} />
             const inCycle = diffDays(start, d) >= 0 && diffDays(d, end) >= 0
-            const past = inCycle && diffDays(d, today) > 0
+            // For paid tenants every day in the cycle is "covered"; for others
+            // only elapsed days (up to today) are "past" (shaded as covered).
+            const past = inCycle && (isPaid ? true : diffDays(d, today) > 0)
             const cls = [
               'th-day',
               inCycle && 'in',
@@ -226,6 +263,57 @@ export default function TenantHome({
           )}
         </section>
       )}
+
+      {/* ── Tenancy info card ── */}
+      <section className="th-info-card">
+        {ctx.unitNumber && (
+          <div className="th-info-row">
+            <span className="th-info-label">Unit</span>
+            <span className="th-info-val">{ctx.unitNumber}</span>
+          </div>
+        )}
+        {ctx.tenancyStart && (
+          <div className="th-info-row">
+            <span className="th-info-label">Move-in date</span>
+            <span className="th-info-val">{fmt(new Date(ctx.tenancyStart), { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+        )}
+        {ctx.totalRent != null && ctx.totalRent > 0 && (
+          <div className="th-info-row">
+            <span className="th-info-label">Monthly rent</span>
+            <span className="th-info-val th-info-val--strong">{money(ctx.totalRent, ctx.currency)}</span>
+          </div>
+        )}
+        {ctx.dueDate && (
+          <div className="th-info-row">
+            <span className="th-info-label">Next due</span>
+            <span className={`th-info-val${effectiveRemaining != null && effectiveRemaining <= 5 && !isPaid ? ' th-info-val--warn' : ''}`}>
+              {fmt(new Date(ctx.dueDate), { day: 'numeric', month: 'short', year: 'numeric' })}
+              {effectiveRemaining != null && !isPaid && (
+                <span className="th-info-due-badge">
+                  {effectiveRemaining < 0
+                    ? `${Math.abs(effectiveRemaining)}d overdue`
+                    : effectiveRemaining === 0
+                      ? 'due today'
+                      : `in ${effectiveRemaining}d`}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+        {ctx.leaseEnd && (
+          <div className="th-info-row">
+            <span className="th-info-label">Lease end</span>
+            <span className="th-info-val">{fmt(new Date(ctx.leaseEnd), { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+        )}
+        {ctx.propertyName && (
+          <div className="th-info-row">
+            <span className="th-info-label">Property</span>
+            <span className="th-info-val">{ctx.propertyName}</span>
+          </div>
+        )}
+      </section>
 
       {receiptsSlot}
     </div>

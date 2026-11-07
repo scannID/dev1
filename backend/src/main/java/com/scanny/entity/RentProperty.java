@@ -74,6 +74,51 @@ public class RentProperty {
     @Column(name = "partial_payment_allowed", nullable = false)
     private boolean partialPaymentAllowed = true;
 
+    // ── Late fee ──────────────────────────────────────────────────────────────
+
+    /**
+     * Type of late fee applied when a charge becomes OVERDUE.
+     * {@code "NONE"} = no late fee (default).
+     * {@code "FLAT"} = a fixed amount in the property's currency.
+     * {@code "PERCENT"} = a percentage of the charge amount.
+     */
+    @Column(name = "late_fee_type", nullable = false, length = 16)
+    private String lateFeeType = "NONE";
+
+    /**
+     * Late fee value.
+     * When {@code lateFeeType = "FLAT"}: whole-number amount in the property's currency.
+     * When {@code lateFeeType = "PERCENT"}: percentage × 100 (so 500 = 5.00%).
+     * Ignored when {@code lateFeeType = "NONE"}.
+     */
+    @Column(name = "late_fee_amount", nullable = false)
+    private long lateFeeAmount = 0;
+
+    // ── Platform fee ──────────────────────────────────────────────────────────
+
+    /**
+     * Platform fee added on top of the tenant's payment.
+     * The platform-level default (set in admin console) is used when this is 0.
+     * A positive value overrides the platform default for this specific property.
+     * Stored as whole-number UGX.
+     */
+    @Column(name = "platform_fee_override", nullable = false)
+    private long platformFeeOverride = 0;
+
+    /**
+     * Default grace period in days after the due date before a charge can be
+     * marked overdue. Individual units can override this via {@code RentUnit.gracePeriodDays}.
+     */
+    @Column(name = "grace_period_days", nullable = false)
+    private int gracePeriodDays = 0;
+
+    /**
+     * Total days after the due date before the system marks a charge OVERDUE
+     * and applies late fees. 0 = use system default (7 days).
+     */
+    @Column(name = "overdue_after_days", nullable = false)
+    private int overdueAfterDays = 0;
+
     /**
      * Minimum partial payment amount in the property's currency minor units.
      * Only enforced when {@code partialPaymentAllowed} is {@code true}.
@@ -146,6 +191,21 @@ public class RentProperty {
     public List<RentPropertyAccess> getAccessList()          { return accessList; }
     public void setAccessList(List<RentPropertyAccess> al)   { this.accessList = al; }
 
+    public String getLateFeeType()               { return lateFeeType != null ? lateFeeType : "NONE"; }
+    public void setLateFeeType(String t)         { this.lateFeeType = (t != null && !t.isBlank()) ? t.toUpperCase() : "NONE"; }
+
+    public long getLateFeeAmount()               { return lateFeeAmount; }
+    public void setLateFeeAmount(long a)         { this.lateFeeAmount = Math.max(0, a); }
+
+    public long getPlatformFeeOverride()         { return platformFeeOverride; }
+    public void setPlatformFeeOverride(long f)   { this.platformFeeOverride = Math.max(0, f); }
+
+    public int getGracePeriodDays()              { return gracePeriodDays; }
+    public void setGracePeriodDays(int d)        { this.gracePeriodDays = Math.max(0, d); }
+
+    public int getOverdueAfterDays()             { return overdueAfterDays; }
+    public void setOverdueAfterDays(int d)       { this.overdueAfterDays = Math.max(0, d); }
+
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }
 
@@ -154,4 +214,18 @@ public class RentProperty {
 
     public Instant getUpdatedAt()                { return updatedAt; }
     public void setUpdatedAt(Instant t)          { this.updatedAt = t; }
+
+    /**
+     * Computes the late fee amount to add when a charge becomes OVERDUE.
+     * Returns 0 if no late fee is configured.
+     *
+     * @param chargeAmount the original charge amount (used for PERCENT calculation)
+     */
+    public long computeLateFee(long chargeAmount) {
+        return switch (getLateFeeType()) {
+            case "FLAT"    -> lateFeeAmount;
+            case "PERCENT" -> Math.round(chargeAmount * lateFeeAmount / 10000.0); // lateFeeAmount is pct × 100
+            default        -> 0L;
+        };
+    }
 }
