@@ -10,6 +10,7 @@ import {
   QrCode,
   Copy,
   ArrowLeft,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,6 +70,7 @@ export default function RentPropertiesPage() {
   const [detail, setDetail]             = useState<AdminPropertyDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailTab, setDetailTab]       = useState<'units' | 'config' | 'info'>('units')
+  const [refreshTrigger, setRefreshTrigger] = useState(0) // For manual refresh
 
   // ── Fee edit ──────────────────────────────────────────────────────────────
   const [editingFees, setEditingFees]   = useState(false)
@@ -125,7 +127,7 @@ export default function RentPropertiesPage() {
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Failed to load property'))
       .finally(() => setDetailLoading(false))
-  }, [selectedId])
+  }, [selectedId, refreshTrigger]) // Added refreshTrigger dependency
 
   // ── Save fees ─────────────────────────────────────────────────────────────
   async function saveFees() {
@@ -190,6 +192,16 @@ export default function RentPropertiesPage() {
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>
                 {detail.property.name}
               </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setRefreshTrigger(t => t + 1)}
+                disabled={detailLoading}
+              >
+                <RefreshCw size={13} className={detailLoading ? 'animate-spin' : ''} />
+                {detailLoading ? 'Refreshing...' : 'Refresh'}
+              </Button>
             </div>
 
             {/* ── Tabs ── */}
@@ -198,7 +210,13 @@ export default function RentPropertiesPage() {
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setDetailTab(tab)}
+                  onClick={() => {
+                    setDetailTab(tab)
+                    // Auto-refresh when switching to units tab to show latest tenant assignments
+                    if (tab === 'units') {
+                      setRefreshTrigger(t => t + 1)
+                    }
+                  }}
                   style={{
                     padding: '8px 16px', fontSize: 13, fontWeight: 600, background: 'none', border: 'none',
                     borderBottom: detailTab === tab ? '2px solid var(--primary)' : '2px solid transparent',

@@ -194,23 +194,27 @@ public class QrCodeService {
     }
 
     /**
-     * Generate a unique QR token in-app so H2 and Postgres both work.
-     * Format matches the Postgres helper: QR-{12 hex}-{epoch seconds}
+     * Generate a cryptographically secure QR token with 256 bits of entropy.
+     * Format: QR-{43 characters of URL-safe Base64}
+     * Example: QR-8fK3mN9pL2dQ7xR4vT6wY1sZ5cA0hJ8bE4gU7iO9kXy
+     * 
+     * Security improvements:
+     * - 32 bytes (256 bits) of randomness (was 48 bits)
+     * - No timestamp exposure (was leaking generation time)
+     * - URL-safe Base64 encoding
+     * - Cryptographically secure random generator
      */
     private String generateUniqueToken() {
         SecureRandom random = new SecureRandom();
         for (int attempt = 0; attempt < 20; attempt++) {
-            byte[] bytes = new byte[6];
+            byte[] bytes = new byte[32];  // 256 bits
             random.nextBytes(bytes);
-            String token = "QR-"
-                    + HexFormat.of().withUpperCase().formatHex(bytes)
-                    + "-"
-                    + Instant.now().getEpochSecond();
+            String token = "QR-" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
             if (!merchantRepository.findByQrCodeToken(token).isPresent()) {
                 return token;
             }
         }
-        throw new ApiException(500, "Failed to generate QR token");
+        throw new ApiException(500, "Failed to generate QR token after 20 attempts");
     }
 
     /**

@@ -1,11 +1,13 @@
 ﻿import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { Building2, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, FileText, Home, LayoutGrid, LogOut, Maximize2, Menu, Minimize2, Moon, Plus, Search, SlidersHorizontal, Sun, Users, Wallet, Wrench, X } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { rentDashboardApi } from './api'
 import { logoutRentManager } from '../keycloak'
 import { applyDarkMode, persistDarkMode, readDarkMode } from '../lib/theme'
 import { usePagination } from '../hooks/usePagination'
 import { PaginationBar } from '../components/PaginationBar'
+import { DanceLoader } from '../components/DanceLoader'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import type {
   PortfolioEntry,
@@ -383,7 +385,7 @@ function UnitRow({
 
 // ── PropertyView (full management screen, opened from the Units tab) ──────────
 
-function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: string; onBack: () => void }) {
+function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId: string; role: string; onBack: () => void; onDataChanged?: () => void }) {
   const canManage = role === 'MANAGER' || role === 'OWNER_MANAGER'
 
   const [dashboard, setDashboard] = useState<PropertyDashboard | null>(null)
@@ -507,6 +509,7 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
     try {
       await rentDashboardApi.generateCharges(propertyId, { periodLabel: period })
       await load()
+      if (onDataChanged) onDataChanged()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate charges')
     }
@@ -516,6 +519,7 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
     try {
       await rentDashboardApi.generateChargeForUnit(propertyId, unitId, { periodLabel: period })
       await load()
+      if (onDataChanged) onDataChanged()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate charge')
     }
@@ -583,6 +587,8 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
       setAddUnitGrace('0')
       setShowAddUnit(false)
       await load()
+      // Notify parent to refresh overview
+      if (onDataChanged) onDataChanged()
       // Immediately show the unit QR that was generated on create
       if (created?.qrCodeUrl) setActiveQrUnit(created)
     } catch (err) {
@@ -624,6 +630,8 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
       })
       setEditUnit(null)
       await load()
+      // Notify parent to refresh overview
+      if (onDataChanged) onDataChanged()
     } catch (err) {
       setEditUnitError(err instanceof Error ? err.message : 'Could not save unit')
     } finally {
@@ -659,8 +667,12 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
         moveInDate: tenantMoveIn || undefined,
         leaseEnd: tenantLeaseEnd || undefined,
       })
-      setManageTenantUnit(null)
+      // Reload data FIRST to fetch the newly added tenant
       await load()
+      // Notify parent to refresh overview
+      if (onDataChanged) onDataChanged()
+      // THEN close the modal so user sees the updated state
+      setManageTenantUnit(null)
     } catch (err) {
       setTenantOpError(err instanceof Error ? err.message : 'Could not add tenant')
     } finally {
@@ -689,6 +701,7 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
       })
       setTenantPanel('view')
       await load()
+      if (onDataChanged) onDataChanged()
     } catch (err) {
       setTenantOpError(err instanceof Error ? err.message : 'Could not update tenant')
     } finally {
@@ -703,6 +716,7 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
       await rentDashboardApi.deactivateTenant(propertyId, unitId, tenantId)
       setManageTenantUnit(null)
       await load()
+      if (onDataChanged) onDataChanged()
     } catch (err) {
       setTenantOpError(err instanceof Error ? err.message : 'Could not deactivate tenant')
     } finally {
@@ -780,7 +794,9 @@ function PropertyView({ propertyId, role, onBack }: { propertyId: string; role: 
         <button type="button" onClick={onBack} className="scanny-back">
           ← Portfolio
         </button>
-        <p style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading property…</p>
+        <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+          <DanceLoader label="Opening property…" size={100} />
+        </div>
       </div>
     )
   }
@@ -2083,7 +2099,11 @@ function MaintenanceTab({ allDashboards }: { allDashboards: PropertyDashboard[] 
     try { return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) } catch { return iso }
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-foreground)' }}>Loading…</div>
+  if (loading) return (
+    <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+      <DanceLoader label="Loading maintenance requests…" size={100} />
+    </div>
+  )
 
   if (allRequests.length === 0) {
     return (
@@ -2194,6 +2214,8 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // Fullscreen properties list pagination
   const [matrixFsPage, setMatrixFsPage] = useState(0)
   const [matrixFsPageSize, setMatrixFsPageSize] = useState(8)
+  // Rent Roll donut chart hover state
+  const [rentRollHoveredIdx, setRentRollHoveredIdx] = useState<number | null>(null)
 
   // Apply dark mode class whenever it changes
   useEffect(() => { applyDarkMode(darkMode) }, [darkMode])
@@ -2273,7 +2295,8 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
           next[idx] = d
           return next
         }
-        return prev
+        // Add new dashboard if not found
+        return [...prev, d]
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load property overview')
@@ -2525,11 +2548,12 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
             title={darkMode ? 'Switch to light mode (D)' : 'Switch to dark mode (D)'}
             onClick={() => setDarkMode((prev) => { persistDarkMode(!prev); return !prev })}
             style={{
-              flex: collapsed ? undefined : '0 0 auto',
+              flex: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '9px 0',
+              gap: collapsed ? 0 : 7,
+              padding: '14px 0',
               background: darkMode ? 'var(--sidebar-accent)' : 'transparent',
               color: 'var(--sidebar-foreground)',
               border: 'none',
@@ -2537,9 +2561,12 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               borderBottom: collapsed ? '1px solid var(--sidebar-border)' : 'none',
               cursor: 'pointer',
               fontFamily: 'inherit',
+              fontSize: 13,
+              fontWeight: 700,
             }}
           >
-            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            {!collapsed && (darkMode ? ' Light' : ' Dark')}
           </button>
           <button
             type="button"
@@ -2547,11 +2574,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
             onClick={() => setShowLogoutConfirm(true)}
             style={{
               flex: 1,
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: collapsed ? 0 : 7,
-              padding: '9px 0',
+              padding: '14px 0',
               background: 'transparent',
               color: 'var(--sidebar-foreground)',
               border: 'none',
@@ -2561,7 +2588,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               fontWeight: 700,
             }}
           >
-            <LogOut size={14} />{!collapsed && ' Log out'}
+            <LogOut size={16} />{!collapsed && ' Log out'}
           </button>
         </div>
       </div>
@@ -2571,7 +2598,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // ── Overview rendering ──────────────────────────────────────────────────
 
   function renderOverview() {
-    if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-foreground)' }}>Loading…</div>
+    if (loading) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading your portfolio…" size={100} />
+      </div>
+    )
     if (error && !dashboard) return <p className="scanny-error" style={{ padding: 20 }}>{error}</p>
     if (!activePropId || portfolio.length === 0) {
       return (
@@ -2584,7 +2615,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
         </div>
       )
     }
-    if (dashLoading && !dashboard) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-foreground)' }}>Loading overview…</div>
+    if (dashLoading && !dashboard) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading overview…" size={100} />
+      </div>
+    )
     if (!dashboard) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted-foreground)' }}>No data.</div>
 
     const d = dashboard
@@ -2608,7 +2643,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
         const days = daysUntil(t.leaseEnd); return days != null && days >= 0 && days <= 60
       }).map((r) => ({ ...r, propId: pd.property.id, propName: pd.property.name, propCur: pd.property.currency }))
     )
-    const attentionCount = overdueItems.length + leaseExpiryItems.length
+    const attentionCount = overdueItems.length
     const dashboardsToSearch = allDashboards.length > 0 ? allDashboards : [d]
     const selectedDash = dashboardsToSearch.find((pd) => pd.units.some((r) => r.unit.id === selectedUnitId)) ?? null
     const selectedRow = selectedDash?.units.find((r) => r.unit.id === selectedUnitId) ?? null
@@ -2786,74 +2821,352 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
         </div>
 
         {/* ── Stat cards ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          {/* Occupancy */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          {/* Gross Scheduled Rent */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)' }}>Occupancy Rate</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gross Scheduled Rent</span>
+              <DollarSign size={14} color="var(--muted-foreground)" />
+            </div>
+            <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{money(expected, currency)}</p>
+            <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 11 }}>
+              <div>
+                <p style={{ margin: 0, color: 'var(--muted-foreground)', fontSize: 10 }}>Collected</p>
+                <p style={{ margin: 0, fontWeight: 700, color: 'var(--primary)' }}>{money(collected, currency)}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, color: 'var(--muted-foreground)', fontSize: 10 }}>Outstanding</p>
+                <p style={{ margin: 0, fontWeight: 700 }}>{money(expected - collected, currency)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Occupancy Performance */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Occupancy Performance</span>
               <Home size={14} color="var(--muted-foreground)" />
             </div>
             <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{occupancyPct}%</p>
-            <p style={{ margin: '4px 0 6px', fontSize: 11, color: 'var(--muted-foreground)' }}>{occupiedUnitsAll}/{totalUnitsAll} Units</p>
-            <div style={{ height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{ height: 6, borderRadius: 99, background: 'var(--border)', overflow: 'hidden', margin: '8px 0' }}>
               <div style={{ height: '100%', width: `${occupancyPct}%`, background: 'var(--primary)', borderRadius: 99 }} />
             </div>
-            <p style={{ margin: '4px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>
-              {allD.map((pd) => `${pd.property.name.split(' ')[0]}: ${pd.totalUnits > 0 ? Math.round((pd.occupiedUnits/pd.totalUnits)*100) : 0}%`).join(' · ')}
-            </p>
-          </div>
-
-          {/* Rent collected */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)' }}>Rent Collected</span>
-              <DollarSign size={14} color="var(--muted-foreground)" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted-foreground)' }}>
+              <span>{occupiedUnitsAll} Leased</span>
+              <span>|</span>
+              <span>1 Notice</span>
+              <span>|</span>
+              <span>{vacantAll} Vacant</span>
             </div>
-            <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{money(collected, currency)}</p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>Expected: {money(expected, currency)}</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>Due {now.toLocaleDateString([], { month: 'short', day: 'numeric' })}</p>
           </div>
 
-          {/* Overdue */}
-          <div style={{ background: 'var(--card)', border: `1px solid ${overdueAmount > 0 ? 'oklch(0.55 0.18 30 / 50%)' : 'var(--border)'}`, borderRadius: 12, padding: '18px 20px' }}>
+          {/* Arrears & Delinquency */}
+          <div style={{ background: 'var(--card)', border: `1px solid ${overdueAmount > 0 ? 'oklch(0.55 0.18 30 / 0.5)' : 'var(--border)'}`, borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)' }}>Overdue / Arrears</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Arrears & Delinquency</span>
               <AlertTriangle size={14} color={overdueAmount > 0 ? 'oklch(0.55 0.18 30)' : 'var(--muted-foreground)'} />
             </div>
             <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', color: overdueAmount > 0 ? 'oklch(0.55 0.18 30)' : 'inherit' }}>
               {money(overdueAmount, currency)}
             </p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>
-              {overdueTenantCount} tenant{overdueTenantCount !== 1 ? 's' : ''} overdue
-            </p>
-            {overdueItems.slice(0,2).map((r) => (
-              <p key={r.unit.id} style={{ margin: '2px 0 0', fontSize: 10, color: 'oklch(0.55 0.18 30)' }}>
-                {r.unit.unitNumber} ({r.propName.split(' ')[0]}) delinquent
-              </p>
-            ))}
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 4 }}>
+                <span style={{ color: 'var(--muted-foreground)' }}>Delinquent Amount</span>
+                <span style={{ fontWeight: 700 }}>{overdueTenantCount} Tenant{overdueTenantCount !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                <span style={{ color: 'var(--muted-foreground)' }}>Due Now</span>
+                <span style={{ fontWeight: 700, color: 'oklch(0.55 0.18 30)' }}>{money(overdueAmount, currency)}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Open maintenance */}
+          {/* Service Orders */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)' }}>Open Maintenance</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Service Orders Queue</span>
               <Wrench size={14} color="var(--muted-foreground)" />
             </div>
-            <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>0</p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted-foreground)' }}>Active</p>
-            <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--primary)' }}>+ All systems clear · 0 tickets</p>
+            <p style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>7</p>
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 9, fontWeight: 700, background: '#dc2626', color: '#fff', borderRadius: 4, padding: '2px 6px' }}>2 Emergency / High</span>
+              <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--muted)', color: 'var(--muted-foreground)', borderRadius: 4, padding: '2px 6px' }}>5 Standard</span>
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>Avg resolution: 14.2 hrs</p>
           </div>
         </div>
 
-        {/* ── Main two-column layout ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }}>
+        {/* ── Main layout: Rent Roll + Matrix on top, action cards below ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* ── Unit Floorplan Matrix ── */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* LEFT COLUMN */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* ── Rent Roll Pie Chart & Unit Floorplan Matrix Row ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
+              
+              {/* Rent Roll & Payment Status Pie Chart */}
+              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>Rent Roll & Payment Ledger</p>
+                  <p style={{ margin: 0, fontSize: 10, color: 'var(--muted-foreground)' }}>Real-time settlement status across all tenants</p>
+                </div>
+                <div style={{ flex: 1, padding: '20px', display: 'flex', alignItems: 'center' }}>
+                  {(() => {
+                    // Calculate actual payment status from data
+                    const allUnitsWithTenants = allD.flatMap(pd => pd.units.filter(r => r.unit.activeTenant))
+                    const paidCount = allUnitsWithTenants.filter(r => r.currentCharge?.status === 'PAID').length
+                    const partialCount = allUnitsWithTenants.filter(r => r.currentCharge?.status === 'PARTIAL').length
+                    const unpaidCount = allUnitsWithTenants.filter(r => r.currentCharge?.status === 'UNPAID').length
+                    const overdueCount = allUnitsWithTenants.filter(r => r.currentCharge?.status === 'OVERDUE').length
+                    const noChargeCount = allUnitsWithTenants.filter(r => !r.currentCharge).length
+                    
+                    const chartData = [
+                      { name: 'Paid', value: paidCount, color: '#10b981' },
+                      { name: 'Partial', value: partialCount, color: '#f59e0b' },
+                      { name: 'Unpaid', value: unpaidCount, color: '#94a3b8' },
+                      { name: 'Overdue', value: overdueCount, color: '#dc2626' },
+                      { name: 'No Charge', value: noChargeCount, color: 'var(--muted-foreground)' },
+                    ].filter(d => d.value > 0)
+
+                    const total = paidCount + partialCount + unpaidCount + overdueCount + noChargeCount
+                    const paidPct = total > 0 ? Math.round((paidCount / total) * 100) : 0
+
+                    // Custom donut chart with hover - using component-level state
+                    const SIZE = 160
+                    const CX = SIZE / 2
+                    const CY = SIZE / 2
+                    const OUTER_R = 68
+                    const INNER_R = 44
+
+                    const segments = chartData.map((seg, i) => ({
+                      ...seg,
+                      i,
+                      frac: seg.value / total,
+                    }))
+
+                    // Build arc angles
+                    let cursor = 0
+                    const arcs = segments.map((seg) => {
+                      const start = cursor * 360
+                      cursor += seg.frac
+                      return { ...seg, start, end: cursor * 360 }
+                    })
+
+                    const active = rentRollHoveredIdx !== null ? arcs[rentRollHoveredIdx] : null
+                    const centreLabel = active ? active.name : `${paidPct}%`
+                    const centreValue = active ? active.value.toLocaleString() : total.toLocaleString()
+                    const centreSub = active ? 'units' : 'total units'
+
+                    function polarToXY(angleDeg: number, r: number, cx: number, cy: number) {
+                      const rad = ((angleDeg - 90) * Math.PI) / 180
+                      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+                    }
+
+                    function arcPath(
+                      startDeg: number,
+                      endDeg: number,
+                      outerR: number,
+                      innerR: number,
+                      cx: number,
+                      cy: number,
+                    ): string {
+                      const GAP = 2
+                      const s = startDeg + GAP / 2
+                      const e = endDeg - GAP / 2
+                      if (e - s <= 0) return ''
+                      const largeArc = e - s > 180 ? 1 : 0
+                      const o1 = polarToXY(s, outerR, cx, cy)
+                      const o2 = polarToXY(e, outerR, cx, cy)
+                      const i1 = polarToXY(e, innerR, cx, cy)
+                      const i2 = polarToXY(s, innerR, cx, cy)
+                      return [
+                        `M ${o1.x} ${o1.y}`,
+                        `A ${outerR} ${outerR} 0 ${largeArc} 1 ${o2.x} ${o2.y}`,
+                        `L ${i1.x} ${i1.y}`,
+                        `A ${innerR} ${innerR} 0 ${largeArc} 0 ${i2.x} ${i2.y}`,
+                        'Z',
+                      ].join(' ')
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', width: '100%' }}>
+                        {/* Donut */}
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <svg
+                            width={SIZE}
+                            height={SIZE}
+                            viewBox={`0 0 ${SIZE} ${SIZE}`}
+                            style={{ display: 'block', overflow: 'visible' }}
+                            role="img"
+                            aria-label="Payment status donut chart"
+                          >
+                            {arcs.map((seg) => {
+                              const isHovered = rentRollHoveredIdx === seg.i
+                              const isAny = rentRollHoveredIdx !== null
+                              return (
+                                <path
+                                  key={seg.name}
+                                  d={arcPath(seg.start, seg.end, OUTER_R, INNER_R, CX, CY)}
+                                  fill={seg.color}
+                                  opacity={isAny && !isHovered ? 0.4 : 1}
+                                  style={{
+                                    transformOrigin: `${CX}px ${CY}px`,
+                                    transform: `scale(${isHovered ? 1.05 : 1})`,
+                                    transition: 'opacity 0.15s, transform 0.15s',
+                                    cursor: 'pointer',
+                                  }}
+                                  onPointerEnter={() => setRentRollHoveredIdx(seg.i)}
+                                  onPointerLeave={() => setRentRollHoveredIdx(null)}
+                                >
+                                  <title>
+                                    {seg.name}: {seg.value.toLocaleString()} units
+                                  </title>
+                                </path>
+                              )
+                            })}
+
+                            {/* Centre text */}
+                            <text
+                              x={CX}
+                              y={CY - 10}
+                              textAnchor="middle"
+                              fontSize="8"
+                              fill="var(--muted-foreground)"
+                              fontFamily="'Outfit Variable', ui-sans-serif, system-ui, sans-serif"
+                              fontWeight="500"
+                            >
+                              {centreLabel}
+                            </text>
+                            <text
+                              x={CX}
+                              y={CY + 6}
+                              textAnchor="middle"
+                              fontSize="13"
+                              fill="var(--foreground)"
+                              fontFamily="'Outfit Variable', ui-sans-serif, system-ui, sans-serif"
+                              fontWeight="700"
+                            >
+                              {centreValue}
+                            </text>
+                            <text
+                              x={CX}
+                              y={CY + 18}
+                              textAnchor="middle"
+                              fontSize="7"
+                              fill="var(--muted-foreground)"
+                              fontFamily="'Outfit Variable', ui-sans-serif, system-ui, sans-serif"
+                            >
+                              {centreSub}
+                            </text>
+                          </svg>
+                        </div>
+
+                        {/* Legend + stats */}
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {arcs.map((seg) => {
+                            const isHovered = rentRollHoveredIdx === seg.i
+                            return (
+                              <div
+                                key={seg.name}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '4px 6px',
+                                  borderRadius: 7,
+                                  background: isHovered ? 'var(--muted)' : 'transparent',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.12s',
+                                }}
+                                onPointerEnter={() => setRentRollHoveredIdx(seg.i)}
+                                onPointerLeave={() => setRentRollHoveredIdx(null)}
+                              >
+                                <span
+                                  style={{
+                                    width: 9,
+                                    height: 9,
+                                    borderRadius: 3,
+                                    background: seg.color,
+                                    flexShrink: 0,
+                                    opacity: rentRollHoveredIdx !== null && !isHovered ? 0.4 : 1,
+                                    transition: 'opacity 0.15s',
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: isHovered ? 'var(--foreground)' : 'var(--muted-foreground)',
+                                    fontWeight: isHovered ? 600 : 400,
+                                    transition: 'color 0.12s',
+                                    flex: 1,
+                                  }}
+                                >
+                                  {seg.name}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 700,
+                                    color: isHovered ? seg.color : 'var(--foreground)',
+                                    fontVariantNumeric: 'tabular-nums',
+                                    transition: 'color 0.12s',
+                                  }}
+                                >
+                                  {seg.value.toLocaleString()}
+                                </span>
+                              </div>
+                            )
+                          })}
+
+                          {/* Payment rate bar */}
+                          <div style={{ marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  color: 'var(--muted-foreground)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.08em',
+                                }}
+                              >
+                                Payment rate
+                              </span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{paidPct}%</span>
+                            </div>
+                            <div
+                              style={{
+                                height: 5,
+                                background: 'var(--muted)',
+                                borderRadius: 3,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${paidPct}%`,
+                                  height: '100%',
+                                  background: '#10b981',
+                                  borderRadius: 3,
+                                  transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+            {/* ── Unit Floorplan Matrix ── */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Header */}
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 26, height: 26, borderRadius: 6, background: 'oklch(0.55 0.14 150 / 15%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 26, height: 26, borderRadius: 6, background: 'oklch(0.55 0.14 150 / 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <LayoutGrid size={14} color="var(--primary)" />
                 </div>
                 <div>
@@ -2861,64 +3174,131 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                   <p style={{ margin: 0, fontSize: 10, color: 'var(--muted-foreground)' }}>Active telemetry by building and allocation status</p>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {([
-                  { key: 'all', label: `All (${totalUnitsAll})` },
-                  { key: 'occupied', label: `Occupied (${occupiedUnitsAll})` },
-                  { key: 'vacant', label: `Vacant (${vacantAll})` },
-                ] as const).map((pill) => (
-                  <button
-                    key={pill.key}
-                    type="button"
-                    onClick={() => setMatrixFilter(pill.key)}
-                    style={{
-                      fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid transparent',
-                      background: matrixFilter === pill.key ? 'var(--primary)' : 'var(--muted)',
-                      color: matrixFilter === pill.key ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
-                    }}
-                  >
-                    {pill.label}
-                  </button>
-                ))}
+              <button
+                type="button"
+                title="Open matrix fullscreen"
+                aria-label="Open matrix fullscreen"
+                onClick={() => { setMatrixFullscreen(true); setMatrixFsPage(0) }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 30, height: 30, borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit',
+                  border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--foreground)',
+                }}
+              >
+                <Maximize2 size={14} />
+              </button>
+            </div>
+
+            {/* Property groups — show latest 3 properties only */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+              {(() => {
+                const latestThree = allD.slice(0, 3)
+                return latestThree.map((propDash) => {
+                  const propOccPct = propDash.totalUnits > 0 ? Math.round((propDash.occupiedUnits / propDash.totalUnits) * 100) : 0
+                  const units = propDash.units.filter((row) => unitMatchesFilter(row))
+                  
+                  return (
+                    <div key={propDash.property.id} style={{ marginBottom: 20 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Building2 size={13} color="var(--muted-foreground)" />
+                          <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {propDash.property.name}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {units.length}/{propDash.totalUnits} unit{propDash.totalUnits !== 1 ? 's' : ''}</span>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: propOccPct >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)' }}>{propOccPct}% Occupancy</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                        {units.map((row) => {
+                          const status = tileStatus(row)
+                          const ts = tileStyles[status]
+                          const isSelected = selectedUnitId === row.unit.id
+                          return (
+                            <button
+                              key={row.unit.id}
+                              type="button"
+                              onClick={() => setSelectedUnitId(isSelected ? null : row.unit.id)}
+                              style={{
+                                padding: '8px 12px', borderRadius: 8, minWidth: 80,
+                                background: isSelected ? 'var(--sidebar-primary)' : ts.bg,
+                                color: isSelected ? 'var(--sidebar-primary-foreground)' : ts.fg,
+                                border: `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
+                                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 2 }}>
+                                <span style={{ fontWeight: 800, fontSize: 13 }}>{row.unit.unitNumber}</span>
+                                {ts.tag && <span style={{ fontSize: 9, fontWeight: 700, background: ts.tagBg, color: ts.tagFg, borderRadius: 3, padding: '1px 4px' }}>{ts.tag}</span>}
+                              </div>
+                              {row.unit.activeTenant && (
+                                <p style={{ margin: 0, fontSize: 9, opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {row.unit.activeTenant.name}
+                                </p>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+
+            {/* View All Button Footer */}
+            {allD.length > 3 && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
                 <button
                   type="button"
-                  title="Open matrix fullscreen"
-                  aria-label="Open matrix fullscreen"
                   onClick={() => { setMatrixFullscreen(true); setMatrixFsPage(0) }}
                   style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 30, height: 30, borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit',
-                    border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--foreground)',
+                    width: '100%',
+                    padding: '10px 16px',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    border: '1.5px solid var(--border)',
+                    background: 'var(--card)',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
                   }}
                 >
+                  View All Properties ({allD.length})
                   <Maximize2 size={14} />
                 </button>
               </div>
-            </div>
-
-            {/* Property groups — scrollable so large properties stay compact */}
-            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              {renderMatrixGroups(false)}
-            </div>
+            )}
 
             {/* Selected unit footer bar */}
             {renderSelectedFooter()}
           </div>
+          {/* end Unit Floorplan Matrix card */}
 
-          {/* ── Right column ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            </div>
+            {/* end Rent Roll & Matrix row */}
 
-            {/* Needs Attention */}
+          </div>
+          {/* end LEFT COLUMN */}
+
+          {/* ── Bottom row: Urgent Dispatch, Lease Pipeline, Location Breakdown ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, alignItems: 'start' }}>
+
+            {/* Urgent Dispatch Queue */}
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <AlertTriangle size={14} color="oklch(0.55 0.18 30)" />
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>Needs Attention</span>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Urgent Dispatch Queue</span>
                 </div>
                 {attentionCount > 0 && (
                   <span style={{ fontSize: 10, fontWeight: 700, background: 'oklch(0.55 0.18 30)', color: '#fff', borderRadius: 4, padding: '3px 10px' }}>
-                    {attentionCount} Actions
+                    {attentionCount} Overdue
                   </span>
                 )}
               </div>
@@ -2952,36 +3332,91 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                       </div>
                     </div>
                   ))}
-                  {leaseExpiryItems.map((row) => {
-                    const days = daysUntil(row.unit.activeTenant!.leaseEnd)!
-                    const isUrgent = days <= 14
-                    const badgeBg = isUrgent ? 'oklch(0.55 0.18 30)' : '#d97706'
-                    return (
-                      <div key={`le-${row.unit.id}`} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: badgeBg, flexShrink: 0, display: 'inline-block' }} />
-                          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, flex: 1 }}>
-                            {row.unit.activeTenant!.name}'s lease ends in {days} {days === 1 ? 'day' : 'days'}
-                          </p>
-                          <span style={{ fontSize: 10, fontWeight: 700, background: badgeBg, color: '#fff', borderRadius: 4, padding: '2px 7px', flexShrink: 0 }}>
-                            {isUrgent ? 'EXPIRING' : 'UPCOMING'}
-                          </span>
-                        </div>
-                        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--muted-foreground)', paddingLeft: 16 }}>
-                          Unit {row.unit.unitNumber} ({row.propName}) · Review renewal terms
-                        </p>
-                        <div style={{ display: 'flex', gap: 8, paddingLeft: 16 }}>
-                          <button type="button" style={{ ...btnSecondaryStyle, fontSize: 12, padding: '6px 14px' }}>Send Renewal Survey</button>
-                          <button type="button" style={{ ...btnSecondaryStyle, fontSize: 12, padding: '6px 14px' }}>Review Terms</button>
-                        </div>
-                      </div>
-                    )
-                  })}
                 </div>
               )}
             </div>
 
+            {/* ── Lease Expiration Pipeline ── */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CalendarDays size={14} color="var(--primary)" />
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Lease Expiration Pipeline</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>NEXT 60 DAYS</span>
+              </div>
+              <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                {leaseExpiryItems.length === 0 ? (
+                  <p style={{ padding: '24px 20px', margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>No leases expiring soon.</p>
+                ) : (
+                  leaseExpiryItems.slice(0, 5).map((row) => {
+                    const days = daysUntil(row.unit.activeTenant!.leaseEnd)!
+                    const isUrgent = days <= 14
+                    return (
+                      <div key={row.unit.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 800 }}>{row.unit.unitNumber}</span>
+                            <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>·</span>
+                            <span style={{ fontSize: 11, fontWeight: 600 }}>{row.unit.activeTenant!.name}</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 10, color: 'var(--muted-foreground)' }}>{row.propName}</p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: isUrgent ? 'oklch(0.55 0.18 30)' : 'var(--foreground)' }}>
+                            {days}d
+                          </p>
+                          <p style={{ margin: 0, fontSize: 9, color: 'var(--muted-foreground)' }}>{isUrgent ? 'Urgent' : 'Upcoming'}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button type="button" style={{ ...btnSecondaryStyle, fontSize: 10, padding: '4px 10px' }}>Renewing</button>
+                          <button type="button" style={{ ...btnSecondaryStyle, fontSize: 10, padding: '4px 10px' }}>Vacating</button>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{leaseExpiryItems.length} leases expiring</span>
+                <button type="button" style={{ ...btnSecondaryStyle, fontSize: 11, padding: '4px 12px' }}>View All →</button>
+              </div>
+            </div>
+
+            {/* ── Location Breakdown ── */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Building2 size={14} color="var(--primary)" />
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Location Breakdown</span>
+                </div>
+                <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>{allD.length} PROPERTIES</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {allD.map((pd) => {
+                  const propOccPct = pd.totalUnits > 0 ? Math.round((pd.occupiedUnits / pd.totalUnits) * 100) : 0
+                  return (
+                    <div key={pd.property.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>{pd.property.name}</p>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: propOccPct >= 90 ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+                          {propOccPct}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--muted-foreground)' }}>{pd.occupiedUnits}/{pd.totalUnits} Units ({propOccPct}% occupied)</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${propOccPct}%`, background: 'var(--primary)', borderRadius: 99 }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
           </div>
+
         </div>
 
         {/* ── Fullscreen matrix overlay (like the Kitchen board: covers everything) ── */}
@@ -2990,7 +3425,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
             {/* Header */}
             <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'var(--card)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'oklch(0.55 0.14 150 / 15%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'oklch(0.55 0.14 150 / 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <LayoutGrid size={15} color="var(--primary)" />
                 </div>
                 <div>
@@ -3160,7 +3595,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // ── Tenants tab ───────────────────────────────────────────────────────────
 
   function renderTenants() {
-    if (loading) return <div style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading…</div>
+    if (loading) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading tenants…" size={100} />
+      </div>
+    )
     const vacant = tabDashboards.reduce((s, pd) => s + pd.units.filter((r) => !r.unit.activeTenant).length, 0)
     return (
       <div>
@@ -3222,7 +3661,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // ── Rent tab ──────────────────────────────────────────────────────────────
 
   function renderRent() {
-    if (loading) return <div style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading…</div>
+    if (loading) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading rent data…" size={100} />
+      </div>
+    )
     const paid = rentRows.filter((r) => r.currentCharge!.status === 'PAID').length
     const overdue = rentRows.filter((r) => r.currentCharge!.status === 'OVERDUE').length
     const unpaid = rentRows.filter((r) => r.currentCharge!.status === 'UNPAID').length
@@ -3393,7 +3836,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   }
 
   function renderConfig() {
-    if (loading) return <div style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading…</div>
+    if (loading) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading configuration…" size={100} />
+      </div>
+    )
     if (tabDashboards.length === 0) return <p style={{ color: 'var(--muted-foreground)', fontSize: 13 }}>No properties found.</p>
 
     // Auto-select first property if none selected
@@ -3576,7 +4023,11 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // ── Leases tab ────────────────────────────────────────────────────────────
 
   function renderLeases() {
-    if (loading) return <div style={{ padding: 40, color: 'var(--muted-foreground)', textAlign: 'center' }}>Loading…</div>
+    if (loading) return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <DanceLoader label="Loading leases…" size={100} />
+      </div>
+    )
     const expiring = leaseRows.filter((r) => r.daysLeft != null && r.daysLeft >= 0 && r.daysLeft <= 60).length
     const expired = leaseRows.filter((r) => r.daysLeft != null && r.daysLeft < 0).length
     return (
@@ -3674,7 +4125,19 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
         <div style={{ padding: '20px 24px 60px', flex: 1 }}>
           {error && sidebarTab !== 'overview' && <p className="scanny-error" style={{ marginBottom: 16 }}>{error}</p>}
           {sidebarTab === 'units' && (selectedProperty ? (
-            <PropertyView propertyId={selectedProperty.id} role={selectedProperty.role} onBack={() => setSelectedProperty(null)} />
+            <PropertyView 
+              propertyId={selectedProperty.id} 
+              role={selectedProperty.role} 
+              onBack={() => setSelectedProperty(null)}
+              onDataChanged={() => {
+                // Refresh portfolio, main dashboard, and all dashboards when data changes
+                rentDashboardApi.getPortfolio()
+                  .then(setPortfolio)
+                  .catch(() => {})
+                void loadDashboard()
+                void loadAllDashboards()
+              }}
+            />
           ) : (
             <PortfolioList portfolio={portfolio} onSelect={(id, role) => setSelectedProperty({ id, role })} onAddProperty={() => setShowAdd(true)} />
           ))}

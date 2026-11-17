@@ -39,7 +39,15 @@ public enum AdminPermission {
 
     // ── Rent / Property management ────────────────────────────────────────────
     /** View and configure all rent properties across all managers. */
-    VIEW_RENT("Rent properties, tenants, and fee configuration");
+    VIEW_RENT("Rent properties, tenants, and fee configuration"),
+
+    // ── Accounting (double-entry ledger) ──────────────────────────────────────
+    /** Read-only access to accounting ledger, trial balance, and failures. */
+    ACCOUNTING_VIEWER("View accounting ledger and reports"),
+    /** Can review and resolve posting failures but not close periods. */
+    ACCOUNTING_ACCOUNTANT("Manage posting failures and reconciliation"),
+    /** Full control: close periods, modify chart of accounts. */
+    ACCOUNTING_ADMIN("Close periods and manage accounting configuration");
 
     private final String description;
 

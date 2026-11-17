@@ -1,20 +1,17 @@
 package com.scanny.controller;
 
+import com.scanny.dto.DeviceBindingDtos;
 import com.scanny.dto.RentDtos;
 import com.scanny.exception.ApiException;
 import com.scanny.repository.RentPaymentRepository;
+import com.scanny.service.QrAuditService;
+import com.scanny.service.QrDeviceBindingService;
 import com.scanny.service.RentAccountService;
 import com.scanny.service.RentPaymentService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Public (no-auth) endpoints for the tenant-facing rent payment flow.
@@ -23,6 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h3>Endpoints</h3>
  * <ul>
+ *   <li>{@code GET  /api/public/rent/pay/:token/check-device}
+ *       — check if device can access this token (device binding)</li>
+ *   <li>{@code POST /api/public/rent/pay/:token/bind}
+ *       — create device binding (first scan with phone verification)</li>
  *   <li>{@code GET  /api/public/rent/pay/:token}
  *       — resolve token → TenantPayContext for the pay page</li>
  *   <li>{@code POST /api/public/rent/pay/:token}
@@ -38,14 +39,94 @@ public class PublicRentController {
     private final RentPaymentService rentPaymentService;
     private final RentAccountService rentAccountService;
     private final RentPaymentRepository rentPaymentRepository;
+    private final QrAuditService qrAuditService;
+    private final QrDeviceBindingService deviceBindingService;
 
     public PublicRentController(
             RentPaymentService rentPaymentService,
             RentAccountService rentAccountService,
-            RentPaymentRepository rentPaymentRepository) {
+            RentPaymentRepository rentPaymentRepository,
+            QrAuditService qrAuditService,
+            QrDeviceBindingService deviceBindingService) {
         this.rentPaymentService = rentPaymentService;
         this.rentAccountService = rentAccountService;
         this.rentPaymentRepository = rentPaymentRepository;
+        this.qrAuditService = qrAuditService;
+        this.deviceBindingService = deviceBindingService;
+    }
+
+    /**
+     * Check if this device can access the QR token.
+     * 
+     * <p>Responses:
+     * <ul>
+     *   <li>200 OK + AccessCheckResult.ALLOWED → device is bound, show payment page</li>
+     *   <li>404 Not Found + AccessCheckResult.FIRST_SCAN → no binding, show phone verification</li>
+     *   <li>403 Forbidden + AccessCheckResult.DEVICE_MISMATCH → different device, show error with contact</li>
+     * </ul>
+     */
+    @GetMapping("/pay/{token}/check-device")
+    public DeviceBindingDtos.AccessCheckResult checkDeviceAccess(
+            @PathVariable String token,
+            @RequestHeader(value = "X-Device-ID", required = false) String deviceId,
+            HttpServletRequest request) {
+        
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new ApiException(400, "X-Device-ID header is required");
+        }
+
+        DeviceBindingDtos.AccessCheckResult result = 
+            deviceBindingService.checkDeviceAccess(token, deviceId, request);
+
+        // Return appropriate HTTP status based on decision
+        if (result.decision() == DeviceBindingDtos.AccessDecision.DEVICE_MISMATCH) {
+            throw new DeviceMismatchException(result);
+        }
+        
+        if (result.decision() == DeviceBindingDtos.AccessDecision.FIRST_SCAN) {
+            throw new FirstScanException(result);
+        }
+
+        return result; // 200 OK for ALLOWED
+    }
+
+    /**
+     * Create device binding after phone verification (first scan).
+     * 
+     * <p>Request body:
+     * <pre>
+     * {
+     *   "phoneNumber": "+256700123456",
+     *   "deviceFingerprint": "{\"type\":\"mobile\",\"os\":\"Android 13\",...}"
+     * }
+     * </pre>
+     */
+    @PostMapping("/pay/{token}/bind")
+    @ResponseStatus(HttpStatus.CREATED)
+    public DeviceBindingDtos.BindingCreatedResponse createBinding(
+            @PathVariable String token,
+            @RequestHeader(value = "X-Device-ID", required = false) String deviceId,
+            @Valid @RequestBody DeviceBindingDtos.CreateBindingRequest request,
+            HttpServletRequest httpRequest) {
+        
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new ApiException(400, "X-Device-ID header is required");
+        }
+
+        var binding = deviceBindingService.createBinding(
+            token,
+            deviceId,
+            request.phoneNumber(),
+            request.deviceFingerprint(),
+            httpRequest
+        );
+
+        return new DeviceBindingDtos.BindingCreatedResponse(
+            binding.getId(),
+            "Device successfully bound. You can now make payments from this device.",
+            binding.getBoundAt(),
+            binding.getExpiresAt()
+        );
     }
 
     /**
@@ -60,8 +141,28 @@ public class PublicRentController {
      * </ul>
      */
     @GetMapping("/pay/{token}")
-    public RentDtos.TenantPayContext resolvePayContext(@PathVariable String token) {
-        return rentPaymentService.resolvePayContext(token);
+    public RentDtos.TenantPayContext resolvePayContext(
+            @PathVariable String token,
+            HttpServletRequest request) {
+        try {
+            RentDtos.TenantPayContext context = rentPaymentService.resolvePayContext(token);
+            
+            // Audit successful access
+            qrAuditService.logSuccess(token, "RENT_PAY", "ACCESS", request, 
+                context.propertyId() != null ? context.propertyId() : null);
+            
+            return context;
+        } catch (ApiException e) {
+            // Audit failed access
+            if (e.getStatus() == 404) {
+                qrAuditService.logInvalid(token, "RENT_PAY", request);
+            } else if (e.getStatus() == 410) {
+                qrAuditService.logExpired(token, "RENT_PAY", request);
+            } else {
+                qrAuditService.logDenied(token, "RENT_PAY", "ACCESS", request, e.getMessage());
+            }
+            throw e;
+        }
     }
 
     /**
@@ -77,8 +178,23 @@ public class PublicRentController {
             @PathVariable String token,
             @RequestParam(required = false) String unitId,
             @RequestParam(required = false) Long chargeId,
-            @Valid @RequestBody RentDtos.InitiateRentPaymentRequest request) {
-        return rentPaymentService.initiatePayment(token, unitId, chargeId, request);
+            @Valid @RequestBody RentDtos.InitiateRentPaymentRequest request,
+            HttpServletRequest httpRequest) {
+        
+        try {
+            RentDtos.InitiateRentPaymentResponse response = 
+                rentPaymentService.initiatePayment(token, unitId, chargeId, request);
+            
+            // Audit successful payment initiation
+            qrAuditService.logSuccess(token, "RENT_PAY", "PAYMENT", httpRequest,
+                unitId != null ? unitId : null);
+            
+            return response;
+        } catch (ApiException e) {
+            // Audit failed payment attempt
+            qrAuditService.logDenied(token, "RENT_PAY", "PAYMENT", httpRequest, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -128,5 +244,45 @@ public class PublicRentController {
     public java.util.List<RentDtos.MaintenanceRequest> listMyMaintenance(
             @PathVariable String token) {
         return rentPaymentService.listMaintenanceByToken(token);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Custom exceptions for device binding HTTP status codes
+    // ────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Thrown when device doesn't match binding (403 Forbidden).
+     * Contains property manager contact info for tenant to call.
+     */
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public static class DeviceMismatchException extends RuntimeException {
+        private final DeviceBindingDtos.AccessCheckResult result;
+
+        public DeviceMismatchException(DeviceBindingDtos.AccessCheckResult result) {
+            super(result.message());
+            this.result = result;
+        }
+
+        public DeviceBindingDtos.AccessCheckResult getResult() {
+            return result;
+        }
+    }
+
+    /**
+     * Thrown when no binding exists yet (404 Not Found).
+     * Frontend should show phone verification form.
+     */
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class FirstScanException extends RuntimeException {
+        private final DeviceBindingDtos.AccessCheckResult result;
+
+        public FirstScanException(DeviceBindingDtos.AccessCheckResult result) {
+            super(result.message());
+            this.result = result;
+        }
+
+        public DeviceBindingDtos.AccessCheckResult getResult() {
+            return result;
+        }
     }
 }

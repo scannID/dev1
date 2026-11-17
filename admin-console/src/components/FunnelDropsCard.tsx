@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react'
+import { 
+  Menu, ShoppingCart, Edit3, CreditCard,
+  DollarSign, Clock, Eye, RefreshCw, Smartphone, Utensils, MessageSquare,
+  TrendingDown, PartyPopper, type LucideIcon
+} from 'lucide-react'
 import { api } from '../api/client'
 import type { TopMerchant } from '../api/types'
 import { InlineSpinner } from './LoadingSpinner'
@@ -13,21 +18,21 @@ interface FunnelAnalytics {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STEP_META: Record<string, { label: string; emoji: string; color: string }> = {
-  menu:    { label: 'Menu',    emoji: '📋', color: '#3b82f6' },
-  cart:    { label: 'Cart',    emoji: '🛒', color: '#f59e0b' },
-  details: { label: 'Details', emoji: '✏️',  color: '#8b5cf6' },
-  pay:     { label: 'Payment', emoji: '💳', color: '#ef4444' },
+const STEP_META: Record<string, { label: string; icon: LucideIcon; color: string }> = {
+  menu:    { label: 'Menu',    icon: Menu,         color: '#3b82f6' },
+  cart:    { label: 'Cart',    icon: ShoppingCart, color: '#f59e0b' },
+  details: { label: 'Details', icon: Edit3,        color: '#8b5cf6' },
+  pay:     { label: 'Payment', icon: CreditCard,   color: '#ef4444' },
 }
 
-const REASON_META: Record<string, { label: string; emoji: string }> = {
-  too_expensive:  { label: 'Too expensive',   emoji: '💸' },
-  long_wait:      { label: 'Seemed too slow',  emoji: '⏳' },
-  just_browsing:  { label: 'Just browsing',    emoji: '👀' },
-  changed_mind:   { label: 'Changed mind',     emoji: '🔄' },
-  payment_issue:  { label: 'Payment trouble',  emoji: '📱' },
-  menu_limited:   { label: 'Nothing wanted',   emoji: '🍽️' },
-  other:          { label: 'Other',            emoji: '💬' },
+const REASON_META: Record<string, { label: string; icon: LucideIcon }> = {
+  too_expensive:  { label: 'Too expensive',   icon: DollarSign },
+  long_wait:      { label: 'Seemed too slow',  icon: Clock },
+  just_browsing:  { label: 'Just browsing',    icon: Eye },
+  changed_mind:   { label: 'Changed mind',     icon: RefreshCw },
+  payment_issue:  { label: 'Payment trouble',  icon: Smartphone },
+  menu_limited:   { label: 'Nothing wanted',   icon: Utensils },
+  other:          { label: 'Other',            icon: MessageSquare },
 }
 
 const DAYS_OPTIONS = [
@@ -45,13 +50,14 @@ async function fetchFunnelAnalytics(businessId: string, days: number): Promise<F
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StepBar({ step, count, total }: { step: string; count: number; total: number }) {
-  const meta = STEP_META[step] ?? { label: step, emoji: '📍', color: '#6b7280' }
+  const meta = STEP_META[step] ?? { label: step, icon: Menu, color: '#6b7280' }
   const pct = total > 0 ? (count / total) * 100 : 0
+  const Icon = meta.icon
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-      <span style={{ width: 20, textAlign: 'center', fontSize: 14 }} aria-hidden="true">
-        {meta.emoji}
+      <span style={{ width: 20, textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
+        <Icon size={16} style={{ color: meta.color }} />
       </span>
       <span style={{ width: 62, fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }}>
         {meta.label}
@@ -82,7 +88,8 @@ function StepBar({ step, count, total }: { step: string; count: number; total: n
 }
 
 function ReasonChip({ reason, count }: { reason: string; count: number }) {
-  const meta = REASON_META[reason] ?? { label: reason, emoji: '❓' }
+  const meta = REASON_META[reason] ?? { label: reason, icon: MessageSquare }
+  const Icon = meta.icon
   return (
     <div style={{
       display: 'flex',
@@ -93,7 +100,7 @@ function ReasonChip({ reason, count }: { reason: string; count: number }) {
       borderRadius: 20,
       border: '1px solid var(--border)',
     }}>
-      <span style={{ fontSize: 13 }} aria-hidden="true">{meta.emoji}</span>
+      <Icon size={14} style={{ color: 'var(--foreground)' }} />
       <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--foreground)' }}>{meta.label}</span>
       <span style={{
         fontSize: 11,
@@ -226,7 +233,7 @@ export default function FunnelDropsCard({ merchants }: FunnelDropsCardProps) {
 
       {!loading && !error && !hasData && (
         <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-          <span style={{ fontSize: 28, display: 'block', marginBottom: 8 }} aria-hidden="true">🎉</span>
+          <PartyPopper size={32} style={{ display: 'inline-block', marginBottom: 8, color: 'var(--primary)' }} />
           <p style={{ margin: 0, fontSize: 13, fontWeight: 500 }}>
             No drop-offs recorded for {selectedName} in the last {days} days.
           </p>
@@ -249,7 +256,7 @@ export default function FunnelDropsCard({ merchants }: FunnelDropsCardProps) {
             borderRadius: 10,
             border: '1px solid color-mix(in oklch, var(--primary) 20%, transparent)',
           }}>
-            <span style={{ fontSize: 22 }} aria-hidden="true">📉</span>
+            <TrendingDown size={24} style={{ color: 'var(--primary)' }} />
             <div>
               <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--foreground)' }}>
                 {totalDrops.toLocaleString()}

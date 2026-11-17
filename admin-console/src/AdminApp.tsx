@@ -59,7 +59,10 @@ import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import CommunicationsPage from './pages/CommunicationsPage'
-import AccountingPage from './pages/AccountingPage'
+import AccountingLedgerPage from './pages/AccountingLedgerPage'
+import RestaurantsFinancialPage from './pages/RestaurantsFinancialPage'
+import TicketingFinancialPage from './pages/TicketingFinancialPage'
+import PropertiesFinancialPage from './pages/PropertiesFinancialPage'
 import AdminsPage from './pages/AdminsPage'
 import FunnelDropsPage from './pages/FunnelDropsPage'
 import RentPropertiesPage from './pages/RentPropertiesPage'
@@ -101,7 +104,7 @@ const PAGE_META: Record<View, { eyebrow: string; title: string }> = {
   'qr-activity':             { eyebrow: 'Admin · Restaurants',     title: 'QR Activity' },
   'cookie-consent':          { eyebrow: 'Admin · Analytics',       title: 'Cookie Consent' },
   reports:                   { eyebrow: 'Admin · Ticketing',       title: 'Reports' },
-  'funnel-drops':            { eyebrow: 'Admin · Ticketing',       title: 'Funnel Drop-offs' },
+  'funnel-drops':            { eyebrow: 'Admin · Analytics',       title: 'Funnel Drop-offs' },
   system:                    { eyebrow: 'Admin · System',          title: 'System Health' },
   audit:              { eyebrow: 'Admin · System',          title: 'Audit Log' },
   configs:            { eyebrow: 'Admin · System',          title: 'Configs' },
@@ -249,7 +252,6 @@ export default function AdminApp({
         items: [
           canSee('VIEW_TICKETING')    && { id: 'ticketing' as const,     label: 'Events & Tickets', icon: Ticket },
           canSee('VIEW_REPORTS')      && { id: 'reports' as const,       label: 'Reports',          icon: BarChart3 },
-          canSee('VIEW_FUNNEL_DROPS') && { id: 'funnel-drops' as const,  label: 'Funnel Drop-offs', icon: TrendingDown },
         ].filter(Boolean) as NavItem[],
       },
       {
@@ -262,6 +264,7 @@ export default function AdminApp({
         label: 'Analytics',
         items: [
           canSee('VIEW_COOKIE_CONSENT') && { id: 'cookie-consent' as const, label: 'Cookie Consent', icon: Cookie },
+          canSee('VIEW_FUNNEL_DROPS') && { id: 'funnel-drops' as const,  label: 'Funnel Drop-offs', icon: TrendingDown },
         ].filter(Boolean) as NavItem[],
       },
       {
@@ -486,10 +489,10 @@ export default function AdminApp({
           {view === 'configs' && <ConfigsPage />}
           {view === 'admins' && <AdminsPage />}
           {view === 'rent-properties' && <RentPropertiesPage />}
-          {view === 'accounting-restaurants' && <AccountingPage initialTab="restaurants" />}
-          {view === 'accounting-ticketing' && <AccountingPage initialTab="ticketing" />}
-          {view === 'accounting-properties' && <AccountingPage initialTab="properties" />}
-          {view === 'accounting-ledger' && <AccountingPage initialTab="ledger" />}
+          {view === 'accounting-restaurants' && <RestaurantsFinancialPage />}
+          {view === 'accounting-ticketing' && <TicketingFinancialPage />}
+          {view === 'accounting-properties' && <PropertiesFinancialPage />}
+          {view === 'accounting-ledger' && <AccountingLedgerPage />}
         </div>
 
         <Sheet open={showNotifications} onOpenChange={setShowNotifications}>

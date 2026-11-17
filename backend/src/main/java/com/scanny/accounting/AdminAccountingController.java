@@ -7,6 +7,7 @@ import com.scanny.accounting.repository.AccountingPeriodRepository;
 import com.scanny.accounting.repository.JournalEntryRepository;
 import com.scanny.accounting.repository.JournalLineRepository;
 import com.scanny.accounting.repository.PostingFailureRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,21 +54,25 @@ public class AdminAccountingController {
     private final JournalEntryRepository     entryRepo;
     private final JournalLineRepository      lineRepo;
     private final PostingFailureRepository   failureRepo;
+    private final PostingService             postingService;
 
     public AdminAccountingController(
             AccountingPeriodRepository periodRepo,
             JournalEntryRepository entryRepo,
             JournalLineRepository lineRepo,
-            PostingFailureRepository failureRepo) {
-        this.periodRepo  = periodRepo;
-        this.entryRepo   = entryRepo;
-        this.lineRepo    = lineRepo;
-        this.failureRepo = failureRepo;
+            PostingFailureRepository failureRepo,
+            PostingService postingService) {
+        this.periodRepo      = periodRepo;
+        this.entryRepo       = entryRepo;
+        this.lineRepo        = lineRepo;
+        this.failureRepo     = failureRepo;
+        this.postingService  = postingService;
     }
 
     // ── Periods ───────────────────────────────────────────────────────────────
 
     @GetMapping("/periods")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_VIEWER', 'ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public List<PeriodDto> listPeriods() {
         return periodRepo.findAll(Sort.by(Sort.Direction.DESC, "periodLabel"))
                 .stream()
@@ -79,6 +85,7 @@ public class AdminAccountingController {
 
     @PostMapping("/periods/{label}/close")
     @Transactional
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public PeriodDto closePeriod(
             @PathVariable String label,
             @AuthenticationPrincipal Jwt jwt) {
@@ -115,6 +122,7 @@ public class AdminAccountingController {
     // ── Trial balance ─────────────────────────────────────────────────────────
 
     @GetMapping("/periods/{label}/trial-balance")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_VIEWER', 'ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public TrialBalanceResponse trialBalance(@PathVariable String label) {
         List<Object[]> rows = entryRepo.trialBalance(label);
         List<TrialBalanceLine> lines = rows.stream().map(r -> new TrialBalanceLine(
@@ -134,6 +142,7 @@ public class AdminAccountingController {
     // ── Journal entries ───────────────────────────────────────────────────────
 
     @GetMapping("/entries")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_VIEWER', 'ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public EntryPageResponse listEntries(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "50") int size,
@@ -166,6 +175,7 @@ public class AdminAccountingController {
     }
 
     @GetMapping("/entries/{id}/lines")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_VIEWER', 'ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public List<LineDto> getLines(@PathVariable Long id) {
         return lineRepo.findByEntryIdOrderById(id).stream().map(l -> new LineDto(
                 l.getId(), l.getAccount().getCode(), l.getAccount().getName(),
@@ -175,6 +185,7 @@ public class AdminAccountingController {
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_VIEWER', 'ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public DashboardDto dashboard() {
         String currentPeriod = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         long pendingFailures = failureRepo.countByStatus("PENDING");
@@ -197,6 +208,7 @@ public class AdminAccountingController {
     // ── Dead-letter queue ─────────────────────────────────────────────────────
 
     @GetMapping("/failures")
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public FailurePageResponse listFailures(
             @RequestParam(defaultValue = "PENDING") String status,
             @RequestParam(defaultValue = "0")       int page,
@@ -214,6 +226,7 @@ public class AdminAccountingController {
 
     @PostMapping("/failures/{id}/resolve")
     @Transactional
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
     public FailureDto resolveFailure(@PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         PostingFailure f = failureRepo.findById(id)
@@ -224,6 +237,87 @@ public class AdminAccountingController {
         return new FailureDto(f.getId(), f.getSourceModule(), f.getSourceEventType(),
                 f.getSourceEventId(), f.getLastError(), f.getRetryCount(),
                 f.getStatus(), f.getCreatedAt());
+    }
+
+    @PostMapping("/failures/{id}/retry")
+    @Transactional
+    @PreAuthorize("hasAnyAuthority('ACCOUNTING_ACCOUNTANT', 'ACCOUNTING_ADMIN', 'SUPER_ADMIN')")
+    public FailureDto retryFailure(@PathVariable Long id) {
+        PostingFailure f = failureRepo.findById(id)
+                .orElseThrow(() -> new com.scanny.exception.ApiException(404, "Failure not found: " + id));
+        
+        if ("RESOLVED".equals(f.getStatus())) {
+            throw new com.scanny.exception.ApiException(409, "Failure already resolved: " + id);
+        }
+
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminAccountingController.class);
+        log.info("[Accounting] Retrying failure id={} module={} event={}", 
+                 id, f.getSourceModule(), f.getSourceEventType());
+
+        try {
+            // Parse payload and reconstruct AccountingEvent
+            ObjectMapper mapper = new ObjectMapper();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = mapper.readValue(f.getPayloadJson(), Map.class);
+            
+            // Extract amounts (handle both Integer and Long from JSON)
+            long grossAmount = toLong(payload.get("gross_amount_ugx"));
+            long commission = toLong(payload.get("platform_commission_ugx"));
+            long payeeAmount = toLong(payload.get("payee_amount_ugx"));
+            long pspFee = toLong(payload.get("psp_fee_ugx"));
+            long lateFee = toLong(payload.get("late_fee_ugx"));
+            long deposit = toLong(payload.get("deposit_amount_ugx"));
+            
+            // Extract extras map for any additional fields
+            @SuppressWarnings("unchecked")
+            Map<String, Object> extrasRaw = (Map<String, Object>) payload.getOrDefault("extras", Map.of());
+            Map<String, Long> extras = new java.util.HashMap<>();
+            try {
+                extrasRaw.forEach((k, v) -> extras.put(k, toLong(v)));
+            } catch (Exception e) {
+                throw new com.scanny.exception.ApiException(400, 
+                        "Invalid extras in payload: " + e.getMessage());
+            }
+            
+            AccountingEvent event = new AccountingEvent(
+                    f.getSourceEventId(),                           // eventId
+                    f.getSourceEventType(),                         // eventType
+                    f.getSourceModule(),                            // sourceModule
+                    (String) payload.get("sourceRecordId"),         // sourceRecordId
+                    grossAmount, commission, payeeAmount,           // money
+                    pspFee, lateFee, deposit,                       // more money
+                    (String) payload.get("merchantId"),             // dimensions
+                    (String) payload.get("propertyId"),
+                    (String) payload.get("tenantId"),
+                    (String) payload.get("eventEntityId"),
+                    (String) payload.get("paymentMethod"),
+                    (String) payload.get("description"),            // description
+                    extras                                          // extras
+            );
+
+            // Retry posting via PostingService
+            postingService.post(event);
+            
+            // If successful, mark as resolved
+            f.setStatus("RESOLVED");
+            f.setRetryCount(f.getRetryCount() + 1);
+            f.setUpdatedAt(Instant.now());
+            failureRepo.save(f);
+            
+            log.info("[Accounting] Retry successful for failure id={}", id);
+            return new FailureDto(f.getId(), f.getSourceModule(), f.getSourceEventType(),
+                    f.getSourceEventId(), "Retry successful", f.getRetryCount(),
+                    f.getStatus(), f.getCreatedAt());
+        } catch (Exception e) {
+            // Update error message but keep PENDING
+            log.warn("[Accounting] Retry failed for failure id={}: {}", id, e.getMessage());
+            f.setLastError("Retry failed: " + e.getMessage());
+            f.setRetryCount(f.getRetryCount() + 1);
+            f.setUpdatedAt(Instant.now());
+            failureRepo.save(f);
+            throw new com.scanny.exception.ApiException(500, 
+                    "Retry failed: " + e.getMessage());
+        }
     }
 
     // ── DTOs ─────────────────────────────────────────────────────────────────

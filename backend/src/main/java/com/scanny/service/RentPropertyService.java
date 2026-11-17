@@ -626,24 +626,32 @@ public class RentPropertyService {
         return "RT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
     }
 
+    /**
+     * Generates a 256-bit cryptographically secure property QR token.
+     * Format: 43 characters of URL-safe Base64 (no padding)
+     * Security: 256 bits of entropy, unpredictable, URL-safe
+     */
     private String generateQrToken() {
         for (int i = 0; i < 8; i++) {
-            String token = UUID.randomUUID().toString().replace("-", "");
+            byte[] bytes = new byte[32]; // 256 bits
+            SECURE_RANDOM.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
             if (!propertyRepository.existsByQrToken(token)) return token;
         }
         throw new IllegalStateException("Could not generate unique property QR token");
     }
 
     /**
-     * Generates a 128-bit URL-safe token for a unit's door-sticker QR code.
+     * Generates a 256-bit cryptographically secure token for a unit's door-sticker QR code.
      * Uses {@link SecureRandom} to ensure unpredictability. The token is
-     * base64url-encoded (no padding) producing a 22-character string.
+     * base64url-encoded (no padding) producing a 43-character string.
+     * Security: Upgraded from 128 to 256 bits for maximum security.
      */
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private String generateUnitQrToken() {
         for (int i = 0; i < 8; i++) {
-            byte[] bytes = new byte[16]; // 128 bits
+            byte[] bytes = new byte[32]; // 256 bits (upgraded from 128)
             SECURE_RANDOM.nextBytes(bytes);
             String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
             if (!unitRepository.existsByQrToken(token)) return token;
@@ -651,9 +659,16 @@ public class RentPropertyService {
         throw new IllegalStateException("Could not generate unique unit QR token");
     }
 
+    /**
+     * Generates a 256-bit cryptographically secure tenant pay token.
+     * Format: TPT-{43 characters of URL-safe Base64}
+     * Security: 256 bits of entropy for tenant payment links
+     */
     private String generatePayToken() {
         for (int i = 0; i < 8; i++) {
-            String token = "TPT-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+            byte[] bytes = new byte[32]; // 256 bits
+            SECURE_RANDOM.nextBytes(bytes);
+            String token = "TPT-" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
             if (!tenantRepository.existsByPayToken(token)) return token;
         }
         throw new IllegalStateException("Could not generate unique tenant pay token");

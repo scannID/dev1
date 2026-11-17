@@ -117,8 +117,8 @@ export function MetricsCard({ business }: { business: BusinessLike }) {
           return keycloak.token
         },
         poll: () => load(true),
-        // Slow safety net only — scans/orders should arrive over the socket.
-        pollIntervalMs: 60_000,
+        // Faster fallback in case WebSocket drops
+        pollIntervalMs: 10_000,
         onEvent: (event) => {
           if (
             event.type === 'QR_SCAN_RECORDED' ||

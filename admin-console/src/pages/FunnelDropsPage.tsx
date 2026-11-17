@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+import {
+  Menu, ShoppingCart, Edit3, CreditCard,
+  DollarSign, Clock, Eye, RefreshCw, Smartphone, Utensils, MessageSquare,
+  TrendingDown, PartyPopper, Lightbulb, type LucideIcon
+} from 'lucide-react'
 import { api } from '../api/client'
 import { merchantsApi } from '../api/services'
 import type { Merchant } from '../api/types'
@@ -14,21 +19,21 @@ interface FunnelAnalytics {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STEP_META: Record<string, { label: string; emoji: string; color: string }> = {
-  menu:    { label: 'Browsing menu',     emoji: '📋', color: '#3b82f6' },
-  cart:    { label: 'Reviewing cart',    emoji: '🛒', color: '#f59e0b' },
-  details: { label: 'Filling details',   emoji: '✏️',  color: '#8b5cf6' },
-  pay:     { label: 'At payment step',   emoji: '💳', color: '#ef4444' },
+const STEP_META: Record<string, { label: string; icon: LucideIcon; color: string }> = {
+  menu:    { label: 'Browsing menu',     icon: Menu,         color: '#3b82f6' },
+  cart:    { label: 'Reviewing cart',    icon: ShoppingCart, color: '#f59e0b' },
+  details: { label: 'Filling details',   icon: Edit3,        color: '#8b5cf6' },
+  pay:     { label: 'At payment step',   icon: CreditCard,   color: '#ef4444' },
 }
 
-const REASON_META: Record<string, { label: string; emoji: string }> = {
-  too_expensive:  { label: 'Too expensive',    emoji: '💸' },
-  long_wait:      { label: 'Seemed too slow',  emoji: '⏳' },
-  just_browsing:  { label: 'Just browsing',    emoji: '👀' },
-  changed_mind:   { label: 'Changed mind',     emoji: '🔄' },
-  payment_issue:  { label: 'Payment trouble',  emoji: '📱' },
-  menu_limited:   { label: 'Nothing wanted',   emoji: '🍽️' },
-  other:          { label: 'Other',            emoji: '💬' },
+const REASON_META: Record<string, { label: string; icon: LucideIcon }> = {
+  too_expensive:  { label: 'Too expensive',    icon: DollarSign },
+  long_wait:      { label: 'Seemed too slow',  icon: Clock },
+  just_browsing:  { label: 'Just browsing',    icon: Eye },
+  changed_mind:   { label: 'Changed mind',     icon: RefreshCw },
+  payment_issue:  { label: 'Payment trouble',  icon: Smartphone },
+  menu_limited:   { label: 'Nothing wanted',   icon: Utensils },
+  other:          { label: 'Other',            icon: MessageSquare },
 }
 
 const DAYS_OPTIONS = [
@@ -47,11 +52,14 @@ async function fetchAnalytics(businessId: string, days: number): Promise<FunnelA
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StepBar({ step, count, total }: { step: string; count: number; total: number }) {
-  const meta = STEP_META[step] ?? { label: step, emoji: '📍', color: '#6b7280' }
+  const meta = STEP_META[step] ?? { label: step, icon: Menu, color: '#6b7280' }
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
+  const Icon = meta.icon
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-      <span style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{meta.emoji}</span>
+      <span style={{ width: 24, textAlign: 'center', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+        <Icon size={18} style={{ color: meta.color }} />
+      </span>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>{meta.label}</span>
@@ -72,8 +80,9 @@ function StepBar({ step, count, total }: { step: string; count: number; total: n
 }
 
 function ReasonChip({ reason, count, maxCount }: { reason: string; count: number; maxCount: number }) {
-  const meta = REASON_META[reason] ?? { label: reason, emoji: '❓' }
+  const meta = REASON_META[reason] ?? { label: reason, icon: MessageSquare }
   const pct = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
+  const Icon = meta.icon
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -81,7 +90,7 @@ function ReasonChip({ reason, count, maxCount }: { reason: string; count: number
       borderRadius: 10, border: '1px solid var(--border)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 16 }}>{meta.emoji}</span>
+        <Icon size={16} style={{ color: 'var(--foreground)' }} />
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)' }}>{meta.label}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -217,7 +226,7 @@ export default function FunnelDropsPage() {
           textAlign: 'center', padding: '60px 20px',
           background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)',
         }}>
-          <p style={{ fontSize: 36, margin: 0 }}>🎉</p>
+          <PartyPopper size={36} style={{ display: 'inline-block', color: 'var(--primary)' }} />
           <p style={{ marginTop: 12, fontSize: 15, fontWeight: 600, color: 'var(--foreground)' }}>
             No drop-offs recorded
           </p>
@@ -238,7 +247,7 @@ export default function FunnelDropsPage() {
             background: 'color-mix(in oklch, var(--primary) 8%, transparent)',
             borderRadius: 12, border: '1px solid color-mix(in oklch, var(--primary) 20%, transparent)',
           }}>
-            <span style={{ fontSize: 28 }}>📉</span>
+            <TrendingDown size={28} style={{ color: 'var(--primary)' }} />
             <div>
               <p style={{ margin: 0, fontSize: 28, fontWeight: 800, color: 'var(--foreground)' }}>
                 {totalDrops.toLocaleString()}
@@ -285,7 +294,7 @@ export default function FunnelDropsPage() {
                   ))
                 ) : (
                   <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-                    <p style={{ fontSize: 24, margin: 0 }}>💬</p>
+                    <MessageSquare size={24} style={{ display: 'inline-block', marginBottom: 8, color: 'var(--muted-foreground)' }} />
                     <p style={{ marginTop: 8, fontSize: 13 }}>
                       No feedback yet. Customers see the nudge on their next scan.
                     </p>
@@ -303,18 +312,18 @@ export default function FunnelDropsPage() {
               border: '1px solid var(--border)',
               display: 'flex', alignItems: 'flex-start', gap: 12,
             }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
+              <Lightbulb size={18} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)', lineHeight: 1.6 }}>
                 <strong style={{ color: 'var(--foreground)' }}>Biggest drop-off: </strong>
                 {(() => {
                   const top = data.byStep[0]
-                  const meta = STEP_META[top.step] ?? { label: top.step, emoji: '' }
+                  const meta = STEP_META[top.step] ?? { label: top.step, icon: Menu }
                   const pct = totalDrops > 0 ? Math.round((top.count / totalDrops) * 100) : 0
                   return `${top.count.toLocaleString()} customers (${pct}%) left at the "${meta.label}" step. `
                 })()}
                 {data.byFeedbackReason.length > 0 && (() => {
                   const topReason = data.byFeedbackReason[0]
-                  const meta = REASON_META[topReason.reason] ?? { label: topReason.reason, emoji: '' }
+                  const meta = REASON_META[topReason.reason] ?? { label: topReason.reason, icon: MessageSquare }
                   return `Top reason given: "${meta.label}" (${topReason.count} responses).`
                 })()}
               </p>

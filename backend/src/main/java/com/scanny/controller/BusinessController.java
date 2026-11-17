@@ -8,10 +8,12 @@ import com.scanny.dto.RequestDtos.CreateBusinessRequest;
 import com.scanny.dto.RequestDtos.CreateOrderRequest;
 import com.scanny.dto.FunnelDtos;
 import com.scanny.dto.admin.AdminAnalyticsDtos;
+import com.scanny.exception.ApiException;
 import com.scanny.service.BusinessService;
 import com.scanny.service.FunnelDropService;
 import com.scanny.service.MerchantAnalyticsService;
 import com.scanny.service.OrderService;
+import com.scanny.service.QrAuditService;
 import com.scanny.service.QrScanService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -36,19 +38,22 @@ public class BusinessController {
     private final QrScanService qrScanService;
     private final MerchantAnalyticsService merchantAnalyticsService;
     private final FunnelDropService funnelDropService;
+    private final QrAuditService qrAuditService;
 
     public BusinessController(
             BusinessService businessService,
             OrderService orderService,
             QrScanService qrScanService,
             MerchantAnalyticsService merchantAnalyticsService,
-            FunnelDropService funnelDropService
+            FunnelDropService funnelDropService,
+            QrAuditService qrAuditService
     ) {
         this.businessService = businessService;
         this.orderService = orderService;
         this.qrScanService = qrScanService;
         this.merchantAnalyticsService = merchantAnalyticsService;
         this.funnelDropService = funnelDropService;
+        this.qrAuditService = qrAuditService;
     }
 
     @GetMapping("/businesses")
@@ -63,8 +68,25 @@ public class BusinessController {
     }
 
     @GetMapping("/qr/{qrToken}")
-    public Map<String, BusinessResponse> getByQr(@PathVariable String qrToken) {
-        return Map.of("business", businessService.getBusinessByQrToken(qrToken));
+    public Map<String, BusinessResponse> getByQr(
+            @PathVariable String qrToken,
+            HttpServletRequest request) {
+        try {
+            BusinessResponse business = businessService.getBusinessByQrToken(qrToken);
+            
+            // Audit successful QR scan
+            qrAuditService.logSuccess(qrToken, "BUSINESS", "SCAN", request, business.id());
+            
+            return Map.of("business", business);
+        } catch (ApiException e) {
+            // Audit failed QR scan
+            if (e.getStatus() == 404) {
+                qrAuditService.logInvalid(qrToken, "BUSINESS", request);
+            } else {
+                qrAuditService.logDenied(qrToken, "BUSINESS", "SCAN", request, e.getMessage());
+            }
+            throw e;
+        }
     }
 
     @GetMapping("/businesses/{businessId}")

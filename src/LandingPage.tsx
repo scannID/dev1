@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import {
   Scissors,
   Check,
@@ -33,7 +33,7 @@ const C = {
 
 const FONT = "'Outfit Variable', 'Outfit', ui-sans-serif, system-ui, sans-serif"
 
-// Landing hero only � events page uses /hero-bg.jpg separately.
+// Landing hero only — events page uses /hero-bg.jpg separately.
 const heroPhoto = '/hero-restaurant.jpg'
 
 /* -------------------------------------------------------------
@@ -201,7 +201,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
                 letterSpacing: '0.1em',
               }}
             >
-              BREW HOUSE CAF� � ONE CODE, ALL ORDERS
+              BREW HOUSE CAFÉ — ONE CODE, ALL ORDERS
             </div>
           </div>
 
@@ -270,7 +270,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
 
             <span>
               {visible < orderLines.length
-                ? 'PRINTING�'
+                ? 'PRINTING…'
                 : 'IN KITCHEN'}
             </span>
           </div>
@@ -334,7 +334,7 @@ function OrderTicket({ onStamped }: { onStamped?: (v: boolean) => void }) {
 }
 
 /* -------------------------------------------------------------
-   Order tracker � slides out from the receipt after CONFIRMED
+   Order tracker — slides out from the receipt after CONFIRMED
    ------------------------------------------------------------- */
 
 const trackSteps = [
@@ -384,7 +384,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
           color: C.inkSoft, marginBottom: 18,
           fontFamily: FONT,
         }}>
-          ORDER ? 0482 � TRACKING
+          ORDER #0482 — TRACKING
         </div>
 
         {/* Vertical step list */}
@@ -447,7 +447,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
 }
 
 /* -------------------------------------------------------------
-   Order scene � receipt ? tracker slides in from right ? ticket book
+   Order scene — receipt ? tracker slides in from right ? ticket book
    ------------------------------------------------------------- */
 
 type ScenePhase = 'receipt' | 'tracker' | 'tickets'
@@ -490,7 +490,7 @@ function OrderScene() {
         <OrderTracker visible={confirmed} onComplete={handleTrackComplete} />
       </div>
 
-      {/* -- Ticket book (phase: tickets) � split-flap departures board -- */}
+      {/* -- Ticket book (phase: tickets) — split-flap departures board -- */}
       <div style={{
         position: phase !== 'tickets' ? 'absolute' : 'relative',
         inset: 0,
@@ -579,7 +579,7 @@ function EventTicketStub() {
             marginBottom: 6,
           }}
         >
-          ADMIT ONE � EVENT TICKET
+          ADMIT ONE — EVENT TICKET
         </div>
 
         <div
@@ -603,7 +603,7 @@ function EventTicketStub() {
             marginBottom: 14,
           }}
         >
-          JINJA � SAT 24 OCT � GATE 7:00 PM
+          JINJA — SAT 24 OCT — GATE 7:00 PM
         </div>
 
         <div
@@ -743,7 +743,7 @@ function EventTicketStub() {
 }
 
 /* -------------------------------------------------------------
-   Ticket Book replacement � "DEPARTURES BOARD" split-flap widget
+   Ticket Book replacement — "DEPARTURES BOARD" split-flap widget
    ------------------------------------------------------------- */
 
 const FB = {
@@ -770,7 +770,7 @@ function flapPad(str: string, len: number) {
   return s + ' '.repeat(len - s.length)
 }
 
-/* Single flap cell � flips on character change */
+/* Single flap cell — flips on character change */
 function FlapChar({ char, delay = 0, size = 15 }: { char: string; delay?: number; size?: number }) {
   const [display, setDisplay] = useState(char)
   const [flip, setFlip] = useState(false)
@@ -930,7 +930,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
           </div>
         </div>
 
-        {/* title � per-character flap */}
+        {/* title — per-character flap */}
         <div style={{ overflowX: 'auto', marginBottom: 12 }}>
           <FlapWord text={ev.title} width={FLAP_TITLE_WIDTH} size={19} />
         </div>
@@ -953,7 +953,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
 
         <div style={{ borderTop: `1px dashed ${C.ink}33`, marginBottom: 16 }} />
 
-        {/* sold counter � digit flaps */}
+        {/* sold counter — digit flaps */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FlapNumber value={sold} digits={3} size={17} />
@@ -978,7 +978,7 @@ function DeparturesBoard({ onDone }: { onDone?: () => void } = {}) {
 }
 
 /* -------------------------------------------------------------
-   Property management � animated rent ledger scene
+   Property management — animated rent ledger scene
    ------------------------------------------------------------- */
 
 const rentUnits = [
@@ -993,7 +993,7 @@ function statusChip(s: string) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
     PAID:    { bg: `${C.ok}22`,    color: C.ok,    label: '? PAID' },
     OVERDUE: { bg: `${C.stamp}22`, color: C.stamp, label: '! OVERDUE' },
-    UNPAID:  { bg: `${C.ink}11`,   color: C.inkSoft, label: '� UNPAID' },
+    UNPAID:  { bg: `${C.ink}11`,   color: C.inkSoft, label: '— UNPAID' },
     PARTIAL: { bg: `${C.spike}22`, color: C.spike, label: '~ PARTIAL' },
   }
   const m = map[s] ?? map.UNPAID
@@ -1045,7 +1045,7 @@ function RentLedger() {
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 4 }}>
             <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '0.06em', color: C.ink }}>Koddly</div>
-            <div style={{ fontSize: 9.5, fontWeight: 500, color: C.inkSoft, letterSpacing: '0.1em' }}>SUNSET COURT � RENT LEDGER</div>
+            <div style={{ fontSize: 9.5, fontWeight: 500, color: C.inkSoft, letterSpacing: '0.1em' }}>SUNSET COURT — RENT LEDGER</div>
           </div>
           <div style={{ borderTop: `1px dashed ${C.ink}55`, margin: '12px 0' }} />
 
@@ -1083,7 +1083,7 @@ function RentLedger() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 600, color: C.inkSoft }}>
             <span>{visible} / {rentUnits.length} UNITS LOADED</span>
             <span style={{ color: C.ok }}>
-              {visible >= rentUnits.length ? '? LIVE' : '? SYNCING�'}
+              {visible >= rentUnits.length ? '? LIVE' : '? SYNCING—'}
             </span>
           </div>
 
@@ -1347,7 +1347,7 @@ const topFeatures = [
   {
     Icon: ClipboardList,
     title: 'Live order dashboard',
-    body: 'Orders land in real time � pending to ready in a tap.',
+    body: 'Orders land in real time — pending to ready in a tap.',
     photo: '/features/dashboard.jpg',
     objectPosition: 'center top',
   },
@@ -1612,7 +1612,7 @@ function Manifest() {
               {v.name}
             </span>
 
-            <span>� {v.city.toUpperCase()}</span>
+            <span>— {v.city.toUpperCase()}</span>
           </div>
         ))}
       </div>
@@ -1621,7 +1621,7 @@ function Manifest() {
 }
 
 /* -------------------------------------------------------------
-   Photo strip � real photographs, taped in like proofs pinned to
+   Photo strip — real photographs, taped in like proofs pinned to
    a corkboard above the counter. This is the one place real
    photography enters an otherwise illustrated page, so it's kept
    small, tactile, and framed like physical prints rather than a
@@ -1772,7 +1772,7 @@ function PhotoStrip() {
    ------------------------------------------------------------- */
 
 /* -------------------------------------------------------------
-   Shared "Get Started" button � matches the header stamp style
+   Shared "Get Started" button — matches the header stamp style
    ------------------------------------------------------------- */
 
 function GetStartedButton({ onClick }: { onClick?: () => void }) {
@@ -2225,7 +2225,7 @@ export default function KodteLandingTicket({
             overflow: 'hidden',
           }}
         >
-          {/* Backdrop photo � a real counter, faded under a paper wash
+          {/* Backdrop photo — a real counter, faded under a paper wash
               so the illustration reads as printed on top of it rather
               than a photo competing with the ticket graphics. */}
           <div
@@ -2249,7 +2249,7 @@ export default function KodteLandingTicket({
               }}
             />
 
-            {/* paper-toned scrim � readable text on the left, photo visible on the right */}
+            {/* paper-toned scrim — readable text on the left, photo visible on the right */}
             <div
               style={{
                 position: 'absolute',
@@ -2512,7 +2512,7 @@ export default function KodteLandingTicket({
           <TicketStack />
         </section>
 
-        {/* PHOTO STRIP � real photography, taped in like counter proofs */}
+        {/* PHOTO STRIP — real photography, taped in like counter proofs */}
         <PhotoStrip />
 
         {/* EVENT TICKETING */}
@@ -2558,7 +2558,7 @@ export default function KodteLandingTicket({
               margin: '0 auto 28px',
             }}
           >
-            Same platform, same QR � sell tickets, scan at the gate, watch sales live.
+            Same platform, same QR — sell tickets, scan at the gate, watch sales live.
           </p>
           </div>
 
@@ -2592,7 +2592,7 @@ export default function KodteLandingTicket({
               PROPERTY MANAGEMENT
             </h2>
             <p style={{ fontFamily: FONT, fontSize: 14, fontWeight: 400, lineHeight: 1.7, color: C.inkSoft, maxWidth: 480, margin: '0 auto' }}>
-              Collect rent, manage leases, handle maintenance requests � all from one dashboard. Tenants scan a QR to pay and report issues from their phone.
+              Collect rent, manage leases, handle maintenance requests — all from one dashboard. Tenants scan a QR to pay and report issues from their phone.
             </p>
           </div>
 
@@ -2610,7 +2610,7 @@ export default function KodteLandingTicket({
               {[
                 { n: '01', title: 'Add your property', body: 'Units, monthly amounts, grace periods. Set up in minutes.' },
                 { n: '02', title: 'QR codes per unit', body: 'Print a QR code for every unit. Tenants scan it to pay rent straight from their phone.' },
-                { n: '03', title: 'Track everything', body: 'Paid, overdue, partial � live. Reminders go out automatically.' },
+                { n: '03', title: 'Track everything', body: 'Paid, overdue, partial — live. Reminders go out automatically.' },
               ].map((s, i) => (
                 <div key={s.n} style={{
                   background: C.paperLt,
@@ -2901,7 +2901,7 @@ export default function KodteLandingTicket({
               }}
             >
               <span>
-                � {new Date().getFullYear()} Qbilabs SMC.
+                © {new Date().getFullYear()} Qbilabs SMC.
                 All rights reserved.
               </span>
             </div>

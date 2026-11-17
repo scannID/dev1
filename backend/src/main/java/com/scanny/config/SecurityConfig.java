@@ -145,7 +145,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/businesses/*/operations/reservations").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/businesses/*/operations/reservations/**").permitAll()
                 .requestMatchers("/api/businesses/*/operations/branches").hasRole("MERCHANT")
-                .requestMatchers("/api/businesses/**").hasAnyRole("MERCHANT", "STAFF_MANAGER", "STAFF")
+                .requestMatchers("/api/businesses/**").hasAnyRole("MERCHANT", "STAFF_MANAGER", "STAFF", "ADMIN")
                 .requestMatchers("/api/catalog/**").hasAnyRole("MERCHANT", "STAFF_MANAGER", "STAFF")
                 .requestMatchers("/api/orders/**").hasAnyRole("MERCHANT", "ADMIN", "STAFF_MANAGER", "STAFF")
                 .requestMatchers("/api/receipts/**").hasAnyRole("MERCHANT", "ADMIN", "STAFF_MANAGER", "STAFF")
