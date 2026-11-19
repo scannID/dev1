@@ -283,10 +283,13 @@ public class RentPaymentService {
 
     private RentDtos.TenantPayContext buildPropertyContext(RentProperty prop) {
         List<RentUnit> units = unitRepository.findByProperty_IdOrderByUnitNumberAsc(prop.getId());
-        List<RentDtos.UnitPickOption> options = units.stream().map(u ->
-                new RentDtos.UnitPickOption(
+        // Only show vacant units with their details (bedrooms, bathrooms, amenities)
+        List<RentDtos.UnitPickOption> options = units.stream()
+                .filter(u -> u.getActiveTenant() == null)  // Only vacant units
+                .map(u -> new RentDtos.UnitPickOption(
                         u.getId(), u.getUnitNumber(), u.getFloor(),
-                        u.getMonthlyAmount(), u.getActiveTenant() != null))
+                        u.getMonthlyAmount(), false, // occupied is always false now
+                        u.getBedrooms(), u.getBathrooms(), u.getAmenities()))
                 .toList();
 
         // No unit selected yet — balance/days fields are null at property level

@@ -1,5 +1,5 @@
 ﻿import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import QRCode from 'qrcode'
+import QRCodeStyling from 'qr-code-styling'
 import { Building2, AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, DollarSign, FileText, Home, LayoutGrid, LogOut, Maximize2, Menu, Minimize2, Moon, Plus, Search, SlidersHorizontal, Sun, Users, Wallet, Wrench, X } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { rentDashboardApi } from './api'
@@ -21,6 +21,106 @@ import type {
   MaintenanceRequest,
 } from './types'
 import AddPropertyModal from './AddPropertyModal'
+
+// ── RED sparkline animation for vacant units ──────────────────────────────────────
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes red-sparkle-travel {
+    0% {
+      border-image-source: linear-gradient(
+        90deg,
+        rgb(239, 68, 68) 0%,
+        rgb(239, 68, 68) 40%,
+        rgb(255, 100, 100) 45%,
+        rgb(255, 150, 150) 50%,
+        rgb(255, 100, 100) 55%,
+        rgb(239, 68, 68) 60%,
+        rgb(239, 68, 68) 100%
+      );
+    }
+    100% {
+      border-image-source: linear-gradient(
+        90deg,
+        rgb(239, 68, 68) -100%,
+        rgb(239, 68, 68) -60%,
+        rgb(255, 100, 100) -55%,
+        rgb(255, 150, 150) -50%,
+        rgb(255, 100, 100) -45%,
+        rgb(239, 68, 68) -40%,
+        rgb(239, 68, 68) 0%
+      );
+    }
+  }
+  
+  @keyframes red-glow-pulse {
+    0%, 100% {
+      box-shadow: 
+        0 0 8px rgba(239, 68, 68, 0.3),
+        inset 0 0 8px rgba(239, 68, 68, 0.05);
+    }
+    50% {
+      box-shadow: 
+        0 0 12px rgba(239, 68, 68, 0.5),
+        inset 0 0 12px rgba(239, 68, 68, 0.1);
+    }
+  }
+  
+  .vacant-unit-pulse {
+    position: relative;
+    border: 2px solid rgb(239, 68, 68) !important;
+    background: linear-gradient(
+      90deg,
+      rgba(239, 68, 68, 0.02) 0%,
+      rgba(239, 68, 68, 0.04) 25%,
+      rgba(255, 150, 150, 0.08) 50%,
+      rgba(239, 68, 68, 0.04) 75%,
+      rgba(239, 68, 68, 0.02) 100%
+    );
+    background-size: 200% 100%;
+    animation: 
+      red-glow-pulse 2s ease-in-out infinite,
+      red-sparkle-travel 1.5s linear infinite;
+    background-position: 0% 0%;
+  }
+  
+  @keyframes bg-sweep {
+    0% {
+      background-position: -200% 0%;
+    }
+    100% {
+      background-position: 200% 0%;
+    }
+  }
+  
+  .vacant-unit-pulse::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border: 2px solid transparent;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(255, 150, 150, 0.6) 48%,
+      rgba(255, 200, 200, 0.8) 50%,
+      rgba(255, 150, 150, 0.6) 52%,
+      transparent 60%,
+      transparent 100%
+    ) border-box;
+    background-size: 200% 100%;
+    animation: bg-sweep 1.5s linear infinite;
+    pointer-events: none;
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+  }
+`
+document.head.appendChild(style)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,8 +159,14 @@ const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
   WAIVED: { bg: '#f3f4f6', color: '#6b7280' },
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isVacant }: { status: string; isVacant?: boolean }) {
   const s = STATUS_STYLES[status] ?? { bg: '#f3f4f6', color: '#6b7280' }
+  
+  // Override with red styling for vacant units
+  const finalStyle = isVacant 
+    ? { bg: 'rgb(254, 226, 226)', color: 'rgb(239, 68, 68)' }
+    : s
+  
   return (
     <span
       style={{
@@ -69,8 +175,9 @@ function StatusBadge({ status }: { status: string }) {
         borderRadius: 20,
         fontSize: 11,
         fontWeight: 700,
-        background: s.bg,
-        color: s.color,
+        background: finalStyle.bg,
+        color: finalStyle.color,
+        border: isVacant ? '1px solid rgb(239, 68, 68)' : 'none',
       }}
     >
       {status}
@@ -94,9 +201,9 @@ function QRCodePanel({
   size?: number
 }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(defaultExpanded)
   const [genError, setGenError] = useState<string | null>(null)
-  const imgRef = useRef<HTMLImageElement>(null)
+  const qrContainerRef = useRef<HTMLDivElement>(null)
+  const qrCodeRef = useRef<QRCodeStyling | null>(null)
 
   useEffect(() => {
     if (!url) {
@@ -104,22 +211,63 @@ function QRCodePanel({
       setGenError('No QR URL')
       return
     }
-    let cancelled = false
-    setGenError(null)
-    QRCode.toDataURL(url, {
-      width: Math.max(size, 400),
-      margin: 4,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#111827', light: '#ffffff' },
-    })
-      .then((d) => {
-        if (!cancelled) setDataUrl(d)
+    
+    try {
+      setGenError(null)
+      
+      // Create Instagram-style QR code with rounded dots
+      const qrCode = new QRCodeStyling({
+        width: Math.max(size, 400),
+        height: Math.max(size, 400),
+        data: url,
+        margin: 10,
+        qrOptions: {
+          errorCorrectionLevel: 'M',
+        },
+        dotsOptions: {
+          type: 'rounded', // Instagram-style rounded dots
+          color: '#ea580c', // Orange color (Koddly brand)
+        },
+        cornersSquareOptions: {
+          type: 'extra-rounded', // Rounded corner squares
+          color: '#ea580c',
+        },
+        cornersDotOptions: {
+          type: 'dot', // Rounded corner dots
+          color: '#ea580c',
+        },
+        backgroundOptions: {
+          color: '#ffffff',
+        },
+        imageOptions: {
+          crossOrigin: 'anonymous',
+          margin: 10,
+          imageSize: 0.3,
+        },
+        image: '/koddlylogo3.png', // Koddly logo in center
       })
-      .catch(() => {
-        if (!cancelled) setGenError('Could not generate QR image')
+      
+      qrCodeRef.current = qrCode
+      
+      // Generate data URL for printing and display
+      qrCode.getRawData('png').then((blob) => {
+        if (blob) {
+          const reader = new FileReader()
+          reader.onload = () => {
+            setDataUrl(reader.result as string)
+          }
+          reader.readAsDataURL(blob)
+        }
+      }).catch(() => {
+        setGenError('Could not generate QR image')
       })
+      
+    } catch (error) {
+      setGenError('Could not generate QR image')
+    }
+    
     return () => {
-      cancelled = true
+      qrCodeRef.current = null
     }
   }, [url, size])
 
@@ -133,85 +281,46 @@ function QRCodePanel({
     w.document.close()
   }
 
-  function handleCopy() {
-    void navigator.clipboard.writeText(url).catch(() => {})
-  }
-
   return (
-    <div style={{ marginTop: 12 }}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        style={{
-          fontSize: 13,
-          padding: '6px 14px',
-          borderRadius: 6,
-          border: '1px solid var(--border)',
-          background: 'var(--card)',
-          cursor: 'pointer',
-          color: 'var(--foreground)',
-        }}
-      >
-        {expanded ? '▲ Hide QR code' : '▼ Show QR code'}
-      </button>
-      {expanded && (
-        <div
+    <div>
+      {/* QR image */}
+      {dataUrl ? (
+        <img
+          src={dataUrl}
+          alt={`QR code for ${label}`}
           style={{
-            marginTop: 12,
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            gap: 16,
+            width: size,
+            height: size,
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: '#fff',
+            display: 'block',
+            margin: '0 auto',
           }}
-        >
-          {/* QR image */}
-          {dataUrl ? (
-            <img
-              ref={imgRef}
-              src={dataUrl}
-              alt={`QR code for ${label}`}
-              style={{
-                width: size,
-                height: size,
-                borderRadius: 8,
-                border: '1px solid var(--border)',
-                background: '#fff',
-                flexShrink: 0,
-              }}
-            />
-          ) : (
-            <p style={{ color: genError ? 'var(--destructive)' : 'var(--muted-foreground)', fontSize: 13 }}>
-              {genError ?? 'Generating…'}
-            </p>
-          )}
+        />
+      ) : (
+        <p style={{ color: genError ? 'var(--destructive)' : 'var(--muted-foreground)', fontSize: 13, textAlign: 'center' }}>
+          {genError ?? 'Generating…'}
+        </p>
+      )}
 
-          {/* Buttons column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={!dataUrl}
-              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', color: 'var(--foreground)' }}
-            >
-              Print
-            </button>
-            <button
-              type="button"
-              onClick={handleCopy}
-              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', color: 'var(--foreground)' }}
-            >
-              Copy link
-            </button>
-            {dataUrl && (
-              <a
-                href={dataUrl}
-                download={`${label.replace(/\s+/g, '-')}.png`}
-                style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', textDecoration: 'none', color: 'var(--foreground)', textAlign: 'center' }}
-              >
-                Download PNG
-              </a>
-            )}
-          </div>
+      {/* Buttons below QR */}
+      {dataUrl && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', color: 'var(--foreground)' }}
+          >
+            Print
+          </button>
+          <a
+            href={dataUrl}
+            download={`${label.replace(/\s+/g, '-')}.png`}
+            style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', textDecoration: 'none', color: 'var(--foreground)', textAlign: 'center' }}
+          >
+            Download PNG
+          </a>
         </div>
       )}
     </div>
@@ -322,8 +431,10 @@ function UnitRow({
 }) {
   const { unit, currentCharge } = row
   const tenant = unit.activeTenant
+  const isVacant = !tenant
+  
   return (
-    <TableRow className="border-b border-border hover:bg-muted/40">
+    <TableRow className={`border-b border-border hover:bg-muted/40 ${isVacant ? 'vacant-unit-pulse' : ''}`}>
       <TableCell className="pl-5 py-2.5">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span className="text-sm font-bold text-foreground">{unit.unitNumber}</span>
@@ -346,18 +457,22 @@ function UnitRow({
           </div>
         ) : (
           <div>
-            <span className="text-sm text-muted-foreground">Vacant</span>
+            <span className="text-sm font-semibold" style={{ color: 'rgb(239, 68, 68)' }}>Vacant</span>
             {canManage && (
               <button type="button" onClick={() => onManageTenant(unit)} className="scanny-link-btn" style={{ display: 'block', fontSize: 11, marginTop: 2 }}>Add tenant</button>
             )}
           </div>
         )}
       </TableCell>
-      <TableCell className="text-sm font-mono font-medium text-foreground py-2.5">{money(unit.monthlyAmount, currency)}</TableCell>
+      <TableCell className="text-sm font-mono font-medium py-2.5">
+        <span style={{ color: isVacant ? 'rgb(239, 68, 68)' : 'var(--foreground)' }}>
+          {money(unit.monthlyAmount, currency)}
+        </span>
+      </TableCell>
       <TableCell className="py-2.5">
         {currentCharge ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <StatusBadge status={currentCharge.status} />
+            <StatusBadge status={currentCharge.status} isVacant={isVacant} />
             {currentCharge.outstandingAmount > 0 && currentCharge.status !== 'PAID' && (
               <span className="text-xs text-muted-foreground">bal {money(currentCharge.outstandingAmount, currency)}</span>
             )}
@@ -373,10 +488,7 @@ function UnitRow({
           {unit.qrCodeUrl && (
             <button type="button" onClick={() => onShowQr(unit)} className="scanny-link-btn" style={{ fontSize: 12 }}>Unit QR</button>
           )}
-          {tenant?.payUrl && (
-            <a href={tenant.payUrl} target="_blank" rel="noreferrer" className="scanny-link" style={{ fontSize: 12 }}>Pay link</a>
-          )}
-          {!unit.qrCodeUrl && !tenant?.payUrl && <span className="text-muted-foreground text-sm">—</span>}
+          {!unit.qrCodeUrl && <span className="text-muted-foreground text-sm">—</span>}
         </div>
       </TableCell>
     </TableRow>
@@ -399,9 +511,9 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
   const [addUnitNum, setAddUnitNum] = useState('')
   const [addUnitFloor, setAddUnitFloor] = useState('')
   const [addUnitAmount, setAddUnitAmount] = useState('')
-  const [addUnitDeposit, setAddUnitDeposit] = useState('')
-  const [addUnitDueDay, setAddUnitDueDay] = useState('5')
-  const [addUnitGrace, setAddUnitGrace] = useState('0')
+  const [addUnitBedrooms, setAddUnitBedrooms] = useState('')
+  const [addUnitBathrooms, setAddUnitBathrooms] = useState('')
+  const [addUnitAmenities, setAddUnitAmenities] = useState('')
   const [addingUnit, setAddingUnit] = useState(false)
   const [addUnitError, setAddUnitError] = useState<string | null>(null)
 
@@ -410,9 +522,9 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
   const [editUnitNum, setEditUnitNum] = useState('')
   const [editUnitFloor, setEditUnitFloor] = useState('')
   const [editUnitAmount, setEditUnitAmount] = useState('')
-  const [editUnitDeposit, setEditUnitDeposit] = useState('')
-  const [editUnitDueDay, setEditUnitDueDay] = useState('5')
-  const [editUnitGrace, setEditUnitGrace] = useState('0')
+  const [editUnitBedrooms, setEditUnitBedrooms] = useState('')
+  const [editUnitBathrooms, setEditUnitBathrooms] = useState('')
+  const [editUnitAmenities, setEditUnitAmenities] = useState('')
   const [savingUnit, setSavingUnit] = useState(false)
   const [editUnitError, setEditUnitError] = useState<string | null>(null)
 
@@ -566,7 +678,7 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
     }
     const monthly = Number(addUnitAmount)
     if (!addUnitAmount || Number.isNaN(monthly)) {
-      setAddUnitError('Monthly amount is required')
+      setAddUnitError('Monthly rent is required')
       return
     }
     setAddingUnit(true)
@@ -575,16 +687,16 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
         unitNumber: addUnitNum.trim(),
         floor: addUnitFloor.trim() || undefined,
         monthlyAmount: monthly,
-        depositAmount: addUnitDeposit ? Number(addUnitDeposit) : undefined,
-        dueDayOfMonth: Number(addUnitDueDay) || 5,
-        gracePeriodDays: Number(addUnitGrace) || 0,
+        bedrooms: addUnitBedrooms ? Number(addUnitBedrooms) : undefined,
+        bathrooms: addUnitBathrooms ? Number(addUnitBathrooms) : undefined,
+        amenities: addUnitAmenities.trim() || undefined,
       })
       setAddUnitNum('')
       setAddUnitFloor('')
       setAddUnitAmount('')
-      setAddUnitDeposit('')
-      setAddUnitDueDay('5')
-      setAddUnitGrace('0')
+      setAddUnitBedrooms('')
+      setAddUnitBathrooms('')
+      setAddUnitAmenities('')
       setShowAddUnit(false)
       await load()
       // Notify parent to refresh overview
@@ -603,9 +715,9 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
     setEditUnitNum(unit.unitNumber)
     setEditUnitFloor(unit.floor)
     setEditUnitAmount(String(unit.monthlyAmount))
-    setEditUnitDeposit(String(unit.depositAmount))
-    setEditUnitDueDay(String(unit.dueDayOfMonth))
-    setEditUnitGrace(String(unit.gracePeriodDays))
+    setEditUnitBedrooms(unit.bedrooms != null ? String(unit.bedrooms) : '')
+    setEditUnitBathrooms(unit.bathrooms != null ? String(unit.bathrooms) : '')
+    setEditUnitAmenities(unit.amenities || '')
     setEditUnitError(null)
   }
 
@@ -615,7 +727,7 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
     setEditUnitError(null)
     const monthly = Number(editUnitAmount)
     if (Number.isNaN(monthly)) {
-      setEditUnitError('Monthly amount must be a number')
+      setEditUnitError('Monthly rent must be a number')
       return
     }
     setSavingUnit(true)
@@ -624,9 +736,9 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
         unitNumber: editUnitNum.trim(),
         floor: editUnitFloor.trim() || undefined,
         monthlyAmount: monthly,
-        depositAmount: editUnitDeposit ? Number(editUnitDeposit) : 0,
-        dueDayOfMonth: Number(editUnitDueDay) || 5,
-        gracePeriodDays: Number(editUnitGrace) || 0,
+        bedrooms: editUnitBedrooms ? Number(editUnitBedrooms) : undefined,
+        bathrooms: editUnitBathrooms ? Number(editUnitBathrooms) : undefined,
+        amenities: editUnitAmenities.trim() || undefined,
       })
       setEditUnit(null)
       await load()
@@ -823,28 +935,55 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
 
   return (
     <div className="scanny-page" style={{ padding: '16px 12px 60px' }}>
-      <button type="button" onClick={onBack} className="scanny-back">
-        ← Portfolio
-      </button>
+      {/* Back button and Header with Property QR on the right */}
+      <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
+        <div style={{ flex: 1 }}>
+          <button type="button" onClick={onBack} className="scanny-back">
+            ← Portfolio
+          </button>
 
-      {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: '2px 8px',
-            borderRadius: 10,
-            background: 'var(--muted)',
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          {role}
-        </span>
-        <h1 style={{ margin: '8px 0 2px', fontSize: 22, fontWeight: 800 }}>{d.property.name}</h1>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>
-          {[d.property.address, d.property.city].filter(Boolean).join(', ')}
-        </p>
+          <div style={{ marginTop: 16 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: 'var(--muted)',
+                color: 'var(--muted-foreground)',
+              }}
+            >
+              {role}
+            </span>
+            <h1 style={{ margin: '8px 0 2px', fontSize: 22, fontWeight: 800 }}>{d.property.name}</h1>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>
+              {[d.property.address, d.property.city].filter(Boolean).join(', ')}
+            </p>
+          </div>
+        </div>
+
+        {/* Property QR - always visible on the right */}
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', padding: '14px', width: 220 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)', display: 'block', marginBottom: 8 }}>Property QR</span>
+            <QRCodePanel
+              url={d.property.qrCodeUrl}
+              label={d.property.name}
+              sublabel="All units"
+              defaultExpanded={true}
+              size={140}
+            />
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => rentDashboardApi.downloadBulkQrPdf(propertyId, d.property.name)}
+                style={{ ...btnSecondaryStyle, fontSize: 11, padding: '6px 10px', marginTop: 10 }}
+              >
+                Bulk PDF
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -934,42 +1073,39 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
             ))}
           </div>
 
-          {/* Two-column: units table (left) + QR panel (right) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, alignItems: 'start' }}>
-
-            {/* Left: units table + add unit */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="overflow-hidden rounded-xl border border-border bg-card">
-                <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Units</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>Rent, tenants and payment status for the period</p>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent border-b border-border">
-                      <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Unit</TableHead>
-                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Tenant</TableHead>
-                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Monthly rent</TableHead>
-                      <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
-                      <TableHead className="pr-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Pay link</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {d.units.map((row) => (
-                      <UnitRow
-                        key={row.unit.id}
-                        row={row}
-                        currency={currency}
-                        canManage={canManage}
-                        onGenerateCharge={handleGenerateSingle}
-                        onShowQr={setActiveQrUnit}
-                        onEditUnit={openEditUnit}
-                        onManageTenant={openManageTenant}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+          {/* Units table + add unit */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Units</h3>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>Rent, tenants and payment status for the period</p>
               </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-b border-border">
+                    <TableHead className="pl-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Unit</TableHead>
+                    <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Tenant</TableHead>
+                    <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Monthly rent</TableHead>
+                    <TableHead className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Status</TableHead>
+                    <TableHead className="pr-5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {d.units.map((row) => (
+                    <UnitRow
+                      key={row.unit.id}
+                      row={row}
+                      currency={currency}
+                      canManage={canManage}
+                      onGenerateCharge={handleGenerateSingle}
+                      onShowQr={setActiveQrUnit}
+                      onEditUnit={openEditUnit}
+                      onManageTenant={openManageTenant}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
               {/* Add unit */}
               {canManage && (
@@ -999,22 +1135,22 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
                           <input className="scanny-input" value={addUnitFloor} onChange={(e) => setAddUnitFloor(e.target.value)} style={fieldInputStyle} placeholder="Ground" disabled={addingUnit} />
                         </label>
                         <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Monthly amount *</span>
+                          <span style={fieldLabelStyle}>Monthly rent *</span>
                           <input className="scanny-input" type="number" value={addUnitAmount} onChange={(e) => setAddUnitAmount(e.target.value)} style={fieldInputStyle} placeholder="500000" disabled={addingUnit} />
                         </label>
                         <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Deposit</span>
-                          <input className="scanny-input" type="number" value={addUnitDeposit} onChange={(e) => setAddUnitDeposit(e.target.value)} style={fieldInputStyle} placeholder="0" disabled={addingUnit} />
+                          <span style={fieldLabelStyle}>Bedrooms</span>
+                          <input className="scanny-input" type="number" min="0" value={addUnitBedrooms} onChange={(e) => setAddUnitBedrooms(e.target.value)} style={fieldInputStyle} placeholder="2" disabled={addingUnit} />
                         </label>
                         <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Due day</span>
-                          <input className="scanny-input" type="number" value={addUnitDueDay} onChange={(e) => setAddUnitDueDay(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
-                        </label>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Grace (days)</span>
-                          <input className="scanny-input" type="number" value={addUnitGrace} onChange={(e) => setAddUnitGrace(e.target.value)} style={fieldInputStyle} disabled={addingUnit} />
+                          <span style={fieldLabelStyle}>Bathrooms</span>
+                          <input className="scanny-input" type="number" min="0" value={addUnitBathrooms} onChange={(e) => setAddUnitBathrooms(e.target.value)} style={fieldInputStyle} placeholder="1" disabled={addingUnit} />
                         </label>
                       </div>
+                      <label style={{ display: 'grid' }}>
+                        <span style={fieldLabelStyle}>Amenities</span>
+                        <textarea className="scanny-input" value={addUnitAmenities} onChange={(e) => setAddUnitAmenities(e.target.value)} style={{...fieldInputStyle, minHeight: 60, resize: 'vertical'}} placeholder="WiFi, AC, Parking, Furnished, Balcony..." disabled={addingUnit} />
+                      </label>
                       {addUnitError && <p className="scanny-error" style={{ fontSize: 13 }}>{addUnitError}</p>}
                       <button type="submit" disabled={addingUnit} style={btnPrimaryStyle}>
                         {addingUnit ? 'Adding…' : 'Add unit'}
@@ -1039,34 +1175,6 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
                 </section>
               )}
             </div>
-
-            {/* Right: Property QR panel */}
-            <div style={{ position: 'sticky', top: 16, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>Property QR</h3>
-              <QRCodePanel
-                url={d.property.qrCodeUrl}
-                label={d.property.name}
-                sublabel="Shows all units on this property"
-                defaultExpanded
-                size={160}
-              />
-              {canManage && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <button type="button" onClick={handleRegeneratePropertyQr} style={btnSecondaryStyle}>
-                    Regenerate QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => rentDashboardApi.downloadBulkQrPdf(propertyId, d.property.name)}
-                    style={btnSecondaryStyle}
-                  >
-                    Bulk QR PDF
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
         </div>
       )}
 
@@ -1315,29 +1423,31 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
               </button>
             </div>
             <form onSubmit={handleSaveUnit} style={{ display: 'grid', gap: 12 }} noValidate>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Unit number</span>
+                  <input className="scanny-input" value={editUnitNum} onChange={(e) => setEditUnitNum(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Floor</span>
+                  <input className="scanny-input" value={editUnitFloor} onChange={(e) => setEditUnitFloor(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Monthly rent</span>
+                  <input className="scanny-input" type="number" value={editUnitAmount} onChange={(e) => setEditUnitAmount(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Bedrooms</span>
+                  <input className="scanny-input" type="number" min="0" value={editUnitBedrooms} onChange={(e) => setEditUnitBedrooms(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Bathrooms</span>
+                  <input className="scanny-input" type="number" min="0" value={editUnitBathrooms} onChange={(e) => setEditUnitBathrooms(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                </label>
+              </div>
               <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Unit number</span>
-                <input className="scanny-input" value={editUnitNum} onChange={(e) => setEditUnitNum(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
-              </label>
-              <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Floor</span>
-                <input className="scanny-input" value={editUnitFloor} onChange={(e) => setEditUnitFloor(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
-              </label>
-              <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Monthly amount</span>
-                <input className="scanny-input" type="number" value={editUnitAmount} onChange={(e) => setEditUnitAmount(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
-              </label>
-              <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Deposit</span>
-                <input className="scanny-input" type="number" value={editUnitDeposit} onChange={(e) => setEditUnitDeposit(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
-              </label>
-              <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Due day of month</span>
-                <input className="scanny-input" type="number" value={editUnitDueDay} onChange={(e) => setEditUnitDueDay(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
-              </label>
-              <label style={{ display: 'grid' }}>
-                <span style={fieldLabelStyle}>Grace period (days)</span>
-                <input className="scanny-input" type="number" value={editUnitGrace} onChange={(e) => setEditUnitGrace(e.target.value)} style={fieldInputStyle} disabled={savingUnit} />
+                <span style={fieldLabelStyle}>Amenities</span>
+                <textarea className="scanny-input" value={editUnitAmenities} onChange={(e) => setEditUnitAmenities(e.target.value)} style={{...fieldInputStyle, minHeight: 60, resize: 'vertical'}} placeholder="WiFi, AC, Parking, Furnished, Balcony..." disabled={savingUnit} />
               </label>
               {editUnitError && <p className="scanny-error">{editUnitError}</p>}
               <button type="submit" disabled={savingUnit} style={btnPrimaryStyle}>
@@ -2211,9 +2321,16 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   const [matrixFullscreen, setMatrixFullscreen] = useState(false)
   const [matrixFilter, setMatrixFilter] = useState<'all' | 'occupied' | 'vacant'>('all')
   const [matrixSearch, setMatrixSearch] = useState('')
+  const [viewAllLocations, setViewAllLocations] = useState(false)
+  const [viewAllDispatch, setViewAllDispatch] = useState(false)
+  const [viewAllLeases, setViewAllLeases] = useState(false)
   // Fullscreen properties list pagination
   const [matrixFsPage, setMatrixFsPage] = useState(0)
   const [matrixFsPageSize, setMatrixFsPageSize] = useState(8)
+  // Per-property pagination in fullscreen view (propertyId -> page number)
+  const [propertyUnitPages, setPropertyUnitPages] = useState<Record<string, number>>({})
+  // Single property fullscreen view
+  const [singlePropertyView, setSinglePropertyView] = useState<string | null>(null)
   // Rent Roll donut chart hover state
   const [rentRollHoveredIdx, setRentRollHoveredIdx] = useState<number | null>(null)
 
@@ -2313,8 +2430,10 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
     const others = portfolio.filter((p) => p.propertyId !== activePropId)
     if (others.length === 0) return
     try {
+      const search = matrixSearch.trim() || undefined
+      const filter = matrixFilter !== 'all' ? matrixFilter : undefined
       const loaded = await Promise.all(
-        others.map((p) => rentDashboardApi.getPropertyDashboard(p.propertyId)),
+        others.map((p) => rentDashboardApi.getPropertyDashboard(p.propertyId, undefined, search, filter)),
       )
       setAllDashboards((prev) => {
         // Merge: keep any entries already present (e.g. the active one), add the rest
@@ -2325,15 +2444,19 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
     } catch {
       // non-fatal
     }
-  }, [portfolio, activePropId])
+  }, [portfolio, activePropId, matrixSearch, matrixFilter])
 
   useEffect(() => {
     void loadDashboard()
   }, [loadDashboard])
 
+  // Debounce matrix search - reload dashboards after 500ms of no typing
   useEffect(() => {
-    void loadAllDashboards()
-  }, [loadAllDashboards])
+    const timer = setTimeout(() => {
+      void loadAllDashboards()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [matrixSearch, matrixFilter, loadAllDashboards])
 
   function handleCreatedProperty(property: RentProperty) {
     setShowAdd(false)
@@ -2470,6 +2593,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                 setSelectedProperty(null)
                 setMobileNavOpen(false)
                 setMatrixFullscreen(false)
+                setSinglePropertyView(null)
               }}
               style={{
                 display: 'flex',
@@ -2598,6 +2722,190 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
   // ── Overview rendering ──────────────────────────────────────────────────
 
   function renderOverview() {
+    // ── Full page views for "View All" ──
+    if (viewAllLocations) {
+      const allD = allDashboards.length > 0 ? allDashboards : (dashboard ? [dashboard] : [])
+      return (
+        <div>
+          <button type="button" onClick={() => setViewAllLocations(false)} className="scanny-back" style={{ marginBottom: 16 }}>
+            ← Back to Overview
+          </button>
+          <div style={{ marginBottom: 20 }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>All Properties</h1>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted-foreground)' }}>{allD.length} properties in your portfolio</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+            {allD.map((pd) => {
+              const propOccPct = pd.totalUnits > 0 ? Math.round((pd.occupiedUnits / pd.totalUnits) * 100) : 0
+              return (
+                <div key={pd.property.id} style={{ padding: '20px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{pd.property.name}</h3>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: propOccPct >= 90 ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+                      {propOccPct}%
+                    </span>
+                  </div>
+                  <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                    {[pd.property.address, pd.property.city].filter(Boolean).join(', ') || 'No address'}
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
+                    <span style={{ color: 'var(--muted-foreground)' }}>{pd.occupiedUnits}/{pd.totalUnits} Units</span>
+                    <span style={{ color: 'var(--muted-foreground)' }}>{propOccPct}% occupied</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 99, background: 'var(--border)', overflow: 'hidden', marginBottom: 12 }}>
+                    <div style={{ height: '100%', width: `${propOccPct}%`, background: 'var(--primary)', borderRadius: 99 }} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { 
+                      setViewAllLocations(false)
+                      setSidebarTab('units')
+                      setSelectedProperty({ id: pd.property.id, role: 'OWNER' })
+                    }}
+                    style={{ ...btnPrimaryStyle, width: '100%', padding: '8px 16px', fontSize: 13 }}
+                  >
+                    View Details
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
+
+    if (viewAllDispatch) {
+      const allD = allDashboards.length > 0 ? allDashboards : (dashboard ? [dashboard] : [])
+      const overdueItems = allD.flatMap((pd) =>
+        pd.units.filter((r) => r.currentCharge && (r.currentCharge.status === 'OVERDUE' || r.currentCharge.status === 'UNPAID') && r.unit.activeTenant)
+          .map((r) => ({ ...r, propId: pd.property.id, propName: pd.property.name, propCur: pd.property.currency }))
+      )
+      return (
+        <div>
+          <button type="button" onClick={() => setViewAllDispatch(false)} className="scanny-back" style={{ marginBottom: 16 }}>
+            ← Back to Overview
+          </button>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <AlertTriangle size={22} color="oklch(0.55 0.18 30)" />
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Urgent Dispatch Queue</h1>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>{overdueItems.length} overdue payments requiring attention</p>
+          </div>
+          {overdueItems.length === 0 ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+              <CheckCircle2 size={48} style={{ color: 'var(--primary)', marginBottom: 16 }} />
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>All clear — no action needed!</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {overdueItems.map((row) => (
+                <div key={`ov-${row.unit.id}`} style={{ padding: '20px 24px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#dc2626', flexShrink: 0 }} />
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, flex: 1 }}>
+                      {row.unit.activeTenant?.name}
+                    </h3>
+                    <span style={{ fontSize: 11, fontWeight: 700, background: '#dc2626', color: '#fff', borderRadius: 6, padding: '3px 10px' }}>OVERDUE</span>
+                  </div>
+                  <div style={{ paddingLeft: 20, marginBottom: 12 }}>
+                    <p style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800, color: '#dc2626' }}>
+                      {money(row.currentCharge!.outstandingAmount, row.propCur)}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>
+                      Unit {row.unit.unitNumber} · {row.propName}
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                      Overdue {row.currentCharge?.dueDate ? `${daysUntil(row.currentCharge.dueDate) != null ? Math.abs(daysUntil(row.currentCharge.dueDate)!) : ''} days` : ''}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, paddingLeft: 20 }}>
+                    <button
+                      type="button"
+                      onClick={async () => { await markRowPaid(row.propId, row.currentCharge!.id); await loadAllDashboards(); await loadDashboard() }}
+                      style={{ ...btnPrimaryStyle, fontSize: 13, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <CheckCircle2 size={15} /> Mark paid
+                    </button>
+                    <button type="button" style={{ ...btnSecondaryStyle, fontSize: 13, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Users size={15} /> Call Tenant
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (viewAllLeases) {
+      const allD = allDashboards.length > 0 ? allDashboards : (dashboard ? [dashboard] : [])
+      const leaseExpiryItems = allD.flatMap((pd) =>
+        pd.units.filter((r) => {
+          const t = r.unit.activeTenant; if (!t || !t.leaseEnd) return false
+          const days = daysUntil(t.leaseEnd); return days != null && days >= 0 && days <= 60
+        }).map((r) => ({ ...r, propId: pd.property.id, propName: pd.property.name, propCur: pd.property.currency }))
+      )
+      return (
+        <div>
+          <button type="button" onClick={() => setViewAllLeases(false)} className="scanny-back" style={{ marginBottom: 16 }}>
+            ← Back to Overview
+          </button>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <CalendarDays size={22} color="var(--primary)" />
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Lease Expiration Pipeline</h1>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>
+              {leaseExpiryItems.length} leases expiring in the next 60 days
+            </p>
+          </div>
+          {leaseExpiryItems.length === 0 ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+              <CheckCircle2 size={48} style={{ color: 'var(--primary)', marginBottom: 16 }} />
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No leases expiring soon</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {leaseExpiryItems.map((row) => {
+                const days = daysUntil(row.unit.activeTenant!.leaseEnd)!
+                const isUrgent = days <= 14
+                return (
+                  <div key={row.unit.id} style={{ padding: '20px 24px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{row.unit.unitNumber}</h3>
+                        <span style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>·</span>
+                        <span style={{ fontSize: 15, fontWeight: 600 }}>{row.unit.activeTenant!.name}</span>
+                      </div>
+                      <p style={{ margin: '0 0 4px', fontSize: 12, color: 'var(--muted-foreground)' }}>{row.propName}</p>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--muted-foreground)' }}>
+                        Lease ends: {row.unit.activeTenant!.leaseEnd ? new Date(row.unit.activeTenant!.leaseEnd).toLocaleDateString() : '—'}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: 0, fontSize: 32, fontWeight: 800, lineHeight: 1, color: isUrgent ? 'oklch(0.55 0.18 30)' : 'var(--foreground)' }}>
+                        {days}
+                      </p>
+                      <p style={{ margin: '4px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                        {isUrgent ? 'URGENT' : 'DAYS LEFT'}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+                      <button type="button" style={{ ...btnPrimaryStyle, fontSize: 12, padding: '6px 16px', whiteSpace: 'nowrap' }}>Renewing</button>
+                      <button type="button" style={{ ...btnSecondaryStyle, fontSize: 12, padding: '6px 16px', whiteSpace: 'nowrap' }}>Vacating</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // ── Normal overview page ──
     if (loading) return (
       <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
         <DanceLoader label="Loading your portfolio…" size={100} />
@@ -2671,55 +2979,94 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
     }
 
     // ── Matrix helpers (shared by the inline card and the fullscreen overlay) ──
-    function unitMatchesFilter(row: UnitDashboardRow): boolean {
-      if (matrixFilter === 'occupied') return row.unit.activeTenant != null
-      if (matrixFilter === 'vacant') return row.unit.activeTenant == null
-      return true
-    }
 
-    function renderMatrixGroups(wide: boolean) {
-      const q = matrixSearch.trim().toLowerCase()
+    function renderMatrixGroups(wide: boolean, paginate: boolean = false) {
       let anyShown = false
+      const UNITS_PER_PAGE = 24 // 24 units per page in fullscreen
       const groups = allD.map((propDash) => {
         const propOccPct = propDash.totalUnits > 0 ? Math.round((propDash.occupiedUnits / propDash.totalUnits) * 100) : 0
-        const units = propDash.units.filter((row) => {
-          if (!unitMatchesFilter(row)) return false
-          if (q) {
-            const num = row.unit.unitNumber.toLowerCase()
-            const tenant = (row.unit.activeTenant?.name ?? '').toLowerCase()
-            if (!num.includes(q) && !tenant.includes(q)) return false
-          }
-          return true
-        })
-        if (units.length === 0) return null
+        
+        // Backend already filtered units based on search and filter params
+        const allUnits = propDash.units
+        if (allUnits.length === 0) return null
         anyShown = true
+        
+        // Get current page for this property (default to 0)
+        const currentPage = propertyUnitPages[propDash.property.id] || 0
+        const totalPages = Math.ceil(allUnits.length / UNITS_PER_PAGE)
+        const safeCurrentPage = Math.min(currentPage, totalPages - 1)
+        
+        // Paginate units if in fullscreen view
+        const units = paginate 
+          ? allUnits.slice(safeCurrentPage * UNITS_PER_PAGE, (safeCurrentPage + 1) * UNITS_PER_PAGE)
+          : allUnits
+        
         return (
           <div key={propDash.property.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Building2 size={13} color="var(--muted-foreground)" />
                 <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {propDash.property.name}
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {units.length}/{propDash.totalUnits} unit{propDash.totalUnits !== 1 ? 's' : ''}</span>
+                <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {allUnits.length}/{propDash.totalUnits} unit{propDash.totalUnits !== 1 ? 's' : ''}</span>
               </div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: propOccPct >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)' }}>{propOccPct}% Occupancy</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: propOccPct >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)' }}>{propOccPct}% Occupancy</span>
+                {paginate && totalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button 
+                      type="button" 
+                      disabled={safeCurrentPage === 0} 
+                      onClick={() => setPropertyUnitPages(prev => ({ ...prev, [propDash.property.id]: Math.max(0, safeCurrentPage - 1) }))}
+                      style={{ 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        width: 24, height: 24, borderRadius: 5, 
+                        border: '1px solid var(--border)', background: 'var(--card)', 
+                        cursor: safeCurrentPage === 0 ? 'not-allowed' : 'pointer', 
+                        opacity: safeCurrentPage === 0 ? 0.4 : 1 
+                      }}
+                    >
+                      <ChevronLeft size={12} />
+                    </button>
+                    <span style={{ fontSize: 10, color: 'var(--muted-foreground)', minWidth: 70, textAlign: 'center' }}>
+                      {safeCurrentPage + 1} / {totalPages}
+                    </span>
+                    <button 
+                      type="button" 
+                      disabled={safeCurrentPage >= totalPages - 1} 
+                      onClick={() => setPropertyUnitPages(prev => ({ ...prev, [propDash.property.id]: Math.min(totalPages - 1, safeCurrentPage + 1) }))}
+                      style={{ 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        width: 24, height: 24, borderRadius: 5, 
+                        border: '1px solid var(--border)', background: 'var(--card)', 
+                        cursor: safeCurrentPage >= totalPages - 1 ? 'not-allowed' : 'pointer', 
+                        opacity: safeCurrentPage >= totalPages - 1 ? 0.4 : 1 
+                      }}
+                    >
+                      <ChevronRight size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: wide ? 12 : 10 }}>
               {units.map((row) => {
                 const status = tileStatus(row)
                 const ts = tileStyles[status]
                 const isSelected = selectedUnitId === row.unit.id
+                const isVacant = !row.unit.activeTenant
                 return (
                   <button
                     key={row.unit.id}
                     type="button"
                     onClick={() => setSelectedUnitId(isSelected ? null : row.unit.id)}
+                    className={isVacant ? 'vacant-unit-pulse' : ''}
                     style={{
                       padding: '8px 12px', borderRadius: 8, minWidth: wide ? 96 : 80,
                       background: isSelected ? 'var(--sidebar-primary)' : ts.bg,
                       color: isSelected ? 'var(--sidebar-primary-foreground)' : ts.fg,
-                      border: `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
+                      border: isVacant ? undefined : `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
                       cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                     }}
                   >
@@ -3189,13 +3536,16 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               </button>
             </div>
 
-            {/* Property groups — show latest 3 properties only */}
+            {/* Property groups — show latest 3 properties, max 6 units each */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
               {(() => {
                 const latestThree = allD.slice(0, 3)
+                const OVERVIEW_UNITS_LIMIT = 6
                 return latestThree.map((propDash) => {
                   const propOccPct = propDash.totalUnits > 0 ? Math.round((propDash.occupiedUnits / propDash.totalUnits) * 100) : 0
-                  const units = propDash.units.filter((row) => unitMatchesFilter(row))
+                  const allUnits = propDash.units  // Backend already filtered
+                  const displayUnits = allUnits.slice(0, OVERVIEW_UNITS_LIMIT)
+                  const hasMore = allUnits.length > OVERVIEW_UNITS_LIMIT
                   
                   return (
                     <div key={propDash.property.id} style={{ marginBottom: 20 }}>
@@ -3205,25 +3555,27 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                           <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             {propDash.property.name}
                           </span>
-                          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {units.length}/{propDash.totalUnits} unit{propDash.totalUnits !== 1 ? 's' : ''}</span>
+                          <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>· {allUnits.length}/{propDash.totalUnits} unit{propDash.totalUnits !== 1 ? 's' : ''}</span>
                         </div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: propOccPct >= 80 ? 'var(--primary)' : 'oklch(0.55 0.18 30)' }}>{propOccPct}% Occupancy</span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                        {units.map((row) => {
+                        {displayUnits.map((row) => {
                           const status = tileStatus(row)
                           const ts = tileStyles[status]
                           const isSelected = selectedUnitId === row.unit.id
+                          const isVacant = !row.unit.activeTenant
                           return (
                             <button
                               key={row.unit.id}
                               type="button"
                               onClick={() => setSelectedUnitId(isSelected ? null : row.unit.id)}
+                              className={isVacant ? 'vacant-unit-pulse' : ''}
                               style={{
                                 padding: '8px 12px', borderRadius: 8, minWidth: 80,
                                 background: isSelected ? 'var(--sidebar-primary)' : ts.bg,
                                 color: isSelected ? 'var(--sidebar-primary-foreground)' : ts.fg,
-                                border: `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
+                                border: isVacant ? undefined : `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
                                 cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                               }}
                             >
@@ -3239,6 +3591,24 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                             </button>
                           )
                         })}
+                        {hasMore && (
+                          <button
+                            type="button"
+                            onClick={() => setSinglePropertyView(propDash.property.id)}
+                            style={{
+                              padding: '8px 12px', borderRadius: 8, minWidth: 80,
+                              background: 'var(--muted)',
+                              color: 'var(--primary)',
+                              border: '1.5px dashed var(--primary)',
+                              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                              fontWeight: 700, fontSize: 11,
+                            }}
+                          >
+                            <Maximize2 size={12} />
+                            +{allUnits.length - OVERVIEW_UNITS_LIMIT} more
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -3286,8 +3656,46 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
           </div>
           {/* end LEFT COLUMN */}
 
-          {/* ── Bottom row: Urgent Dispatch, Lease Pipeline, Location Breakdown ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, alignItems: 'start' }}>
+          {/* ── Bottom row: Location Breakdown, Urgent Dispatch, Lease Pipeline ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* ── Location Breakdown ── */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Building2 size={14} color="var(--primary)" />
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Location Breakdown</span>
+                </div>
+                <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>{allD.length} PROPERTIES</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {allD.slice(0, 4).map((pd) => {
+                  const propOccPct = pd.totalUnits > 0 ? Math.round((pd.occupiedUnits / pd.totalUnits) * 100) : 0
+                  return (
+                    <div key={pd.property.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>{pd.property.name}</p>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: propOccPct >= 90 ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+                          {propOccPct}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--muted-foreground)' }}>{pd.occupiedUnits}/{pd.totalUnits} Units ({propOccPct}% occupied)</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${propOccPct}%`, background: 'var(--primary)', borderRadius: 99 }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {allD.length > 4 && (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{allD.length} total properties</span>
+                  <button type="button" onClick={() => setViewAllLocations(true)} style={{ ...btnSecondaryStyle, fontSize: 11, padding: '4px 12px' }}>View All →</button>
+                </div>
+              )}
+            </div>
 
             {/* Urgent Dispatch Queue */}
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
@@ -3306,7 +3714,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                 <p style={{ padding: '24px 20px', margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>All clear — no action needed.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                  {overdueItems.map((row) => (
+                  {overdueItems.slice(0, 4).map((row) => (
                     <div key={`ov-${row.unit.id}`} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#dc2626', flexShrink: 0, display: 'inline-block' }} />
@@ -3334,6 +3742,12 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                   ))}
                 </div>
               )}
+              {overdueItems.length > 4 && (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{overdueItems.length} overdue</span>
+                  <button type="button" onClick={() => setViewAllDispatch(true)} style={{ ...btnSecondaryStyle, fontSize: 11, padding: '4px 12px' }}>View All →</button>
+                </div>
+              )}
             </div>
 
             {/* ── Lease Expiration Pipeline ── */}
@@ -3349,7 +3763,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                 {leaseExpiryItems.length === 0 ? (
                   <p style={{ padding: '24px 20px', margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>No leases expiring soon.</p>
                 ) : (
-                  leaseExpiryItems.slice(0, 5).map((row) => {
+                  leaseExpiryItems.slice(0, 4).map((row) => {
                     const days = daysUntil(row.unit.activeTenant!.leaseEnd)!
                     const isUrgent = days <= 14
                     return (
@@ -3377,47 +3791,143 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                   })
                 )}
               </div>
-              <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{leaseExpiryItems.length} leases expiring</span>
-                <button type="button" style={{ ...btnSecondaryStyle, fontSize: 11, padding: '4px 12px' }}>View All →</button>
-              </div>
-            </div>
-
-            {/* ── Location Breakdown ── */}
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Building2 size={14} color="var(--primary)" />
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>Location Breakdown</span>
+              {leaseExpiryItems.length > 0 && (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{leaseExpiryItems.length} leases expiring</span>
+                  {leaseExpiryItems.length > 4 && (
+                    <button type="button" onClick={() => setViewAllLeases(true)} style={{ ...btnSecondaryStyle, fontSize: 11, padding: '4px 12px' }}>View All →</button>
+                  )}
                 </div>
-                <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--muted-foreground)' }}>{allD.length} PROPERTIES</p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                {allD.map((pd) => {
-                  const propOccPct = pd.totalUnits > 0 ? Math.round((pd.occupiedUnits / pd.totalUnits) * 100) : 0
-                  return (
-                    <div key={pd.property.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>{pd.property.name}</p>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: propOccPct >= 90 ? 'var(--primary)' : 'var(--muted-foreground)' }}>
-                          {propOccPct}%
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                        <span style={{ color: 'var(--muted-foreground)' }}>{pd.occupiedUnits}/{pd.totalUnits} Units ({propOccPct}% occupied)</span>
-                      </div>
-                      <div style={{ height: 4, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${propOccPct}%`, background: 'var(--primary)', borderRadius: 99 }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              )}
             </div>
 
           </div>
 
         </div>
+
+        {/* ── Single Property Fullscreen View ── */}
+        {singlePropertyView && (() => {
+          const propDash = allD.find(pd => pd.property.id === singlePropertyView)
+          if (!propDash) return null
+          
+          const propOccPct = propDash.totalUnits > 0 ? Math.round((propDash.occupiedUnits / propDash.totalUnits) * 100) : 0
+          const allUnits = propDash.units  // Backend already filtered
+          
+          // Pagination
+          const UNITS_PER_PAGE = 24
+          const currentPage = propertyUnitPages[propDash.property.id] || 0
+          const totalPages = Math.ceil(allUnits.length / UNITS_PER_PAGE)
+          const safeCurrentPage = Math.min(currentPage, totalPages - 1)
+          const displayUnits = allUnits.slice(safeCurrentPage * UNITS_PER_PAGE, (safeCurrentPage + 1) * UNITS_PER_PAGE)
+          
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'var(--background)', display: 'flex', flexDirection: 'column' }}>
+              {/* Header */}
+              <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, background: 'var(--card)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 7, background: 'oklch(0.55 0.14 150 / 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Building2 size={15} color="var(--primary)" />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{propDash.property.name}</p>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                      {allUnits.length} units · {propDash.occupiedUnits} occupied · {propDash.totalUnits - propDash.occupiedUnits} vacant · {propOccPct}% occupancy
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSinglePropertyView(null); setPropertyUnitPages(prev => ({ ...prev, [propDash.property.id]: 0 })) }}
+                  style={{ ...btnSecondaryStyle, padding: '8px 14px' }}
+                >
+                  <X size={15} /> Close
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+                <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                      {displayUnits.map((row) => {
+                        const status = tileStatus(row)
+                        const ts = tileStyles[status]
+                        const isSelected = selectedUnitId === row.unit.id
+                        const isVacant = !row.unit.activeTenant
+                        return (
+                          <button
+                            key={row.unit.id}
+                            type="button"
+                            onClick={() => setSelectedUnitId(isSelected ? null : row.unit.id)}
+                            className={isVacant ? 'vacant-unit-pulse' : ''}
+                            style={{
+                              padding: '8px 12px', borderRadius: 8, minWidth: 96,
+                              background: isSelected ? 'var(--sidebar-primary)' : ts.bg,
+                              color: isSelected ? 'var(--sidebar-primary-foreground)' : ts.fg,
+                              border: isVacant ? undefined : `1.5px solid ${isSelected ? 'var(--sidebar-primary)' : ts.border}`,
+                              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 2 }}>
+                              <span style={{ fontWeight: 800, fontSize: 13 }}>{row.unit.unitNumber}</span>
+                              {ts.tag && <span style={{ fontSize: 9, fontWeight: 700, background: ts.tagBg, color: ts.tagFg, borderRadius: 3, padding: '1px 4px' }}>{ts.tag}</span>}
+                            </div>
+                            <div style={{ fontSize: 10, opacity: 0.9 }}>
+                              {row.unit.activeTenant ? money(row.unit.monthlyAmount, propDash.property.currency) : 'Available'}
+                            </div>
+                            {row.unit.activeTenant && <div style={{ fontSize: 9, opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110 }}>{row.unit.activeTenant.name}</div>}
+                            {status === 'vacant' && (
+                              <div style={{ fontSize: 9, color: 'var(--primary)', marginTop: 1 }}>+ List Unit</div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Pagination footer */}
+                  {totalPages > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--muted-foreground)' }}>
+                      <span>{safeCurrentPage * UNITS_PER_PAGE + 1}–{Math.min((safeCurrentPage + 1) * UNITS_PER_PAGE, allUnits.length)} of {allUnits.length} units</span>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button 
+                          type="button" 
+                          disabled={safeCurrentPage === 0} 
+                          onClick={() => setPropertyUnitPages(prev => ({ ...prev, [propDash.property.id]: Math.max(0, safeCurrentPage - 1) }))}
+                          style={{ 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            width: 26, height: 26, borderRadius: 6, 
+                            border: '1px solid var(--border)', background: 'var(--card)', 
+                            cursor: safeCurrentPage === 0 ? 'not-allowed' : 'pointer', 
+                            opacity: safeCurrentPage === 0 ? 0.4 : 1 
+                          }}
+                        >
+                          <ChevronLeft size={13} />
+                        </button>
+                        <button 
+                          type="button" 
+                          disabled={safeCurrentPage >= totalPages - 1} 
+                          onClick={() => setPropertyUnitPages(prev => ({ ...prev, [propDash.property.id]: Math.min(totalPages - 1, safeCurrentPage + 1) }))}
+                          style={{ 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            width: 26, height: 26, borderRadius: 6, 
+                            border: '1px solid var(--border)', background: 'var(--card)', 
+                            cursor: safeCurrentPage >= totalPages - 1 ? 'not-allowed' : 'pointer', 
+                            opacity: safeCurrentPage >= totalPages - 1 ? 0.4 : 1 
+                          }}
+                        >
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {renderSelectedFooter()}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Fullscreen matrix overlay (like the Kitchen board: covers everything) ── */}
         {matrixFullscreen && (
@@ -3442,7 +3952,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                   <input
                     value={matrixSearch}
                     onChange={(e) => setMatrixSearch(e.target.value)}
-                    placeholder="Search unit number or tenant…"
+                    placeholder="Search property, unit number or tenant…"
                     style={{
                       width: '100%', padding: '9px 12px 9px 34px', borderRadius: 9,
                       border: '1px solid var(--border)', background: 'var(--background)',
@@ -3475,7 +3985,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
               </div>
               <button
                 type="button"
-                onClick={() => { setMatrixFullscreen(false); setSelectedUnitId(null); setMatrixSearch(''); setMatrixFsPage(0) }}
+                onClick={() => { setMatrixFullscreen(false); setSelectedUnitId(null); setMatrixSearch(''); setMatrixFsPage(0); setSinglePropertyView(null) }}
                 style={{ ...btnSecondaryStyle, padding: '8px 14px' }}
               >
                 <Minimize2 size={15} /> Exit fullscreen
@@ -3570,7 +4080,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
                 })()}
                 {/* Unit matrix */}
                 <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-                  {renderMatrixGroups(true)}
+                  {renderMatrixGroups(true, true)}
                   {renderSelectedFooter()}
                 </div>
               </div>
@@ -3578,7 +4088,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
           </div>
         )}
 
-        {selectedRow && selectedDash && !matrixFullscreen && (
+        {selectedRow && selectedDash && !matrixFullscreen && !singlePropertyView && (
           <UnitSheet
             row={selectedRow}
             propertyId={selectedDash.property.id}
@@ -4150,6 +4660,7 @@ export default function RentDashboard({ onLogout }: { onLogout?: () => void }) {
         </div>
       </main>
       {showAdd && <AddPropertyModal onCreated={handleCreatedProperty} onClose={() => setShowAdd(false)} />}
+      
       {showLogoutConfirm && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setShowLogoutConfirm(false)}>
           <div style={{ background: 'var(--card)', borderRadius: 16, padding: '24px', maxWidth: 360, width: '100%' }} onClick={(e) => e.stopPropagation()}>

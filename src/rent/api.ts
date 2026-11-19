@@ -210,15 +210,24 @@ export const rentDashboardApi = {
   getMe: (): Promise<RentAccount> =>
     get('/public/rent/dashboard/me'),
 
-  getPortfolio: (): Promise<PortfolioEntry[]> =>
-    get('/public/rent/dashboard/portfolio'),
+  getPortfolio: (search?: string, filter?: string): Promise<PortfolioEntry[]> => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (filter) params.set('filter', filter)
+    const qs = params.toString()
+    return get(`/public/rent/dashboard/portfolio${qs ? `?${qs}` : ''}`)
+  },
 
   createProperty: (req: CreatePropertyRequest): Promise<RentProperty> =>
     post('/public/rent/dashboard/properties', req),
 
-  getPropertyDashboard: (propertyId: string, period?: string): Promise<PropertyDashboard> => {
-    const qs = period ? `?period=${encodeURIComponent(period)}` : ''
-    return get(`/public/rent/dashboard/properties/${propertyId}${qs}`)
+  getPropertyDashboard: (propertyId: string, period?: string, search?: string, filter?: string): Promise<PropertyDashboard> => {
+    const params = new URLSearchParams()
+    if (period) params.set('period', period)
+    if (search) params.set('search', search)
+    if (filter) params.set('filter', filter)
+    const qs = params.toString()
+    return get(`/public/rent/dashboard/properties/${propertyId}${qs ? `?${qs}` : ''}`)
   },
 
   addUnit: (propertyId: string, req: CreateUnitRequest): Promise<RentUnit> =>

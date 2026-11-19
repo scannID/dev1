@@ -2148,6 +2148,7 @@ export default function KodteLandingTicket({
                 flexWrap: 'wrap',
               }}
             >
+              {/* TICKETING BUTTON - HIDDEN FOR NOW
               <button
                 onClick={onCreateEventTicket}
                 className="kodte-stamp-btn kodte-nav-btn-secondary"
@@ -2170,6 +2171,7 @@ export default function KodteLandingTicket({
                 <Scissors size={14} />
                  Ticketing
               </button>
+              */}
 
               <button
                 onClick={onOpenRentManager}
@@ -2395,6 +2397,7 @@ export default function KodteLandingTicket({
                 body: 'Guests scan, order, and pay from their phone. Orders land on the kitchen dashboard instantly. No app download needed.',
                 rot: -1.2,
               },
+              /* HIDING TICKETING FOR NOW
               {
                 Icon: Ticket,
                 label: 'EVENT ORGANISERS',
@@ -2402,6 +2405,7 @@ export default function KodteLandingTicket({
                 body: 'Sell tiered tickets online, scan QR codes at the gate, and watch live attendance counts from any device.',
                 rot: 0.8,
               },
+              */
               {
                 Icon: Building2,
                 label: 'LANDLORDS & PROPERTY MANAGERS',
@@ -2515,7 +2519,8 @@ export default function KodteLandingTicket({
         {/* PHOTO STRIP — real photography, taped in like counter proofs */}
         <PhotoStrip />
 
-        {/* EVENT TICKETING */}
+        {/* EVENT TICKETING - HIDDEN FOR NOW */}
+        {/*
         <section
           className="kodte-ticket-section"
           style={{ textAlign: 'center' }}
@@ -2566,8 +2571,10 @@ export default function KodteLandingTicket({
           <EventTicketStub />
           </div>
         </section>
+        */}
 
-        {/* FEATURES */}
+        {/* FEATURES - HIDDEN FOR NOW (Contains ticketing features) */}
+        {/*
         <section
           style={{
             padding: '0 24px 90px',
@@ -2575,6 +2582,7 @@ export default function KodteLandingTicket({
         >
           <FeatureCards />
         </section>
+        */}
 
         {/* PROPERTY MANAGEMENT */}
         <section
@@ -2776,7 +2784,7 @@ export default function KodteLandingTicket({
                 {[
                   'QR Menus',
                   'Order Dashboard',
-                  'Event Ticketing',
+                  /* 'Event Ticketing', - Hidden for now */
                   'Property Management',
                   'Payments',
                 ].map((l) => (

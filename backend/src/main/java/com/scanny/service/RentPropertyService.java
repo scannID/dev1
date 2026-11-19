@@ -191,7 +191,7 @@ public class RentPropertyService {
      */
     @Transactional(readOnly = true)
     public RentDtos.PropertyDashboard getPropertyDashboard(
-            RentAccount account, String propertyId, String period) {
+            RentAccount account, String propertyId, String period, String search, String filter) {
 
         RentProperty property = requireProperty(propertyId);
         requireAnyAccess(account, property);
@@ -203,6 +203,28 @@ public class RentPropertyService {
         List<RentUnit> units = unitRepository.findByPropertyIdWithTenants(propertyId).stream()
                 .sorted(Comparator.comparing(RentUnit::getUnitNumber, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+        
+        // Apply search filter if provided
+        if (search != null && !search.trim().isEmpty()) {
+            String searchLower = search.trim().toLowerCase();
+            units = units.stream()
+                    .filter(u -> 
+                        u.getUnitNumber().toLowerCase().contains(searchLower) ||
+                        (u.getActiveTenant() != null && u.getActiveTenant().getName().toLowerCase().contains(searchLower))
+                    )
+                    .toList();
+        }
+        
+        // Apply occupancy filter if provided
+        if (filter != null && !filter.trim().isEmpty()) {
+            String filterLower = filter.trim().toLowerCase();
+            if ("occupied".equals(filterLower)) {
+                units = units.stream().filter(u -> u.getActiveTenant() != null).toList();
+            } else if ("vacant".equals(filterLower)) {
+                units = units.stream().filter(u -> u.getActiveTenant() == null).toList();
+            }
+        }
+        
         List<RentCharge> periodCharges = chargeRepository.findByPropertyIdAndPeriodLabelForDashboard(
                 propertyId, currentPeriod);
 
@@ -219,8 +241,10 @@ public class RentPropertyService {
                     charge != null ? RentDtos.ChargeResponse.from(charge) : null);
         }).toList();
 
-        long totalUnits = units.size();
-        long occupied = units.stream().filter(u -> u.getActiveTenant() != null).count();
+        // Get total counts (unfiltered)
+        List<RentUnit> allUnits = unitRepository.findByPropertyIdWithTenants(propertyId);
+        long totalUnits = allUnits.size();
+        long occupied = allUnits.stream().filter(u -> u.getActiveTenant() != null).count();
         long paid = periodCharges.stream().filter(c -> c.getStatus() == RentChargeStatus.PAID).count();
         long unpaid = periodCharges.stream()
                 .filter(c -> c.getStatus() == RentChargeStatus.UNPAID || c.getStatus() == RentChargeStatus.PARTIAL)
@@ -249,6 +273,12 @@ public class RentPropertyService {
                 paid, unpaid, overdueCount, totalCollected,
                 rows, recentPayments, accessList);
     }
+    
+    // Overload for backward compatibility
+    public RentDtos.PropertyDashboard getPropertyDashboard(
+            RentAccount account, String propertyId, String period) {
+        return getPropertyDashboard(account, propertyId, period, null, null);
+    }
 
     // ── Portfolio ─────────────────────────────────────────────────────────────
 
@@ -263,7 +293,7 @@ public class RentPropertyService {
      * unit list + access role lookups.
      */
     @Transactional(readOnly = true)
-    public List<RentDtos.PortfolioEntry> getPortfolio(RentAccount account) {
+    public List<RentDtos.PortfolioEntry> getPortfolio(RentAccount account, String search, String filter) {
         List<com.scanny.repository.projection.PortfolioSummaryProjection> summaries =
                 propertyRepository.findPortfolioSummary(account.getId());
         if (summaries.isEmpty()) return List.of();
@@ -275,7 +305,17 @@ public class RentPropertyService {
                         com.scanny.repository.projection.PropertyOccupancyProjection::getPropertyId,
                         com.scanny.repository.projection.PropertyOccupancyProjection::getOccupiedCount));
 
-        return summaries.stream().map(s -> new RentDtos.PortfolioEntry(
+        // Apply search filter if provided
+        var filtered = summaries.stream();
+        if (search != null && !search.trim().isEmpty()) {
+            String searchLower = search.trim().toLowerCase();
+            filtered = filtered.filter(s -> 
+                s.getPropertyName().toLowerCase().contains(searchLower) ||
+                (s.getCity() != null && s.getCity().toLowerCase().contains(searchLower))
+            );
+        }
+
+        return filtered.map(s -> new RentDtos.PortfolioEntry(
                 s.getPropertyId(),
                 s.getPropertyName(),
                 s.getCity(),
@@ -286,6 +326,11 @@ public class RentPropertyService {
                 0L,    // totalCollectedThisMonth — fetched on demand in the full dashboard
                 s.getCurrency()
         )).toList();
+    }
+    
+    // Overload for backward compatibility
+    public List<RentDtos.PortfolioEntry> getPortfolio(RentAccount account) {
+        return getPortfolio(account, null, null);
     }
 
     // ── Access management ─────────────────────────────────────────────────────
@@ -358,7 +403,7 @@ public class RentPropertyService {
         unit.setUnitNumber(req.unitNumber().trim());
         unit.setFloor(req.floor() != null ? req.floor().trim() : "");
         unit.setMonthlyAmount(req.monthlyAmount());
-        unit.setDepositAmount(Math.max(0, req.depositAmount()));
+        unit.setDepositAmount(req.depositAmount() != null ? Math.max(0, req.depositAmount()) : 0);
         // due-day: 1–28, default 5 if not provided
         if (req.dueDayOfMonth() != null) {
             unit.setDueDayOfMonth(req.dueDayOfMonth());
@@ -367,6 +412,10 @@ public class RentPropertyService {
         if (req.gracePeriodDays() != null) {
             unit.setGracePeriodDays(req.gracePeriodDays());
         }
+        // New fields: bedrooms, bathrooms, amenities
+        unit.setBedrooms(req.bedrooms());
+        unit.setBathrooms(req.bathrooms());
+        unit.setAmenities(req.amenities());
         // Auto-generate a unique 128-bit URL-safe QR token for this unit
         unit.setQrToken(generateUnitQrToken());
         unit.setCreatedAt(Instant.now());
@@ -402,6 +451,16 @@ public class RentPropertyService {
         }
         if (req.dueDayOfMonth() != null) {
             unit.setDueDayOfMonth(req.dueDayOfMonth());
+        }
+        // Update new fields
+        if (req.bedrooms() != null) {
+            unit.setBedrooms(req.bedrooms());
+        }
+        if (req.bathrooms() != null) {
+            unit.setBathrooms(req.bathrooms());
+        }
+        if (req.amenities() != null) {
+            unit.setAmenities(req.amenities());
         }
         if (req.gracePeriodDays() != null) {
             unit.setGracePeriodDays(req.gracePeriodDays());

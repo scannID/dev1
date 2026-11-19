@@ -98,7 +98,7 @@ public final class RentDtos {
             @NotBlank @Size(max = 64) String unitNumber,
             @Size(max = 32) String floor,
             @Min(1) long monthlyAmount,
-            long depositAmount,
+            Long depositAmount,
             /**
              * Day of the month (1–28) rent is due. Null = inherit property default (5).
              * Clamped to 28 to avoid month-length edge cases.
@@ -108,7 +108,13 @@ public final class RentDtos {
              * Calendar days after the due date before the charge becomes OVERDUE.
              * Null or absent = 0 (strict — overdue the day after due date).
              */
-            Integer gracePeriodDays
+            Integer gracePeriodDays,
+            /** Number of bedrooms (0 for studios, null for unspecified). */
+            Integer bedrooms,
+            /** Number of bathrooms. */
+            Integer bathrooms,
+            /** Comma-separated amenities (WiFi, AC, Parking, Furnished, etc.). */
+            @Size(max = 1000) String amenities
     ) {}
 
     /** Update a unit's rent amount, deposit, or due-day config. */
@@ -120,7 +126,13 @@ public final class RentDtos {
             /** 1–28, null = no change. */
             Integer dueDayOfMonth,
             /** >= 0, null = no change. */
-            Integer gracePeriodDays
+            Integer gracePeriodDays,
+            /** Number of bedrooms. */
+            Integer bedrooms,
+            /** Number of bathrooms. */
+            Integer bathrooms,
+            /** Comma-separated amenities. */
+            @Size(max = 1000) String amenities
     ) {}
 
     /** Add a tenant to a unit. */
@@ -307,6 +319,9 @@ public final class RentDtos {
             String currency,
             int dueDayOfMonth,
             int gracePeriodDays,
+            Integer bedrooms,
+            Integer bathrooms,
+            String amenities,
             String qrToken,
             String qrCodeUrl,
             TenantSummary activeTenant,   // null when vacant
@@ -326,6 +341,9 @@ public final class RentDtos {
                     u.getProperty().getCurrency(),
                     u.getDueDayOfMonth(),
                     u.getGracePeriodDays(),
+                    u.getBedrooms(),
+                    u.getBathrooms(),
+                    u.getAmenities(),
                     unitQr,
                     unitQr != null ? baseUrl + "/rent/pay/" + unitQr : null,
                     ts,
@@ -494,7 +512,10 @@ public final class RentDtos {
             String unitNumber,
             String floor,
             long monthlyAmount,
-            boolean hasActiveTenant
+            boolean hasActiveTenant,
+            Integer bedrooms,
+            Integer bathrooms,
+            String amenities
     ) {}
 
     /** Result returned after a payment is successfully initiated. */

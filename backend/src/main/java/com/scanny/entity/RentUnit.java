@@ -69,6 +69,18 @@ public class RentUnit {
     @Column(name = "grace_period_days", nullable = false)
     private int gracePeriodDays = 0;
 
+    /** Number of bedrooms in this unit (0 for studios, etc.). */
+    @Column(name = "bedrooms")
+    private Integer bedrooms;
+
+    /** Number of bathrooms in this unit. */
+    @Column(name = "bathrooms")
+    private Integer bathrooms;
+
+    /** Comma-separated amenities or JSON list (WiFi, AC, Parking, Furnished, etc.). */
+    @Column(name = "amenities", length = 1000)
+    private String amenities;
+
     @OneToMany(mappedBy = "unit", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("createdAt DESC")
     private List<RentTenant> tenants = new ArrayList<>();
@@ -119,6 +131,15 @@ public class RentUnit {
 
     public List<RentTenant> getTenants()         { return tenants; }
     public void setTenants(List<RentTenant> t)   { this.tenants = t; }
+
+    public Integer getBedrooms()                 { return bedrooms; }
+    public void setBedrooms(Integer b)           { this.bedrooms = b; }
+
+    public Integer getBathrooms()                { return bathrooms; }
+    public void setBathrooms(Integer b)          { this.bathrooms = b; }
+
+    public String getAmenities()                 { return amenities; }
+    public void setAmenities(String a)           { this.amenities = a; }
 
     public Instant getCreatedAt()                { return createdAt; }
     public void setCreatedAt(Instant t)          { this.createdAt = t; }

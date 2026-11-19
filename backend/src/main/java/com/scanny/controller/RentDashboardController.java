@@ -136,9 +136,11 @@ public class RentDashboardController {
     @GetMapping("/portfolio")
     public List<RentDtos.PortfolioEntry> getPortfolio(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey) {
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String filter) {
         RentAccount account = resolveAccount(jwt, accessKey);
-        return propertyService.getPortfolio(account);
+        return propertyService.getPortfolio(account, search, filter);
     }
 
     @PostMapping("/properties")
@@ -168,8 +170,10 @@ public class RentDashboardController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @PathVariable String propertyId,
-            @RequestParam(required = false) String period) {
-        return propertyService.getPropertyDashboard(resolveAccount(jwt, accessKey), propertyId, period);
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String filter) {
+        return propertyService.getPropertyDashboard(resolveAccount(jwt, accessKey), propertyId, period, search, filter);
     }
 
     // ── Unit management ───────────────────────────────────────────────────────

@@ -61,6 +61,9 @@ export interface RentUnit {
   dueDayOfMonth: number
   /** Days after due date before charge becomes OVERDUE. */
   gracePeriodDays: number
+  bedrooms?: number | null
+  bathrooms?: number | null
+  amenities?: string | null
   qrToken: string | null
   qrCodeUrl: string | null
   activeTenant: TenantSummary | null
@@ -159,6 +162,9 @@ export interface UnitPickOption {
   floor: string
   monthlyAmount: number
   hasActiveTenant: boolean
+  bedrooms?: number | null
+  bathrooms?: number | null
+  amenities?: string | null
 }
 
 export interface InitiateRentPaymentResponse {

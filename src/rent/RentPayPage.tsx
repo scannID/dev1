@@ -308,40 +308,64 @@ export default function RentPayPage({ token }: { token: string }) {
         <header className="rp-topbar">
           <div className="rp-brand">
             <span className="rp-brand-name">{ctx.propertyName}</span>
-            <span className="rp-brand-sub">Select your unit</span>
+            <span className="rp-brand-sub">Available units</span>
           </div>
         </header>
         <div className="rp-section">
-          <p className="rp-section-heading">{ctx.units.length} unit{ctx.units.length !== 1 ? 's' : ''}</p>
+          <p className="rp-section-heading">{ctx.units.length} available unit{ctx.units.length !== 1 ? 's' : ''}</p>
+          {ctx.units.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--rp-muted)', padding: '20px 0' }}>
+              No vacant units available at the moment
+            </p>
+          )}
           {ctx.units.map((u) => (
-            <button
+            <div
               key={u.unitId}
-              type="button"
               className="rp-unit-row"
-              onClick={() => { setSelectedUnit(u); setPickingUnit(false) }}
+              style={{ 
+                flexDirection: 'column', 
+                alignItems: 'flex-start', 
+                gap: 8,
+                cursor: 'default',
+                background: 'var(--rp-card)',
+                border: '1px solid var(--rp-border)',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 12
+              }}
             >
-              <div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
-                  Unit {u.unitNumber}
-                  {u.floor ? <span style={{ fontWeight: 400, color: 'var(--rp-muted)', fontSize: 13 }}> · {u.floor}</span> : null}
-                </p>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--rp-muted)' }}>
-                  {money(u.monthlyAmount, ctx.currency)} / month
-                </p>
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
+                    Unit {u.unitNumber}
+                    {u.floor ? <span style={{ fontWeight: 400, color: 'var(--rp-muted)', fontSize: 13 }}> · {u.floor}</span> : null}
+                  </p>
+                  <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--rp-foreground)' }}>
+                    {money(u.monthlyAmount, ctx.currency)} / month
+                  </p>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 600,
-                  color: u.hasActiveTenant ? 'var(--rp-green)' : 'var(--rp-muted)',
-                  background: u.hasActiveTenant ? 'color-mix(in srgb, var(--rp-green) 12%, transparent)' : 'var(--rp-bg)',
-                  border: `1px solid ${u.hasActiveTenant ? 'color-mix(in srgb, var(--rp-green) 30%, transparent)' : 'var(--rp-border)'}`,
-                  borderRadius: 6, padding: '2px 8px',
-                }}>
-                  {u.hasActiveTenant ? 'Occupied' : 'Vacant'}
-                </span>
-                <ChevronRight size={16} color="var(--rp-muted)" />
-              </div>
-            </button>
+              {/* Unit details for vacant units */}
+              {(u.bedrooms != null || u.bathrooms != null || u.amenities) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {u.bedrooms != null && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', background: 'var(--rp-bg)', border: '1px solid var(--rp-border)', borderRadius: 6, padding: '3px 8px' }}>
+                      🛏️ {u.bedrooms} {u.bedrooms === 1 ? 'bedroom' : 'bedrooms'}
+                    </span>
+                  )}
+                  {u.bathrooms != null && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', background: 'var(--rp-bg)', border: '1px solid var(--rp-border)', borderRadius: 6, padding: '3px 8px' }}>
+                      🚿 {u.bathrooms} {u.bathrooms === 1 ? 'bathroom' : 'bathrooms'}
+                    </span>
+                  )}
+                </div>
+              )}
+              {u.amenities && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--rp-muted)', lineHeight: 1.4 }}>
+                  {u.amenities}
+                </p>
+              )}
+            </div>
           ))}
         </div>
       </div>
