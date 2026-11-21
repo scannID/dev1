@@ -181,7 +181,7 @@ export default function OccupancyDonut({ occupied, vacant, totalUnits, totalProp
         {/* Occupancy rate bar */}
         <div style={{ marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--muted-foreground)', letterSpacing: '0.08em' }}>
               Occupancy rate
             </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{pct}%</span>
@@ -198,7 +198,7 @@ export default function OccupancyDonut({ occupied, vacant, totalUnits, totalProp
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
-          <span style={{ fontSize: 10, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 500 }}>Properties</span>
+          <span style={{ fontSize: 10, color: 'var(--muted-foreground)', letterSpacing: '0.08em', fontWeight: 500 }}>Properties</span>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--foreground)' }}>{totalProperties.toLocaleString()}</span>
         </div>
       </div>

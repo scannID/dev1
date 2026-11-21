@@ -447,7 +447,7 @@ function OrderTracker({ visible: show, onComplete }: { visible: boolean; onCompl
 }
 
 /* -------------------------------------------------------------
-   Order scene — receipt ? tracker slides in from right ? ticket book
+   Order scene — receipt → tracker slides in from right → ticket book
    ------------------------------------------------------------- */
 
 type ScenePhase = 'receipt' | 'tracker' | 'tickets'
@@ -506,6 +506,64 @@ function OrderScene() {
         <DeparturesBoard onDone={handleTicketsDone} />
       </div>
 
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------
+   Hero Scene Cycler — Restaurant order → Rent ledger
+   ------------------------------------------------------------- */
+
+type HeroMode = 'restaurant' | 'rent'
+
+function HeroSceneCycler() {
+  const [mode, setMode] = useState<HeroMode>('restaurant')
+  const [key, setKey] = useState(0)
+
+  useEffect(() => {
+    // Show restaurant scene for ~12 seconds, then switch to rent for ~8 seconds
+    const timer = setTimeout(() => {
+      if (mode === 'restaurant') {
+        setMode('rent')
+        setKey(k => k + 1)
+        setTimeout(() => {
+          setMode('restaurant')
+          setKey(k => k + 1)
+        }, 8000)
+      }
+    }, 12000)
+
+    return () => clearTimeout(timer)
+  }, [mode])
+
+  return (
+    <div style={{ position: 'relative', width: '100%', minHeight: 420 }}>
+      {/* Restaurant scene */}
+      <div style={{
+        position: mode === 'rent' ? 'absolute' : 'relative',
+        inset: 0,
+        opacity: mode === 'rent' ? 0 : 1,
+        transform: mode === 'rent' ? 'scale(0.95) translateY(12px)' : 'scale(1) translateY(0)',
+        transition: 'opacity 0.6s ease, transform 0.6s ease',
+        pointerEvents: mode === 'rent' ? 'none' : 'auto',
+      }}>
+        <OrderScene key={`order-${key}`} />
+      </div>
+
+      {/* Rent ledger scene */}
+      <div style={{
+        position: mode !== 'rent' ? 'absolute' : 'relative',
+        inset: 0,
+        opacity: mode === 'rent' ? 1 : 0,
+        transform: mode === 'rent' ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(12px)',
+        transition: 'opacity 0.6s ease, transform 0.6s ease',
+        pointerEvents: mode === 'rent' ? 'auto' : 'none',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <RentLedger key={`rent-${key}`} />
+      </div>
     </div>
   )
 }
@@ -1154,7 +1212,7 @@ function RentFeatureCards() {
               <div style={{
                 position: 'absolute', top: 6, left: '50%',
                 transform: `translateX(-50%) rotate(${rot[i] > 0 ? -5 : 5}deg)`,
-                width: 48, height: 16, background: `${C.stamp}44`,
+                width: 48, height: 16, background: C.stamp, opacity: 0.5,
                 boxShadow: '0 2px 4px rgba(38,32,26,0.12)', zIndex: 2, pointerEvents: 'none',
               }} />
               <div style={{
@@ -1430,7 +1488,8 @@ function FeatureCards() {
                     transform: `translateX(-50%) rotate(${rot[i] > 0 ? -5 : 5}deg)`,
                     width: 48,
                     height: 16,
-                    background: `${C.stamp}44`,
+                    background: C.stamp,
+                    opacity: 0.5,
                     boxShadow: '0 2px 4px rgba(38,32,26,0.12)',
                     zIndex: 2,
                     pointerEvents: 'none',
@@ -1673,8 +1732,8 @@ function Polaroid({ url, caption, rot }: { url: string; caption: string; rot: nu
           transform: `translateX(-50%) rotate(${rot > 0 ? -6 : 6}deg)`,
           width: 56,
           height: 20,
-          background: `${C.stamp}55`,
-          opacity: 0.8,
+          background: C.stamp,
+          opacity: 0.5,
           boxShadow: '0 2px 4px rgba(38,32,26,0.15)',
         }}
       />
@@ -2327,7 +2386,7 @@ export default function KodteLandingTicket({
 
             <div className="kodte-scene-wrap">
               <div className="kodte-scene-inner">
-                <OrderScene />
+                <HeroSceneCycler />
               </div>
             </div>
           </div>

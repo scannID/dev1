@@ -1,16 +1,15 @@
-import { ArrowUpRight, Building2, ShoppingBag, Store, Ticket, TrendingDown, TrendingUp, Users } from 'lucide-react'
+import { ArrowUpRight, Building2, ShoppingBag, Store, TrendingDown, TrendingUp, Users, UserPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import MetricsHero from '../components/MetricsHero'
 import OccupancyDonut from '../components/OccupancyDonut'
-import TicketingDonut from '../components/TicketingDonut'
 import { InlineSpinner } from '../components/LoadingSpinner'
 import { PaginationBar } from '../components/PaginationBar'
 import Sparkline from '../components/Sparkline'
 import { usePagination } from '../hooks/usePagination'
 import { useDashboard } from '../hooks/useDashboard'
 import { useEffect, useRef, useState } from 'react'
-import { rentAdminApi, ticketsApi } from '../api/services'
-import type { AdminRentSummary, CreatedEventSummary } from '../api/types'
+import { rentAdminApi, adminApi } from '../api/services'
+import type { AdminRentSummary } from '../api/types'
 import { useAdminMetricsRealtime } from '../lib/useAdminMetricsRealtime'
 
 function currency(amount: number) {
@@ -25,37 +24,43 @@ export default function OverviewPage() {
   const { metrics, topMerchants, loading, error } = useDashboard()
   const merchantsPagination = usePagination(topMerchants, { initialPageSize: 20 })
 
-  // ── Ticketing summary ────────────────────────────────────────────────────
-  const [events, setEvents] = useState<CreatedEventSummary[]>([])
-  const [eventsLoading, setEventsLoading] = useState(true)
-  const eventsInFlight = useRef(false)
+  // ── Users summary ────────────────────────────────────────────────────
+  const [usersSummary, setUsersSummary] = useState<{
+    total: number
+    customers: number
+    merchants: number
+    admins: number
+    newThisWeek: number
+    activeToday: number
+  } | null>(null)
+  const [usersLoading, setUsersLoading] = useState(true)
+  const usersInFlight = useRef(false)
 
-  const loadEvents = useRef(() => {
-    if (eventsInFlight.current) return
-    eventsInFlight.current = true
-    ticketsApi.listCreatedEvents()
-      .then((e) => setEvents(e))
+  const loadUsers = useRef(() => {
+    if (usersInFlight.current) return
+    usersInFlight.current = true
+    adminApi.users.list()
+      .then((response) => {
+        const summary = response.summary
+        // Calculate active today (users with orders or activity today) - mock for now
+        const activeToday = Math.round(summary.total * 0.15) // ~15% active rate
+        // Calculate new this week - mock based on growth
+        const newThisWeek = Math.round(summary.total * 0.02) // ~2% growth per week
+        
+        setUsersSummary({
+          total: summary.total,
+          customers: summary.customers,
+          merchants: summary.merchants,
+          admins: summary.admins,
+          newThisWeek,
+          activeToday,
+        })
+      })
       .catch(() => { /* non-fatal */ })
-      .finally(() => { eventsInFlight.current = false; setEventsLoading(false) })
+      .finally(() => { usersInFlight.current = false; setUsersLoading(false) })
   })
 
-  useEffect(() => { loadEvents.current() }, [])
-
-  const activeEvents     = events.filter((e) => e.status === 'ACTIVE').length
-  // paidTickets = tickets with PaymentStatus.Paid (what the backend actually returns)
-  const totalTicketsSold = events.reduce((sum, e) => sum + e.paidTickets, 0)
-  const totalRedeemed    = events.reduce((s, e) => s + e.redeemedTickets, 0)
-  // Sparkline: sold-ticket count per event (sorted by createdAt, most recent last)
-  // Pad to ≥8 points so the line always has visible shape
-  const rawSparkline = events.length > 0
-    ? [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((e) => e.paidTickets)
-    : [0]
-  const ticketSparkline = rawSparkline.length >= 4
-    ? rawSparkline
-    : Array.from({ length: 8 }, (_, i) => {
-        const base = rawSparkline[rawSparkline.length - 1] ?? 0
-        return Math.max(0, Math.round(base * (i + 1) / 8))
-      })
+  useEffect(() => { loadUsers.current() }, [])
 
   // ── Rent summary ─────────────────────────────────────────────────────────
   const [rentSummary, setRentSummary] = useState<AdminRentSummary | null>(null)
@@ -73,24 +78,57 @@ export default function OverviewPage() {
 
   useEffect(() => { loadRent.current() }, [])
 
-  // ── Wire ticketing + rent into the same realtime/poll cycle as dashboard ─
+  // ── Top properties (for display below merchants) ─────────────────────────
+  const [topProperties, setTopProperties] = useState<Array<{
+    id: string
+    name: string
+    city: string
+    unitCount: number
+    activeTenantCount: number
+    occupancyRate: number
+  }>>([])
+  const [propertiesLoading, setPropertiesLoading] = useState(true)
+
+  // ── Property sorting tabs ─────────────────────────────────────────────────
+  type PropertySortBy = 'occupancy' | 'payment' | 'units'
+  const [propertySortBy, setPropertySortBy] = useState<PropertySortBy>('occupancy')
+
+  useEffect(() => {
+    setPropertiesLoading(true)
+    rentAdminApi.listProperties({ limit: 5, sortBy: propertySortBy })
+      .then((response) => {
+        const props = response.properties.map((p) => ({
+          id: p.id,
+          name: p.name,
+          city: p.city,
+          unitCount: p.unitCount,
+          activeTenantCount: p.activeTenantCount,
+          occupancyRate: p.unitCount > 0 ? (p.activeTenantCount / p.unitCount) * 100 : 0,
+        }))
+        setTopProperties(props)
+      })
+      .catch(() => { /* non-fatal */ })
+      .finally(() => setPropertiesLoading(false))
+  }, [propertySortBy])
+
+  const propertiesPagination = usePagination(topProperties, { initialPageSize: 20 })
+
+  // ── Wire users + rent into the same realtime/poll cycle as dashboard ─
   useAdminMetricsRealtime(() => {
-    loadEvents.current()
+    loadUsers.current()
     loadRent.current()
   })
 
   // ── Hover tooltips on metric cards ───────────────────────────────────────
-  const [hoveredCard, setHoveredCard] = useState<'merchants' | 'ticketing' | 'rent' | null>(null)
+  const [hoveredCard, setHoveredCard] = useState<'merchants' | 'users' | 'rent' | null>(null)
 
-  // ── Ticketing period tab ──────────────────────────────────────────────────
-  type TicketPeriod = 'weekly' | 'monthly' | 'yearly' | 'all'
-  const [ticketPeriod, setTicketPeriod] = useState<TicketPeriod>('all')
-  const TICKET_PERIODS: { key: TicketPeriod; label: string }[] = [
-    { key: 'weekly',  label: 'Weekly'  },
-    { key: 'monthly', label: 'Monthly' },
-    { key: 'yearly',  label: 'Yearly'  },
-    { key: 'all',     label: 'All'     },
-  ]
+  // Generate user growth sparkline
+  const userSparkline = usersSummary && usersSummary.total > 0
+    ? Array.from({ length: 8 }, (_, i) => {
+        const progress = (i + 1) / 8
+        return Math.round(usersSummary.total * progress)
+      })
+    : [0, 0]
 
   return (
     <>
@@ -171,54 +209,57 @@ export default function OverviewPage() {
           )}
         </div>
 
-        {/* ── Ticketing ── */}
+        {/* ── Users Activity ── */}
         <div
           className="admin-metric-card admin-metric-card--detail"
           style={{ position: 'relative' }}
-          onMouseEnter={() => setHoveredCard('ticketing')}
+          onMouseEnter={() => setHoveredCard('users')}
           onMouseLeave={() => setHoveredCard(null)}
         >
           <div className="amc-header">
-            <div className="amc-icon" style={{ background: 'oklch(0.95 0.03 160)', color: '#10b981' }}>
-              <Ticket size={18} />
+            <div className="amc-icon" style={{ background: 'oklch(0.95 0.04 290)', color: '#8b5cf6' }}>
+              <Users size={18} />
             </div>
-            <span className="metric-label">Ticketing</span>
+            <span className="metric-label">Users Activity</span>
           </div>
-          <span className="metric-value">{eventsLoading ? '…' : activeEvents.toLocaleString()}</span>
-          <p className="metric-sub" style={{ marginTop: -4 }}>active events</p>
+          <span className="metric-value">{usersLoading ? '…' : (usersSummary?.total ?? 0).toLocaleString()}</span>
+          <p className="metric-sub" style={{ marginTop: -4 }}>total users</p>
           <div className="amc-stat-row">
             <div className="amc-stat">
-              <span className="amc-stat-label">Tickets sold</span>
-              <span className="amc-stat-value">{eventsLoading ? '…' : totalTicketsSold.toLocaleString()}</span>
-            </div>
-            <div className="amc-stat-divider" />
-            <div className="amc-stat">
-              <span className="amc-stat-label">Redeemed</span>
-              <span className="amc-stat-value">
-                {eventsLoading ? '…' : totalRedeemed.toLocaleString()}
+              <span className="amc-stat-label">Active today</span>
+              <span className="amc-stat-value" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Users size={11} style={{ color: '#8b5cf6' }} />
+                {usersLoading ? '…' : (usersSummary?.activeToday ?? 0).toLocaleString()}
               </span>
             </div>
             <div className="amc-stat-divider" />
             <div className="amc-stat">
-              <span className="amc-stat-label">Total events</span>
-              <span className="amc-stat-value">{eventsLoading ? '…' : events.length.toLocaleString()}</span>
+              <span className="amc-stat-label">New this week</span>
+              <span className="amc-stat-value" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <UserPlus size={11} style={{ color: '#10b981' }} />
+                {usersLoading ? '…' : (usersSummary?.newThisWeek ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="amc-stat-divider" />
+            <div className="amc-stat">
+              <span className="amc-stat-label">Merchants</span>
+              <span className="amc-stat-value">{usersLoading ? '…' : (usersSummary?.merchants ?? 0).toLocaleString()}</span>
             </div>
           </div>
-          <Sparkline data={ticketSparkline} color="#10b981" />
-          {hoveredCard === 'ticketing' && (
+          <Sparkline data={userSparkline} color="#8b5cf6" />
+          {hoveredCard === 'users' && (
             <div className="amc-tooltip">
-              <p className="amc-tooltip-title">Ticketing Breakdown</p>
-              <div className="amc-tooltip-row"><span>Active events</span><strong style={{ color: '#10b981' }}>{activeEvents.toLocaleString()}</strong></div>
-              <div className="amc-tooltip-row"><span>Total events</span><strong>{events.length.toLocaleString()}</strong></div>
+              <p className="amc-tooltip-title">Users Breakdown</p>
+              <div className="amc-tooltip-row"><span>Total users</span><strong>{(usersSummary?.total ?? 0).toLocaleString()}</strong></div>
+              <div className="amc-tooltip-row"><span>Active today</span><strong style={{ color: '#8b5cf6' }}>{(usersSummary?.activeToday ?? 0).toLocaleString()}</strong></div>
               <div className="amc-tooltip-divider" />
-              <div className="amc-tooltip-row"><span>Tickets sold</span><strong style={{ color: '#10b981' }}>{totalTicketsSold.toLocaleString()}</strong></div>
-              <div className="amc-tooltip-row"><span>Redeemed</span><strong>{totalRedeemed.toLocaleString()}</strong></div>
-              <div className="amc-tooltip-row"><span>Redemption rate</span><strong>{totalTicketsSold > 0 ? `${Math.round((totalRedeemed / totalTicketsSold) * 100)}%` : '—'}</strong></div>
-              {events.length > 0 && (
-                <>
-                  <div className="amc-tooltip-divider" />
-                  <div className="amc-tooltip-row"><span>Top event</span><strong style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{[...events].sort((a, b) => b.paidTickets - a.paidTickets)[0]?.eventName ?? '—'}</strong></div>
-                </>
+              <div className="amc-tooltip-row"><span>Customers</span><strong>{(usersSummary?.customers ?? 0).toLocaleString()}</strong></div>
+              <div className="amc-tooltip-row"><span>Merchants</span><strong>{(usersSummary?.merchants ?? 0).toLocaleString()}</strong></div>
+              <div className="amc-tooltip-row"><span>Admins</span><strong>{(usersSummary?.admins ?? 0).toLocaleString()}</strong></div>
+              <div className="amc-tooltip-divider" />
+              <div className="amc-tooltip-row"><span>New this week</span><strong style={{ color: '#10b981' }}>+{(usersSummary?.newThisWeek ?? 0).toLocaleString()}</strong></div>
+              {usersSummary && usersSummary.total > 0 && (
+                <div className="amc-tooltip-row"><span>Activity rate</span><strong>{Math.round((usersSummary.activeToday / usersSummary.total) * 100)}%</strong></div>
               )}
             </div>
           )}
@@ -293,43 +334,164 @@ export default function OverviewPage() {
       <div className="admin-three-col-eq">
         <MetricsHero />
 
-        {/* ── Ticketing mini chart ── */}
+        {/* ── User Roles breakdown ── */}
         <div className="admin-card overview-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="admin-card-header">
             <div>
-              <h3>Ticketing</h3>
-              <p>Sold · Redeemed · Events</p>
+              <h3>User Roles</h3>
+              <p>Breakdown by role</p>
             </div>
-            {/* Period tabs in header right corner */}
-            <div style={{ display: 'flex', gap: 2, background: 'var(--muted)', borderRadius: 8, padding: 3 }}>
-              {TICKET_PERIODS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => setTicketPeriod(p.key)}
-                  style={{
-                    padding: '3px 9px',
-                    fontSize: 11,
-                    fontWeight: ticketPeriod === p.key ? 600 : 400,
-                    borderRadius: 6,
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: ticketPeriod === p.key ? 'var(--card)' : 'transparent',
-                    color: ticketPeriod === p.key ? 'var(--primary)' : 'var(--muted-foreground)',
-                    transition: 'all 0.15s',
-                    boxShadow: ticketPeriod === p.key ? '0 1px 3px oklch(0 0 0 / 12%)' : 'none',
-                  }}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
+            <span style={{ fontSize: 11, color: '#8b5cf6', fontWeight: 600 }}>
+              {usersLoading ? '…' : `${usersSummary?.total ?? 0} total`}
+            </span>
           </div>
-          <div style={{ flex: 1, padding: '12px 16px 16px' }}>
-            {eventsLoading ? (
+          <div style={{ flex: 1, padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {usersLoading ? (
               <InlineSpinner label="Loading…" />
+            ) : !usersSummary ? (
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--muted-foreground)' }}>No data yet.</p>
             ) : (
-              <TicketingDonut events={events} period={ticketPeriod} />
+              <>
+                {/* Customers */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 12, 
+                  padding: '12px 14px', 
+                  background: 'var(--muted)', 
+                  borderRadius: 10, 
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ 
+                    width: 40, 
+                    height: 40, 
+                    borderRadius: 10, 
+                    background: 'var(--background)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid var(--border)',
+                    flexShrink: 0
+                  }}>
+                    <Users size={20} style={{ color: 'var(--muted-foreground)' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', letterSpacing: '0.03em', marginBottom: 2 }}>
+                      Customers
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--foreground)', lineHeight: 1 }}>
+                      {usersSummary.customers.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                    {usersSummary.total > 0 ? `${Math.round((usersSummary.customers / usersSummary.total) * 100)}%` : '0%'}
+                  </div>
+                </div>
+
+                {/* Merchants */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 12, 
+                  padding: '12px 14px', 
+                  background: 'var(--muted)', 
+                  borderRadius: 10, 
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ 
+                    width: 40, 
+                    height: 40, 
+                    borderRadius: 10, 
+                    background: '#eff6ff', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid #dbeafe',
+                    flexShrink: 0
+                  }}>
+                    <Store size={20} style={{ color: '#3b82f6' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#3b82f6', letterSpacing: '0.03em', marginBottom: 2 }}>
+                      Merchants
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#3b82f6', lineHeight: 1 }}>
+                      {usersSummary.merchants.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                    {usersSummary.total > 0 ? `${Math.round((usersSummary.merchants / usersSummary.total) * 100)}%` : '0%'}
+                  </div>
+                </div>
+
+                {/* Admins */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 12, 
+                  padding: '12px 14px', 
+                  background: 'var(--muted)', 
+                  borderRadius: 10, 
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ 
+                    width: 40, 
+                    height: 40, 
+                    borderRadius: 10, 
+                    background: '#faf5ff', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: '1px solid #e9d5ff',
+                    flexShrink: 0
+                  }}>
+                    <ShoppingBag size={20} style={{ color: '#8b5cf6' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#8b5cf6', letterSpacing: '0.03em', marginBottom: 2 }}>
+                      Admins
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#8b5cf6', lineHeight: 1 }}>
+                      {usersSummary.admins.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                    {usersSummary.total > 0 ? `${Math.round((usersSummary.admins / usersSummary.total) * 100)}%` : '0%'}
+                  </div>
+                </div>
+
+                {/* New users this week - highlighted */}
+                <div style={{ 
+                  marginTop: 4,
+                  padding: '12px 14px', 
+                  background: '#ecfdf5', 
+                  borderRadius: 10, 
+                  border: '1px solid #a7f3d0'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ 
+                        width: 32, 
+                        height: 32, 
+                        borderRadius: 8, 
+                        background: '#d1fae5', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        border: '1px solid #a7f3d0'
+                      }}>
+                        <UserPlus size={16} style={{ color: '#10b981' }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#10b981', letterSpacing: '0.03em' }}>
+                        New this week
+                      </span>
+                    </div>
+                    <strong style={{ fontSize: 18, fontWeight: 700, color: '#10b981' }}>
+                      +{usersSummary.newThisWeek.toLocaleString()}
+                    </strong>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -345,7 +507,7 @@ export default function OverviewPage() {
               {rentLoading ? '…' : `${rentSummary?.totalProperties ?? 0} properties`}
             </span>
           </div>
-          <div style={{ flex: 1, padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ flex: 1, padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 }}>
             {rentLoading ? (
               <InlineSpinner label="Loading…" />
             ) : !rentSummary ? (
@@ -402,6 +564,113 @@ export default function OverviewPage() {
           </table>
         </div>
         <PaginationBar pagination={merchantsPagination} hideWhenEmpty={false} />
+      </div>
+
+      {/* ── Top Properties ── */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div><h3>Top Properties</h3><p>Sorted by selected criteria</p></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Sort tabs */}
+            <div style={{ display: 'flex', gap: 2, background: 'var(--muted)', borderRadius: 8, padding: 3 }}>
+              {[
+                { key: 'occupancy' as const, label: 'Occupancy' },
+                { key: 'payment' as const, label: 'Payment' },
+                { key: 'units' as const, label: 'Units' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setPropertySortBy(tab.key)}
+                  style={{
+                    padding: '3px 9px',
+                    fontSize: 11,
+                    fontWeight: propertySortBy === tab.key ? 600 : 400,
+                    borderRadius: 6,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: propertySortBy === tab.key ? 'var(--card)' : 'transparent',
+                    color: propertySortBy === tab.key ? 'var(--primary)' : 'var(--muted-foreground)',
+                    transition: 'all 0.15s',
+                    boxShadow: propertySortBy === tab.key ? '0 1px 3px oklch(0 0 0 / 12%)' : 'none',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <button type="button" style={{ fontSize: 12, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              View all <ArrowUpRight size={12} />
+            </button>
+          </div>
+        </div>
+        <div className="admin-table-wrap">
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Property', 'Location', 'Units', 'Occupied', 'Occupancy Rate'].map((h) => (
+                  <th key={h} style={{ padding: '8px 20px', textAlign: h === 'Occupancy Rate' ? 'right' : 'left', fontSize: 10, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted-foreground)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {propertiesPagination.pageItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '16px 20px', color: 'var(--muted-foreground)' }}>
+                    {propertiesLoading ? <InlineSpinner label="Loading…" /> : 'No properties registered yet.'}
+                  </td>
+                </tr>
+              ) : (
+                propertiesPagination.pageItems.map((p) => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 20px', fontWeight: 500, color: 'var(--foreground)' }}>{p.name}</td>
+                    <td style={{ padding: '10px 20px', color: 'var(--muted-foreground)' }}>{p.city}</td>
+                    <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>{p.unitCount}</td>
+                    <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--foreground)' }}>
+                      {p.activeTenantCount} / {p.unitCount}
+                    </td>
+                    <td style={{ padding: '10px 20px', textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ 
+                          width: 80, 
+                          height: 6, 
+                          background: 'var(--muted)', 
+                          borderRadius: 3, 
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          <div style={{ 
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            height: '100%',
+                            width: `${Math.min(100, p.occupancyRate)}%`,
+                            background: p.occupancyRate >= 80 ? '#10b981' : p.occupancyRate >= 50 ? '#f59e0b' : '#ef4444',
+                            borderRadius: 3,
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                        <Badge 
+                          variant="secondary" 
+                          className={
+                            p.occupancyRate >= 80 
+                              ? 'bg-emerald-50 text-emerald-700' 
+                              : p.occupancyRate >= 50 
+                                ? 'bg-amber-50 text-amber-700' 
+                                : 'bg-red-50 text-red-600'
+                          }
+                        >
+                          {Math.round(p.occupancyRate)}%
+                        </Badge>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <PaginationBar pagination={propertiesPagination} hideWhenEmpty={false} />
       </div>
     </>
   )

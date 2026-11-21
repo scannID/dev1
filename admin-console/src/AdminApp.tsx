@@ -48,20 +48,21 @@ import { Toaster } from '@/components/ui/sonner'
 import OverviewPage from './pages/OverviewPage'
 import MerchantsPage from './pages/MerchantsPage'
 import OrdersPage from './pages/OrdersPage'
-import TicketingPage from './pages/TicketingPage'
+// Ticketing module disabled
+// import TicketingPage from './pages/TicketingPage'
 import UsersPage from './pages/UsersPage'
 import RevenuePaymentsPage from './pages/RevenuePaymentsPage'
 import CashCollectionsPage from './pages/CashCollectionsPage'
 import QRActivityPage from './pages/QRActivityPage'
 import CookieConsentPage from './pages/CookieConsentPage'
-import ReportsPage from './pages/ReportsPage'
+// import ReportsPage from './pages/ReportsPage'
 import SystemHealthPage from './pages/SystemHealthPage'
 import AuditLogPage from './pages/AuditLogPage'
 import ConfigsPage from './pages/ConfigsPage'
 import CommunicationsPage from './pages/CommunicationsPage'
 import AccountingLedgerPage from './pages/AccountingLedgerPage'
 import RestaurantsFinancialPage from './pages/RestaurantsFinancialPage'
-import TicketingFinancialPage from './pages/TicketingFinancialPage'
+// import TicketingFinancialPage from './pages/TicketingFinancialPage'
 import PropertiesFinancialPage from './pages/PropertiesFinancialPage'
 import AdminsPage from './pages/AdminsPage'
 import FunnelDropsPage from './pages/FunnelDropsPage'
@@ -230,7 +231,8 @@ export default function AdminApp({
         label: 'Accounting',
         items: [
           (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-restaurants' as const, label: 'Restaurants', icon: Building2 },
-          (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-ticketing' as const, label: 'Ticketing', icon: Ticket },
+          // Ticketing module disabled
+          // (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-ticketing' as const, label: 'Ticketing', icon: Ticket },
           (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-properties' as const, label: 'Properties', icon: Building2 },
           (isSuperAdmin || canSee('VIEW_REVENUE')) && { id: 'accounting-ledger' as const, label: 'Ledger', icon: BookOpen },
         ].filter(Boolean) as NavItem[],
@@ -250,8 +252,9 @@ export default function AdminApp({
       {
         label: 'Ticketing',
         items: [
-          canSee('VIEW_TICKETING')    && { id: 'ticketing' as const,     label: 'Events & Tickets', icon: Ticket },
-          canSee('VIEW_REPORTS')      && { id: 'reports' as const,       label: 'Reports',          icon: BarChart3 },
+          // Ticketing module disabled
+          // canSee('VIEW_TICKETING')    && { id: 'ticketing' as const,     label: 'Events & Tickets', icon: Ticket },
+          // canSee('VIEW_REPORTS')      && { id: 'reports' as const,       label: 'Reports',          icon: BarChart3 },
         ].filter(Boolean) as NavItem[],
       },
       {
@@ -475,14 +478,15 @@ export default function AdminApp({
           {view === 'overview' && <OverviewPage />}
           {view === 'merchants' && <MerchantsPage />}
           {view === 'orders' && <OrdersPage />}
-          {view === 'ticketing' && <TicketingPage />}
+          {/* Ticketing module disabled */}
+          {/* {view === 'ticketing' && <TicketingPage />} */}
           {view === 'users' && <UsersPage />}
           {view === 'communications' && <CommunicationsPage />}
           {view === 'revenue' && <RevenuePaymentsPage />}
           {view === 'cash-collections' && <CashCollectionsPage />}
           {view === 'qr-activity' && <QRActivityPage />}
           {view === 'cookie-consent' && <CookieConsentPage />}
-          {view === 'reports' && <ReportsPage />}
+          {/* {view === 'reports' && <ReportsPage />} */}
           {view === 'funnel-drops' && <FunnelDropsPage />}
           {view === 'system' && <SystemHealthPage />}
           {view === 'audit' && <AuditLogPage />}
@@ -490,7 +494,7 @@ export default function AdminApp({
           {view === 'admins' && <AdminsPage />}
           {view === 'rent-properties' && <RentPropertiesPage />}
           {view === 'accounting-restaurants' && <RestaurantsFinancialPage />}
-          {view === 'accounting-ticketing' && <TicketingFinancialPage />}
+          {/* {view === 'accounting-ticketing' && <TicketingFinancialPage />} */}
           {view === 'accounting-properties' && <PropertiesFinancialPage />}
           {view === 'accounting-ledger' && <AccountingLedgerPage />}
         </div>

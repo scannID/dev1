@@ -1,20 +1,18 @@
-import { Shield } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import MeshGradientBackground from '@/components/MeshGradientBackground'
-import CursorField from '@/components/CursorField'
+import { Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import CursorField from "@/components/CursorField";
 
 export default function AdminLogin({
   onLogin,
   error,
   busy,
 }: {
-  onLogin: () => void
-  error?: string | null
-  busy?: boolean
+  onLogin: () => void;
+  error?: string | null;
+  busy?: boolean;
 }) {
   return (
     <div className="admin-login">
-      <MeshGradientBackground />
       <CursorField />
       <div className="admin-login-card">
         <div className="admin-login-brand">
@@ -40,7 +38,7 @@ export default function AdminLogin({
             disabled={busy}
           >
             <Shield size={16} />
-            {busy ? 'Redirecting…' : 'Sign in'}
+            {busy ? "Redirecting…" : "Sign in"}
           </Button>
         </div>
 
@@ -49,5 +47,5 @@ export default function AdminLogin({
         </p>
       </div>
     </div>
-  )
+  );
 }

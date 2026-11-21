@@ -390,11 +390,17 @@ export const rentAdminApi = {
   getAccounting: (): Promise<RentAccountingSummary> =>
     api.get<RentAccountingSummary>('/admin/rent/accounting'),
 
-  listProperties: (params?: { page?: number; limit?: number; search?: string }): Promise<AdminPropertiesResponse> => {
+  listProperties: (params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string; 
+    sortBy?: 'occupancy' | 'payment' | 'units' 
+  }): Promise<AdminPropertiesResponse> => {
     const q = new URLSearchParams()
     q.set('page',  String(params?.page  ?? 1))
     q.set('limit', String(params?.limit ?? 25))
     if (params?.search) q.set('search', params.search)
+    if (params?.sortBy) q.set('sortBy', params.sortBy)
     return api.get<AdminPropertiesResponse>(`/admin/rent/properties?${q.toString()}`)
   },
 

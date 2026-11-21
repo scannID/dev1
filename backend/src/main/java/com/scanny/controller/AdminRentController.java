@@ -12,6 +12,7 @@ import com.scanny.repository.RentUnitRepository;
 import com.scanny.service.RentPropertyService;
 import jakarta.validation.Valid;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -144,7 +145,8 @@ public class AdminRentController {
     public AdminPropertiesResponse listProperties(
             @RequestParam(defaultValue = "1")  int page,
             @RequestParam(defaultValue = "25") int limit,
-            @RequestParam(required = false)    String search) {
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    String sortBy) {
 
         int pageIndex = Math.max(0, page - 1);
         int pageSize  = Math.min(100, Math.max(1, limit));
@@ -161,6 +163,17 @@ public class AdminRentController {
                               || p.getOwnerName().toLowerCase().contains(search.toLowerCase()))
                     .toList();
 
+        // Apply sorting if requested
+        if (sortBy != null && !sortBy.isBlank()) {
+            Comparator<RentProperty> comparator = switch (sortBy.toLowerCase()) {
+                case "occupancy" -> Comparator.comparingDouble(this::calculateOccupancyRate).reversed();
+                case "payment" -> Comparator.comparingLong(this::countActiveTenants).reversed();
+                case "units" -> Comparator.<RentProperty>comparingInt(p -> p.getUnits().size()).reversed();
+                default -> Comparator.comparing(RentProperty::getName);
+            };
+            filtered = filtered.stream().sorted(comparator).toList();
+        }
+
         int total = filtered.size();
         int fromIdx = pageIndex * pageSize;
         int toIdx   = Math.min(fromIdx + pageSize, total);
@@ -172,6 +185,21 @@ public class AdminRentController {
                     .toList();
 
         return new AdminPropertiesResponse(rows, total, page, pageSize);
+    }
+
+    private double calculateOccupancyRate(RentProperty property) {
+        int totalUnits = property.getUnits().size();
+        if (totalUnits == 0) return 0.0;
+        long occupied = property.getUnits().stream()
+                .filter(u -> u.getActiveTenant() != null)
+                .count();
+        return (double) occupied / totalUnits;
+    }
+
+    private long countActiveTenants(RentProperty property) {
+        return property.getUnits().stream()
+                .filter(u -> u.getActiveTenant() != null)
+                .count();
     }
 
     public record AdminPropertiesResponse(
