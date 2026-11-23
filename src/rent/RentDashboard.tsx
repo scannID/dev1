@@ -256,7 +256,9 @@ function QRCodePanel({
           reader.onload = () => {
             setDataUrl(reader.result as string)
           }
-          reader.readAsDataURL(blob)
+          // Convert Buffer to Blob if needed (in browser, getRawData returns Blob)
+          const blobData = blob instanceof Blob ? blob : new Blob([new Uint8Array(blob)])
+          reader.readAsDataURL(blobData)
         }
       }).catch(() => {
         setGenError('Could not generate QR image')

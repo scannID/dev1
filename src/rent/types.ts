@@ -121,6 +121,7 @@ export interface TenantPayContext {
   propertyId: string
   propertyName: string
   ownerName: string
+  ownerPhone?: string | null  // TODO: Backend should add ownerMomo/ownerPhone field
   currency: string
   unitId: string | null
   unitNumber: string | null
@@ -256,6 +257,12 @@ export interface CreateUnitRequest {
   dueDayOfMonth?: number
   /** Grace period in days before charge becomes OVERDUE. Defaults to 0. */
   gracePeriodDays?: number
+  /** Number of bedrooms */
+  bedrooms?: number
+  /** Number of bathrooms */
+  bathrooms?: number
+  /** Amenities description */
+  amenities?: string
 }
 
 export interface CreateTenantRequest {

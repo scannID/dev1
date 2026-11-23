@@ -33,6 +33,13 @@ form :where(input, select, textarea)[aria-invalid='true'] {
   overflow-y: auto;
   overflow-x: hidden;
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Hide scrollbar */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.company-sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .company-sidebar.sidebar-collapsed {

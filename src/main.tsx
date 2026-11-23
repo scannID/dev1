@@ -31,6 +31,7 @@ import { clearStaffSession } from './api/client'
 import ReceiptPage from './receipt/ReceiptPage'
 import EventsDiscoveryPage from './tickets/EventsDiscoveryPage'
 import RentPayPage from './rent/RentPayPage'
+import MaintenanceRequestPage from './rent/MaintenanceRequestPage'
 import RentDashboard from './rent/RentDashboard'
 
 initThemeFromStorage()
@@ -115,6 +116,11 @@ function resolveRentPayRoute(): string | null {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+function resolveRentMaintenanceRoute(): string | null {
+  const match = window.location.pathname.match(/^\/rent\/maintenance\/([^/]+)\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 function resolveRentDashboardRoute(): boolean {
   const p = window.location.pathname
   // Matches /rent/dashboard or /rent/dashboard/<anything> (legacy key URLs still land here)
@@ -157,6 +163,7 @@ const createEventRoute = resolveCreateEventRoute()
 const gateScanRoute = resolveGateScanRoute()
 const receiptOrderId = resolveReceiptRoute()
 const rentPayToken = resolveRentPayRoute()
+const rentMaintenanceToken = resolveRentMaintenanceRoute()
 const rentDashboardRoute = resolveRentDashboardRoute()
 const isUnknownPath = resolveIsUnknownPath()
 
@@ -224,6 +231,15 @@ if (kitchenBusinessId) {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <RentPayPage token={rentPayToken} />
+    </StrictMode>,
+  )
+} else if (rentMaintenanceToken !== null) {
+  // ── /rent/maintenance/:token — tenant maintenance request page ──────────
+  document.documentElement.classList.add('cm-app')
+  applyDarkMode(false)
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <MaintenanceRequestPage token={rentMaintenanceToken} />
     </StrictMode>,
   )
 } else if (rentDashboardRoute) {

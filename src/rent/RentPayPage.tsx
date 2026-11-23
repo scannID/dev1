@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import {
-  Home, CreditCard, Receipt, Wrench, ChevronRight, ArrowLeft,
+  Home, CreditCard, Receipt, Wrench, ChevronRight, ArrowLeft, Building2,
 } from 'lucide-react'
 import { rentPublicApi } from './api'
 import type {
@@ -11,6 +11,7 @@ import type {
   MaintenanceRequest,
 } from './types'
 import TenantHome from './TenantHome'
+import VacantUnitsShowcase from './VacantUnitsShowcase'
 import './RentPayPage.css'
 
 // ── Rent loader — three bouncing icons: person → money → apartment ─────────
@@ -302,76 +303,20 @@ export default function RentPayPage({ token }: { token: string }) {
   }
 
   // ── Unit picker (property QR) ─────────────────────────────────────────────
+  // -- Unit picker (property QR) ---------------------------------------------
   if (pickingUnit) {
     return (
-      <div className="rp-page">
-        <header className="rp-topbar">
-          <div className="rp-brand">
-            <span className="rp-brand-name">{ctx.propertyName}</span>
-            <span className="rp-brand-sub">Available units</span>
-          </div>
-        </header>
-        <div className="rp-section">
-          <p className="rp-section-heading">{ctx.units.length} available unit{ctx.units.length !== 1 ? 's' : ''}</p>
-          {ctx.units.length === 0 && (
-            <p style={{ textAlign: 'center', color: 'var(--rp-muted)', padding: '20px 0' }}>
-              No vacant units available at the moment
-            </p>
-          )}
-          {ctx.units.map((u) => (
-            <div
-              key={u.unitId}
-              className="rp-unit-row"
-              style={{ 
-                flexDirection: 'column', 
-                alignItems: 'flex-start', 
-                gap: 8,
-                cursor: 'default',
-                background: 'var(--rp-card)',
-                border: '1px solid var(--rp-border)',
-                borderRadius: 12,
-                padding: 16,
-                marginBottom: 12
-              }}
-            >
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
-                    Unit {u.unitNumber}
-                    {u.floor ? <span style={{ fontWeight: 400, color: 'var(--rp-muted)', fontSize: 13 }}> · {u.floor}</span> : null}
-                  </p>
-                  <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--rp-foreground)' }}>
-                    {money(u.monthlyAmount, ctx.currency)} / month
-                  </p>
-                </div>
-              </div>
-              {/* Unit details for vacant units */}
-              {(u.bedrooms != null || u.bathrooms != null || u.amenities) && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                  {u.bedrooms != null && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', background: 'var(--rp-bg)', border: '1px solid var(--rp-border)', borderRadius: 6, padding: '3px 8px' }}>
-                      🛏️ {u.bedrooms} {u.bedrooms === 1 ? 'bedroom' : 'bedrooms'}
-                    </span>
-                  )}
-                  {u.bathrooms != null && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', background: 'var(--rp-bg)', border: '1px solid var(--rp-border)', borderRadius: 6, padding: '3px 8px' }}>
-                      🚿 {u.bathrooms} {u.bathrooms === 1 ? 'bathroom' : 'bathrooms'}
-                    </span>
-                  )}
-                </div>
-              )}
-              {u.amenities && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--rp-muted)', lineHeight: 1.4 }}>
-                  {u.amenities}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      <VacantUnitsShowcase
+        propertyName={ctx.propertyName}
+        propertyAddress={ctx.propertyName}
+        city={ctx.propertyName}
+        units={ctx.units}
+        currency={ctx.currency}
+        ownerName={ctx.ownerName}
+        ownerPhone={ctx.ownerPhone ?? undefined}
+      />
     )
   }
-
   // ── Main app ──────────────────────────────────────────────────────────────
 
   const balance = ctx.balance ?? 0

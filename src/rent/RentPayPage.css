@@ -1,6 +1,6 @@
 /* ── Tenant Pay App ─────────────────────────────────────────────────────────
    Benchmarked against CustomerApp.css — white + brand blue (#2563eb) theme.
-   ──────────────────────────────────────────────────────────────────────── */
+   ────────────────────────────────────────────────────────────────────────── */
 
 .rp-page {
   --rp-blue: #2563eb;
@@ -21,6 +21,13 @@
   font-family: 'Outfit Variable', Outfit, ui-sans-serif, system-ui, sans-serif;
   touch-action: manipulation;
   overscroll-behavior-y: contain;
+  /* Hide scrollbars */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rp-page::-webkit-scrollbar {
+  display: none;
 }
 
 html.cm-app .rp-page {

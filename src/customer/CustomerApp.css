@@ -20,6 +20,13 @@
   padding-bottom: 108px;
   touch-action: manipulation;
   overscroll-behavior-y: contain;
+  /* Hide scrollbars */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.cm-page::-webkit-scrollbar {
+  display: none;
 }
 
 .cm-app-shell {
@@ -72,6 +79,14 @@ html.cm-app body {
   --sidebar-ring: #e86a17;
   background: #ffffff;
   color: #111827;
+  /* Hide scrollbars */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.cm-app::-webkit-scrollbar,
+html.cm-app body::-webkit-scrollbar {
+  display: none;
 }
 
 html.cm-app body,
