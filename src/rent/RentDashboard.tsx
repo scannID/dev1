@@ -8,6 +8,7 @@ import { applyDarkMode, persistDarkMode, readDarkMode } from '../lib/theme'
 import { usePagination } from '../hooks/usePagination'
 import { PaginationBar } from '../components/PaginationBar'
 import { DanceLoader } from '../components/DanceLoader'
+import { DatePicker } from '../components/ui/date-picker'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import type {
   PortfolioEntry,
@@ -516,6 +517,7 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
   const [addUnitBedrooms, setAddUnitBedrooms] = useState('')
   const [addUnitBathrooms, setAddUnitBathrooms] = useState('')
   const [addUnitAmenities, setAddUnitAmenities] = useState('')
+  const [addUnitSecurityDeposit, setAddUnitSecurityDeposit] = useState(false)
   const [addingUnit, setAddingUnit] = useState(false)
   const [addUnitError, setAddUnitError] = useState<string | null>(null)
 
@@ -685,13 +687,19 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
     }
     setAddingUnit(true)
     try {
+      // Add security deposit marker to amenities if checked
+      let amenitiesStr = addUnitAmenities.trim()
+      if (addUnitSecurityDeposit && !amenitiesStr.includes('[SECURITY_DEPOSIT_REQUIRED]')) {
+        amenitiesStr = amenitiesStr ? `${amenitiesStr}, [SECURITY_DEPOSIT_REQUIRED]` : '[SECURITY_DEPOSIT_REQUIRED]'
+      }
+      
       const created = await rentDashboardApi.addUnit(propertyId, {
         unitNumber: addUnitNum.trim(),
         floor: addUnitFloor.trim() || undefined,
         monthlyAmount: monthly,
         bedrooms: addUnitBedrooms ? Number(addUnitBedrooms) : undefined,
         bathrooms: addUnitBathrooms ? Number(addUnitBathrooms) : undefined,
-        amenities: addUnitAmenities.trim() || undefined,
+        amenities: amenitiesStr || undefined,
       })
       setAddUnitNum('')
       setAddUnitFloor('')
@@ -699,6 +707,7 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
       setAddUnitBedrooms('')
       setAddUnitBathrooms('')
       setAddUnitAmenities('')
+      setAddUnitSecurityDeposit(false)
       setShowAddUnit(false)
       await load()
       // Notify parent to refresh overview
@@ -979,7 +988,7 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
               <button
                 type="button"
                 onClick={() => rentDashboardApi.downloadBulkQrPdf(propertyId, d.property.name)}
-                style={{ ...btnSecondaryStyle, fontSize: 11, padding: '6px 10px', marginTop: 10 }}
+                style={{ ...btnSecondaryStyle, marginTop: 10, width: '100%', justifyContent: 'center' }}
               >
                 Bulk PDF
               </button>
@@ -1041,6 +1050,11 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
               >
                 Export CSV
               </button>
+              {canManage && (
+                <button type="button" onClick={() => setShowAddUnit(true)} style={btnSecondaryStyle}>
+                  <Plus size={16} /> Add unit
+                </button>
+              )}
               {canManage && (
                 <button type="button" onClick={handleGenerateCharges} style={btnPrimaryStyle}>
                   Generate all charges
@@ -1108,59 +1122,6 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
                 </TableBody>
               </Table>
             </div>
-
-              {/* Add unit */}
-              {canManage && (
-                <div>
-                  {!showAddUnit ? (
-                    <button type="button" onClick={() => setShowAddUnit(true)} style={btnSecondaryStyle}>
-                      <Plus size={16} /> Add unit
-                    </button>
-                  ) : (
-                    <form
-                      onSubmit={handleAddUnit}
-                      style={{ display: 'grid', gap: 10, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: 14 }}>Add unit</strong>
-                        <button type="button" onClick={() => setShowAddUnit(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
-                          <X size={18} />
-                        </button>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Unit number *</span>
-                          <input className="scanny-input" value={addUnitNum} onChange={(e) => setAddUnitNum(e.target.value)} style={fieldInputStyle} placeholder="A1" disabled={addingUnit} />
-                        </label>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Floor</span>
-                          <input className="scanny-input" value={addUnitFloor} onChange={(e) => setAddUnitFloor(e.target.value)} style={fieldInputStyle} placeholder="Ground" disabled={addingUnit} />
-                        </label>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Monthly rent *</span>
-                          <input className="scanny-input" type="number" value={addUnitAmount} onChange={(e) => setAddUnitAmount(e.target.value)} style={fieldInputStyle} placeholder="500000" disabled={addingUnit} />
-                        </label>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Bedrooms</span>
-                          <input className="scanny-input" type="number" min="0" value={addUnitBedrooms} onChange={(e) => setAddUnitBedrooms(e.target.value)} style={fieldInputStyle} placeholder="2" disabled={addingUnit} />
-                        </label>
-                        <label style={{ display: 'grid' }}>
-                          <span style={fieldLabelStyle}>Bathrooms</span>
-                          <input className="scanny-input" type="number" min="0" value={addUnitBathrooms} onChange={(e) => setAddUnitBathrooms(e.target.value)} style={fieldInputStyle} placeholder="1" disabled={addingUnit} />
-                        </label>
-                      </div>
-                      <label style={{ display: 'grid' }}>
-                        <span style={fieldLabelStyle}>Amenities</span>
-                        <textarea className="scanny-input" value={addUnitAmenities} onChange={(e) => setAddUnitAmenities(e.target.value)} style={{...fieldInputStyle, minHeight: 60, resize: 'vertical'}} placeholder="WiFi, AC, Parking, Furnished, Balcony..." disabled={addingUnit} />
-                      </label>
-                      {addUnitError && <p className="scanny-error" style={{ fontSize: 13 }}>{addUnitError}</p>}
-                      <button type="submit" disabled={addingUnit} style={btnPrimaryStyle}>
-                        {addingUnit ? 'Adding…' : 'Add unit'}
-                      </button>
-                    </form>
-                  )}
-                </div>
-              )}
 
               {/* Recent payments */}
               {d.recentPayments.length > 0 && (
@@ -1390,6 +1351,95 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
         </div>
       )}
 
+      {/* ── Add unit modal ───────────────────────────────────────────────── */}
+      {showAddUnit && (
+        <div
+          onClick={() => setShowAddUnit(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 540,
+              background: 'var(--card)',
+              borderRadius: 16,
+              padding: 24,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            <form onSubmit={handleAddUnit} style={{ display: 'grid', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Add unit</h2>
+                <button type="button" onClick={() => setShowAddUnit(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)' }}>
+                  <X size={22} />
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Unit number *</span>
+                  <input className="scanny-input" value={addUnitNum} onChange={(e) => setAddUnitNum(e.target.value)} style={fieldInputStyle} placeholder="A1" disabled={addingUnit} required />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Floor</span>
+                  <input className="scanny-input" value={addUnitFloor} onChange={(e) => setAddUnitFloor(e.target.value)} style={fieldInputStyle} placeholder="Ground Floor" disabled={addingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Monthly rent *</span>
+                  <input className="scanny-input" type="number" value={addUnitAmount} onChange={(e) => setAddUnitAmount(e.target.value)} style={fieldInputStyle} placeholder="500000" disabled={addingUnit} required />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Bedrooms</span>
+                  <input className="scanny-input" type="number" min="0" value={addUnitBedrooms} onChange={(e) => setAddUnitBedrooms(e.target.value)} style={fieldInputStyle} placeholder="2" disabled={addingUnit} />
+                </label>
+                <label style={{ display: 'grid' }}>
+                  <span style={fieldLabelStyle}>Bathrooms</span>
+                  <input className="scanny-input" type="number" min="0" value={addUnitBathrooms} onChange={(e) => setAddUnitBathrooms(e.target.value)} style={fieldInputStyle} placeholder="1" disabled={addingUnit} />
+                </label>
+              </div>
+              <label style={{ display: 'grid' }}>
+                <span style={fieldLabelStyle}>Amenities</span>
+                <textarea className="scanny-input" value={addUnitAmenities} onChange={(e) => setAddUnitAmenities(e.target.value)} style={{...fieldInputStyle, minHeight: 70, resize: 'vertical'}} placeholder="WiFi, AC, Parking, Furnished, Balcony..." disabled={addingUnit} />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', background: addUnitSecurityDeposit ? 'rgba(234, 88, 12, 0.05)' : 'transparent' }}>
+                <input 
+                  type="checkbox" 
+                  checked={addUnitSecurityDeposit} 
+                  onChange={(e) => setAddUnitSecurityDeposit(e.target.checked)}
+                  disabled={addingUnit}
+                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary)' }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>Security Deposit Required</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted-foreground)', marginTop: 2 }}>
+                    When checked, "Security deposit required" will be shown on the vacant units page
+                  </div>
+                </div>
+              </label>
+              {addUnitError && <p className="scanny-error" style={{ fontSize: 13, margin: 0 }}>{addUnitError}</p>}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowAddUnit(false)} disabled={addingUnit} style={btnSecondaryStyle}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={addingUnit} style={btnPrimaryStyle}>
+                  {addingUnit ? 'Adding…' : 'Add unit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Edit unit modal ─────────────────────────────────────────────── */}
       {editUnit && (
         <div
@@ -1563,11 +1613,21 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
                 </label>
                 <label style={{ display: 'grid' }}>
                   <span style={fieldLabelStyle}>Move-in date</span>
-                  <input className="scanny-input" type="date" value={tenantMoveIn} onChange={(e) => setTenantMoveIn(e.target.value)} style={fieldInputStyle} disabled={tenantOpBusy} />
+                  <DatePicker 
+                    value={tenantMoveIn} 
+                    onChange={setTenantMoveIn} 
+                    disabled={tenantOpBusy}
+                    placeholder="Select move-in date"
+                  />
                 </label>
                 <label style={{ display: 'grid' }}>
                   <span style={fieldLabelStyle}>Lease end</span>
-                  <input className="scanny-input" type="date" value={tenantLeaseEnd} onChange={(e) => setTenantLeaseEnd(e.target.value)} style={fieldInputStyle} disabled={tenantOpBusy} />
+                  <DatePicker 
+                    value={tenantLeaseEnd} 
+                    onChange={setTenantLeaseEnd} 
+                    disabled={tenantOpBusy}
+                    placeholder="Select lease end date"
+                  />
                 </label>
                 <button type="submit" disabled={tenantOpBusy} style={btnPrimaryStyle}>
                   {tenantOpBusy ? 'Adding…' : 'Add tenant'}
@@ -1588,7 +1648,12 @@ function PropertyView({ propertyId, role, onBack, onDataChanged }: { propertyId:
                 </label>
                 <label style={{ display: 'grid' }}>
                   <span style={fieldLabelStyle}>Lease end</span>
-                  <input className="scanny-input" type="date" value={editTenantLeaseEnd} onChange={(e) => setEditTenantLeaseEnd(e.target.value)} style={fieldInputStyle} disabled={tenantOpBusy} />
+                  <DatePicker 
+                    value={editTenantLeaseEnd} 
+                    onChange={setEditTenantLeaseEnd} 
+                    disabled={tenantOpBusy}
+                    placeholder="Select lease end date"
+                  />
                 </label>
                 <button type="submit" disabled={tenantOpBusy} style={btnPrimaryStyle}>
                   {tenantOpBusy ? 'Saving…' : 'Save tenant'}

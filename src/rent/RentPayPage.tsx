@@ -1,18 +1,25 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from "react";
 import {
-  Home, CreditCard, Receipt, Wrench, ChevronRight, ArrowLeft, Building2,
-} from 'lucide-react'
-import { rentPublicApi } from './api'
+  Home,
+  CreditCard,
+  Receipt,
+  Wrench,
+  ChevronRight,
+  ArrowLeft,
+  Building2,
+} from "lucide-react";
+import { rentPublicApi } from "./api";
 import type {
   TenantPayContext,
   UnitPickOption,
   InitiateRentPaymentResponse,
   PaymentSummary,
   MaintenanceRequest,
-} from './types'
-import TenantHome from './TenantHome'
-import VacantUnitsShowcase from './VacantUnitsShowcase'
-import './RentPayPage.css'
+} from "./types";
+import TenantHome from "./TenantHome";
+import VacantUnitsShowcase from "./VacantUnitsShowcase";
+import PropertyViewPayment from "./PropertyViewPayment";
+import "./RentPayPage.css";
 
 // ── Rent loader — three bouncing icons: person → money → apartment ─────────
 
@@ -73,14 +80,32 @@ function RentLoader() {
       <div className="rl-icons" aria-hidden="true">
         {/* Person */}
         <div className="rl-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="7" r="4" />
             <path d="M5.5 21a8.38 8.38 0 0 1 13 0" />
           </svg>
         </div>
         {/* Money / Banknote */}
         <div className="rl-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="2" y="6" width="20" height="12" rx="2" />
             <circle cx="12" cy="12" r="2" />
             <path d="M6 12h.01M18 12h.01" />
@@ -88,7 +113,16 @@ function RentLoader() {
         </div>
         {/* Apartment / Building */}
         <div className="rl-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="4" y="2" width="16" height="20" rx="1" />
             <path d="M9 22V12h6v10" />
             <rect x="8" y="6" width="2" height="2" />
@@ -101,180 +135,246 @@ function RentLoader() {
 
       <p className="rl-label">Loading your account…</p>
     </div>
-  )
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function money(n: number, currency: string) {
-  return `${n.toLocaleString()} ${currency}`
+  return `${n.toLocaleString()} ${currency}`;
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return iso }
+    return new Date(iso).toLocaleDateString([], {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
 }
 
 function periodLabel(label: string | null) {
-  if (!label) return ''
+  if (!label) return "";
   try {
-    const [y, m] = label.split('-')
-    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString([], { month: 'long', year: 'numeric' })
-  } catch { return label }
+    const [y, m] = label.split("-");
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString([], {
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return label;
+  }
 }
 
 function statusText(s: string | null) {
   switch (s) {
-    case 'PAID': return '✓ Paid'
-    case 'OVERDUE': return '! Overdue'
-    case 'PARTIAL': return '~ Partial'
-    case 'WAIVED': return 'Waived'
-    case 'UNPAID': return 'Unpaid'
-    default: return 'No charge'
+    case "PAID":
+      return "✓ Paid";
+    case "OVERDUE":
+      return "! Overdue";
+    case "PARTIAL":
+      return "~ Partial";
+    case "WAIVED":
+      return "Waived";
+    case "UNPAID":
+      return "Unpaid";
+    default:
+      return "No charge";
   }
 }
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type Tab = 'home' | 'pay' | 'receipts' | 'maintenance'
-type PayPhase = 'form' | 'pending' | 'confirmed'
-type PayMode = 'current' | 'ahead'
+type Tab = "home" | "pay" | "receipts" | "maintenance";
+type PayPhase = "form" | "pending" | "confirmed";
+type PayMode = "current" | "ahead";
 
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function RentPayPage({ token }: { token: string }) {
   // ── Boot ────────────────────────────────────────────────────────────────
-  const [ctx, setCtx] = useState<TenantPayContext | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [booting, setBooting] = useState(true)
+  const [ctx, setCtx] = useState<TenantPayContext | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
 
   // ── Navigation ──────────────────────────────────────────────────────────
-  const [tab, setTab] = useState<Tab>('home')
-  const [selectedUnit, setSelectedUnit] = useState<UnitPickOption | null>(null)
-  const [pickingUnit, setPickingUnit] = useState(false)
+  const [tab, setTab] = useState<Tab>("home");
+  const [selectedUnit, setSelectedUnit] = useState<UnitPickOption | null>(null);
+  const [pickingUnit, setPickingUnit] = useState(false);
+  const [showPaymentGate, setShowPaymentGate] = useState(false);
+  const [hasPayedViewingFee, setHasPayedViewingFee] = useState(false);
 
   // ── Pay ─────────────────────────────────────────────────────────────────
-  const [payPhase, setPayPhase] = useState<PayPhase>('form')
-  const [payMode, setPayMode] = useState<PayMode>('current')
-  const [phone, setPhone] = useState('')
-  const [payAmount, setPayAmount] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [payResult, setPayResult] = useState<InitiateRentPaymentResponse | null>(null)
-  const [pollStatus, setPollStatus] = useState<'Pending' | 'Completed' | 'Failed'>('Pending')
+  const [payPhase, setPayPhase] = useState<PayPhase>("form");
+  const [payMode, setPayMode] = useState<PayMode>("current");
+  const [phone, setPhone] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [payResult, setPayResult] =
+    useState<InitiateRentPaymentResponse | null>(null);
+  const [pollStatus, setPollStatus] = useState<
+    "Pending" | "Completed" | "Failed"
+  >("Pending");
 
   // ── Maintenance ──────────────────────────────────────────────────────────
-  const [maintRequests, setMaintRequests] = useState<MaintenanceRequest[]>([])
-  const [maintTitle, setMaintTitle] = useState('')
-  const [maintDesc, setMaintDesc] = useState('')
-  const [maintSubmitting, setMaintSubmitting] = useState(false)
-  const [maintSuccess, setMaintSuccess] = useState(false)
-  const [maintError, setMaintError] = useState<string | null>(null)
+  const [maintRequests, setMaintRequests] = useState<MaintenanceRequest[]>([]);
+  const [maintTitle, setMaintTitle] = useState("");
+  const [maintDesc, setMaintDesc] = useState("");
+  const [maintSubmitting, setMaintSubmitting] = useState(false);
+  const [maintSuccess, setMaintSuccess] = useState(false);
+  const [maintError, setMaintError] = useState<string | null>(null);
 
   // Load context + maintenance requests
   useEffect(() => {
-    let cancelled = false
-    rentPublicApi.resolvePayContext(token)
+    let cancelled = false;
+    rentPublicApi
+      .resolvePayContext(token)
       .then((data) => {
-        if (cancelled) return
-        setCtx(data)
-        if (data.tokenType === 'property') setPickingUnit(true)
+        if (cancelled) return;
+        console.log('[RentPayPage] Context resolved:', data);
+        setCtx(data);
+        if (data.tokenType === "property") {
+          console.log('[RentPayPage] Property QR detected, showing payment gate');
+          setPickingUnit(true);
+          setShowPaymentGate(true);
+        }
       })
       .catch((err) => {
-        if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : 'QR link not found')
+        if (cancelled) return;
+        console.error('[RentPayPage] Failed to resolve context:', err);
+        setLoadError(err instanceof Error ? err.message : "QR link not found");
       })
-      .finally(() => { if (!cancelled) setBooting(false) })
+      .finally(() => {
+        if (!cancelled) setBooting(false);
+      });
     // Load existing maintenance requests from backend
-    rentPublicApi.listMyMaintenance(token)
-      .then((items) => { if (!cancelled) setMaintRequests(items) })
-      .catch(() => {}) // non-fatal
-    return () => { cancelled = true }
-  }, [token])
+    rentPublicApi
+      .listMyMaintenance(token)
+      .then((items) => {
+        if (!cancelled) setMaintRequests(items);
+      })
+      .catch(() => {}); // non-fatal
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   // ── Poll payment ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (payPhase !== 'pending' || !payResult?.transactionRef) return
-    let cancelled = false
-    let attempts = 0
+    if (payPhase !== "pending" || !payResult?.transactionRef) return;
+    let cancelled = false;
+    let attempts = 0;
     function poll() {
-      if (cancelled || attempts >= 24) return
-      attempts++
-      rentPublicApi.pollPaymentStatus(payResult!.transactionRef)
+      if (cancelled || attempts >= 24) return;
+      attempts++;
+      rentPublicApi
+        .pollPaymentStatus(payResult!.transactionRef)
         .then((s) => {
-          if (cancelled) return
-          if (s.status === 'Completed') { setPollStatus('Completed'); setPayPhase('confirmed') }
-          else if (s.status === 'Failed') { setPollStatus('Failed'); setPayPhase('confirmed') }
-          else setTimeout(poll, 5000)
+          if (cancelled) return;
+          if (s.status === "Completed") {
+            setPollStatus("Completed");
+            setPayPhase("confirmed");
+          } else if (s.status === "Failed") {
+            setPollStatus("Failed");
+            setPayPhase("confirmed");
+          } else setTimeout(poll, 5000);
         })
-        .catch(() => { if (!cancelled) setTimeout(poll, 5000) })
+        .catch(() => {
+          if (!cancelled) setTimeout(poll, 5000);
+        });
     }
-    setTimeout(poll, 5000)
-    return () => { cancelled = true }
-  }, [payPhase, payResult])
+    setTimeout(poll, 5000);
+    return () => {
+      cancelled = true;
+    };
+  }, [payPhase, payResult]);
 
   // ── Pay submit ────────────────────────────────────────────────────────────
   async function handlePay(e: FormEvent) {
-    e.preventDefault()
-    if (!ctx) return
-    setFormError(null)
-    setSubmitting(true)
-    const balance = ctx.balance ?? 0
-    let amount: number | undefined
+    e.preventDefault();
+    if (!ctx) return;
+    setFormError(null);
+    setSubmitting(true);
+    const balance = ctx.balance ?? 0;
+    let amount: number | undefined;
 
-    if (payMode === 'ahead') {
+    if (payMode === "ahead") {
       // Pay-ahead: always the full monthly rent for the next period
-      amount = ctx.totalRent ?? undefined
+      amount = ctx.totalRent ?? undefined;
     } else if (ctx.partialPaymentAllowed && payAmount.trim()) {
-      const parsed = parseInt(payAmount.replace(/,/g, ''), 10)
-      if (isNaN(parsed) || parsed <= 0) { setFormError('Enter a valid amount'); setSubmitting(false); return }
-      if (parsed > balance) { setFormError(`Cannot exceed ${money(balance, ctx.currency)}`); setSubmitting(false); return }
-      if (ctx.minPaymentAmount && parsed < ctx.minPaymentAmount) {
-        setFormError(`Minimum is ${money(ctx.minPaymentAmount, ctx.currency)}`); setSubmitting(false); return
+      const parsed = parseInt(payAmount.replace(/,/g, ""), 10);
+      if (isNaN(parsed) || parsed <= 0) {
+        setFormError("Enter a valid amount");
+        setSubmitting(false);
+        return;
       }
-      amount = parsed
+      if (parsed > balance) {
+        setFormError(`Cannot exceed ${money(balance, ctx.currency)}`);
+        setSubmitting(false);
+        return;
+      }
+      if (ctx.minPaymentAmount && parsed < ctx.minPaymentAmount) {
+        setFormError(`Minimum is ${money(ctx.minPaymentAmount, ctx.currency)}`);
+        setSubmitting(false);
+        return;
+      }
+      amount = parsed;
     }
     try {
       const res = await rentPublicApi.initiatePayment(
         token,
-        { customerPhone: phone.trim(), amount, payAhead: payMode === 'ahead' || undefined },
+        {
+          customerPhone: phone.trim(),
+          amount,
+          payAhead: payMode === "ahead" || undefined,
+        },
         selectedUnit?.unitId ?? ctx.unitId ?? undefined,
         null,
-      )
-      if (!res.success) { setFormError(res.message); return }
-      setPayResult(res)
-      setPollStatus('Pending')
-      setPayPhase('pending')
+      );
+      if (!res.success) {
+        setFormError(res.message);
+        return;
+      }
+      setPayResult(res);
+      setPollStatus("Pending");
+      setPayPhase("pending");
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not start payment')
+      setFormError(
+        err instanceof Error ? err.message : "Could not start payment",
+      );
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   // ── Maintenance submit ────────────────────────────────────────────────────
   async function handleMaintSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!maintTitle.trim()) return
-    setMaintSubmitting(true)
-    setMaintError(null)
+    e.preventDefault();
+    if (!maintTitle.trim()) return;
+    setMaintSubmitting(true);
+    setMaintError(null);
     try {
       const req = await rentPublicApi.submitMaintenance(token, {
         title: maintTitle.trim(),
         description: maintDesc.trim() || undefined,
         tenantName: ctx?.tenantFirstName ?? undefined,
-      })
-      setMaintRequests((prev) => [req, ...prev])
-      setMaintTitle('')
-      setMaintDesc('')
-      setMaintSuccess(true)
-      setTimeout(() => setMaintSuccess(false), 3000)
+      });
+      setMaintRequests((prev) => [req, ...prev]);
+      setMaintTitle("");
+      setMaintDesc("");
+      setMaintSuccess(true);
+      setTimeout(() => setMaintSuccess(false), 3000);
     } catch (err) {
-      setMaintError(err instanceof Error ? err.message : 'Could not submit request')
+      setMaintError(
+        err instanceof Error ? err.message : "Could not submit request",
+      );
     } finally {
-      setMaintSubmitting(false)
+      setMaintSubmitting(false);
     }
   }
 
@@ -282,29 +382,73 @@ export default function RentPayPage({ token }: { token: string }) {
 
   if (booting) {
     return (
-      <div className="rp-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', minHeight: '100dvh' }}>
+      <div
+        className="rp-page"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          minHeight: "100dvh",
+        }}
+      >
         <RentLoader />
       </div>
-    )
+    );
   }
 
   if (loadError || !ctx) {
     return (
-      <div className="rp-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ maxWidth: 380, textAlign: 'center' }}>
+      <div
+        className="rp-page"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <div style={{ maxWidth: 380, textAlign: "center" }}>
           <div style={{ fontSize: 42, marginBottom: 16 }}>🏚️</div>
-          <h1 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800 }}>Link unavailable</h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--rp-muted)', lineHeight: 1.6 }}>
-            {loadError ?? 'This QR code could not be found. Please scan again or contact your landlord.'}
+          <h1 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800 }}>
+            Link unavailable
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14,
+              color: "var(--rp-muted)",
+              lineHeight: 1.6,
+            }}
+          >
+            {loadError ??
+              "This QR code could not be found. Please scan again or contact your landlord."}
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   // ── Unit picker (property QR) ─────────────────────────────────────────────
-  // -- Unit picker (property QR) ---------------------------------------------
   if (pickingUnit) {
+    console.log('[RentPayPage] pickingUnit=true, showPaymentGate=', showPaymentGate, 'hasPayedViewingFee=', hasPayedViewingFee);
+    
+    // Show payment gate first for property QR scans
+    if (showPaymentGate && !hasPayedViewingFee) {
+      console.log('[RentPayPage] Rendering PropertyViewPayment');
+      return (
+        <PropertyViewPayment
+          propertyToken={token}
+          onPaymentSuccess={() => {
+            setHasPayedViewingFee(true);
+            setShowPaymentGate(false);
+          }}
+        />
+      );
+    }
+
+    console.log('[RentPayPage] Rendering VacantUnitsShowcase with', ctx.units.length, 'units');
+    // Show vacant units after payment
     return (
       <VacantUnitsShowcase
         propertyName={ctx.propertyName}
@@ -315,37 +459,50 @@ export default function RentPayPage({ token }: { token: string }) {
         ownerName={ctx.ownerName}
         ownerPhone={ctx.ownerPhone ?? undefined}
       />
-    )
+    );
   }
   // ── Main app ──────────────────────────────────────────────────────────────
 
-  const balance = ctx.balance ?? 0
-  const sc = ctx.chargeStatus
-  const isPaid = sc === 'PAID' || sc === 'WAIVED'
-  const isOverdue = sc === 'OVERDUE'
-  const unitLabel = selectedUnit?.unitNumber ?? ctx.unitNumber
-  const receipts = ctx.recentPayments ?? []
+  const balance = ctx.balance ?? 0;
+  const sc = ctx.chargeStatus;
+  const isPaid = sc === "PAID" || sc === "WAIVED";
+  const isOverdue = sc === "OVERDUE";
+  const unitLabel = selectedUnit?.unitNumber ?? ctx.unitNumber;
+  const receipts = ctx.recentPayments ?? [];
 
   // Derive status props for TenantHome
-  const statusKey: 'paid' | 'overdue' | 'partial' | 'unpaid' =
-    isPaid ? 'paid' : isOverdue ? 'overdue' : sc === 'PARTIAL' ? 'partial' : 'unpaid'
-  const statusLabel = isPaid ? '✓ Paid' : isOverdue ? '! Overdue' : sc === 'PARTIAL' ? '~ Partial' : statusText(sc)
+  const statusKey: "paid" | "overdue" | "partial" | "unpaid" = isPaid
+    ? "paid"
+    : isOverdue
+      ? "overdue"
+      : sc === "PARTIAL"
+        ? "partial"
+        : "unpaid";
+  const statusLabel = isPaid
+    ? "✓ Paid"
+    : isOverdue
+      ? "! Overdue"
+      : sc === "PARTIAL"
+        ? "~ Partial"
+        : statusText(sc);
 
   return (
     <div className="rp-page">
-
       {/* ── Topbar ── */}
       <header className="rp-topbar">
         <div className="rp-brand">
           <span className="rp-brand-name">
-            {ctx.tenantFirstName ? `Hi, ${ctx.tenantFirstName}` : ctx.propertyName}
+            {ctx.tenantFirstName
+              ? `Hi, ${ctx.tenantFirstName}`
+              : ctx.propertyName}
           </span>
           <span className="rp-brand-sub">
-            {ctx.propertyName}{unitLabel ? ` · Unit ${unitLabel}` : ''}
+            {ctx.propertyName}
+            {unitLabel ? ` · Unit ${unitLabel}` : ""}
           </span>
         </div>
         <div className="rp-topbar-actions">
-          {ctx.tokenType === 'property' && (
+          {ctx.tokenType === "property" && (
             <button
               type="button"
               className="rp-icon-btn"
@@ -355,102 +512,237 @@ export default function RentPayPage({ token }: { token: string }) {
               <ArrowLeft size={16} />
             </button>
           )}
-          <button type="button" className={`rp-icon-btn${tab === 'home' ? ' active' : ''}`} onClick={() => setTab('home')} title="Home">
+          <button
+            type="button"
+            className={`rp-icon-btn${tab === "home" ? " active" : ""}`}
+            onClick={() => setTab("home")}
+            title="Home"
+          >
             <Home size={16} />
           </button>
-          <button type="button" className={`rp-icon-btn${tab === 'pay' ? ' active' : ''}`} onClick={() => setTab('pay')} title="Pay">
+          <button
+            type="button"
+            className={`rp-icon-btn${tab === "pay" ? " active" : ""}`}
+            onClick={() => setTab("pay")}
+            title="Pay"
+          >
             <CreditCard size={16} />
           </button>
-          <button type="button" className={`rp-icon-btn${tab === 'receipts' ? ' active' : ''}`} onClick={() => setTab('receipts')} title={`${receipts.length} receipt${receipts.length !== 1 ? 's' : ''}`}>
+          <button
+            type="button"
+            className={`rp-icon-btn${tab === "receipts" ? " active" : ""}`}
+            onClick={() => setTab("receipts")}
+            title={`${receipts.length} receipt${receipts.length !== 1 ? "s" : ""}`}
+          >
             <Receipt size={16} />
-            {receipts.length > 0 && <span className="rp-badge">{receipts.length > 9 ? '9+' : receipts.length}</span>}
+            {receipts.length > 0 && (
+              <span className="rp-badge">
+                {receipts.length > 9 ? "9+" : receipts.length}
+              </span>
+            )}
           </button>
-          <button type="button" className={`rp-icon-btn${tab === 'maintenance' ? ' active' : ''}`} onClick={() => setTab('maintenance')} title="Maintenance">
+          <button
+            type="button"
+            className={`rp-icon-btn${tab === "maintenance" ? " active" : ""}`}
+            onClick={() => setTab("maintenance")}
+            title="Maintenance"
+          >
             <Wrench size={16} />
-            {maintRequests.length > 0 && <span className="rp-badge">{maintRequests.length > 9 ? '9+' : maintRequests.length}</span>}
+            {maintRequests.length > 0 && (
+              <span className="rp-badge">
+                {maintRequests.length > 9 ? "9+" : maintRequests.length}
+              </span>
+            )}
           </button>
         </div>
       </header>
 
       {/* ── Content ── */}
-      {tab === 'home' && (
+      {tab === "home" && (
         <div className="rp-section">
           <TenantHome
             ctx={ctx}
             statusKey={statusKey}
             statusLabel={statusLabel}
-            onPay={() => setTab('pay')}
-            receiptsSlot={receipts.length > 0 ? (
-              <div className="rp-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <p className="rp-section-heading" style={{ margin: 0 }}>Recent payments</p>
-                  <button type="button" onClick={() => setTab('receipts')} style={{ background: 'none', border: 'none', color: 'var(--rp-blue)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                    See all →
-                  </button>
+            onPay={() => setTab("pay")}
+            receiptsSlot={
+              receipts.length > 0 ? (
+                <div className="rp-card">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <p className="rp-section-heading" style={{ margin: 0 }}>
+                      Recent payments
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTab("receipts")}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--rp-blue)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        padding: 0,
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      See all →
+                    </button>
+                  </div>
+                  {receipts.slice(0, 3).map((p) => (
+                    <ReceiptRow
+                      key={p.transactionRef}
+                      p={p}
+                      currency={ctx.currency}
+                    />
+                  ))}
                 </div>
-                {receipts.slice(0, 3).map((p) => <ReceiptRow key={p.transactionRef} p={p} currency={ctx.currency} />)}
-              </div>
-            ) : undefined}
+              ) : undefined
+            }
           />
         </div>
       )}
 
-      {tab === 'pay' && (
+      {tab === "pay" && (
         <div className="rp-section">
-          {payPhase === 'form' && (
+          {payPhase === "form" && (
             <>
               {/* ── Header ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <button type="button" onClick={() => setTab('home')} style={{ background: 'none', border: 'none', color: 'var(--rp-muted)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 16,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setTab("home")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--rp-muted)",
+                    cursor: "pointer",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
                   <ArrowLeft size={18} />
                 </button>
                 <div>
                   <p style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
-                    {payMode === 'ahead'
+                    {payMode === "ahead"
                       ? `Pay ahead · ${money(ctx.totalRent ?? 0, ctx.currency)}`
                       : money(balance, ctx.currency)}
                   </p>
-                  <p style={{ margin: 0, fontSize: 12, color: 'var(--rp-muted)' }}>
-                    {ctx.propertyName}{unitLabel ? ` · Unit ${unitLabel}` : ''}{ctx.periodLabel ? ` · ${periodLabel(ctx.periodLabel)}` : ''}
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: "var(--rp-muted)",
+                    }}
+                  >
+                    {ctx.propertyName}
+                    {unitLabel ? ` · Unit ${unitLabel}` : ""}
+                    {ctx.periodLabel
+                      ? ` · ${periodLabel(ctx.periodLabel)}`
+                      : ""}
                   </p>
                 </div>
               </div>
 
               {/* ── Due date info banner ── */}
               {ctx.dueDate && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', borderRadius: 12, marginBottom: 14,
-                  background: isOverdue
-                    ? 'color-mix(in srgb, var(--rp-red) 10%, transparent)'
-                    : isPaid
-                    ? 'color-mix(in srgb, var(--rp-green) 8%, transparent)'
-                    : 'color-mix(in srgb, var(--rp-blue) 8%, transparent)',
-                  border: `1px solid ${isOverdue ? 'color-mix(in srgb, var(--rp-red) 25%, transparent)' : isPaid ? 'color-mix(in srgb, var(--rp-green) 25%, transparent)' : 'color-mix(in srgb, var(--rp-blue) 25%, transparent)'}`,
-                }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    marginBottom: 14,
+                    background: isOverdue
+                      ? "color-mix(in srgb, var(--rp-red) 10%, transparent)"
+                      : isPaid
+                        ? "color-mix(in srgb, var(--rp-green) 8%, transparent)"
+                        : "color-mix(in srgb, var(--rp-blue) 8%, transparent)",
+                    border: `1px solid ${isOverdue ? "color-mix(in srgb, var(--rp-red) 25%, transparent)" : isPaid ? "color-mix(in srgb, var(--rp-green) 25%, transparent)" : "color-mix(in srgb, var(--rp-blue) 25%, transparent)"}`,
+                  }}
+                >
                   <div>
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: 'var(--rp-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {isPaid ? 'Paid through' : isOverdue ? 'Was due' : 'Rent due'}
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--rp-muted)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      {isPaid
+                        ? "Paid through"
+                        : isOverdue
+                          ? "Was due"
+                          : "Rent due"}
                     </p>
-                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 800, color: isOverdue ? 'var(--rp-red)' : 'var(--rp-text)' }}>
-                      {new Date(ctx.dueDate).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
+                    <p
+                      style={{
+                        margin: "2px 0 0",
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: isOverdue ? "var(--rp-red)" : "var(--rp-text)",
+                      }}
+                    >
+                      {new Date(ctx.dueDate).toLocaleDateString([], {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
                     </p>
                   </div>
                   {ctx.daysRemaining != null && !isPaid && (
-                    <span style={{
-                      fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
-                      background: isOverdue ? 'var(--rp-red)' : ctx.daysRemaining <= 3 ? '#f59e0b' : 'var(--rp-blue)',
-                      color: '#fff',
-                    }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: isOverdue
+                          ? "var(--rp-red)"
+                          : ctx.daysRemaining <= 3
+                            ? "#f59e0b"
+                            : "var(--rp-blue)",
+                        color: "#fff",
+                      }}
+                    >
                       {ctx.daysRemaining < 0
                         ? `${Math.abs(ctx.daysRemaining)}d overdue`
                         : ctx.daysRemaining === 0
-                          ? 'due today'
+                          ? "due today"
                           : `${ctx.daysRemaining}d left`}
                     </span>
                   )}
                   {isPaid && (
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: 'var(--rp-green)', color: '#fff' }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: "var(--rp-green)",
+                        color: "#fff",
+                      }}
+                    >
                       ✓ Paid
                     </span>
                   )}
@@ -458,62 +750,146 @@ export default function RentPayPage({ token }: { token: string }) {
               )}
 
               {/* ── Pay-ahead toggle (only when current is paid or no balance) ── */}
-              {(isPaid || balance <= 0) && ctx.totalRent != null && ctx.totalRent > 0 && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPayMode('current')}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid var(--rp-border)',
-                      background: payMode === 'current' ? 'var(--rp-blue)' : 'transparent',
-                      color: payMode === 'current' ? '#fff' : 'var(--rp-muted)',
-                    }}
-                  >
-                    Current period
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPayMode('ahead')}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid var(--rp-border)',
-                      background: payMode === 'ahead' ? 'var(--rp-blue)' : 'transparent',
-                      color: payMode === 'ahead' ? '#fff' : 'var(--rp-muted)',
-                    }}
-                  >
-                    Pay ahead (next period)
-                  </button>
-                </div>
-              )}
+              {(isPaid || balance <= 0) &&
+                ctx.totalRent != null &&
+                ctx.totalRent > 0 && (
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => setPayMode("current")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        borderRadius: 10,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        border: "1px solid var(--rp-border)",
+                        background:
+                          payMode === "current"
+                            ? "var(--rp-blue)"
+                            : "transparent",
+                        color:
+                          payMode === "current" ? "#fff" : "var(--rp-muted)",
+                      }}
+                    >
+                      Current period
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPayMode("ahead")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        borderRadius: 10,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        border: "1px solid var(--rp-border)",
+                        background:
+                          payMode === "ahead"
+                            ? "var(--rp-blue)"
+                            : "transparent",
+                        color: payMode === "ahead" ? "#fff" : "var(--rp-muted)",
+                      }}
+                    >
+                      Pay ahead (next period)
+                    </button>
+                  </div>
+                )}
 
               {/* ── Already paid + no pay-ahead selected → show a confirmation ── */}
-              {isPaid && payMode === 'current' ? (
-                <div className="rp-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+              {isPaid && payMode === "current" ? (
+                <div
+                  className="rp-card"
+                  style={{ textAlign: "center", padding: "28px 20px" }}
+                >
                   <div style={{ fontSize: 44, marginBottom: 10 }}>✓</div>
-                  <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: 'var(--rp-green)' }}>You're all caught up!</h2>
-                  <p style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 800 }}>{money(ctx.totalRent ?? 0, ctx.currency)}</p>
-                  <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--rp-muted)' }}>
-                    {ctx.periodLabel ? `${periodLabel(ctx.periodLabel)} is fully paid.` : 'Rent is fully paid for this period.'}
+                  <h2
+                    style={{
+                      margin: "0 0 6px",
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "var(--rp-green)",
+                    }}
+                  >
+                    You're all caught up!
+                  </h2>
+                  <p
+                    style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800 }}
+                  >
+                    {money(ctx.totalRent ?? 0, ctx.currency)}
+                  </p>
+                  <p
+                    style={{
+                      margin: "0 0 18px",
+                      fontSize: 13,
+                      color: "var(--rp-muted)",
+                    }}
+                  >
+                    {ctx.periodLabel
+                      ? `${periodLabel(ctx.periodLabel)} is fully paid.`
+                      : "Rent is fully paid for this period."}
                   </p>
                   {ctx.dueDate && (
-                    <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--rp-muted)' }}>
-                      Next payment due:{' '}
-                      <strong style={{ color: 'var(--rp-text)' }}>
-                        {new Date(ctx.dueDate).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
+                    <p
+                      style={{
+                        margin: "0 0 18px",
+                        fontSize: 13,
+                        color: "var(--rp-muted)",
+                      }}
+                    >
+                      Next payment due:{" "}
+                      <strong style={{ color: "var(--rp-text)" }}>
+                        {new Date(ctx.dueDate).toLocaleDateString([], {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
                       </strong>
                     </p>
                   )}
-                  <button type="button" className="rp-pay-btn" onClick={() => setTab('home')}>Back to home</button>
+                  <button
+                    type="button"
+                    className="rp-pay-btn"
+                    onClick={() => setTab("home")}
+                  >
+                    Back to home
+                  </button>
                 </div>
               ) : (
                 /* ── Payment form ── */
                 <div className="rp-card">
-                  {payMode === 'ahead' && (
-                    <div style={{ padding: '10px 12px', borderRadius: 10, background: 'color-mix(in srgb, var(--rp-blue) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--rp-blue) 20%, transparent)', marginBottom: 14, fontSize: 12, color: 'var(--rp-muted)' }}>
-                      <strong style={{ color: 'var(--rp-text)' }}>Paying ahead</strong> — this covers your next rent period.
+                  {payMode === "ahead" && (
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background:
+                          "color-mix(in srgb, var(--rp-blue) 8%, transparent)",
+                        border:
+                          "1px solid color-mix(in srgb, var(--rp-blue) 20%, transparent)",
+                        marginBottom: 14,
+                        fontSize: 12,
+                        color: "var(--rp-muted)",
+                      }}
+                    >
+                      <strong style={{ color: "var(--rp-text)" }}>
+                        Paying ahead
+                      </strong>{" "}
+                      — this covers your next rent period.
                       {ctx.totalRent != null && (
-                        <span style={{ display: 'block', marginTop: 2, fontSize: 13, fontWeight: 700, color: 'var(--rp-text)' }}>
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: 2,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--rp-text)",
+                          }}
+                        >
                           Amount: {money(ctx.totalRent, ctx.currency)}
                         </span>
                       )}
@@ -523,7 +899,8 @@ export default function RentPayPage({ token }: { token: string }) {
                   <form onSubmit={handlePay} noValidate>
                     <div className="rp-field">
                       <label className="rp-label" htmlFor="rp-phone">
-                        Mobile money number <span style={{ color: 'var(--rp-red)' }}>*</span>
+                        Mobile money number{" "}
+                        <span style={{ color: "var(--rp-red)" }}>*</span>
                       </label>
                       <input
                         id="rp-phone"
@@ -537,37 +914,61 @@ export default function RentPayPage({ token }: { token: string }) {
                         disabled={submitting}
                         autoComplete="tel"
                       />
-                      <span className="rp-hint">You'll receive a MoMo prompt on this number</span>
+                      <span className="rp-hint">
+                        You'll receive a MoMo prompt on this number
+                      </span>
                     </div>
 
-                    {ctx.partialPaymentAllowed && balance > 0 && payMode === 'current' && (
-                      <div className="rp-field">
-                        <label className="rp-label" htmlFor="rp-amount">
-                          Amount{' '}
-                          <span style={{ fontWeight: 400, color: 'var(--rp-muted)' }}>
-                            (blank = full {money(balance, ctx.currency)})
-                          </span>
-                        </label>
-                        <input
-                          id="rp-amount"
-                          className="rp-input"
-                          type="number"
-                          inputMode="numeric"
-                          min={ctx.minPaymentAmount ?? 1}
-                          max={balance}
-                          value={payAmount}
-                          onChange={(e) => setPayAmount(e.target.value)}
-                          placeholder={balance.toLocaleString()}
-                          disabled={submitting}
-                        />
-                        {ctx.minPaymentAmount > 0 && (
-                          <span className="rp-hint">Minimum: {money(ctx.minPaymentAmount, ctx.currency)}</span>
-                        )}
-                      </div>
-                    )}
+                    {ctx.partialPaymentAllowed &&
+                      balance > 0 &&
+                      payMode === "current" && (
+                        <div className="rp-field">
+                          <label className="rp-label" htmlFor="rp-amount">
+                            Amount{" "}
+                            <span
+                              style={{
+                                fontWeight: 400,
+                                color: "var(--rp-muted)",
+                              }}
+                            >
+                              (blank = full {money(balance, ctx.currency)})
+                            </span>
+                          </label>
+                          <input
+                            id="rp-amount"
+                            className="rp-input"
+                            type="number"
+                            inputMode="numeric"
+                            min={ctx.minPaymentAmount ?? 1}
+                            max={balance}
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                            placeholder={balance.toLocaleString()}
+                            disabled={submitting}
+                          />
+                          {ctx.minPaymentAmount > 0 && (
+                            <span className="rp-hint">
+                              Minimum:{" "}
+                              {money(ctx.minPaymentAmount, ctx.currency)}
+                            </span>
+                          )}
+                        </div>
+                      )}
 
-                    <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--rp-bg)', marginBottom: 14, fontSize: 12, color: 'var(--rp-muted)' }}>
-                      Paying to <strong style={{ color: 'var(--rp-text)' }}>{ctx.ownerName}</strong>
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background: "var(--rp-bg)",
+                        marginBottom: 14,
+                        fontSize: 12,
+                        color: "var(--rp-muted)",
+                      }}
+                    >
+                      Paying to{" "}
+                      <strong style={{ color: "var(--rp-text)" }}>
+                        {ctx.ownerName}
+                      </strong>
                     </div>
 
                     {formError && <p className="rp-error">{formError}</p>}
@@ -575,17 +976,21 @@ export default function RentPayPage({ token }: { token: string }) {
                     <button
                       type="submit"
                       disabled={submitting || !phone.trim()}
-                      className={`rp-pay-btn${isOverdue ? ' danger' : ''}`}
+                      className={`rp-pay-btn${isOverdue ? " danger" : ""}`}
                       style={{ marginTop: 0 }}
                     >
                       <CreditCard size={17} />
                       {submitting
-                        ? 'Starting…'
-                        : payMode === 'ahead'
+                        ? "Starting…"
+                        : payMode === "ahead"
                           ? `Pay ahead ${money(ctx.totalRent ?? 0, ctx.currency)}`
                           : `Pay ${
                               payAmount.trim() && ctx.partialPaymentAllowed
-                                ? money(parseInt(payAmount.replace(/,/g, ''), 10) || 0, ctx.currency)
+                                ? money(
+                                    parseInt(payAmount.replace(/,/g, ""), 10) ||
+                                      0,
+                                    ctx.currency,
+                                  )
                                 : money(balance, ctx.currency)
                             }`}
                     </button>
@@ -595,47 +1000,153 @@ export default function RentPayPage({ token }: { token: string }) {
             </>
           )}
 
-          {payPhase === 'pending' && payResult && (
-            <div className="rp-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+          {payPhase === "pending" && payResult && (
+            <div
+              className="rp-card"
+              style={{ textAlign: "center", padding: "28px 20px" }}
+            >
               <div style={{ fontSize: 38, marginBottom: 14 }}>📱</div>
-              <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800 }}>Check your phone</h2>
-              <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--rp-muted)', lineHeight: 1.6 }}>
-                Approve the MoMo prompt to send{' '}
-                <strong style={{ color: 'var(--rp-text)' }}>{money(payResult.amount, payResult.currency)}</strong>{' '}
-                to <strong style={{ color: 'var(--rp-text)' }}>{payResult.paymentDestination}</strong>
+              <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 800 }}>
+                Check your phone
+              </h2>
+              <p
+                style={{
+                  margin: "0 0 18px",
+                  fontSize: 13,
+                  color: "var(--rp-muted)",
+                  lineHeight: 1.6,
+                }}
+              >
+                Approve the MoMo prompt to send{" "}
+                <strong style={{ color: "var(--rp-text)" }}>
+                  {money(payResult.amount, payResult.currency)}
+                </strong>{" "}
+                to{" "}
+                <strong style={{ color: "var(--rp-text)" }}>
+                  {payResult.paymentDestination}
+                </strong>
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginBottom: 14,
+                }}
+              >
                 <span className="rp-pulse-dot" />
-                <span style={{ fontSize: 13, color: 'var(--rp-muted)' }}>Waiting for confirmation…</span>
+                <span style={{ fontSize: 13, color: "var(--rp-muted)" }}>
+                  Waiting for confirmation…
+                </span>
               </div>
-              <p style={{ margin: 0, fontSize: 10, color: '#d1d5db', fontFamily: 'monospace' }}>Ref: {payResult.transactionRef}</p>
-              <p style={{ margin: '12px 0 0', fontSize: 11, color: 'var(--rp-muted)' }}>Keep this page open. It updates automatically.</p>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 10,
+                  color: "#d1d5db",
+                  fontFamily: "monospace",
+                }}
+              >
+                Ref: {payResult.transactionRef}
+              </p>
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  fontSize: 11,
+                  color: "var(--rp-muted)",
+                }}
+              >
+                Keep this page open. It updates automatically.
+              </p>
             </div>
           )}
 
-          {payPhase === 'confirmed' && payResult && (
-            <div className="rp-card" style={{ textAlign: 'center', padding: '28px 20px' }}>
-              <div className={`rp-confirm-icon ${pollStatus === 'Completed' ? 'ok' : 'fail'}`}>
-                {pollStatus === 'Completed' ? '✓' : '✗'}
+          {payPhase === "confirmed" && payResult && (
+            <div
+              className="rp-card"
+              style={{ textAlign: "center", padding: "28px 20px" }}
+            >
+              <div
+                className={`rp-confirm-icon ${pollStatus === "Completed" ? "ok" : "fail"}`}
+              >
+                {pollStatus === "Completed" ? "✓" : "✗"}
               </div>
-              <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: pollStatus === 'Completed' ? 'var(--rp-green)' : 'var(--rp-red)' }}>
-                {pollStatus === 'Completed' ? 'Rent paid!' : 'Payment failed'}
+              <h2
+                style={{
+                  margin: "0 0 6px",
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color:
+                    pollStatus === "Completed"
+                      ? "var(--rp-green)"
+                      : "var(--rp-red)",
+                }}
+              >
+                {pollStatus === "Completed" ? "Rent paid!" : "Payment failed"}
               </h2>
-              {pollStatus === 'Completed' ? (
+              {pollStatus === "Completed" ? (
                 <>
-                  <p style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800 }}>{money(payResult.amount, payResult.currency)}</p>
-                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--rp-muted)' }}>Your landlord has been notified.</p>
-                  <p style={{ margin: 0, fontSize: 10, color: '#d1d5db', fontFamily: 'monospace' }}>Ref: {payResult.transactionRef}</p>
-                  <button type="button" className="rp-pay-btn" style={{ marginTop: 18 }} onClick={() => { setTab('home'); setPayPhase('form'); setPayResult(null); setPayMode('current') }}>
+                  <p
+                    style={{ margin: "0 0 6px", fontSize: 24, fontWeight: 800 }}
+                  >
+                    {money(payResult.amount, payResult.currency)}
+                  </p>
+                  <p
+                    style={{
+                      margin: "0 0 16px",
+                      fontSize: 13,
+                      color: "var(--rp-muted)",
+                    }}
+                  >
+                    Your landlord has been notified.
+                  </p>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 10,
+                      color: "#d1d5db",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    Ref: {payResult.transactionRef}
+                  </p>
+                  <button
+                    type="button"
+                    className="rp-pay-btn"
+                    style={{ marginTop: 18 }}
+                    onClick={() => {
+                      setTab("home");
+                      setPayPhase("form");
+                      setPayResult(null);
+                      setPayMode("current");
+                    }}
+                  >
                     Back to home
                   </button>
                 </>
               ) : (
                 <>
-                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--rp-muted)', lineHeight: 1.6 }}>
+                  <p
+                    style={{
+                      margin: "0 0 16px",
+                      fontSize: 13,
+                      color: "var(--rp-muted)",
+                      lineHeight: 1.6,
+                    }}
+                  >
                     The payment did not go through. Please try again.
                   </p>
-                  <button type="button" className="rp-pay-btn danger" onClick={() => { setPayPhase('form'); setPayResult(null); setFormError(null); setPayMode('current') }}>
+                  <button
+                    type="button"
+                    className="rp-pay-btn danger"
+                    onClick={() => {
+                      setPayPhase("form");
+                      setPayResult(null);
+                      setFormError(null);
+                      setPayMode("current");
+                    }}
+                  >
                     Try again
                   </button>
                 </>
@@ -645,31 +1156,62 @@ export default function RentPayPage({ token }: { token: string }) {
         </div>
       )}
 
-      {tab === 'receipts' && (
+      {tab === "receipts" && (
         <div className="rp-section">
-          <h2 style={{ margin: '0 0 14px', fontSize: 20, fontWeight: 800 }}>Receipts</h2>
+          <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 800 }}>
+            Receipts
+          </h2>
           {receipts.length === 0 ? (
             <div className="rp-empty">
-              <Receipt size={36} style={{ opacity: 0.2, display: 'block', margin: '0 auto 12px' }} />
+              <Receipt
+                size={36}
+                style={{
+                  opacity: 0.2,
+                  display: "block",
+                  margin: "0 auto 12px",
+                }}
+              />
               <p>No payment history yet.</p>
             </div>
           ) : (
             <div className="rp-card">
-              {receipts.map((p) => <ReceiptRow key={p.transactionRef} p={p} currency={ctx.currency} full />)}
+              {receipts.map((p) => (
+                <ReceiptRow
+                  key={p.transactionRef}
+                  p={p}
+                  currency={ctx.currency}
+                  full
+                />
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {tab === 'maintenance' && (
+      {tab === "maintenance" && (
         <div className="rp-section">
-          <h2 style={{ margin: '0 0 14px', fontSize: 20, fontWeight: 800 }}>Maintenance</h2>
+          <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 800 }}>
+            Maintenance
+          </h2>
 
           {/* Request form */}
           <div className="rp-card">
             <p className="rp-section-heading">New request</p>
             {maintSuccess && (
-              <div style={{ padding: '10px 12px', borderRadius: 10, background: 'color-mix(in srgb, var(--rp-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--rp-green) 30%, transparent)', color: 'var(--rp-green)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background:
+                    "color-mix(in srgb, var(--rp-green) 12%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--rp-green) 30%, transparent)",
+                  color: "var(--rp-green)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 14,
+                }}
+              >
                 Request submitted — your landlord has been notified.
               </div>
             )}
@@ -677,7 +1219,7 @@ export default function RentPayPage({ token }: { token: string }) {
             <form onSubmit={handleMaintSubmit}>
               <div className="rp-field">
                 <label className="rp-label" htmlFor="maint-title">
-                  Issue <span style={{ color: 'var(--rp-red)' }}>*</span>
+                  Issue <span style={{ color: "var(--rp-red)" }}>*</span>
                 </label>
                 <input
                   id="maint-title"
@@ -691,7 +1233,9 @@ export default function RentPayPage({ token }: { token: string }) {
                 />
               </div>
               <div className="rp-field">
-                <label className="rp-label" htmlFor="maint-desc">Details</label>
+                <label className="rp-label" htmlFor="maint-desc">
+                  Details
+                </label>
                 <textarea
                   id="maint-desc"
                   className="rp-textarea"
@@ -708,7 +1252,7 @@ export default function RentPayPage({ token }: { token: string }) {
                 style={{ marginTop: 0 }}
               >
                 <Wrench size={16} />
-                {maintSubmitting ? 'Submitting…' : 'Submit request'}
+                {maintSubmitting ? "Submitting…" : "Submit request"}
               </button>
             </form>
           </div>
@@ -718,52 +1262,90 @@ export default function RentPayPage({ token }: { token: string }) {
             <div className="rp-card">
               <p className="rp-section-heading">Your requests</p>
               {maintRequests.map((r) => {
-                const dotCls = r.status === 'RESOLVED' ? 'resolved' : r.status === 'IN_PROGRESS' ? 'open' : 'submitted'
+                const dotCls =
+                  r.status === "RESOLVED"
+                    ? "resolved"
+                    : r.status === "IN_PROGRESS"
+                      ? "open"
+                      : "submitted";
                 return (
                   <div key={r.id} className="rp-maint-row">
                     <span className={`rp-maint-dot ${dotCls}`} />
                     <div className="rp-maint-body">
                       <p className="rp-maint-title">{r.title}</p>
-                      {r.description && <p className="rp-maint-desc">{r.description}</p>}
-                      <p className="rp-maint-desc" style={{ fontSize: 10, marginTop: 2 }}>
-                        {r.status === 'OPEN' ? 'Open' : r.status === 'IN_PROGRESS' ? 'In progress' : r.status === 'RESOLVED' ? 'Resolved' : r.status}
+                      {r.description && (
+                        <p className="rp-maint-desc">{r.description}</p>
+                      )}
+                      <p
+                        className="rp-maint-desc"
+                        style={{ fontSize: 10, marginTop: 2 }}
+                      >
+                        {r.status === "OPEN"
+                          ? "Open"
+                          : r.status === "IN_PROGRESS"
+                            ? "In progress"
+                            : r.status === "RESOLVED"
+                              ? "Resolved"
+                              : r.status}
                       </p>
                     </div>
-                    <span className="rp-maint-date">{fmtDate(r.submittedAt)}</span>
+                    <span className="rp-maint-date">
+                      {fmtDate(r.submittedAt)}
+                    </span>
                   </div>
-                )
+                );
               })}
             </div>
           )}
         </div>
       )}
-
     </div>
-  )
+  );
 }
 
 // ── Receipt row ───────────────────────────────────────────────────────────────
 
-function ReceiptRow({ p, currency, full }: { p: PaymentSummary; currency: string; full?: boolean }) {
-  const ok = p.status === 'Completed'
-  const fail = p.status === 'Failed'
-  const cls = ok ? 'ok' : fail ? 'fail' : 'pending'
-  const icon = ok ? '✓' : fail ? '✗' : '…'
-  const date = p.paidAt ?? p.createdAt
+function ReceiptRow({
+  p,
+  currency,
+  full,
+}: {
+  p: PaymentSummary;
+  currency: string;
+  full?: boolean;
+}) {
+  const ok = p.status === "Completed";
+  const fail = p.status === "Failed";
+  const cls = ok ? "ok" : fail ? "fail" : "pending";
+  const icon = ok ? "✓" : fail ? "✗" : "…";
+  const date = p.paidAt ?? p.createdAt;
   return (
     <div className="rp-receipt-row">
-      <div className={`rp-receipt-icon ${cls}`} style={{ color: ok ? 'var(--rp-green)' : fail ? 'var(--rp-red)' : 'var(--rp-amber)' }}>
+      <div
+        className={`rp-receipt-icon ${cls}`}
+        style={{
+          color: ok
+            ? "var(--rp-green)"
+            : fail
+              ? "var(--rp-red)"
+              : "var(--rp-amber)",
+        }}
+      >
         {icon}
       </div>
       <div className="rp-receipt-body">
-        <p className={`rp-receipt-amount ${cls}`}>{money(p.amount, currency)}</p>
+        <p className={`rp-receipt-amount ${cls}`}>
+          {money(p.amount, currency)}
+        </p>
         <p className="rp-receipt-meta">
           {fmtDate(date)}
-          {p.paymentMethod ? ` · ${p.paymentMethod}` : ''}
-          {fail && p.failureReason ? ` · ${p.failureReason}` : ''}
+          {p.paymentMethod ? ` · ${p.paymentMethod}` : ""}
+          {fail && p.failureReason ? ` · ${p.failureReason}` : ""}
         </p>
       </div>
-      {full && <span className="rp-receipt-ref">···{p.transactionRef.slice(-6)}</span>}
+      {full && (
+        <span className="rp-receipt-ref">···{p.transactionRef.slice(-6)}</span>
+      )}
     </div>
-  )
+  );
 }

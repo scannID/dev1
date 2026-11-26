@@ -121,7 +121,7 @@ export interface TenantPayContext {
   propertyId: string
   propertyName: string
   ownerName: string
-  ownerPhone?: string | null  // TODO: Backend should add ownerMomo/ownerPhone field
+  ownerPhone?: string | null
   currency: string
   unitId: string | null
   unitNumber: string | null

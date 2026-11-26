@@ -1,0 +1,506 @@
+/* ── Property View Payment Gate ──────────────────────────────────────────── */
+
+.pvp-page {
+  min-height: 100dvh;
+  background: linear-gradient(180deg, #fff7ed 0%, #f9fafb 100%);
+  font-family: "Outfit Variable", Outfit, ui-sans-serif, system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* Hide scrollbar */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pvp-page::-webkit-scrollbar {
+  display: none;
+}
+
+.pvp-page * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pvp-page *::-webkit-scrollbar {
+  display: none;
+}
+
+.pvp-container {
+  width: 100%;
+  max-width: 440px;
+  animation: pvp-fade-in 0.4s ease-out;
+}
+
+@keyframes pvp-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.pvp-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pvp-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.pvp-logo-animated {
+  width: 120px;
+  height: auto;
+  animation: pvp-logo-pulse 2s ease-in-out infinite;
+  filter: drop-shadow(0 4px 12px rgba(234, 88, 12, 0.2));
+}
+
+@keyframes pvp-logo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 4px 12px rgba(234, 88, 12, 0.2));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 6px 16px rgba(234, 88, 12, 0.3));
+  }
+}
+
+.pvp-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  color: #ffffff;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+.pvp-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.pvp-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+
+.pvp-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 32px 28px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.pvp-card-center {
+  text-align: center;
+}
+
+/* ── Fee Banner ───────────────────────────────────────────────────────────── */
+
+.pvp-fee-banner {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  border-radius: 12px;
+  padding: 20px 24px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.pvp-fee-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pvp-fee-amount {
+  margin: 6px 0 0;
+  font-size: 36px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+/* ── Description ──────────────────────────────────────────────────────────── */
+
+.pvp-description {
+  margin: 0 0 28px;
+  font-size: 15px;
+  color: #6b7280;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+
+.pvp-form {
+  margin-bottom: 0;
+}
+
+.pvp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pvp-field-large {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.pvp-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.pvp-label-large {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.pvp-input-wrapper {
+  position: relative;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+.pvp-input-wrapper:focus-within {
+  background: #ffffff;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.1);
+}
+
+/* ── MoMo Input Overrides ─────────────────────────────────────────────────── */
+
+.pvp-input-wrapper .momo-wrap {
+  display: block;
+  position: relative;
+}
+
+.pvp-input-wrapper .momo-input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  outline: none;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+}
+
+.pvp-input-wrapper .momo-input::placeholder {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.pvp-input-wrapper .momo-badge {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+
+.pvp-input-wrapper .momo-badge img {
+  height: 24px;
+  width: auto;
+  display: block;
+}
+
+.pvp-input-wrapper .momo-badge-mtn {
+  background: linear-gradient(135deg, #ffcc00 0%, #ffb700 100%);
+  color: #000000;
+  box-shadow: 0 2px 6px rgba(255, 204, 0, 0.3);
+}
+
+.pvp-input-wrapper .momo-badge-airtel {
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(255, 0, 0, 0.3);
+}
+
+.pvp-required {
+  color: #dc2626;
+}
+
+.pvp-hint {
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+/* ── Error ────────────────────────────────────────────────────────────────── */
+
+.pvp-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+.pvp-btn {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pvp-btn-primary {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.3);
+}
+
+.pvp-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+}
+
+.pvp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pvp-btn-secondary {
+  background: #ffffff;
+  color: #ea580c;
+  border: 2px solid #ea580c;
+}
+
+.pvp-btn-secondary:hover {
+  background: #fff7ed;
+}
+
+/* ── Benefits ─────────────────────────────────────────────────────────────── */
+
+.pvp-benefits {
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.pvp-benefits-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.pvp-benefits-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.pvp-benefits-list li {
+  position: relative;
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+.pvp-benefits-list li:last-child {
+  margin-bottom: 0;
+}
+
+.pvp-benefits-list li::before {
+  content: "✓";
+  position: absolute;
+  left: -20px;
+  color: #ea580c;
+  font-weight: 700;
+}
+
+/* ── Processing State ─────────────────────────────────────────────────────── */
+
+.pvp-processing-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+  color: #ea580c;
+  margin-bottom: 20px;
+}
+
+.pvp-spin {
+  animation: pvp-spin 1s linear infinite;
+}
+
+@keyframes pvp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pvp-status-title {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.pvp-status-desc {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.pvp-phone-display {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  font-family: ui-monospace, monospace;
+}
+
+/* ── Success State ────────────────────────────────────────────────────────── */
+
+.pvp-success-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #059669;
+  margin-bottom: 20px;
+}
+
+.pvp-status-title.pvp-success {
+  color: #059669;
+}
+
+/* ── Error State ──────────────────────────────────────────────────────────── */
+
+.pvp-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%);
+  color: #dc2626;
+  margin-bottom: 20px;
+}
+
+.pvp-status-title.pvp-error {
+  color: #dc2626;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.pvp-footer {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.pvp-footer-text {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .pvp-page {
+    padding: 16px;
+  }
+
+  .pvp-card {
+    padding: 24px 20px;
+  }
+
+  .pvp-fee-amount {
+    font-size: 28px;
+  }
+
+  .pvp-title {
+    font-size: 20px;
+  }
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .pvp-spin,
+  .pvp-container {
+    animation: none;
+  }
+}

@@ -62,6 +62,10 @@ public class PaymentIntentService {
     @Autowired @Lazy
     private RentPaymentService rentPaymentService;
 
+    /** Lazy to avoid circular dependency: PropertyViewPaymentService → PaymentGatewayService → here */
+    @Autowired @Lazy
+    private com.scanny.service.PropertyViewPaymentService propertyViewPaymentService;
+
     public PaymentIntentService(
             PaymentIntentRepository paymentIntentRepository,
             OrderService orderService,
@@ -279,6 +283,7 @@ public class PaymentIntentService {
             );
             case EVENT_PROMOTION -> promotionService.handlePaymentPaid(intent.getId());
             case RENT -> rentPaymentService.completePayment(intent.getReferenceId());
+            case PROPERTY_VIEW -> propertyViewPaymentService.completePayment(intent.getReferenceId());
             default -> logger.warn("No side-effect handler for payment context {}", intent.getContext());
         }
     }
@@ -289,6 +294,9 @@ public class PaymentIntentService {
         }
         if (intent.getContext() == PaymentContext.RENT) {
             rentPaymentService.failPayment(intent.getReferenceId(), failureReason);
+        }
+        if (intent.getContext() == PaymentContext.PROPERTY_VIEW) {
+            propertyViewPaymentService.failPayment(intent.getReferenceId(), failureReason);
         }
     }
 

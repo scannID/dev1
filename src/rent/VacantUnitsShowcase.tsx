@@ -60,7 +60,11 @@ export default function VacantUnitsShowcase({
   // Parse amenities into array
   function parseAmenities(amenities: string | null): string[] {
     if (!amenities) return []
-    return amenities.split(',').map((a) => a.trim()).filter(Boolean)
+    return amenities
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .filter((a) => a !== '[SECURITY_DEPOSIT_REQUIRED]') // Filter out the marker
   }
 
   // Calculate square footage placeholder (can be added to backend later)
@@ -85,13 +89,15 @@ export default function VacantUnitsShowcase({
             <div>
               <h1 className="vus-brand-name">{propertyName}</h1>
               {ownerPhone && (
-                <div className="vus-call-info">
-                  <Phone size={12} />
-                  <span>Call</span>
-                  <a href={`tel:${ownerPhone}`} className="vus-manager-phone">
-                    {ownerPhone}
-                  </a>
-                  <span className="vus-manager-name">({ownerName})</span>
+                <div className="vus-contact-stack">
+                  <div className="vus-call-info">
+                    <Phone size={12} />
+                    <span>Call</span>
+                    <a href={`tel:${ownerPhone}`} className="vus-manager-phone">
+                      {ownerPhone}
+                    </a>
+                  </div>
+                  <div className="vus-manager-name">{ownerName}</div>
                 </div>
               )}
             </div>
@@ -147,7 +153,9 @@ export default function VacantUnitsShowcase({
                     <div>
                       <h3 className="vus-unit-number">Unit {unit.unitNumber}</h3>
                       <p className="vus-security-deposit">
-                        ${(unit.monthlyAmount * 0.1).toLocaleString()} Security Deposit Promo Applied
+                        {unit.amenities?.includes('[SECURITY_DEPOSIT_REQUIRED]') 
+                          ? 'Security deposit inclusive'
+                          : ''}
                       </p>
                     </div>
                     <div className="vus-price-block">
@@ -227,22 +235,9 @@ export default function VacantUnitsShowcase({
         </div>
       )}
 
-      {/* ── Contact Section ── */}
-      {vacantUnits.length > 0 && ownerPhone && (
-        <div className="vus-contact-section">
-          <div className="vus-contact-card">
-            <p className="vus-contact-name">{ownerName}</p>
-            <a href={`tel:${ownerPhone}`} className="vus-contact-phone-link">
-              <Phone size={16} />
-              {ownerPhone}
-            </a>
-          </div>
-        </div>
-      )}
-
       {/* ── Footer ── */}
       <footer className="vus-footer">
-        <p className="vus-footer-text">Powered by Koddly</p>
+        <p className="vus-footer-text">Powered by Qbilabs SMC Ltd</p>
       </footer>
     </div>
   )

@@ -41,18 +41,21 @@ public class PublicRentController {
     private final RentPaymentRepository rentPaymentRepository;
     private final QrAuditService qrAuditService;
     private final QrDeviceBindingService deviceBindingService;
+    private final com.scanny.service.PropertyViewPaymentService propertyViewPaymentService;
 
     public PublicRentController(
             RentPaymentService rentPaymentService,
             RentAccountService rentAccountService,
             RentPaymentRepository rentPaymentRepository,
             QrAuditService qrAuditService,
-            QrDeviceBindingService deviceBindingService) {
+            QrDeviceBindingService deviceBindingService,
+            com.scanny.service.PropertyViewPaymentService propertyViewPaymentService) {
         this.rentPaymentService = rentPaymentService;
         this.rentAccountService = rentAccountService;
         this.rentPaymentRepository = rentPaymentRepository;
         this.qrAuditService = qrAuditService;
         this.deviceBindingService = deviceBindingService;
+        this.propertyViewPaymentService = propertyViewPaymentService;
     }
 
     /**
@@ -244,6 +247,56 @@ public class PublicRentController {
     public java.util.List<RentDtos.MaintenanceRequest> listMyMaintenance(
             @PathVariable String token) {
         return rentPaymentService.listMaintenanceByToken(token);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Property view payment endpoints
+    // ────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Check if viewer has already paid to access this property.
+     * GET /api/public/rent/property-view/{token}/access?phone=0700123456
+     */
+    @GetMapping("/property-view/{token}/access")
+    public RentDtos.PropertyViewAccessResponse checkPropertyViewAccess(
+            @PathVariable String token,
+            @RequestParam String phone) {
+        return propertyViewPaymentService.checkAccess(token, phone);
+    }
+
+    /**
+     * Initiate a property viewing payment.
+     * POST /api/public/rent/property-view/{token}
+     * Body: { "phone": "0700123456" }
+     */
+    @PostMapping("/property-view/{token}")
+    public RentDtos.InitiatePropertyViewPaymentResponse initiatePropertyViewPayment(
+            @PathVariable String token,
+            @Valid @RequestBody RentDtos.InitiatePropertyViewPaymentRequest request,
+            HttpServletRequest httpRequest) {
+        
+        try {
+            RentDtos.InitiatePropertyViewPaymentResponse response = 
+                propertyViewPaymentService.initiatePayment(token, request);
+            
+            // Audit successful payment initiation
+            qrAuditService.logSuccess(token, "PROPERTY_VIEW", "PAYMENT", httpRequest, null);
+            
+            return response;
+        } catch (ApiException e) {
+            // Audit failed payment attempt
+            qrAuditService.logDenied(token, "PROPERTY_VIEW", "PAYMENT", httpRequest, e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Get property view payment status (for frontend polling).
+     * GET /api/public/rent/property-view/payments/{ref}
+     */
+    @GetMapping("/property-view/payments/{ref}")
+    public RentDtos.PaymentStatusResponse getPropertyViewPaymentStatus(@PathVariable String ref) {
+        return propertyViewPaymentService.getPaymentStatus(ref);
     }
 
     // ────────────────────────────────────────────────────────────────────────────

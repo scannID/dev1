@@ -6,5 +6,6 @@ public enum PaymentContext {
     QUICK_PAY,
     TICKET,
     EVENT_PROMOTION,
-    RENT
+    RENT,
+    PROPERTY_VIEW
 }

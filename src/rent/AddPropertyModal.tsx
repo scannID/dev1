@@ -22,6 +22,16 @@ export default function AddPropertyModal({ onCreated, onClose }: Props) {
   const [ownerName, setOwnerName] = useState('')
   const [ownerMomo, setOwnerMomo] = useState('')
   const [ownerEmail, setOwnerEmail] = useState('')
+  
+  // Initial unit fields
+  const [unitNumber, setUnitNumber] = useState('')
+  const [unitFloor, setUnitFloor] = useState('')
+  const [monthlyRent, setMonthlyRent] = useState('')
+  const [bedrooms, setBedrooms] = useState('')
+  const [bathrooms, setBathrooms] = useState('')
+  const [amenities, setAmenities] = useState('')
+  const [securityDepositRequired, setSecurityDepositRequired] = useState(false)
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,9 +42,30 @@ export default function AddPropertyModal({ onCreated, onClose }: Props) {
     if (!name.trim()) { setError('Property name is required.'); return }
     if (!ownerName.trim()) { setError('Owner name is required.'); return }
     if (!ownerMomo.trim()) { setError('Owner MoMo number is required.'); return }
+    if (!unitNumber.trim()) { setError('Unit number is required (at least one unit).'); return }
+    if (!monthlyRent.trim() || isNaN(Number(monthlyRent))) { 
+      setError('Monthly rent is required and must be a number.'); 
+      return 
+    }
+    if (!bedrooms.trim() || isNaN(Number(bedrooms))) {
+      setError('Number of bedrooms is required.')
+      return
+    }
+    if (!bathrooms.trim() || isNaN(Number(bathrooms))) {
+      setError('Number of bathrooms is required.')
+      return
+    }
 
     setSaving(true)
+    let createdPropertyId: string | null = null
+    
     try {
+      // Create property
+      console.log('Creating property...', {
+        name: name.trim(),
+        ownerName: ownerName.trim(),
+        ownerMomo: ownerMomo.trim(),
+      })
       const property = await rentDashboardApi.createProperty({
         name: name.trim(),
         address: address.trim() || undefined,
@@ -43,9 +74,48 @@ export default function AddPropertyModal({ onCreated, onClose }: Props) {
         ownerMomo: ownerMomo.trim(),
         ownerEmail: ownerEmail.trim() || undefined,
       })
+      console.log('Property created:', property)
+      createdPropertyId = property.id
+      
+      // Create initial unit
+      const finalAmenities = securityDepositRequired 
+        ? (amenities.trim() ? amenities.trim() + ',[SECURITY_DEPOSIT_REQUIRED]' : '[SECURITY_DEPOSIT_REQUIRED]')
+        : amenities.trim() || undefined
+      
+      console.log('Creating initial unit...', {
+        propertyId: property.id,
+        unitNumber: unitNumber.trim(),
+        floor: unitFloor.trim() || undefined,
+        monthlyAmount: Number(monthlyRent),
+        bedrooms: Number(bedrooms),
+        bathrooms: Number(bathrooms),
+        amenities: finalAmenities,
+      })
+      const unit = await rentDashboardApi.addUnit(property.id, {
+        unitNumber: unitNumber.trim(),
+        floor: unitFloor.trim() || undefined,
+        monthlyAmount: Number(monthlyRent),
+        bedrooms: Number(bedrooms),
+        bathrooms: Number(bathrooms),
+        amenities: finalAmenities,
+      })
+      console.log('Unit created successfully:', unit)
+      
+      // Success - close modal and refresh
       onCreated(property)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create property')
+      console.error('Error creating property/unit:', err)
+      
+      // If property was created but unit failed, show specific error
+      if (createdPropertyId) {
+        setError(`Property created but unit creation failed: ${err instanceof Error ? err.message : 'Unknown error'}. Please add a unit manually.`)
+        // Still call onCreated to refresh the list so user can see the property
+        setTimeout(() => {
+          onCreated({ id: createdPropertyId } as any)
+        }, 2000)
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not create property')
+      }
     } finally {
       setSaving(false)
     }
@@ -141,6 +211,88 @@ export default function AddPropertyModal({ onCreated, onClose }: Props) {
             <input className="scanny-input" type="email" value={ownerEmail}
               onChange={(e) => setOwnerEmail(e.target.value)}
               placeholder="owner@email.com" disabled={saving} style={inputStyle} />
+          </label>
+
+          <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 14, marginTop: 4 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#6b7280', fontWeight: 600 }}>
+              Initial unit — at least one unit required
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+            <label style={{ display: 'grid' }}>
+              <span style={labelStyle}>Unit number <span style={{ color: '#ef4444' }}>*</span></span>
+              <input className="scanny-input" value={unitNumber} onChange={(e) => setUnitNumber(e.target.value)}
+                placeholder="e.g. A1 or 101" required disabled={saving} style={inputStyle} />
+            </label>
+
+            <label style={{ display: 'grid' }}>
+              <span style={labelStyle}>Floor</span>
+              <input className="scanny-input" value={unitFloor} onChange={(e) => setUnitFloor(e.target.value)}
+                placeholder="e.g. 1st" disabled={saving} style={inputStyle} />
+            </label>
+          </div>
+
+          <label style={{ display: 'grid' }}>
+            <span style={labelStyle}>Monthly rent <span style={{ color: '#ef4444' }}>*</span></span>
+            <input className="scanny-input" type="number" value={monthlyRent}
+              onChange={(e) => setMonthlyRent(e.target.value)}
+              placeholder="e.g. 500000" required disabled={saving} style={inputStyle} />
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <label style={{ display: 'grid' }}>
+              <span style={labelStyle}>Bedrooms <span style={{ color: '#ef4444' }}>*</span></span>
+              <input className="scanny-input" type="number" min="0" value={bedrooms}
+                onChange={(e) => setBedrooms(e.target.value)}
+                placeholder="e.g. 2" required disabled={saving} style={inputStyle} />
+            </label>
+
+            <label style={{ display: 'grid' }}>
+              <span style={labelStyle}>Bathrooms <span style={{ color: '#ef4444' }}>*</span></span>
+              <input className="scanny-input" type="number" min="0" value={bathrooms}
+                onChange={(e) => setBathrooms(e.target.value)}
+                placeholder="e.g. 1" required disabled={saving} style={inputStyle} />
+            </label>
+          </div>
+
+          <label style={{ display: 'grid' }}>
+            <span style={labelStyle}>Amenities</span>
+            <textarea 
+              className="scanny-input" 
+              value={amenities}
+              onChange={(e) => setAmenities(e.target.value)}
+              placeholder="WiFi, AC, Parking, Furnished, Balcony..." 
+              disabled={saving} 
+              style={{...inputStyle, minHeight: 70, resize: 'vertical', fontFamily: 'inherit'}} 
+            />
+          </label>
+
+          <label 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 10, 
+              padding: '12px 14px', 
+              border: '1.5px solid #e5e7eb', 
+              borderRadius: 8, 
+              cursor: 'pointer', 
+              background: securityDepositRequired ? 'rgba(234, 88, 12, 0.05)' : 'transparent' 
+            }}
+          >
+            <input 
+              type="checkbox" 
+              checked={securityDepositRequired}
+              onChange={(e) => setSecurityDepositRequired(e.target.checked)}
+              disabled={saving}
+              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#2563eb' }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Security Deposit Required <span style={{ color: '#ef4444' }}>*</span></div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                When checked, "Security deposit required" will be shown on the vacant units page
+              </div>
+            </div>
           </label>
 
           {error && <p className="scanny-error" role="alert" style={{ fontSize: 13 }}>{error}</p>}

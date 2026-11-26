@@ -196,7 +196,7 @@ public class RentPaymentService {
 
         return new RentDtos.TenantPayContext(
                 "tenant",
-                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getCurrency(),
+                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getOwnerMomo(), prop.getCurrency(),
                 unit.getId(), unit.getUnitNumber(),
                 tenant.getId(), firstName,
                 totalRent, paid, balance,
@@ -265,7 +265,7 @@ public class RentPaymentService {
 
         return new RentDtos.TenantPayContext(
                 "unit",
-                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getCurrency(),
+                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getOwnerMomo(), prop.getCurrency(),
                 unit.getId(), unit.getUnitNumber(),
                 tenant != null ? tenant.getId() : null,
                 firstName,
@@ -295,7 +295,7 @@ public class RentPaymentService {
         // No unit selected yet — balance/days fields are null at property level
         return new RentDtos.TenantPayContext(
                 "property",
-                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getCurrency(),
+                prop.getId(), prop.getName(), prop.getOwnerName(), prop.getOwnerMomo(), prop.getCurrency(),
                 null, null, null, null,
                 null, null, null,
                 currentPeriod(), null, null, null,

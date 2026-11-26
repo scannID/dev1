@@ -202,6 +202,43 @@ export const rentPublicApi = {
    */
   pollPaymentStatus: (ref: string): Promise<PaymentStatusResponse> =>
     get(`/public/rent/payments/${encodeURIComponent(ref)}`),
+
+  // ── Property view payment endpoints ──────────────────────────────────────
+
+  /**
+   * Check if viewer has already paid to access this property.
+   */
+  checkPropertyViewAccess: (token: string, phone: string): Promise<{
+    hasAccess: boolean
+    message: string
+    paidAt: string | null
+    expiresAt: string | null
+  }> => {
+    const params = new URLSearchParams({ phone })
+    return get(`/public/rent/property-view/${encodeURIComponent(token)}/access?${params}`)
+  },
+
+  /**
+   * Initiate a property viewing payment (2000 UGX fee before showing vacant units).
+   */
+  initiatePropertyViewPayment: (
+    token: string,
+    req: { phone: string },
+  ): Promise<{
+    success: boolean
+    message: string
+    transactionRef: string
+    paymentId: string | null
+    amount: number
+    currency: string
+  }> =>
+    post(`/public/rent/property-view/${encodeURIComponent(token)}`, req),
+
+  /**
+   * Poll property view payment status.
+   */
+  pollPropertyViewPaymentStatus: (ref: string): Promise<PaymentStatusResponse> =>
+    get(`/public/rent/property-view/payments/${encodeURIComponent(ref)}`),
 }
 
 // ── Dashboard endpoints (require access key) ──────────────────────────────────

@@ -451,6 +451,8 @@ public final class RentDtos {
             String propertyId,
             String propertyName,
             String ownerName,
+            /** Owner's MoMo/phone number for contact purposes. */
+            String ownerPhone,
             String currency,
             /** Non-null when token resolves to a specific unit. */
             String unitId,
@@ -557,6 +559,40 @@ public final class RentDtos {
                     p.getFailureReason());
         }
     }
+
+    // ── Property view payment DTOs ─────────────────────────────────────────────
+
+    /**
+     * Request to initiate a property viewing payment.
+     */
+    public record InitiatePropertyViewPaymentRequest(
+            @jakarta.validation.constraints.NotBlank(message = "Phone number is required")
+            String phone
+    ) {}
+
+    /**
+     * Response after initiating a property viewing payment.
+     */
+    public record InitiatePropertyViewPaymentResponse(
+            boolean success,
+            String message,
+            String transactionRef,
+            String paymentId,
+            long amount,
+            String currency
+    ) {}
+
+    /**
+     * Check if viewer has already paid for this property.
+     */
+    public record PropertyViewAccessResponse(
+            boolean hasAccess,
+            String message,
+            java.time.Instant paidAt,
+            java.time.Instant expiresAt
+    ) {}
+
+    // ──────────────────────────────────────────────────────────────────────────
 
     /**
      * Full property dashboard: units with current-period charges,
